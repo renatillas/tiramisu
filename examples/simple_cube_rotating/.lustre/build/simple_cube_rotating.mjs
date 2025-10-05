@@ -1,0 +1,1 @@
+import { main } from '../../build/dev/javascript/simple_cube_rotating/simple_cube_rotating.mjs'; main();

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gleam test:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:hexdocs.pm)",
+      "Read(//Users/renata-amutio/Projects/renatillas/tiramisu_dev_tools/**)",
+      "Bash(gleam build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

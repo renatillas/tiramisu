@@ -1,0 +1,121 @@
+# Tiramisu - Gleam Game Engine
+
+## Gleam Language Overview
+
+### Core Features
+- **Static Type System**: Expressive type system catching bugs at compile time
+- **Dual Compilation**: Compiles to both Erlang (BEAM) and JavaScript
+- **Functional Programming**: Everything is immutable, algebraic data types (ADTs)
+- **Integrated Tooling**: Single binary with compiler, build tool, package manager, formatter, LSP
+- **JavaScript FFI**: Seamless interop with JavaScript/TypeScript with generated .d.ts files
+- **Concurrency**: Actor-based on BEAM; Promise-based when targeting JavaScript
+- **Human-Readable Output**: Generated JS code is readable and pretty-printed
+
+### Key Strengths for Game Development
+1. **Type Safety**: Eliminates entire classes of runtime errors
+2. **Immutability**: Predictable game state management, easier debugging
+3. **JavaScript Target**: Direct browser execution without runtime overhead
+4. **FFI Support**: Can leverage existing Canvas/WebGL JavaScript libraries
+5. **Pattern Matching**: Excellent for game state machines and entity systems
+6. **Small Bundle Size**: No additional runtime for JS target
+
+### Limitations & Constraints
+
+#### Language Limitations
+- **No Type Classes**: Simplified type system (no higher-kinded types)
+- **No Native Mutation**: All data structures immutable (must use actors or JS FFI)
+- **Limited Metaprogramming**: Minimal compile-time code generation
+- **Impure Functional**: Allows side effects (not purely functional like Haskell)
+- **No Hot Code Reloading**: Available but without type safety guarantees
+
+#### Ecosystem Limitations
+- **Young Language**: Small core team, ~6 years old
+- **Limited Standard Library**: Only 19 modules, no built-in filesystem access
+- **Small Package Ecosystem**: Far fewer libraries than JS/TypeScript
+- **No Game Development Libraries**: Essentially zero existing game engines/frameworks
+- **Setup Complexity**: Requires Erlang toolchain even for JS-only projects
+- **Limited Documentation**: Sparse examples for advanced use cases
+
+#### Performance Considerations
+- **Immutability Overhead**: Potential GC pressure from structural sharing
+- **No SIMD**: Can't directly use hardware acceleration features
+- **FFI Boundary Costs**: Crossing JS FFI has overhead for hot paths
+- **No WebAssembly Target**: Limited to JS performance characteristics
+
+### Web Development Context
+- **Lustre Framework**: Elm-like web framework (React-based), not game-focused
+- **No Canvas/WebGL Libraries**: Must use JavaScript FFI for graphics
+- **Promise-Based Concurrency**: Standard JS async model on browser target
+- **TypeScript Definitions**: Generated for all Gleam code
+
+## Game Engine Architecture Strategy
+
+### Approach
+Build a **type-safe, powerful game engine** that:
+1. Leverages Gleam's type safety for game logic
+2. Uses Three.js via FFI for production-ready 3D/2D rendering
+3. Provides functional APIs for game state management
+4. Wraps Three.js in type-safe Gleam abstractions
+
+### Why Three.js over Canvas 2D?
+
+#### Advantages
+- **WebGL Performance**: Hardware-accelerated rendering out of the box
+- **3D Capabilities**: Full 3D support with option for 2D games (orthographic camera)
+- **Production Ready**: Mature, battle-tested library used in real games
+- **Rich Features**: Built-in scene graph, materials, lighting, shadows, post-processing
+- **Active Ecosystem**: Large community, extensive documentation, frequent updates
+- **Cross-Platform**: Consistent performance across devices
+- **Geometry Instancing**: Efficient rendering of many similar objects
+- **Asset Pipeline**: Built-in loaders for various formats (GLTF, FBX, textures)
+
+#### Tradeoffs
+- **Larger Bundle**: ~600KB minified (vs minimal Canvas 2D)
+- **Learning Curve**: More complex API surface to wrap
+- **Overkill for Simple 2D**: Canvas 2D sufficient for basic pixel games
+- **FFI Surface Area**: More JavaScript interop points
+
+#### Decision
+Three.js provides a **professional foundation** that:
+- Scales from 2D to 3D games
+- Handles WebGL complexity
+- Offers production-grade performance
+- Reduces need for custom rendering code
+- Still maintains type safety through Gleam wrappers
+
+### Design Principles
+- **Hybrid Approach**: Pure Gleam for game logic, Three.js FFI for rendering
+- **Entity-Component Pattern**: Functional implementation using records and modules
+- **Immutable Game State**: Single source of truth updated functionally
+- **Type-Safe Three.js Wrappers**: Opaque types wrapping Three.js objects
+- **Thin FFI Layer**: Minimal overhead between Gleam and Three.js
+- **Scene Graph Integration**: Leverage Three.js scene graph with functional updates
+
+### Target Features
+1. Core loop (update/render cycle)
+2. Input handling (keyboard, mouse, touch)
+3. 3D rendering (Three.js WebGL via FFI)
+4. 2D sprite support (orthographic camera + planes)
+5. Scene/entity management (integrate with Three.js scene graph)
+6. Basic physics (collision detection, raycasting)
+7. Asset loading (models, textures, audio via Three.js loaders)
+8. Animation system (Three.js AnimationMixer + custom)
+9. Camera controls (orbital, first-person, 2D)
+10. Lighting and materials
+11. Post-processing effects
+
+### Non-Goals (Initially)
+- Custom WebGL shaders (use Three.js built-ins first)
+- Advanced physics engine (integrate with Rapier later)
+- Networking/multiplayer
+- Level editors
+- Mobile-specific optimizations
+- VR/AR support
+
+## Technology Stack
+- **Language**: Gleam (targeting JavaScript)
+- **Rendering**: Three.js (WebGL) via FFI
+- **Build Tool**: Gleam's built-in tooling + Vite for bundling
+- **Type Safety**: Gleam's type system + opaque types for Three.js objects
+- **Testing**: Gleam's built-in test framework
+- **Future Physics**: Rapier physics engine (WASM)
