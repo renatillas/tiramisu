@@ -1,20 +1,14 @@
-/// Example demonstrating touch input
-///
-/// Controls:
-/// - Single touch: Move the cube to touch position
-/// - Multi-touch (2 fingers): Scale cube based on pinch gesture
-/// - Shows touch count and touch IDs as visual feedback
 import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
+import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/math/vec3
 import tiramisu/scene
-import tiramisu/three/camera
 
 pub type Model {
   Model(

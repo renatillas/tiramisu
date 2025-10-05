@@ -131,17 +131,13 @@ export function initMouse(canvas) {
  * Initialize touch input on canvas
  */
 export function initTouch(canvas) {
-  console.log('[Input] Initializing touch input on canvas');
-
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    console.log('[Input] Touch start:', e.changedTouches.length, 'touches');
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       const rect = canvas.getBoundingClientRect();
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
-      console.log(`[Input] Touch ${touch.identifier} at (${x}, ${y})`);
       touches.set(touch.identifier, { x, y });
       touchesJustStarted.set(touch.identifier, { x, y });
     }

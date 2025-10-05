@@ -7,12 +7,12 @@
 /// - Right Click: Change cube color to blue
 /// - Mouse Wheel: Scale the cube up/down
 import gleam/option
+import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/math/vec3
 import tiramisu/scene
-import tiramisu/three/camera
 
 pub type Model {
   Model(position: vec3.Vec3, rotation: vec3.Vec3, scale: Float, color: Int)

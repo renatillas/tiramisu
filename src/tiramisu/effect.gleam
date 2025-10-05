@@ -1,9 +1,10 @@
+import gleam/list
+
 /// Effect system for managing side effects in Tiramisu
 /// Inspired by Lustre's effect architecture
 ///
 /// Effects represent side effects as data, allowing the runtime to
 /// manage them in a controlled, testable way.
-
 /// Opaque effect type that can dispatch messages back to the application
 pub opaque type Effect(msg) {
   Effect(perform: fn(fn(msg) -> Nil) -> Nil)
@@ -24,22 +25,11 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
 pub fn batch(effects: List(Effect(msg))) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     effects
-    |> list_each(fn(effect) {
+    |> list.each(fn(effect) {
       let Effect(perform) = effect
       perform(dispatch)
     })
   })
-}
-
-// Helper to iterate over list with side effects
-fn list_each(list: List(a), f: fn(a) -> Nil) -> Nil {
-  case list {
-    [] -> Nil
-    [x, ..rest] -> {
-      f(x)
-      list_each(rest, f)
-    }
-  }
 }
 
 /// Map effect messages to a different type
@@ -50,7 +40,7 @@ pub fn map(effect: Effect(a), f: fn(a) -> b) -> Effect(b) {
   })
 }
 
-/// Execute an effect (internal use by runtime)
+@internal
 pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
   let Effect(perform) = effect
   perform(dispatch)

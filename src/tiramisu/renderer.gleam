@@ -1,9 +1,14 @@
-import tiramisu/three/camera
-import tiramisu/three/scene
-
 pub type DomElement
 
 pub type WebGLRenderer
+
+/// Internal Three.js Scene type (not exposed to users)
+@internal
+pub type Scene
+
+/// Internal Three.js Camera type (not exposed to users)
+@internal
+pub type ThreeCamera
 
 /// Configuration options for the renderer
 pub type RendererOptions {
@@ -14,13 +19,10 @@ pub type RendererOptions {
 @external(javascript, "./ffi/renderer.mjs", "createRenderer")
 pub fn create(options: RendererOptions) -> WebGLRenderer
 
-/// Render a scene with a camera
+/// Render a scene with a camera (internal use only)
 @external(javascript, "./ffi/renderer.mjs", "render")
-pub fn render(
-  renderer: WebGLRenderer,
-  scene: scene.Scene,
-  camera: camera.Camera,
-) -> Nil
+@internal
+pub fn render(renderer: WebGLRenderer, scene: Scene, camera: ThreeCamera) -> Nil
 
 /// Set the size of the renderer
 @external(javascript, "./ffi/renderer.mjs", "setSize")

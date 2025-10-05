@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight } from '../diff.mjs';
+import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight } from '../scene.mjs';
 import {
   Mesh, Light, Group,
   BoxGeometry, SphereGeometry, ConeGeometry, PlaneGeometry, CircleGeometry,
@@ -7,7 +7,7 @@ import {
   BasicMaterial, StandardMaterial, PhongMaterial, LambertMaterial, ToonMaterial,
   LineMaterial, SpriteMaterial,
   AmbientLight, DirectionalLight, PointLight, SpotLight, HemisphereLight
-} from '../../scene.mjs';
+} from '../scene.mjs';
 
 // Cache of Three.js objects by ID
 const objectCache = new Map();

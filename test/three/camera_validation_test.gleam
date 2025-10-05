@@ -1,4 +1,4 @@
-import tiramisu/three/camera
+import tiramisu/camera
 
 // Test: valid camera creation succeeds
 pub fn valid_camera_test() {

@@ -1,15 +1,14 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
 import * as inputCapture from './input_capture.mjs';
-import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform } from '../scene/ffi/renderer.mjs';
-import { diff } from '../../tiramisu/scene/diff.mjs';
-import { AddNode } from '../../tiramisu/scene/diff.mjs';
+import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform } from './renderer_ffi.mjs';
+import { AddNode, diff } from '../scene.mjs';
+import { updateCamera as updateInternalCamera, getInternalCamera } from './camera.mjs';
 
 /**
  * Create a Three.js scene with background color
  */
 export function createScene(background) {
-  console.log('[Tiramisu] Creating scene with background:', background);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(background);
   return scene;
@@ -69,6 +68,9 @@ export function startLoop(
     messageQueue.push(msg);
   };
 
+  // Initialize internal camera with initial config
+  updateInternalCamera(context.camera);
+
   // Run initial effect
   runEffect(effect, dispatch);
 
@@ -108,8 +110,12 @@ export function startLoop(
     applyPatches(scene, patches);
 
     currentNodes = newNodes;
-    // Render
-    renderer.render(scene, camera);
+
+    // Update internal Three.js camera from immutable config
+    updateInternalCamera(newContext.camera);
+
+    // Render with internal Three.js camera
+    renderer.render(scene, getInternalCamera());
 
     // Clear per-frame input state
     inputCapture.clearInputFrameState();

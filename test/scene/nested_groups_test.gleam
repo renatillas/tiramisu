@@ -1,7 +1,6 @@
 import gleam/list
 import gleam/option
 import tiramisu/scene
-import tiramisu/scene/diff
 
 // Test: nested group structure tracks parent IDs correctly
 pub fn nested_group_parent_test() {
@@ -20,7 +19,7 @@ pub fn nested_group_parent_test() {
       ],
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   // Should have 2 patches: add parent group, add child mesh
   assert list.length(patches) == 2
@@ -29,14 +28,14 @@ pub fn nested_group_parent_test() {
   let child_patch =
     list.find(patches, fn(patch) {
       case patch {
-        diff.AddNode("child_mesh", _, _) -> True
+        scene.AddNode("child_mesh", _, _) -> True
         _ -> False
       }
     })
 
   // Verify child has parent_group as parent
   assert case child_patch {
-    Ok(diff.AddNode(_, _, option.Some("parent_group"))) -> True
+    Ok(scene.AddNode(_, _, option.Some("parent_group"))) -> True
     _ -> False
   }
 }
@@ -45,26 +44,22 @@ pub fn nested_group_parent_test() {
 pub fn deeply_nested_groups_test() {
   let previous = []
   let current = [
-    scene.Group(
-      id: "root",
-      transform: scene.identity_transform(),
-      children: [
-        scene.Group(
-          id: "level1",
-          transform: scene.identity_transform(),
-          children: [
-            scene.Mesh(
-              id: "leaf",
-              geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-              material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-              transform: scene.identity_transform(),
-            ),
-          ],
-        ),
-      ],
-    ),
+    scene.Group(id: "root", transform: scene.identity_transform(), children: [
+      scene.Group(
+        id: "level1",
+        transform: scene.identity_transform(),
+        children: [
+          scene.Mesh(
+            id: "leaf",
+            geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+            material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+            transform: scene.identity_transform(),
+          ),
+        ],
+      ),
+    ]),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   // Should have 3 patches: root, level1, leaf
   assert list.length(patches) == 3
@@ -73,13 +68,13 @@ pub fn deeply_nested_groups_test() {
   let level1_patch =
     list.find(patches, fn(patch) {
       case patch {
-        diff.AddNode("level1", _, _) -> True
+        scene.AddNode("level1", _, _) -> True
         _ -> False
       }
     })
 
   assert case level1_patch {
-    Ok(diff.AddNode(_, _, option.Some("root"))) -> True
+    Ok(scene.AddNode(_, _, option.Some("root"))) -> True
     _ -> False
   }
 
@@ -87,13 +82,13 @@ pub fn deeply_nested_groups_test() {
   let leaf_patch =
     list.find(patches, fn(patch) {
       case patch {
-        diff.AddNode("leaf", _, _) -> True
+        scene.AddNode("leaf", _, _) -> True
         _ -> False
       }
     })
 
   assert case leaf_patch {
-    Ok(diff.AddNode(_, _, option.Some("level1"))) -> True
+    Ok(scene.AddNode(_, _, option.Some("level1"))) -> True
     _ -> False
   }
 }
@@ -121,7 +116,7 @@ pub fn multiple_children_test() {
       ],
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   // Should have 3 patches: container, child1, child2
   assert list.length(patches) == 3
@@ -130,7 +125,7 @@ pub fn multiple_children_test() {
   let child1_has_correct_parent =
     list.any(patches, fn(patch) {
       case patch {
-        diff.AddNode("child1", _, option.Some("container")) -> True
+        scene.AddNode("child1", _, option.Some("container")) -> True
         _ -> False
       }
     })
@@ -138,7 +133,7 @@ pub fn multiple_children_test() {
   let child2_has_correct_parent =
     list.any(patches, fn(patch) {
       case patch {
-        diff.AddNode("child2", _, option.Some("container")) -> True
+        scene.AddNode("child2", _, option.Some("container")) -> True
         _ -> False
       }
     })
@@ -158,12 +153,12 @@ pub fn root_level_no_parent_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(diff.AddNode("root_mesh", _, option.None)) -> True
+    Ok(scene.AddNode("root_mesh", _, option.None)) -> True
     _ -> False
   }
 }

@@ -1,11 +1,13 @@
 /// Immutable game loop with effect system
 /// Following Lustre's Model-View-Update architecture
+import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/input.{type InputState}
+import tiramisu/renderer
 import tiramisu/scene.{type SceneNode}
-import tiramisu/three/camera
-import tiramisu/three/renderer
-import tiramisu/three/scene as three_scene
+
+/// Internal Three.js Scene type (opaque)
+type Scene
 
 /// Game context passed to init and update functions
 pub type GameContext {
@@ -69,7 +71,7 @@ pub fn run(
 // --- FFI Declarations ---
 
 @external(javascript, "./ffi/game.mjs", "createScene")
-fn create_scene(background: Int) -> three_scene.Scene
+fn create_scene(background: Int) -> Scene
 
 @external(javascript, "./ffi/game.mjs", "appendToDom")
 fn append_to_dom(element: renderer.DomElement) -> Nil
@@ -78,7 +80,7 @@ fn append_to_dom(element: renderer.DomElement) -> Nil
 fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
 
 @external(javascript, "./ffi/game.mjs", "applyInitialScene")
-fn apply_initial_scene(scene: three_scene.Scene, nodes: List(SceneNode)) -> Nil
+fn apply_initial_scene(scene: Scene, nodes: List(SceneNode)) -> Nil
 
 @external(javascript, "./ffi/game.mjs", "startLoop")
 fn start_loop(
@@ -86,7 +88,7 @@ fn start_loop(
   prev_nodes: List(SceneNode),
   effect: Effect(msg),
   context: GameContext,
-  scene: three_scene.Scene,
+  scene: Scene,
   renderer: renderer.WebGLRenderer,
   camera: camera.Camera,
   update: fn(state, msg, GameContext) -> #(state, Effect(msg)),

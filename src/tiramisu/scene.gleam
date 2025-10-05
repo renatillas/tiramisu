@@ -1,7 +1,11 @@
 import gleam/bool
+import gleam/dict
+import gleam/list
 import gleam/option.{type Option}
 import tiramisu/math/vec3
-import tiramisu/three/texture
+
+/// Opaque type for Three.js textures
+pub type Texture
 
 /// Validation errors for scene node creation
 pub type ValidationError {
@@ -32,7 +36,12 @@ pub type GeometryType {
     height: Float,
     radial_segments: Int,
   )
-  TorusGeometry(radius: Float, tube: Float, radial_segments: Int, tubular_segments: Int)
+  TorusGeometry(
+    radius: Float,
+    tube: Float,
+    radial_segments: Int,
+    tubular_segments: Int,
+  )
   TetrahedronGeometry(radius: Float, detail: Int)
   IcosahedronGeometry(radius: Float, detail: Int)
 }
@@ -43,23 +52,23 @@ pub type MaterialType {
     color: Int,
     transparent: Bool,
     opacity: Float,
-    map: Option(texture.Texture),
+    map: Option(Texture),
   )
   StandardMaterial(
     color: Int,
     metalness: Float,
     roughness: Float,
-    map: Option(texture.Texture),
+    map: Option(Texture),
   )
-  PhongMaterial(color: Int, shininess: Float, map: Option(texture.Texture))
-  LambertMaterial(color: Int, map: Option(texture.Texture))
-  ToonMaterial(color: Int, map: Option(texture.Texture))
+  PhongMaterial(color: Int, shininess: Float, map: Option(Texture))
+  LambertMaterial(color: Int, map: Option(Texture))
+  ToonMaterial(color: Int, map: Option(Texture))
   LineMaterial(color: Int, linewidth: Float)
   SpriteMaterial(
     color: Int,
     transparent: Bool,
     opacity: Float,
-    map: Option(texture.Texture),
+    map: Option(Texture),
   )
 }
 
@@ -165,7 +174,11 @@ pub fn look_at_transform(
   let yaw = case forward.x == 0.0 && forward.z == 0.0 {
     True -> 0.0
     False -> {
-      let assert Ok(result) = vec3.angle(vec3.Vec3(0.0, 0.0, 1.0), vec3.Vec3(forward.x, 0.0, forward.z))
+      let assert Ok(result) =
+        vec3.angle(
+          vec3.Vec3(0.0, 0.0, 1.0),
+          vec3.Vec3(forward.x, 0.0, forward.z),
+        )
       case forward.x <. 0.0 {
         True -> 0.0 -. result
         False -> result
@@ -174,7 +187,8 @@ pub fn look_at_transform(
   }
 
   let pitch = {
-    let assert Ok(result) = vec3.angle(vec3.Vec3(forward.x, 0.0, forward.z), forward)
+    let assert Ok(result) =
+      vec3.angle(vec3.Vec3(forward.x, 0.0, forward.z), forward)
     case forward.y <. 0.0 {
       True -> 0.0 -. result
       False -> result
@@ -184,13 +198,17 @@ pub fn look_at_transform(
   // Roll is typically 0 for look-at transforms
   let roll = 0.0
 
-  Transform(position: from, rotation: vec3.Vec3(pitch, yaw, roll), scale: vec3.one())
+  Transform(
+    position: from,
+    rotation: vec3.Vec3(pitch, yaw, roll),
+    scale: vec3.one(),
+  )
 }
 
 // --- Validated Geometry Constructors ---
 
 /// Create a validated box geometry
-pub fn validated_box(
+pub fn box(
   width width: Float,
   height height: Float,
   depth depth: Float,
@@ -203,7 +221,7 @@ pub fn validated_box(
 }
 
 /// Create a validated sphere geometry
-pub fn validated_sphere(
+pub fn sphere(
   radius radius: Float,
   width_segments width_segments: Int,
   height_segments height_segments: Int,
@@ -222,7 +240,7 @@ pub fn validated_sphere(
 }
 
 /// Create a validated cylinder geometry
-pub fn validated_cylinder(
+pub fn cylinder(
   radius_top radius_top: Float,
   radius_bottom radius_bottom: Float,
   height height: Float,
@@ -246,7 +264,7 @@ pub fn validated_cylinder(
 }
 
 /// Create a validated torus geometry
-pub fn validated_torus(
+pub fn torus(
   radius radius: Float,
   tube tube: Float,
   radial_segments radial_segments: Int,
@@ -267,7 +285,7 @@ pub fn validated_torus(
 }
 
 /// Create a validated tetrahedron geometry
-pub fn validated_tetrahedron(
+pub fn tetrahedron(
   radius radius: Float,
   detail detail: Int,
 ) -> Result(GeometryType, ValidationError) {
@@ -278,7 +296,7 @@ pub fn validated_tetrahedron(
 }
 
 /// Create a validated icosahedron geometry
-pub fn validated_icosahedron(
+pub fn icosahedron(
   radius radius: Float,
   detail detail: Int,
 ) -> Result(GeometryType, ValidationError) {
@@ -288,10 +306,7 @@ pub fn validated_icosahedron(
   Ok(IcosahedronGeometry(radius, detail))
 }
 
-// --- Validated Material Constructors ---
-
-/// Create a validated basic material
-pub fn validated_basic_material(
+pub fn basic_material(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
@@ -304,8 +319,7 @@ pub fn validated_basic_material(
   Ok(BasicMaterial(color, transparent, opacity, option.None))
 }
 
-/// Create a validated standard material
-pub fn validated_standard_material(
+pub fn standard_material(
   color color: Int,
   metalness metalness: Float,
   roughness roughness: Float,
@@ -322,8 +336,7 @@ pub fn validated_standard_material(
   Ok(StandardMaterial(color, metalness, roughness, option.None))
 }
 
-/// Create a validated line material
-pub fn validated_line_material(
+pub fn line_material(
   color color: Int,
   linewidth linewidth: Float,
 ) -> Result(MaterialType, ValidationError) {
@@ -332,8 +345,7 @@ pub fn validated_line_material(
   Ok(LineMaterial(color, linewidth))
 }
 
-/// Create a validated sprite material
-pub fn validated_sprite_material(
+pub fn sprite_material(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
@@ -344,4 +356,128 @@ pub fn validated_sprite_material(
   )
 
   Ok(SpriteMaterial(color, transparent, opacity, option.None))
+}
+
+@internal
+pub type Patch {
+  AddNode(id: String, node: SceneNode, parent_id: option.Option(String))
+  RemoveNode(id: String)
+  UpdateTransform(id: String, transform: Transform)
+  UpdateMaterial(id: String, material: MaterialType)
+  UpdateGeometry(id: String, geometry: GeometryType)
+  UpdateLight(id: String, light_type: LightType)
+}
+
+type NodeWithParent {
+  NodeWithParent(node: SceneNode, parent_id: option.Option(String))
+}
+
+fn flatten_scene(nodes: List(SceneNode)) -> dict.Dict(String, NodeWithParent) {
+  flatten_scene_helper(nodes, option.None, dict.new())
+}
+
+fn flatten_scene_helper(
+  nodes: List(SceneNode),
+  parent_id: option.Option(String),
+  acc: dict.Dict(String, NodeWithParent),
+) -> dict.Dict(String, NodeWithParent) {
+  list.fold(nodes, acc, fn(acc, node) {
+    let node_id = get_node_id(node)
+    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id))
+    case node {
+      Group(_, _, children) ->
+        flatten_scene_helper(children, option.Some(node_id), acc)
+      _ -> acc
+    }
+  })
+}
+
+/// Get the ID from a scene node
+fn get_node_id(node: SceneNode) -> String {
+  case node {
+    Mesh(id, ..) -> id
+    Group(id, ..) -> id
+    Light(id, ..) -> id
+  }
+}
+
+@internal
+pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) {
+  let prev_dict = flatten_scene(previous)
+  let curr_dict = flatten_scene(current)
+
+  let prev_ids = dict.keys(prev_dict)
+  let curr_ids = dict.keys(curr_dict)
+
+  // Find removals: IDs in previous but not in current
+  let removals =
+    list.filter(prev_ids, fn(id) { !list.contains(curr_ids, id) })
+    |> list.map(fn(id) { RemoveNode(id) })
+
+  // Find additions: IDs in current but not in previous
+  let additions =
+    list.filter(curr_ids, fn(id) { !list.contains(prev_ids, id) })
+    |> list.filter_map(fn(id) {
+      case dict.get(curr_dict, id) {
+        Ok(NodeWithParent(node, parent_id)) -> Ok(AddNode(id, node, parent_id))
+        Error(_) -> Error(Nil)
+      }
+    })
+
+  // Find updates: IDs in both, compare node properties
+  let updates =
+    list.filter(curr_ids, fn(id) { list.contains(prev_ids, id) })
+    |> list.flat_map(fn(id) {
+      case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+        Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
+          compare_nodes(id, prev_node, curr_node)
+        _, _ -> []
+      }
+    })
+
+  list.flatten([removals, additions, updates])
+}
+
+/// Compare two nodes and generate update patches
+fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
+  case prev, curr {
+    Mesh(_, prev_geom, prev_mat, prev_trans),
+      Mesh(_, curr_geom, curr_mat, curr_trans)
+    -> {
+      []
+      |> list.append(case prev_trans != curr_trans {
+        True -> [UpdateTransform(id, curr_trans)]
+        False -> []
+      })
+      |> list.append(case prev_mat != curr_mat {
+        True -> [UpdateMaterial(id, curr_mat)]
+        False -> []
+      })
+      |> list.append(case prev_geom != curr_geom {
+        True -> [UpdateGeometry(id, curr_geom)]
+        False -> []
+      })
+    }
+
+    Light(_, prev_light, prev_trans), Light(_, curr_light, curr_trans) -> {
+      []
+      |> list.append(case prev_trans != curr_trans {
+        True -> [UpdateTransform(id, curr_trans)]
+        False -> []
+      })
+      |> list.append(case prev_light != curr_light {
+        True -> [UpdateLight(id, curr_light)]
+        False -> []
+      })
+    }
+
+    Group(_, prev_trans, _), Group(_, curr_trans, _) -> {
+      case prev_trans != curr_trans {
+        True -> [UpdateTransform(id, curr_trans)]
+        False -> []
+      }
+    }
+
+    _, _ -> []
+  }
 }

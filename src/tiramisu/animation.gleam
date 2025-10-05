@@ -48,7 +48,6 @@ pub fn ease(easing: Easing, t: Float) -> Float {
         }
       }
     EaseInSine -> {
-      // sin/cos don't actually error for finite inputs
       let angle = t *. 1.5707963267948966
       1.0 -. maths.cos(angle)
     }

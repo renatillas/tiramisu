@@ -330,7 +330,6 @@ pub type GamepadAxis {
   RightStickY
 }
 
-
 /// Get axis value with dead zone applied
 pub fn get_axis_with_deadzone(
   input: InputState,

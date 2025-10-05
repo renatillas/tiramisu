@@ -1,11 +1,10 @@
 import gleam/list
 import gleam/option
 import tiramisu/scene
-import tiramisu/scene/diff
 
 // Test: empty to empty diff produces no patches
 pub fn empty_to_empty_test() {
-  let patches = diff.diff([], [])
+  let patches = scene.diff([], [])
   assert patches == []
 }
 
@@ -20,11 +19,11 @@ pub fn add_mesh_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.AddNode("cube1", _, _)) -> True
+    Ok(scene.AddNode("cube1", _, _)) -> True
     _ -> False
   }
 }
@@ -40,11 +39,11 @@ pub fn remove_mesh_test() {
     ),
   ]
   let current = []
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.RemoveNode("cube1")) -> True
+    Ok(scene.RemoveNode("cube1")) -> True
     _ -> False
   }
 }
@@ -59,7 +58,7 @@ pub fn no_changes_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(nodes, nodes)
+  let patches = scene.diff(nodes, nodes)
   assert patches == []
 }
 
@@ -81,11 +80,11 @@ pub fn update_transform_test() {
       transform: scene.transform_at(1.0, 2.0, 3.0),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.UpdateTransform("cube1", transform)) -> {
+    Ok(scene.UpdateTransform("cube1", transform)) -> {
       transform.position.x == 1.0
       && transform.position.y == 2.0
       && transform.position.z == 3.0
@@ -112,12 +111,14 @@ pub fn update_material_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.UpdateMaterial("cube1", scene.BasicMaterial(0x00ff00, False, 1.0, option.None))) ->
-      True
+    Ok(scene.UpdateMaterial(
+      "cube1",
+      scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+    )) -> True
     _ -> False
   }
 }
@@ -140,11 +141,11 @@ pub fn update_geometry_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.UpdateGeometry("cube1", scene.SphereGeometry(1.5, 32, 32))) -> True
+    Ok(scene.UpdateGeometry("cube1", scene.SphereGeometry(1.5, 32, 32))) -> True
     _ -> False
   }
 }
@@ -159,11 +160,11 @@ pub fn add_light_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.AddNode("light1", _, _)) -> True
+    Ok(scene.AddNode("light1", _, _)) -> True
     _ -> False
   }
 }
@@ -184,11 +185,11 @@ pub fn update_light_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(diff.UpdateLight("light1", scene.AmbientLight(0xffffff, 1.0))) -> True
+    Ok(scene.UpdateLight("light1", scene.AmbientLight(0xffffff, 1.0))) -> True
     _ -> False
   }
 }
@@ -223,7 +224,7 @@ pub fn multiple_changes_test() {
       transform: scene.identity_transform(),
     ),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   // Should have: remove cube2, add cube3, update cube1 transform
   assert list.length(patches) == 3
@@ -233,20 +234,16 @@ pub fn multiple_changes_test() {
 pub fn group_test() {
   let previous = []
   let current = [
-    scene.Group(
-      id: "group1",
-      transform: scene.identity_transform(),
-      children: [
-        scene.Mesh(
-          id: "child1",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-          transform: scene.identity_transform(),
-        ),
-      ],
-    ),
+    scene.Group(id: "group1", transform: scene.identity_transform(), children: [
+      scene.Mesh(
+        id: "child1",
+        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        transform: scene.identity_transform(),
+      ),
+    ]),
   ]
-  let patches = diff.diff(previous, current)
+  let patches = scene.diff(previous, current)
 
   // Should add group and child
   assert list.length(patches) == 2
