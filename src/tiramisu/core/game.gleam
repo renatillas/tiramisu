@@ -1,7 +1,3 @@
-/// New declarative game loop using scene diffing
-import tiramisu/input/keyboard
-import tiramisu/input/mouse
-import tiramisu/input/touch
 import tiramisu/scene.{type SceneNode}
 import tiramisu/three/camera
 import tiramisu/three/renderer
@@ -47,11 +43,6 @@ pub fn run(
   // Append renderer to DOM
   let canvas = renderer.get_dom_element(renderer_obj)
   append_to_dom(canvas)
-
-  // Initialize input systems
-  keyboard.init()
-  mouse.init(canvas)
-  touch.init(canvas)
 
   // Apply initial scene nodes (diff from empty to initial)
   apply_initial_scene(scene_obj, initial_nodes)

@@ -1,9 +1,6 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
 import * as inputCapture from './input_capture.mjs';
-import * as keyboardFFI from '../input/ffi/keyboard.mjs';
-import * as mouseFFI from '../input/ffi/mouse.mjs';
-import * as touchFFI from '../input/ffi/touch.mjs';
 import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform } from '../scene/ffi/renderer.mjs';
 import { diff } from '../../tiramisu/scene/diff.mjs';
 import { AddNode } from '../../tiramisu/scene/diff.mjs';
@@ -29,9 +26,9 @@ export function appendToDom(canvas) {
  * Initialize all input systems
  */
 export function initializeInputSystems(canvas) {
-  keyboardFFI.initKeyboard();
-  mouseFFI.initMouse(canvas);
-  touchFFI.initTouch(canvas);
+  inputCapture.initKeyboard();
+  inputCapture.initMouse(canvas);
+  inputCapture.initTouch(canvas);
 }
 
 /**
@@ -40,8 +37,6 @@ export function initializeInputSystems(canvas) {
 export function applyInitialScene(scene, nodes) {
   // Convert Gleam list to JS array
   const nodeArray = gleamListToArray(nodes);
-
-  console.log('[Tiramisu] Applying initial scene with', nodeArray.length, 'nodes');
 
   // Convert nodes to AddNode patches and apply them
   // This ensures objects are added to the objectCache for later updates
@@ -65,13 +60,6 @@ export function startLoop(
   update,
   view,
 ) {
-  console.log('[Tiramisu] Starting game loop');
-  console.log('[Tiramisu] Initial state:', state);
-  console.log('[Tiramisu] Scene:', scene);
-  console.log('[Tiramisu] Camera:', camera);
-  console.log('[Tiramisu] Camera position:', camera.position);
-  console.log('[Tiramisu] Camera rotation:', camera.rotation);
-
   let currentState = state;
   let currentNodes = prevNodes;
   let messageQueue = [];
@@ -85,13 +73,8 @@ export function startLoop(
   runEffect(effect, dispatch);
 
   let lastTime = performance.now();
-  let frameCount = 0;
 
   function gameLoop() {
-    frameCount++;
-    if (frameCount <= 3) {
-      console.log('[Tiramisu] Game loop frame', frameCount);
-    }
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
     lastTime = currentTime;
@@ -120,26 +103,13 @@ export function startLoop(
     // Generate new scene nodes
     const newNodes = view(currentState);
 
-    if (frameCount <= 3) {
-      console.log('[Tiramisu] New nodes:', newNodes);
-    }
-
     // Diff and patch
     const patches = diff(currentNodes, newNodes);
-
-    if (frameCount <= 3) {
-      console.log('[Tiramisu] Patches:', patches);
-    }
-
     applyPatches(scene, patches);
-    currentNodes = newNodes;
 
+    currentNodes = newNodes;
     // Render
     renderer.render(scene, camera);
-
-    if (frameCount === 1) {
-      console.log('[Tiramisu] First render complete. Scene children:', scene.children.length);
-    }
 
     // Clear per-frame input state
     inputCapture.clearInputFrameState();

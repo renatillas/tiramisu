@@ -67,7 +67,7 @@ pub type InputState {
   InputState(
     keyboard: KeyboardState,
     mouse: MouseState,
-    gamepad: GamepadState,
+    gamepad: List(GamepadState),  // Supports multiple gamepads
     touch: TouchState,
   )
 }
@@ -88,10 +88,19 @@ pub type InputState {
 - `mouse_wheel_delta(input)`
 
 **Gamepad:**
-- `is_gamepad_connected(input)`
-- `gamepad_button(input, button)` → `Float`
-- `is_gamepad_button_pressed(input, button)`
-- `gamepad_axis(input, axis)` → `Float`
+- `is_gamepad_connected(input, index)` → `Bool`
+- `gamepad_button(input, gamepad_index, button)` → `Float`
+- `is_gamepad_button_pressed(input, gamepad_index, button)` → `Bool`
+- `gamepad_axis(input, gamepad_index, axis)` → `Float`
+- `get_axis_with_deadzone(input, gamepad_index, axis, deadzone)` → `Float`
+- `is_left_stick_active(input, gamepad_index, threshold)` → `Bool`
+- `is_right_stick_active(input, gamepad_index, threshold)` → `Bool`
+
+**Gamepad (Primary - index 0 convenience functions):**
+- `is_primary_connected(input)` → `Bool`
+- `is_primary_gamepad_button_pressed(input, button)` → `Bool`
+- `get_primary_button(input, button)` → `Float`
+- `get_primary_axis(input, axis)` → `Float`
 
 **Touch:**
 - `touches(input)` → `List(Touch)`
@@ -391,7 +400,7 @@ assert new_model.position == vec3.Vec3(1.0, 0.0, 0.0)
 |---------------|-----------------|
 | `keyboard.is_pressed(key)` | `input.is_key_pressed(ctx.input, key)` |
 | `mouse.get_x()` | `let #(x, _) = input.mouse_position(ctx.input)` |
-| `gamepad.is_pressed(button)` | `input.is_gamepad_button_pressed(ctx.input, button)` |
+| `gamepad.is_pressed(button)` | `input.is_gamepad_button_pressed(ctx.input, gamepad_index, button)` or `input.is_primary_gamepad_button_pressed(ctx.input, button)` |
 | Mutate state directly | Return new state from `update()` |
 | Perform side effects inline | Return `Effect` from `update()` |
 

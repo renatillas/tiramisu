@@ -183,7 +183,7 @@ fn update(state: State, msg: Msg, ctx: GameContext) -> #(State, Effect(Msg)) {
 | `keyboard.is_pressed(key)` | `input.is_key_pressed(ctx.input, key)` |
 | `mouse.get_x()` | `let #(x, _) = input.mouse_position(ctx.input)` |
 | `mouse.get_delta_x()` | `let #(dx, _) = input.mouse_delta(ctx.input)` |
-| `gamepad.is_pressed(btn)` | `input.is_gamepad_button_pressed(ctx.input, btn)` |
+| `gamepad.is_pressed(btn)` | `input.is_gamepad_button_pressed(ctx.input, gamepad_index, btn)` or `input.is_primary_gamepad_button_pressed(ctx.input, btn)` |
 
 ### Game Loop Changes
 

@@ -1,19 +1,15 @@
 import gleam/list
 import gleam/result
-import tiramisu/input/gamepad as gamepad_module
-import tiramisu/input/keyboard as keyboard_module
 
-/// Complete immutable snapshot of all input state for a frame
 pub opaque type InputState {
   InputState(
     keyboard: KeyboardState,
     mouse: MouseState,
-    gamepad: GamepadState,
+    gamepad: List(GamepadState),
     touch: TouchState,
   )
 }
 
-/// Keyboard state snapshot
 pub opaque type KeyboardState {
   KeyboardState(
     pressed_keys: List(String),
@@ -22,7 +18,6 @@ pub opaque type KeyboardState {
   )
 }
 
-/// Mouse state snapshot
 pub opaque type MouseState {
   MouseState(
     x: Float,
@@ -36,22 +31,19 @@ pub opaque type MouseState {
   )
 }
 
-/// Button state (pressed, just pressed, just released)
 pub type ButtonState {
   ButtonState(pressed: Bool, just_pressed: Bool, just_released: Bool)
 }
 
-/// Gamepad state snapshot
 pub type GamepadState {
   GamepadState(
     connected: Bool,
+    /// Buttons: Values clamped between 0.0 and 1.0
     buttons: List(Float),
-    // Button values 0.0-1.0
     axes: List(Float),
   )
 }
 
-/// Touch state snapshot
 pub type TouchState {
   TouchState(
     touches: List(Touch),
@@ -60,13 +52,11 @@ pub type TouchState {
   )
 }
 
-/// Touch point
 pub type Touch {
   Touch(id: Int, x: Float, y: Float)
 }
 
-/// Create an empty input state (for initialization)
-pub fn empty() -> InputState {
+pub fn new() -> InputState {
   InputState(
     keyboard: KeyboardState(
       pressed_keys: [],
@@ -95,7 +85,7 @@ pub fn empty() -> InputState {
         just_released: False,
       ),
     ),
-    gamepad: GamepadState(connected: False, buttons: [], axes: []),
+    gamepad: [],
     touch: TouchState(
       touches: [],
       touches_just_started: [],
@@ -107,20 +97,20 @@ pub fn empty() -> InputState {
 // --- Keyboard Helpers ---
 
 /// Check if a key is currently pressed
-pub fn is_key_pressed(input: InputState, key: keyboard_module.Key) -> Bool {
-  let key_code = keyboard_module.key_to_code(key)
+pub fn is_key_pressed(input: InputState, key: Key) -> Bool {
+  let key_code = key_to_code(key)
   list.contains(input.keyboard.pressed_keys, key_code)
 }
 
 /// Check if a key was just pressed this frame
-pub fn is_key_just_pressed(input: InputState, key: keyboard_module.Key) -> Bool {
-  let key_code = keyboard_module.key_to_code(key)
+pub fn is_key_just_pressed(input: InputState, key: Key) -> Bool {
+  let key_code = key_to_code(key)
   list.contains(input.keyboard.just_pressed_keys, key_code)
 }
 
 /// Check if a key was just released this frame
-pub fn is_key_just_released(input: InputState, key: keyboard_module.Key) -> Bool {
-  let key_code = keyboard_module.key_to_code(key)
+pub fn is_key_just_released(input: InputState, key: Key) -> Bool {
+  let key_code = key_to_code(key)
   list.contains(input.keyboard.just_released_keys, key_code)
 }
 
@@ -163,37 +153,51 @@ pub fn mouse_wheel_delta(input: InputState) -> Float {
 
 // --- Gamepad Helpers ---
 
-/// Check if primary gamepad is connected
-pub fn is_gamepad_connected(input: InputState) -> Bool {
-  input.gamepad.connected
+/// Check if gamepad at index is connected
+pub fn is_gamepad_connected(input: InputState, index: Int) -> Bool {
+  case list_get(input.gamepad, index) {
+    Ok(gamepad) -> gamepad.connected
+    Error(_) -> False
+  }
 }
 
 /// Get gamepad button value
 pub fn gamepad_button(
   input: InputState,
-  button: gamepad_module.GamepadButton,
+  gamepad_index: Int,
+  button: GamepadButton,
 ) -> Float {
-  let index = gamepad_button_to_index(button)
-  list_get(input.gamepad.buttons, index)
-  |> result.unwrap(0.0)
+  let button_index = gamepad_button_to_index(button)
+  case list_get(input.gamepad, gamepad_index) {
+    Ok(gamepad) ->
+      list_get(gamepad.buttons, button_index)
+      |> result.unwrap(0.0)
+    Error(_) -> 0.0
+  }
 }
 
 /// Check if gamepad button is pressed
 pub fn is_gamepad_button_pressed(
   input: InputState,
-  button: gamepad_module.GamepadButton,
+  gamepad_index: Int,
+  button: GamepadButton,
 ) -> Bool {
-  gamepad_button(input, button) >. 0.5
+  gamepad_button(input, gamepad_index, button) >. 0.5
 }
 
 /// Get gamepad axis value
 pub fn gamepad_axis(
   input: InputState,
-  axis: gamepad_module.GamepadAxis,
+  gamepad_index: Int,
+  axis: GamepadAxis,
 ) -> Float {
-  let index = gamepad_axis_to_index(axis)
-  list_get(input.gamepad.axes, index)
-  |> result.unwrap(0.0)
+  let axis_index = gamepad_axis_to_index(axis)
+  case list_get(input.gamepad, gamepad_index) {
+    Ok(gamepad) ->
+      list_get(gamepad.axes, axis_index)
+      |> result.unwrap(0.0)
+    Error(_) -> 0.0
+  }
 }
 
 // --- Touch Helpers ---
@@ -227,33 +231,167 @@ fn list_get(list: List(a), index: Int) -> Result(a, Nil) {
 }
 
 // Map gamepad enums to indices
-fn gamepad_button_to_index(button: gamepad_module.GamepadButton) -> Int {
+fn gamepad_button_to_index(button: GamepadButton) -> Int {
   case button {
-    gamepad_module.ButtonA -> 0
-    gamepad_module.ButtonB -> 1
-    gamepad_module.ButtonX -> 2
-    gamepad_module.ButtonY -> 3
-    gamepad_module.LeftBumper -> 4
-    gamepad_module.RightBumper -> 5
-    gamepad_module.LeftTrigger -> 6
-    gamepad_module.RightTrigger -> 7
-    gamepad_module.Select -> 8
-    gamepad_module.Start -> 9
-    gamepad_module.LeftStick -> 10
-    gamepad_module.RightStick -> 11
-    gamepad_module.DPadUp -> 12
-    gamepad_module.DPadDown -> 13
-    gamepad_module.DPadLeft -> 14
-    gamepad_module.DPadRight -> 15
-    gamepad_module.Home -> 16
+    ButtonA -> 0
+    ButtonB -> 1
+    ButtonX -> 2
+    ButtonY -> 3
+    LeftBumper -> 4
+    RightBumper -> 5
+    LeftTrigger -> 6
+    RightTrigger -> 7
+    Select -> 8
+    Start -> 9
+    LeftStick -> 10
+    RightStick -> 11
+    DPadUp -> 12
+    DPadDown -> 13
+    DPadLeft -> 14
+    DPadRight -> 15
+    Home -> 16
   }
 }
 
-fn gamepad_axis_to_index(axis: gamepad_module.GamepadAxis) -> Int {
+fn gamepad_axis_to_index(axis: GamepadAxis) -> Int {
   case axis {
-    gamepad_module.LeftStickX -> 0
-    gamepad_module.LeftStickY -> 1
-    gamepad_module.RightStickX -> 2
-    gamepad_module.RightStickY -> 3
+    LeftStickX -> 0
+    LeftStickY -> 1
+    RightStickX -> 2
+    RightStickY -> 3
   }
+}
+
+/// Common keyboard codes (standard KeyboardEvent.code values)
+pub type Key {
+  KeyW
+  KeyA
+  KeyS
+  KeyD
+  ArrowUp
+  ArrowDown
+  ArrowLeft
+  ArrowRight
+  Space
+  Enter
+  Escape
+  Shift
+  Control
+  Alt
+  Custom(String)
+}
+
+/// Convert Key to JavaScript KeyboardEvent.code string
+fn key_to_code(key: Key) -> String {
+  case key {
+    KeyW -> "KeyW"
+    KeyA -> "KeyA"
+    KeyS -> "KeyS"
+    KeyD -> "KeyD"
+    ArrowUp -> "ArrowUp"
+    ArrowDown -> "ArrowDown"
+    ArrowLeft -> "ArrowLeft"
+    ArrowRight -> "ArrowRight"
+    Space -> "Space"
+    Enter -> "Enter"
+    Escape -> "Escape"
+    Shift -> "ShiftLeft"
+    Control -> "ControlLeft"
+    Alt -> "AltLeft"
+    Custom(code) -> code
+  }
+}
+
+/// Gamepad button enumeration (standard mapping)
+pub type GamepadButton {
+  ButtonA
+  ButtonB
+  ButtonX
+  ButtonY
+  LeftBumper
+  RightBumper
+  LeftTrigger
+  RightTrigger
+  Select
+  Start
+  LeftStick
+  RightStick
+  DPadUp
+  DPadDown
+  DPadLeft
+  DPadRight
+  Home
+}
+
+pub type GamepadAxis {
+  LeftStickX
+  LeftStickY
+  RightStickX
+  RightStickY
+}
+
+
+/// Get axis value with dead zone applied
+pub fn get_axis_with_deadzone(
+  input: InputState,
+  gamepad_index: Int,
+  axis: GamepadAxis,
+  deadzone: Float,
+) -> Float {
+  let value = gamepad_axis(input, gamepad_index, axis)
+  case value >. deadzone || value <. 0.0 -. deadzone {
+    True -> value
+    False -> 0.0
+  }
+}
+
+/// Check if left stick is moved in any direction
+pub fn is_left_stick_active(
+  input: InputState,
+  gamepad_index: Int,
+  threshold: Float,
+) -> Bool {
+  let x = gamepad_axis(input, gamepad_index, LeftStickX)
+  let y = gamepad_axis(input, gamepad_index, LeftStickY)
+  x >. threshold
+  || x <. 0.0 -. threshold
+  || y >. threshold
+  || y <. 0.0 -. threshold
+}
+
+/// Check if right stick is moved in any direction
+pub fn is_right_stick_active(
+  input: InputState,
+  gamepad_index: Int,
+  threshold: Float,
+) -> Bool {
+  let x = gamepad_axis(input, gamepad_index, RightStickX)
+  let y = gamepad_axis(input, gamepad_index, RightStickY)
+  x >. threshold
+  || x <. 0.0 -. threshold
+  || y >. threshold
+  || y <. 0.0 -. threshold
+}
+
+/// Convenience: Check if primary gamepad (index 0) is connected
+pub fn is_primary_connected(input: InputState) -> Bool {
+  is_gamepad_connected(input, 0)
+}
+
+/// Convenience: Check button on primary gamepad
+pub fn is_primary_gamepad_button_pressed(
+  input: InputState,
+  button: GamepadButton,
+) -> Bool {
+  is_gamepad_button_pressed(input, 0, button)
+}
+
+/// Convenience: Get button value on primary gamepad
+pub fn get_primary_button(input: InputState, button: GamepadButton) -> Float {
+  gamepad_button(input, 0, button)
+}
+
+/// Convenience: Get axis value on primary gamepad
+pub fn get_primary_axis(input: InputState, axis: GamepadAxis) -> Float {
+  gamepad_axis(input, 0, axis)
 }
