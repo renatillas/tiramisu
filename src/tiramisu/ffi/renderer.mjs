@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio } from '../scene.mjs';
+import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio, UpdateInstances, UpdateLODLevels } from '../scene.mjs';
 import {
-  Mesh, Light, Group, Model3D, Audio,
+  Mesh, InstancedMesh, Light, Group, LOD, Model3D, Audio,
   DebugBox, DebugSphere, DebugLine, DebugAxes, DebugGrid, DebugPoint,
   BoxGeometry, SphereGeometry, ConeGeometry, PlaneGeometry, CircleGeometry,
   CylinderGeometry, TorusGeometry, TetrahedronGeometry, IcosahedronGeometry,
@@ -228,12 +228,56 @@ export function applyPatch(scene, patch) {
       if (node.physics && node.physics[0]) {
         createRigidBody(id, node.physics[0], node.transform);
       }
+    } else if (node instanceof InstancedMesh) {
+      const geometry = createGeometry(node.geometry);
+      const material = createMaterial(node.material);
+
+      // Convert Gleam list to array to get count
+      const instancesArray = Array.from(node.instances);
+      const count = instancesArray.length;
+
+      threeObj = new THREE.InstancedMesh(geometry, material, count);
+
+      // Set transform matrix for each instance
+      updateInstancedMeshTransforms(threeObj, node.instances);
     } else if (node instanceof Light) {
       threeObj = createLight(node.light_type);
       applyTransform(threeObj, node.transform);
     } else if (node instanceof Group) {
       threeObj = new THREE.Group();
       applyTransform(threeObj, node.transform);
+    } else if (node instanceof LOD) {
+      threeObj = new THREE.LOD();
+      applyTransform(threeObj, node.transform);
+
+      // Add LOD levels
+      for (const level of node.levels) {
+        const levelNode = level.node;
+        const distance = level.distance;
+
+        // Create Three.js object for this LOD level
+        // We need to recursively create the node (but we don't add it to scene)
+        let levelObj;
+
+        if (levelNode instanceof Mesh) {
+          const geometry = createGeometry(levelNode.geometry);
+          const material = createMaterial(levelNode.material);
+          levelObj = new THREE.Mesh(geometry, material);
+          applyTransform(levelObj, levelNode.transform);
+        } else if (levelNode instanceof Group) {
+          levelObj = new THREE.Group();
+          applyTransform(levelObj, levelNode.transform);
+          // TODO: Handle children of Group in LOD levels if needed
+        } else if (levelNode instanceof Model3D) {
+          levelObj = levelNode.object.clone();
+          applyTransform(levelObj, levelNode.transform);
+        }
+        // TODO: Add other node types as needed
+
+        if (levelObj) {
+          threeObj.addLevel(levelObj, distance);
+        }
+      }
     } else if (node instanceof Model3D) {
       // Use the object directly - it will be cached
       // The immutability is maintained at the Gleam level via the scene graph diff
@@ -398,9 +442,84 @@ export function applyPatch(scene, patch) {
     // Update audio configuration
     updateAudioConfig(id, config);
     console.log('[Renderer] Updated audio config for node:', id);
+  } else if (patch instanceof UpdateInstances) {
+    const { id, instances } = patch;
+    const obj = objectCache.get(id);
+    if (obj && obj instanceof THREE.InstancedMesh) {
+      updateInstancedMeshTransforms(obj, instances);
+    } else {
+      console.warn('[Renderer] Object not found or not an InstancedMesh:', id);
+    }
+  } else if (patch instanceof UpdateLODLevels) {
+    const { id, levels } = patch;
+    const obj = objectCache.get(id);
+    if (obj && obj instanceof THREE.LOD) {
+      // Clear existing levels
+      while (obj.levels.length > 0) {
+        obj.removeLevel(obj.levels[0].distance);
+      }
+
+      // Add new levels
+      for (const level of levels) {
+        const levelNode = level.node;
+        const distance = level.distance;
+
+        // Create Three.js object for this LOD level
+        let levelObj;
+
+        if (levelNode instanceof Mesh) {
+          const geometry = createGeometry(levelNode.geometry);
+          const material = createMaterial(levelNode.material);
+          levelObj = new THREE.Mesh(geometry, material);
+          applyTransform(levelObj, levelNode.transform);
+        } else if (levelNode instanceof Group) {
+          levelObj = new THREE.Group();
+          applyTransform(levelObj, levelNode.transform);
+        } else if (levelNode instanceof Model3D) {
+          levelObj = levelNode.object.clone();
+          applyTransform(levelObj, levelNode.transform);
+        }
+
+        if (levelObj) {
+          obj.addLevel(levelObj, distance);
+        }
+      }
+      console.log('[Renderer] Updated LOD levels for:', id);
+    } else {
+      console.warn('[Renderer] Object not found or not an LOD:', id);
+    }
   } else {
     console.warn('Unknown patch type:', patch);
   }
+}
+
+// Update InstancedMesh transform matrices from Gleam InstanceTransform list
+function updateInstancedMeshTransforms(instancedMesh, instances) {
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const rotation = new THREE.Euler();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+
+  // Convert Gleam list to array and iterate
+  let i = 0;
+  for (const inst of instances) {
+    // Extract position, rotation, scale from Gleam InstanceTransform
+    position.set(inst.position.x, inst.position.y, inst.position.z);
+    rotation.set(inst.rotation.x, inst.rotation.y, inst.rotation.z);
+    scale.set(inst.scale.x, inst.scale.y, inst.scale.z);
+
+    // Compose matrix
+    quaternion.setFromEuler(rotation);
+    matrix.compose(position, quaternion, scale);
+
+    // Set matrix for this instance
+    instancedMesh.setMatrixAt(i, matrix);
+    i++;
+  }
+
+  // Mark instance matrix as needing update
+  instancedMesh.instanceMatrix.needsUpdate = true;
 }
 
 // Apply multiple patches

@@ -7,6 +7,7 @@ import { updateCamera as updateInternalCamera, getInternalCamera } from './camer
 import { toList } from '../../../gleam_stdlib/gleam.mjs';
 import { stepWorld, getBodyTransform } from './physics.mjs';
 import { startPerformanceMonitoring, updatePerformanceStats, setRenderStats } from './debug.mjs';
+import { setCamera } from './effects.mjs';
 
 /**
  * Create a Three.js scene with background color
@@ -70,6 +71,10 @@ export function startLoop(
   // Initialize internal camera with initial config
   updateInternalCamera(context.camera);
 
+  // Set camera reference for effects (use the actual Three.js camera)
+  const threeCamera = getInternalCamera();
+  setCamera(threeCamera);
+
   // Initialize performance monitoring
   startPerformanceMonitoring();
 
@@ -122,8 +127,10 @@ export function startLoop(
     // Update animation mixers
     updateMixers(deltaTime);
 
-    // Update internal Three.js camera from immutable config
-    updateInternalCamera(newContext.camera);
+    // Note: We don't call updateInternalCamera every frame because:
+    // 1. The camera config is immutable and doesn't change
+    // 2. Effects (like update_camera_position) directly modify the Three.js camera
+    // 3. Calling updateInternalCamera would overwrite effect changes
 
     // Render with internal Three.js camera
     renderer.render(scene, getInternalCamera());

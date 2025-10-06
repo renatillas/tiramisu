@@ -90,9 +90,7 @@ pub fn positional_audio_default_test() {
   // Should match PositionalAudio pattern with defaults
   assert case audio_type {
     audio.PositionalAudio(ref_distance, rolloff_factor, max_distance) ->
-      ref_distance == 1.0
-      && rolloff_factor == 1.0
-      && max_distance == 10000.0
+      ref_distance == 1.0 && rolloff_factor == 1.0 && max_distance == 10_000.0
     _ -> False
   }
 }

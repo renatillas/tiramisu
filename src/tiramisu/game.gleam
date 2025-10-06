@@ -34,11 +34,10 @@ pub fn run(
     ))
 
   let scene_obj = create_scene(background)
-  let camera_obj = camera
 
   // Initial context with empty input
   let initial_context =
-    GameContext(camera: camera_obj, delta_time: 0.0, input: input.new())
+    GameContext(camera:, delta_time: 0.0, input: input.new())
 
   // Initialize game state
   let #(initial_state, initial_effect) = init(initial_context)
@@ -62,7 +61,7 @@ pub fn run(
     initial_context,
     scene_obj,
     renderer_obj,
-    camera_obj,
+    camera,
     update,
     view,
   )

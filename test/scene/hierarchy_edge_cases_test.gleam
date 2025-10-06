@@ -9,7 +9,11 @@ import tiramisu/vec3
 pub fn empty_group_test() {
   let previous = []
   let current = [
-    scene.Group(id: "empty_group", transform: transform.identity(), children: []),
+    scene.Group(
+      id: "empty_group",
+      transform: transform.identity(),
+      children: [],
+    ),
   ]
   let patches = scene.diff(previous, current)
 
@@ -638,4 +642,3 @@ pub fn restructure_hierarchy_test() {
     _ -> False
   }
 }
-

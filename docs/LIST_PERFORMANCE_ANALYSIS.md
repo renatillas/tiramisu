@@ -280,11 +280,113 @@ dict.fold(curr_dict, #([], [], []), fn(acc, id, node) {
 **Phase 3 Target** (dict-first):
 - Large (1000 nodes): **500+ IPS** (2x original)
 
-## Next Steps
+## Phase 1 Results
 
-1. Start with Phase 1 (replace list.flatten, single-pass partition)
-2. Benchmark after each change
-3. Move to Phase 2 if gains are significant
-4. Consider Phase 3 only if Phase 2 shows promise
+**Implemented**:
+1. ✅ Single-pass partitioning with fold (O(n) instead of O(3n))
+2. ✅ Manual concatenation with `concat_patches` helper
+3. ✅ Eliminated `list.flatten`
 
-**Key Principle**: Minimize list traversals, work with dicts/sets longer, flatten only at FFI boundary.
+**Benchmark Results**:
+- Large (1000 nodes): 266 → 279 IPS (+5%)
+- Medium (100 nodes): 3018 → 3053 IPS (+1%)
+- Small (10 nodes): 30,244 → 31,412 IPS (+4%)
+
+**Analysis**: Minimal improvement (~5%) vs expected 20-30%
+
+**Root Cause**: Still doing multiple `list.reverse` calls:
+- 4x reverse for update groups (transforms, materials, geometries, misc)
+- 1x reverse in `concat_patches` helper
+- Total: **5+ list traversals still happening**
+
+**Conclusion**: Phase 1 optimizations are limited by the need to concatenate lists. The real bottleneck is the final list concatenation, not the partitioning method.
+
+**Recommendation**: Proceed to Phase 2 (FFI optimization) - return grouped patches as tuple, eliminate concatenation entirely.
+
+## Phase 2 Results
+
+**Implemented**:
+1. ✅ Created `PatchGroups` type with 7 separate lists
+2. ✅ Modified `diff_grouped()` to return `PatchGroups` without concatenation
+3. ✅ Updated FFI `applyPatchGroups()` to iterate 7 lists separately
+
+**Benchmark Results**:
+- Large (1000 nodes): 279 → 267 IPS (-4%)
+- Medium (100 nodes): 3053 → 3051 IPS (~0%)
+- Small (10 nodes): 31,412 → 29,974 IPS (-5%)
+
+**Analysis**: **No improvement, slight slowdown**
+
+**Root Cause**: Moving concatenation from Gleam to FFI doesn't help:
+- **Before**: 1x concatenated list → 1x `for...of` loop (traverses Gleam list in JS)
+- **After**: 7x separate lists → 7x `for...of` loops (7 separate Gleam list traversals in JS)
+- **Problem**: Gleam list iteration in JavaScript has overhead regardless of where concatenation happens
+
+**Key Learning**: The bottleneck is **Gleam list → JS iteration overhead**, not list concatenation in Gleam.
+
+**Why Phase 2 Failed**:
+1. Eliminated list concatenation in Gleam (saved ~5 list traversals)
+2. Added 7x separate list iterations in JS (added 6x more iteration overhead)
+3. Net result: Slightly worse due to increased iteration setup cost
+
+**Conclusion**: Phase 1 and Phase 2 both failed because they addressed the wrong problem. The real bottleneck is crossing the FFI boundary with immutable linked lists.
+
+## Summary
+
+### What Worked
+- ✅ **Set-based lookups** (already done): **7x improvement** for large scenes (41 → 266 IPS)
+- ✅ **Single-pass partitioning**: Small code quality improvement, no measurable performance change
+
+### What Didn't Work
+- ❌ **Phase 1 list optimizations**: +5% improvement (266 → 279 IPS), within variance
+  - Problem: Still doing 5+ `list.reverse` calls
+  - Root cause: List concatenation overhead persists
+- ❌ **Phase 2 grouped patches**: -4% regression (279 → 267 IPS)
+  - Problem: Moved concatenation from Gleam to JS, but JS list iteration has overhead
+  - 7 separate `for...of` loops worse than 1 concatenated loop
+  - **Reverted to keep codebase simple**
+
+### Key Learnings
+
+1. **Algorithmic improvements >> Micro-optimizations**
+   - Set-based lookups: 7x improvement (O(log n) vs O(n))
+   - List operation tweaking: ~0% improvement
+
+2. **FFI boundary is the real bottleneck**
+   - Gleam list → JS iteration has overhead
+   - Doesn't matter if concatenation happens in Gleam or JS
+   - Need to minimize total data crossing FFI, not reorganize it
+
+3. **Immutable lists are fundamentally slow for game loops**
+   - Every list operation is O(n)
+   - 60 FPS means 180,000+ list traversals/second
+   - Can't optimize around this with current architecture
+
+## Recommendations
+
+### Keep Current Implementation
+- ✅ Set-based ID lookups (proven 7x improvement)
+- ✅ Early exit for empty scenes
+- ✅ Single-pass partitioning (code quality, minimal overhead)
+
+### Don't Pursue
+- ❌ Further list operation optimizations (diminishing returns)
+- ❌ Grouped patches (adds complexity, no benefit)
+- ❌ Phase 3 dict-first (still outputs lists for FFI)
+
+### Future Work (If Needed)
+1. **Dirty flagging at scene level** - Skip diff entirely when scene unchanged
+2. **Incremental scene updates** - Track which nodes changed, only diff those
+3. **FFI redesign** - Pass dicts/arrays directly instead of immutable lists
+4. **WASM alternative** - Avoid FFI boundary entirely for hot paths
+
+## Final Performance
+
+**Achieved** (with set-based lookups only):
+- Small (10 nodes): 31,414 IPS
+- Medium (100 nodes): 3,078 IPS
+- Large (1000 nodes): **277 IPS** (vs 41 IPS original = **7x improvement**)
+- No changes (100 nodes): 7,611 IPS
+- All changed (100 nodes): 2,299 IPS
+
+**Conclusion**: The 7x improvement from set-based lookups is the main gain. Further micro-optimizations yield no measurable benefit. Focus should shift to other Phase 5 areas (documentation, examples) or architectural changes (dirty flagging, incremental updates).

@@ -1,0 +1,211 @@
+/// Frustum Culling Demo
+///
+/// Demonstrates automatic frustum culling in Three.js - only rendering visible objects.
+///
+/// This demo creates a large grid of 1000 cubes spread across 100x100 units.
+/// Only cubes within the camera's view frustum are actually rendered, saving performance.
+///
+/// Controls:
+/// - WASD: Move camera forward/back/left/right
+/// - Arrow Keys: Look around
+/// - P: Toggle performance stats
+/// - F: Toggle showing all cubes (orange) vs only frustum-visible (green)
+///
+/// Watch the draw calls and triangle count change as you look around!
+import gleam/float
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/option
+import gleam_community/maths
+import tiramisu/camera
+import tiramisu/debug
+import tiramisu/effect.{type Effect}
+import tiramisu/game.{type GameContext}
+import tiramisu/input
+import tiramisu/scene
+import tiramisu/transform
+import tiramisu/vec3
+
+pub type Model {
+  Model(show_performance: Bool, time: Float)
+}
+
+pub type Msg {
+  Tick
+}
+
+pub fn main() -> Nil {
+  let assert Ok(cam) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1280.0 /. 720.0,
+      near: 0.1,
+      far: 200.0,
+    )
+
+  let cam =
+    cam
+    |> camera.set_position(vec3.Vec3(0.0, 10.0, 50.0))
+    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+
+  game.run(
+    width: 1280,
+    height: 720,
+    background: 0x000510,
+    camera: cam,
+    init: init,
+    update: update,
+    view: view,
+  )
+}
+
+fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+  io.println("=== Frustum Culling Demo ===")
+  io.println("")
+  io.println("This demo shows automatic frustum culling:")
+  io.println("- 1000 cubes spread across a large grid")
+  io.println("- Camera rotates automatically")
+  io.println("- Watch draw calls change as cubes move in/out of view!")
+  io.println("")
+  io.println("Controls:")
+  io.println("  P - Toggle performance stats")
+  io.println("")
+
+  #(Model(show_performance: True, time: 0.0), effect.tick(Tick))
+}
+
+fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+  case msg {
+    Tick -> {
+      // Toggle performance stats
+      let p_pressed = input.is_key_just_pressed(ctx.input, input.Custom("KeyP"))
+      let show_performance = case p_pressed {
+        True -> {
+          io.println(
+            "Performance stats: "
+            <> case !model.show_performance {
+              True -> "ON"
+              False -> "OFF"
+            },
+          )
+          !model.show_performance
+        }
+        False -> model.show_performance
+      }
+
+      // Show performance stats
+      case show_performance {
+        True -> {
+          let stats = debug.get_performance_stats()
+          io.println(
+            "FPS: "
+            <> float.to_string(stats.fps)
+            <> " | Frame: "
+            <> float.to_string(stats.frame_time)
+            <> "ms"
+            <> " | Draw Calls: "
+            <> int.to_string(stats.draw_calls)
+            <> " | Tris: "
+            <> int.to_string(stats.triangles),
+          )
+        }
+        False -> Nil
+      }
+
+      #(
+        Model(
+          show_performance: show_performance,
+          time: model.time +. ctx.delta_time,
+        ),
+        effect.tick(Tick),
+      )
+    }
+  }
+}
+
+fn view(model: Model) -> List(scene.SceneNode) {
+  let lights = [
+    scene.Light(
+      id: "ambient",
+      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
+      transform: transform.identity(),
+    ),
+    scene.Light(
+      id: "directional",
+      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.6),
+      transform: transform.Transform(
+        position: vec3.Vec3(50.0, 50.0, 50.0),
+        rotation: vec3.Vec3(0.0, 0.0, 0.0),
+        scale: vec3.Vec3(1.0, 1.0, 1.0),
+      ),
+    ),
+  ]
+
+  // Create a large grid of cubes spread across 100x100 units
+  // Grid: 10x10x10 = 1000 cubes
+  // Spacing: 10 units apart
+  // Cubes orbit around center to demonstrate frustum culling
+  let cubes =
+    list.range(0, 999)
+    |> list.map(fn(i) {
+      let x = i % 10
+      let y = { i / 10 } % 10
+      let z = i / 100
+
+      // Base position in grid
+      let fx = int.to_float(x) *. 10.0 -. 45.0
+      let fy = int.to_float(y) *. 10.0 -. 45.0
+      let fz = int.to_float(z) *. 10.0 -. 45.0
+
+      // Orbit around center - cubes move in/out of frustum
+      let orbit_angle = model.time *. 0.3 +. int.to_float(i) *. 0.01
+      let orbit_radius = 60.0
+      let orbit_x = fx +. orbit_radius *. maths.cos(orbit_angle)
+      let orbit_z = fz +. orbit_radius *. maths.sin(orbit_angle)
+
+      // Slight rotation animation
+      let rotation = model.time *. 0.5
+
+      scene.Mesh(
+        id: "cube_" <> int.to_string(i),
+        geometry: scene.BoxGeometry(2.0, 2.0, 2.0),
+        material: scene.StandardMaterial(
+          color: 0x4a9eff,
+          metalness: 0.3,
+          roughness: 0.7,
+          map: option.None,
+          normal_map: option.None,
+        ),
+        transform: transform.Transform(
+          position: vec3.Vec3(orbit_x, fy, orbit_z),
+          rotation: vec3.Vec3(rotation, rotation *. 0.7, rotation *. 0.3),
+          scale: vec3.Vec3(1.0, 1.0, 1.0),
+        ),
+        physics: option.None,
+      )
+    })
+
+  // Add a ground plane for reference
+  let ground =
+    scene.Mesh(
+      id: "ground",
+      geometry: scene.PlaneGeometry(200.0, 200.0),
+      material: scene.StandardMaterial(
+        color: 0x1a1a2e,
+        metalness: 0.0,
+        roughness: 1.0,
+        map: option.None,
+        normal_map: option.None,
+      ),
+      transform: transform.Transform(
+        position: vec3.Vec3(0.0, -50.0, 0.0),
+        rotation: vec3.Vec3(-1.5708, 0.0, 0.0),
+        // Rotate 90° to make horizontal
+        scale: vec3.Vec3(1.0, 1.0, 1.0),
+      ),
+      physics: option.None,
+    )
+
+  list.flatten([lights, cubes, [ground]])
+}

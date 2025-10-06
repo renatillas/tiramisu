@@ -14,14 +14,10 @@ pub fn register_and_get_transform_test() {
   let world = physics.register_body(world, "test_body", body, initial_transform)
 
   // Get transform - should return the initial transform we set
-  case physics.get_transform(world, "test_body") {
-    option.Some(t) -> {
-      assert t.position.x == 0.0
-      assert t.position.y == 5.0
-      assert t.position.z == 0.0
-    }
-    option.None -> panic as "Expected Some transform"
-  }
+  let assert option.Some(t) = physics.get_transform(world, "test_body")
+  assert t.position.x == 0.0
+  assert t.position.y == 5.0
+  assert t.position.z == 0.0
 }
 
 // Test: Get non-existent body transform
@@ -29,10 +25,8 @@ pub fn get_nonexistent_transform_test() {
   let world =
     physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
 
-  assert case physics.get_transform(world, "nonexistent") {
-    option.Some(_) -> False
-    option.None -> True
-  }
+  let assert option.None = physics.get_transform(world, "nonexistent")
+  Nil
 }
 
 // Test: Unregister body

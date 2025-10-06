@@ -89,12 +89,18 @@ pub opaque type AssetCache {
 
 /// Create a new empty asset cache with default max size (100 assets)
 pub fn new_cache() -> AssetCache {
-  AssetCache(assets: dict.new(), config: CacheConfig(max_size: 100, current_time: 0))
+  AssetCache(
+    assets: dict.new(),
+    config: CacheConfig(max_size: 100, current_time: 0),
+  )
 }
 
 /// Create a new empty asset cache with custom max size
 pub fn new_cache_with_size(max_size: Int) -> AssetCache {
-  AssetCache(assets: dict.new(), config: CacheConfig(max_size: max_size, current_time: 0))
+  AssetCache(
+    assets: dict.new(),
+    config: CacheConfig(max_size: max_size, current_time: 0),
+  )
 }
 
 /// Get the number of cached assets
@@ -271,10 +277,11 @@ pub fn insert_asset(
   let new_assets = dict.insert(cache.assets, url, entry)
 
   // Check if we need to evict
-  let new_cache = AssetCache(
-    assets: new_assets,
-    config: CacheConfig(..cache.config, current_time: new_time),
-  )
+  let new_cache =
+    AssetCache(
+      assets: new_assets,
+      config: CacheConfig(..cache.config, current_time: new_time),
+    )
 
   case dict.size(new_assets) > cache.config.max_size {
     True -> evict_lru(new_cache)
@@ -285,16 +292,18 @@ pub fn insert_asset(
 /// Evict the least recently used asset from the cache
 fn evict_lru(cache: AssetCache) -> AssetCache {
   // Find the URL with the oldest timestamp
-  case dict.to_list(cache.assets)
+  case
+    dict.to_list(cache.assets)
     |> list.sort(fn(a, b) {
       let #(_, CacheEntry(_, time_a)) = a
       let #(_, CacheEntry(_, time_b)) = b
       case time_a < time_b {
         True -> order.Lt
-        False -> case time_a > time_b {
-          True -> order.Gt
-          False -> order.Eq
-        }
+        False ->
+          case time_a > time_b {
+            True -> order.Gt
+            False -> order.Eq
+          }
       }
     })
     |> list.first

@@ -1,5 +1,6 @@
 import gleam/javascript/promise.{type Promise}
 import gleam/list
+import tiramisu/vec3
 
 /// Effect system for managing side effects in Tiramisu
 /// Inspired by Lustre's effect architecture
@@ -60,3 +61,8 @@ pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
 /// This is the primary way to create frame-based updates in games
 @external(javascript, "./ffi/effects.mjs", "requestAnimationFrame")
 pub fn tick(msg: msg) -> Effect(msg)
+
+/// Update the camera position
+/// This allows dynamic camera movement during gameplay
+@external(javascript, "./ffi/effects.mjs", "updateCameraPosition")
+pub fn update_camera_position(position: vec3.Vec3) -> Effect(msg)

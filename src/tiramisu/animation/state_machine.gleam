@@ -248,7 +248,8 @@ fn find_valid_transition(
 ) -> Result(Transition(ctx), Nil) {
   machine.transitions
   |> list.find(fn(transition) {
-    transition.from == from_state && check_condition(transition.condition, context)
+    transition.from == from_state
+    && check_condition(transition.condition, context)
   })
 }
 
@@ -263,10 +264,7 @@ fn check_condition(condition: Condition(ctx), context: ctx) -> Bool {
 }
 
 /// Get a state by ID
-pub fn get_state(
-  machine: StateMachine(ctx),
-  id: StateId,
-) -> Result(State, Nil) {
+pub fn get_state(machine: StateMachine(ctx), id: StateId) -> Result(State, Nil) {
   dict.get(machine.states, id)
 }
 
@@ -286,7 +284,9 @@ pub fn transition_count(machine: StateMachine(ctx)) -> Int {
 }
 
 /// Convert AnimationOutput to AnimationPlayback for use with Model3D
-pub fn to_playback(output: AnimationOutput) -> Option(object3d.AnimationPlayback) {
+pub fn to_playback(
+  output: AnimationOutput,
+) -> Option(object3d.AnimationPlayback) {
   case output {
     None -> option.None
     Single(anim) -> option.Some(object3d.SingleAnimation(anim))

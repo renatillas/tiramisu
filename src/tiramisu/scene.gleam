@@ -93,6 +93,39 @@ pub type LightType {
   HemisphereLight(sky_color: Int, ground_color: Int, intensity: Float)
 }
 
+/// Transform data for a single instance in an InstancedMesh
+pub type InstanceTransform {
+  InstanceTransform(position: vec3.Vec3, rotation: vec3.Vec3, scale: vec3.Vec3)
+}
+
+/// Create an instance transform at a position with default rotation and scale
+pub fn instance_at(position: vec3.Vec3) -> InstanceTransform {
+  InstanceTransform(
+    position: position,
+    rotation: vec3.zero(),
+    scale: vec3.one(),
+  )
+}
+
+/// Create an instance transform with custom position, rotation, and scale
+pub fn instance(
+  position position: vec3.Vec3,
+  rotation rotation: vec3.Vec3,
+  scale scale: vec3.Vec3,
+) -> InstanceTransform {
+  InstanceTransform(position: position, rotation: rotation, scale: scale)
+}
+
+/// Level of Detail configuration - a mesh to show at a specific distance from camera
+pub type LODLevel {
+  LODLevel(distance: Float, node: SceneNode)
+}
+
+/// Create an LOD level with a distance threshold and node
+pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
+  LODLevel(distance: distance, node: node)
+}
+
 /// Scene node - declarative description of 3D objects
 pub type SceneNode {
   Mesh(
@@ -102,8 +135,19 @@ pub type SceneNode {
     transform: transform.Transform,
     physics: option.Option(RigidBody),
   )
+  /// Instanced mesh - renders many copies of the same geometry/material with 1 draw call
+  /// Much more efficient than creating individual Mesh nodes for identical objects
+  InstancedMesh(
+    id: String,
+    geometry: GeometryType,
+    material: MaterialType,
+    instances: List(InstanceTransform),
+  )
   Group(id: String, transform: transform.Transform, children: List(SceneNode))
   Light(id: String, light_type: LightType, transform: transform.Transform)
+  /// Level of Detail - automatically switches between different meshes based on camera distance
+  /// Levels should be ordered from closest (distance: 0.0) to farthest
+  LOD(id: String, levels: List(LODLevel), transform: transform.Transform)
   Model3D(
     id: String,
     object: Object3D,
@@ -290,6 +334,8 @@ pub type Patch {
   UpdateAnimation(id: String, animation: option.Option(AnimationPlayback))
   UpdatePhysics(id: String, physics: option.Option(RigidBody))
   UpdateAudio(id: String, config: AudioConfig)
+  UpdateInstances(id: String, instances: List(InstanceTransform))
+  UpdateLODLevels(id: String, levels: List(LODLevel))
 }
 
 type NodeWithParent {
@@ -342,8 +388,9 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
         list.filter(curr_ids, fn(id) { set.contains(prev_id_set, id) })
         |> list.partition(fn(id) {
           case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-            Ok(NodeWithParent(_, prev_parent)), Ok(NodeWithParent(_, curr_parent)) ->
-              prev_parent != curr_parent
+            Ok(NodeWithParent(_, prev_parent)),
+              Ok(NodeWithParent(_, curr_parent))
+            -> prev_parent != curr_parent
             _, _ -> False
           }
         })
@@ -395,47 +442,60 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
 }
 
 /// Batch patches by type for optimal rendering order
+/// Optimized: Single-pass partitioning + manual concatenation (no list.flatten)
 fn batch_patches(
   removals: List(Patch),
   parent_change_removals: List(Patch),
   updates: List(Patch),
   additions: List(Patch),
 ) -> List(Patch) {
-  // Group updates by type for better cache locality
-  let #(transform_updates, other_updates) =
-    list.partition(updates, fn(patch) {
+  // Single-pass partitioning with fold (O(n) instead of O(3n))
+  let #(transform_updates, material_updates, geometry_updates, misc_updates) =
+    list.fold(updates, #([], [], [], []), fn(acc, patch) {
+      let #(transforms, materials, geometries, misc) = acc
       case patch {
-        UpdateTransform(_, _) -> True
-        _ -> False
+        UpdateTransform(_, _) -> #(
+          [patch, ..transforms],
+          materials,
+          geometries,
+          misc,
+        )
+        UpdateMaterial(_, _) -> #(
+          transforms,
+          [patch, ..materials],
+          geometries,
+          misc,
+        )
+        UpdateGeometry(_, _) -> #(
+          transforms,
+          materials,
+          [patch, ..geometries],
+          misc,
+        )
+        _ -> #(transforms, materials, geometries, [patch, ..misc])
       }
     })
 
-  let #(material_updates, remaining_updates) =
-    list.partition(other_updates, fn(patch) {
-      case patch {
-        UpdateMaterial(_, _) -> True
-        _ -> False
-      }
-    })
-
-  let #(geometry_updates, misc_updates) =
-    list.partition(remaining_updates, fn(patch) {
-      case patch {
-        UpdateGeometry(_, _) -> True
-        _ -> False
-      }
-    })
-
-  // Optimal order: removals → transform updates → material updates → geometry updates → misc → additions
-  list.flatten([
+  // Efficient concatenation: prepend in reverse order, then single reverse
+  // This avoids list.flatten's multiple traversals
+  concat_patches([
     removals,
     parent_change_removals,
-    transform_updates,
-    material_updates,
-    geometry_updates,
-    misc_updates,
+    list.reverse(transform_updates),
+    list.reverse(material_updates),
+    list.reverse(geometry_updates),
+    list.reverse(misc_updates),
     additions,
   ])
+}
+
+/// Efficiently concatenate multiple lists using fold + prepend
+/// O(n) total instead of list.flatten's O(n * m)
+fn concat_patches(lists: List(List(Patch))) -> List(Patch) {
+  list.fold(lists, [], fn(acc, patches) {
+    list.fold(patches, acc, fn(acc2, patch) { [patch, ..acc2] })
+  })
+  |> list.reverse
 }
 
 /// Sort AddNode patches so that parents are added before their children
@@ -525,6 +585,19 @@ fn compare_nodes_detailed(
         curr_phys,
       )
 
+    InstancedMesh(_, prev_geom, prev_mat, prev_instances),
+      InstancedMesh(_, curr_geom, curr_mat, curr_instances)
+    ->
+      compare_instanced_mesh_fields(
+        id,
+        prev_geom,
+        prev_mat,
+        prev_instances,
+        curr_geom,
+        curr_mat,
+        curr_instances,
+      )
+
     Light(_, prev_light, prev_trans), Light(_, curr_light, curr_trans) ->
       compare_light_fields(id, prev_light, prev_trans, curr_light, curr_trans)
 
@@ -533,6 +606,9 @@ fn compare_nodes_detailed(
         True -> [UpdateTransform(id, curr_trans)]
         False -> []
       }
+
+    LOD(_, prev_levels, prev_trans), LOD(_, curr_levels, curr_trans) ->
+      compare_lod_fields(id, prev_levels, prev_trans, curr_levels, curr_trans)
 
     Model3D(_, _, prev_trans, prev_anim, prev_phys),
       Model3D(_, _, curr_trans, curr_anim, curr_phys)
@@ -594,6 +670,36 @@ fn compare_mesh_fields(
   patches
 }
 
+/// Compare InstancedMesh fields using accumulator pattern
+fn compare_instanced_mesh_fields(
+  id: String,
+  prev_geom: GeometryType,
+  prev_mat: MaterialType,
+  prev_instances: List(InstanceTransform),
+  curr_geom: GeometryType,
+  curr_mat: MaterialType,
+  curr_instances: List(InstanceTransform),
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_mat != curr_mat {
+    True -> [UpdateMaterial(id, curr_mat), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_geom != curr_geom {
+    True -> [UpdateGeometry(id, curr_geom), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_instances != curr_instances {
+    True -> [UpdateInstances(id, curr_instances), ..patches]
+    False -> patches
+  }
+
+  patches
+}
+
 /// Compare Light fields using accumulator pattern
 fn compare_light_fields(
   id: String,
@@ -611,6 +717,29 @@ fn compare_light_fields(
 
   let patches = case prev_light != curr_light {
     True -> [UpdateLight(id, curr_light), ..patches]
+    False -> patches
+  }
+
+  patches
+}
+
+/// Compare LOD fields using accumulator pattern
+fn compare_lod_fields(
+  id: String,
+  prev_levels: List(LODLevel),
+  prev_trans: transform.Transform,
+  curr_levels: List(LODLevel),
+  curr_trans: transform.Transform,
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_trans != curr_trans {
+    True -> [UpdateTransform(id, curr_trans), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_levels != curr_levels {
+    True -> [UpdateLODLevels(id, curr_levels), ..patches]
     False -> patches
   }
 
