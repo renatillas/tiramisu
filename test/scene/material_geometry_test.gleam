@@ -10,7 +10,13 @@ pub fn update_standard_material_test() {
     scene.Mesh(
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(0xff0000, 0.5, 0.5, option.None),
+      material: scene.StandardMaterial(
+        0xff0000,
+        0.5,
+        0.5,
+        option.None,
+        option.None,
+      ),
       transform: transform.identity(),
       physics: option.None,
     ),
@@ -19,7 +25,13 @@ pub fn update_standard_material_test() {
     scene.Mesh(
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(0xff0000, 0.8, 0.2, option.None),
+      material: scene.StandardMaterial(
+        0xff0000,
+        0.8,
+        0.2,
+        option.None,
+        option.None,
+      ),
       transform: transform.identity(),
       physics: option.None,
     ),
@@ -31,7 +43,7 @@ pub fn update_standard_material_test() {
   assert case list.first(patches) {
     Ok(scene.UpdateMaterial(
       "mesh1",
-      scene.StandardMaterial(0xff0000, 0.8, 0.2, option.None),
+      scene.StandardMaterial(0xff0000, 0.8, 0.2, option.None, option.None),
     )) -> True
     _ -> False
   }
@@ -52,7 +64,13 @@ pub fn change_material_type_test() {
     scene.Mesh(
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(0xff0000, 0.5, 0.5, option.None),
+      material: scene.StandardMaterial(
+        0xff0000,
+        0.5,
+        0.5,
+        option.None,
+        option.None,
+      ),
       transform: transform.identity(),
       physics: option.None,
     ),
@@ -62,8 +80,10 @@ pub fn change_material_type_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateMaterial("mesh1", scene.StandardMaterial(_, _, _, _))) ->
-      True
+    Ok(scene.UpdateMaterial(
+      "mesh1",
+      scene.StandardMaterial(_, _, _, _, option.None),
+    )) -> True
     _ -> False
   }
 }
@@ -371,7 +391,13 @@ pub fn complex_scene_test() {
     scene.Mesh(
       id: "box",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(0xff0000, 0.5, 0.5, option.None),
+      material: scene.StandardMaterial(
+        0xff0000,
+        0.5,
+        0.5,
+        option.None,
+        option.None,
+      ),
       transform: transform.identity(),
       physics: option.None,
     ),

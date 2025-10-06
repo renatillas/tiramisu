@@ -95,7 +95,8 @@ pub fn invalid_opacity_negative_test() {
 pub fn valid_standard_material_test() {
   let result = scene.standard_material(0xff0000, 0.5, 0.8)
   assert case result {
-    Ok(scene.StandardMaterial(0xff0000, 0.5, 0.8, option.None)) -> True
+    Ok(scene.StandardMaterial(0xff0000, 0.5, 0.8, option.None, option.None)) ->
+      True
     _ -> False
   }
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics } from '../scene.mjs';
+import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio } from '../scene.mjs';
 import {
-  Mesh, Light, Group, Model3D,
+  Mesh, Light, Group, Model3D, Audio,
   DebugBox, DebugSphere, DebugLine, DebugAxes, DebugGrid, DebugPoint,
   BoxGeometry, SphereGeometry, ConeGeometry, PlaneGeometry, CircleGeometry,
   CylinderGeometry, TorusGeometry, TetrahedronGeometry, IcosahedronGeometry,
@@ -11,6 +11,8 @@ import {
   AmbientLight, DirectionalLight, PointLight, SpotLight, HemisphereLight
 } from '../scene.mjs';
 import { LoopOnce, LoopRepeat, SingleAnimation, BlendedAnimations } from '../object3d.mjs';
+import { GlobalAudio, PositionalAudio } from '../audio.mjs';
+import { playAudio, pauseAudio, stopAudio, setAudioVolume, updateAudioConfig } from './audio.mjs';
 import { createRigidBody, removeRigidBody, getBodyTransform } from './physics.mjs';
 import { createDebugBox, createDebugSphere, createDebugLine, createDebugAxes, createDebugGrid, createDebugPoint, updatePerformanceStats, setRenderStats } from './debug.mjs';
 
@@ -251,6 +253,12 @@ export function applyPatch(scene, patch) {
       if (node.physics && node.physics[0]) {
         createRigidBody(id, node.physics[0], node.transform);
       }
+    } else if (node instanceof Audio) {
+      // Audio nodes don't need a visual Three.js object
+      // Just play the audio using the audio system
+      playAudio(id, node.buffer, node.config, node.audio_type);
+      // Store a placeholder to track the audio node in cache
+      threeObj = new THREE.Group(); // Empty group as placeholder
     } else if (node instanceof DebugBox) {
       threeObj = createDebugBox(node.min, node.max, node.color);
     } else if (node instanceof DebugSphere) {
@@ -297,6 +305,9 @@ export function applyPatch(scene, patch) {
         mixerCache.delete(id);
         actionCache.delete(id);
       }
+
+      // Stop audio if exists
+      stopAudio(id);
 
       // Remove physics body if exists
       removeRigidBody(id);
@@ -382,6 +393,11 @@ export function applyPatch(scene, patch) {
     } else {
       console.log('[Renderer] Removed physics from node:', id);
     }
+  } else if (patch instanceof UpdateAudio) {
+    const { id, config } = patch;
+    // Update audio configuration
+    updateAudioConfig(id, config);
+    console.log('[Renderer] Updated audio config for node:', id);
   } else {
     console.warn('Unknown patch type:', patch);
   }

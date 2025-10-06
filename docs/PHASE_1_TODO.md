@@ -67,6 +67,10 @@
 - Examples
 
 ### Phase 5: Advanced
-- Physics integration
 - Performance optimization
-- Post-processing
+- Full test suite
+- Full documentation, with tutorials like lustre
+
+### Phase 6: Extras
+- Postprocessing
+- UI

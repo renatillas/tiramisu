@@ -4,6 +4,7 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/order
 import gleam/result
+import tiramisu/audio.{type AudioBuffer, type AudioConfig, type AudioType}
 import tiramisu/math/vec3.{type Vec3}
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
@@ -63,6 +64,7 @@ pub type MaterialType {
     metalness: Float,
     roughness: Float,
     map: Option(Texture),
+    normal_map: Option(Texture),
   )
   PhongMaterial(color: Int, shininess: Float, map: Option(Texture))
   LambertMaterial(color: Int, map: Option(Texture))
@@ -108,6 +110,12 @@ pub type SceneNode {
     transform: transform.Transform,
     animation: option.Option(AnimationPlayback),
     physics: option.Option(RigidBody),
+  )
+  Audio(
+    id: String,
+    buffer: AudioBuffer,
+    config: AudioConfig,
+    audio_type: AudioType,
   )
   // Debug visualization nodes
   DebugBox(id: String, min: Vec3, max: Vec3, color: Int)
@@ -246,7 +254,7 @@ pub fn standard_material(
     Error(InvalidRoughness(roughness)),
   )
 
-  Ok(StandardMaterial(color, metalness, roughness, option.None))
+  Ok(StandardMaterial(color, metalness, roughness, option.None, option.None))
 }
 
 pub fn line_material(
@@ -281,6 +289,7 @@ pub type Patch {
   UpdateLight(id: String, light_type: LightType)
   UpdateAnimation(id: String, animation: option.Option(AnimationPlayback))
   UpdatePhysics(id: String, physics: option.Option(RigidBody))
+  UpdateAudio(id: String, config: AudioConfig)
 }
 
 type NodeWithParent {
@@ -482,6 +491,13 @@ fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
         True -> [UpdatePhysics(id, curr_phys)]
         False -> []
       })
+    }
+
+    Audio(_, _, prev_config, _), Audio(_, _, curr_config, _) -> {
+      case prev_config != curr_config {
+        True -> [UpdateAudio(id, curr_config)]
+        False -> []
+      }
     }
 
     _, _ -> []
