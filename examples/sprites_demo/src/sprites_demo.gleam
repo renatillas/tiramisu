@@ -10,10 +10,10 @@ import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
 import tiramisu/graphics/sprite
-import tiramisu/math/vec3
 import tiramisu/scene.{type Texture}
 import tiramisu/texture
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(

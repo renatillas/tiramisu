@@ -1,8 +1,8 @@
 import gleam/list
 import gleam/option
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 // Test: empty to empty diff produces no patches
 pub fn empty_to_empty_test() {

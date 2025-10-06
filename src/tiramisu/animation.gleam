@@ -1,7 +1,7 @@
 import gleam/float
 import gleam_community/maths
-import tiramisu/math/vec3
 import tiramisu/transform
+import tiramisu/vec3
 
 /// Easing functions for smooth animations
 pub type Easing {

@@ -1,4 +1,4 @@
-import tiramisu/math/vec3
+import tiramisu/vec3
 
 /// Transform represents position, rotation, and scale
 pub type Transform {

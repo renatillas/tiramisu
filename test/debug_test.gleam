@@ -1,7 +1,7 @@
 import tiramisu/debug
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub fn bounding_box_creates_debug_box_test() {
   let min = vec3.Vec3(0.0, 0.0, 0.0)

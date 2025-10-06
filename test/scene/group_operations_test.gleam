@@ -1,8 +1,8 @@
 import gleam/list
 import gleam/option
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 // Test: Removing a group removes all its children
 pub fn remove_group_with_children_test() {

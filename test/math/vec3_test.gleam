@@ -1,5 +1,5 @@
 import gleam/float
-import tiramisu/math/vec3
+import tiramisu/vec3
 
 // Test: zero vector
 pub fn zero_test() {

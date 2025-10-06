@@ -8,8 +8,8 @@
 import gleam/dict.{type Dict}
 import gleam/list
 import gleam/option.{type Option}
-import tiramisu/math/vec3.{type Vec3}
 import tiramisu/transform.{type Transform}
+import tiramisu/vec3.{type Vec3}
 
 // --- Opaque Types ---
 
@@ -92,10 +92,7 @@ pub fn new_world(config: WorldConfig) -> PhysicsWorld {
 }
 
 /// Create a new rigid body with default settings
-pub fn rigid_body(
-  body_type: BodyType,
-  collider: ColliderShape,
-) -> RigidBody {
+pub fn rigid_body(body_type: BodyType, collider: ColliderShape) -> RigidBody {
   RigidBody(
     body_type: body_type,
     mass: option.None,

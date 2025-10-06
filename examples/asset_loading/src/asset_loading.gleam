@@ -8,9 +8,9 @@ import tiramisu/audio
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type LoadState {
   Loading(progress: Int, total: Int, current_url: String)

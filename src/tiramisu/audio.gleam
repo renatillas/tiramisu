@@ -3,7 +3,7 @@
 /// Provides audio playback with support for both 2D (global) and 3D (positional) audio.
 /// Uses the Web Audio API via THREE.js Audio classes.
 import gleam/option.{type Option}
-import tiramisu/math/vec3.{type Vec3}
+import tiramisu/vec3.{type Vec3}
 
 // --- Public Types ---
 
@@ -46,12 +46,7 @@ pub type AudioSource
 
 /// Create default audio config
 pub fn config() -> AudioConfig {
-  AudioConfig(
-    volume: 1.0,
-    loop: False,
-    playback_rate: 1.0,
-    autoplay: False,
-  )
+  AudioConfig(volume: 1.0, loop: False, playback_rate: 1.0, autoplay: False)
 }
 
 /// Set volume (0.0 to 1.0)
@@ -76,7 +71,11 @@ pub fn set_autoplay(config: AudioConfig, autoplay: Bool) -> AudioConfig {
 
 /// Create a default positional audio configuration
 pub fn positional() -> AudioType {
-  PositionalAudio(ref_distance: 1.0, rolloff_factor: 1.0, max_distance: 10000.0)
+  PositionalAudio(
+    ref_distance: 1.0,
+    rolloff_factor: 1.0,
+    max_distance: 10_000.0,
+  )
 }
 
 /// Set reference distance for positional audio
@@ -170,7 +169,12 @@ pub type AudioNode {
 
 /// Create a global audio node (2D audio)
 pub fn global_audio(id: String, config: AudioConfig) -> AudioNode {
-  AudioNode(id: id, config: config, audio_type: GlobalAudio, position: option.None)
+  AudioNode(
+    id: id,
+    config: config,
+    audio_type: GlobalAudio,
+    position: option.None,
+  )
 }
 
 /// Create a positional audio node (3D audio at a position)

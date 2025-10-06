@@ -5,8 +5,9 @@ import gleam/option
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/scene
+import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(time: Float)
@@ -49,7 +50,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.0),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
     ),
     // Center square
     scene.Mesh(
@@ -61,7 +62,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         opacity: 1.0,
         map: option.None,
       ),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(0.0, 0.0, 0.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
         scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -78,7 +79,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         opacity: 1.0,
         map: option.None,
       ),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(-150.0, 150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
         scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -94,7 +95,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         opacity: 1.0,
         map: option.None,
       ),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(150.0, 150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
         scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -110,7 +111,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         opacity: 1.0,
         map: option.None,
       ),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(-150.0, -150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
         scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -126,7 +127,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         opacity: 1.0,
         map: option.None,
       ),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(150.0, -150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
         scale: vec3.Vec3(1.0, 1.0, 1.0),

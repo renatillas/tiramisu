@@ -2,10 +2,10 @@ import gleam/option
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/physics
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(rotation: Float, physics_world: physics.PhysicsWorld)
@@ -90,6 +90,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.3,
         roughness: 0.7,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
@@ -108,6 +109,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.2,
         roughness: 0.8,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: case physics.get_transform(model.physics_world, "cube1") {
         option.Some(t) -> t
@@ -130,6 +132,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.2,
         roughness: 0.8,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: case physics.get_transform(model.physics_world, "cube2") {
         option.Some(t) -> t
@@ -152,6 +155,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.2,
         roughness: 0.8,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: case physics.get_transform(model.physics_world, "cube3") {
         option.Some(t) -> t

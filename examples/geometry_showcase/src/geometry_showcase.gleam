@@ -10,9 +10,9 @@ import gleam/option
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(rotation: Float)
@@ -176,6 +176,7 @@ fn create_mesh(
       metalness: 0.2,
       roughness: 0.6,
       map: option.None,
+      normal_map: option.None,
     ),
     transform: transform.Transform(
       position: vec3.Vec3(x, y, 0.0),

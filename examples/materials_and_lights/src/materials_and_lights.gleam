@@ -3,9 +3,9 @@ import gleam/option
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(rotation: Float, light_intensity: Float)
@@ -122,6 +122,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.8,
         roughness: 0.2,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: transform.Transform(
         position: vec3.Vec3(-3.0, 2.0, 0.0),
@@ -178,6 +179,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         metalness: 0.0,
         roughness: 0.8,
         map: option.None,
+        normal_map: option.None,
       ),
       transform: transform.Transform(
         position: vec3.Vec3(0.0, -2.0, 0.0),

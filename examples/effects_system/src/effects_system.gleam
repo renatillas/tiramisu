@@ -9,8 +9,9 @@ import plinth/javascript/global
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
-import tiramisu/math/vec3
 import tiramisu/scene
+import tiramisu/transform
+import tiramisu/vec3
 
 pub type Model {
   Model(cubes: List(Cube), next_id: Int)
@@ -131,12 +132,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
     ),
     scene.Light(
       id: "directional",
       light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
-      transform: scene.Transform(
+      transform: transform.Transform(
         position: vec3.Vec3(10.0, 10.0, 10.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
         scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -154,8 +155,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
           metalness: 0.3,
           roughness: 0.5,
           map: option.None,
+          normal_map: option.None,
         ),
-        transform: scene.Transform(
+        transform: transform.Transform(
           position: cube.position,
           rotation: vec3.Vec3(
             cube.position.y *. 0.5,

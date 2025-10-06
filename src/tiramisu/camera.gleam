@@ -1,6 +1,6 @@
 import gleam/bool
 import gleam/int
-import tiramisu/math/vec3
+import tiramisu/vec3
 
 /// Opaque immutable camera configuration
 pub opaque type Camera {

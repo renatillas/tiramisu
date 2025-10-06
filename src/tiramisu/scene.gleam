@@ -5,10 +5,10 @@ import gleam/option.{type Option}
 import gleam/order
 import gleam/result
 import tiramisu/audio.{type AudioBuffer, type AudioConfig, type AudioType}
-import tiramisu/math/vec3.{type Vec3}
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
 import tiramisu/transform
+import tiramisu/vec3.{type Vec3}
 
 /// Opaque type for Three.js textures
 pub type Texture

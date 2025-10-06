@@ -1,5 +1,5 @@
-import tiramisu/math/vec3
 import tiramisu/transform
+import tiramisu/vec3
 
 // Test: identity transform
 pub fn identity_transform_test() {

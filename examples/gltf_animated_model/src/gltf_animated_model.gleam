@@ -11,10 +11,10 @@ import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/game.{type GameContext}
 import tiramisu/gltf
-import tiramisu/math/vec3
 import tiramisu/object3d
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3
 
 pub type LoadState {
   Loading
@@ -105,7 +105,7 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
       )
 
       // Print animation names
-      case gltf.animations(data) {
+      case data.animations {
         [] -> io.println("No animations found")
         clips -> {
           io.println("Available animations:")
@@ -217,6 +217,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             metalness: 0.5,
             roughness: 0.5,
             map: option.None,
+            normal_map: option.None,
           ),
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
@@ -234,13 +235,11 @@ fn view(model: Model) -> List(scene.SceneNode) {
         gltf.get_animation(gltf_model, model.current_animation)
       {
         Ok(clip) ->
-          option.Some(
-            object3d.SingleAnimation(
-              object3d.new_animation(clip)
-              |> object3d.set_loop(object3d.LoopRepeat)
-              |> object3d.set_speed(model.animation_speed),
-            ),
-          )
+          option.Some(object3d.SingleAnimation(
+            object3d.new_animation(clip)
+            |> object3d.set_loop(object3d.LoopRepeat)
+            |> object3d.set_speed(model.animation_speed),
+          ))
         Error(_) -> option.None
       }
 
@@ -248,7 +247,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let model_node =
         scene.Model3D(
           id: "gltf_model",
-          object: gltf.scene(gltf_model),
+          object: gltf_model.scene,
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(0.0, model.rotation, 0.0),

@@ -5,9 +5,9 @@
 /// can be conditionally included in your view based on debug mode.
 import gleam/int
 import gleam/list
-import tiramisu/math/vec3.{type Vec3}
 import tiramisu/scene
 import tiramisu/transform
+import tiramisu/vec3.{type Vec3}
 
 // --- Debug Scene Node Constructors ---
 // All functions return regular SceneNodes for declarative rendering
