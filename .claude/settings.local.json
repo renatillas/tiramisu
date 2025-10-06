@@ -7,7 +7,16 @@
       "WebSearch",
       "WebFetch(domain:hexdocs.pm)",
       "Read(//Users/renata-amutio/Projects/renatillas/tiramisu_dev_tools/**)",
-      "Bash(gleam build:*)"
+      "Bash(gleam build:*)",
+      "Bash(for dir in */)",
+      "Bash(do)",
+      "Bash(file=\"$dir/src/$dir%/.gleam\")",
+      "Bash(if [ -f \"$file\" ])",
+      "Bash(then)",
+      "Bash(if grep -q \"camera: cam,\" \"$file\")",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

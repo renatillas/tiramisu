@@ -5,6 +5,7 @@ import gleam/option.{type Option}
 import gleam/order
 import gleam/set
 import tiramisu/audio.{type AudioBuffer, type AudioConfig, type AudioType}
+import tiramisu/camera
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
 import tiramisu/transform
@@ -145,6 +146,20 @@ pub type SceneNode {
   )
   Group(id: String, transform: transform.Transform, children: List(SceneNode))
   Light(id: String, light_type: LightType, transform: transform.Transform)
+  /// Camera - defines a viewpoint in the scene
+  /// Only one camera can be active at a time for rendering (when viewport is None)
+  /// Use effect.set_active_camera(id) to switch between cameras
+  /// Set viewport to render in a specific area (for picture-in-picture effects)
+  Camera(
+    id: String,
+    camera_type: camera.Camera,
+    transform: transform.Transform,
+    active: Bool,
+    /// Optional viewport: (x, y, width, height) in pixels
+    /// If None, camera fills entire canvas (only when active=True)
+    /// If Some, camera renders in specified rectangle (regardless of active state)
+    viewport: option.Option(#(Int, Int, Int, Int)),
+  )
   /// Level of Detail - automatically switches between different meshes based on camera distance
   /// Levels should be ordered from closest (distance: 0.0) to farthest
   LOD(id: String, levels: List(LODLevel), transform: transform.Transform)
@@ -336,6 +351,8 @@ pub type Patch {
   UpdateAudio(id: String, config: AudioConfig)
   UpdateInstances(id: String, instances: List(InstanceTransform))
   UpdateLODLevels(id: String, levels: List(LODLevel))
+  UpdateCamera(id: String, camera_type: camera.Camera)
+  SetActiveCamera(id: String)
 }
 
 type NodeWithParent {
@@ -607,6 +624,21 @@ fn compare_nodes_detailed(
         False -> []
       }
 
+    Camera(_, prev_cam, prev_trans, prev_active, prev_viewport),
+      Camera(_, curr_cam, curr_trans, curr_active, curr_viewport)
+    ->
+      compare_camera_fields(
+        id,
+        prev_cam,
+        prev_trans,
+        prev_active,
+        prev_viewport,
+        curr_cam,
+        curr_trans,
+        curr_active,
+        curr_viewport,
+      )
+
     LOD(_, prev_levels, prev_trans), LOD(_, curr_levels, curr_trans) ->
       compare_lod_fields(id, prev_levels, prev_trans, curr_levels, curr_trans)
 
@@ -741,6 +773,40 @@ fn compare_lod_fields(
   let patches = case prev_levels != curr_levels {
     True -> [UpdateLODLevels(id, curr_levels), ..patches]
     False -> patches
+  }
+
+  patches
+}
+
+/// Compare Camera fields using accumulator pattern
+fn compare_camera_fields(
+  id: String,
+  prev_cam: camera.Camera,
+  prev_trans: transform.Transform,
+  prev_active: Bool,
+  prev_viewport: option.Option(#(Int, Int, Int, Int)),
+  curr_cam: camera.Camera,
+  curr_trans: transform.Transform,
+  curr_active: Bool,
+  curr_viewport: option.Option(#(Int, Int, Int, Int)),
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_trans != curr_trans {
+    True -> [UpdateTransform(id, curr_trans), ..patches]
+    False -> patches
+  }
+
+  // If camera config or viewport changed, emit UpdateCamera patch
+  let patches = case prev_cam != curr_cam || prev_viewport != curr_viewport {
+    True -> [UpdateCamera(id, curr_cam), ..patches]
+    False -> patches
+  }
+
+  // If active state changed, emit SetActiveCamera patch
+  let patches = case prev_active, curr_active {
+    False, True -> [SetActiveCamera(id), ..patches]
+    _, _ -> patches
   }
 
   patches

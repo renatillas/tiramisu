@@ -1,5 +1,6 @@
 /// Immutable game loop with effect system
 /// Following Lustre's Model-View-Update architecture
+import gleam/option.{type Option}
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/input.{type InputState}
@@ -11,15 +12,19 @@ type Scene
 
 /// Game context passed to init and update functions
 pub type GameContext {
-  GameContext(camera: camera.Camera, delta_time: Float, input: InputState)
+  GameContext(delta_time: Float, input: InputState)
 }
 
 /// Initialize and run the game loop
+///
+/// The camera parameter is optional. If provided, it will initialize a default camera for
+/// backwards compatibility. If not provided, you must include a Camera scene node with
+/// active=True in your initial scene.
 pub fn run(
   width width: Int,
   height height: Int,
   background background: Int,
-  camera camera: camera.Camera,
+  camera camera: Option(camera.Camera),
   init init: fn(GameContext) -> #(state, Effect(msg)),
   update update: fn(state, msg, GameContext) -> #(state, Effect(msg)),
   view view: fn(state) -> List(SceneNode),
@@ -36,8 +41,7 @@ pub fn run(
   let scene_obj = create_scene(background)
 
   // Initial context with empty input
-  let initial_context =
-    GameContext(camera:, delta_time: 0.0, input: input.new())
+  let initial_context = GameContext(delta_time: 0.0, input: input.new())
 
   // Initialize game state
   let #(initial_state, initial_effect) = init(initial_context)
@@ -50,8 +54,14 @@ pub fn run(
   append_to_dom(canvas)
   initialize_input_systems(canvas)
 
-  // Apply initial scene
+  // Apply initial scene (this will set up cameras from scene nodes)
   apply_initial_scene(scene_obj, initial_nodes)
+
+  // Initialize camera if provided (for backwards compatibility)
+  case camera {
+    option.Some(cam) -> initialize_camera(cam)
+    option.None -> Nil
+  }
 
   // Start game loop
   start_loop(
@@ -61,7 +71,6 @@ pub fn run(
     initial_context,
     scene_obj,
     renderer_obj,
-    camera,
     update,
     view,
   )
@@ -81,6 +90,9 @@ fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
 @external(javascript, "./ffi/game.mjs", "applyInitialScene")
 fn apply_initial_scene(scene: Scene, nodes: List(SceneNode)) -> Nil
 
+@external(javascript, "./ffi/game.mjs", "initializeCamera")
+fn initialize_camera(camera: camera.Camera) -> Nil
+
 @external(javascript, "./ffi/game.mjs", "startLoop")
 fn start_loop(
   state: state,
@@ -89,7 +101,6 @@ fn start_loop(
   context: GameContext,
   scene: Scene,
   renderer: renderer.WebGLRenderer,
-  camera: camera.Camera,
   update: fn(state, msg, GameContext) -> #(state, Effect(msg)),
   view: fn(state) -> List(SceneNode),
 ) -> Nil

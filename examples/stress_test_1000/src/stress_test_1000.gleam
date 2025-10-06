@@ -34,24 +34,11 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 0.0, 60.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   game.run(
     width: 1280,
     height: 720,
     background: 0x0a0a1a,
-    camera: cam,
+    camera: option.None,
     init: init,
     update: update,
     view: view,
@@ -192,6 +179,28 @@ fn compute_instances(time: Float) -> List(scene.InstanceTransform) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  // Camera setup
+  let assert Ok(cam) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1280.0 /. 720.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+
+  let cam =
+    cam
+    |> camera.set_position(vec3.Vec3(0.0, 0.0, 60.0))
+    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+
+  let camera_node =
+    scene.Camera(
+      id: "main_camera",
+      camera_type: cam,
+      transform: transform.identity(),
+      active: True,
+    )
+
   let lights = [
     scene.Light(
       id: "ambient",
@@ -227,5 +236,5 @@ fn view(model: Model) -> List(scene.SceneNode) {
       instances: instances,
     )
 
-  list.flatten([lights, [instanced_cubes]])
+  list.flatten([[camera_node], lights, [instanced_cubes]])
 }

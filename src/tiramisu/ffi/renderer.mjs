@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio, UpdateInstances, UpdateLODLevels } from '../scene.mjs';
+import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio, UpdateInstances, UpdateLODLevels, UpdateCamera, SetActiveCamera } from '../scene.mjs';
 import {
-  Mesh, InstancedMesh, Light, Group, LOD, Model3D, Audio,
+  Mesh, InstancedMesh, Light, Group, LOD, Model3D, Audio, Camera,
   DebugBox, DebugSphere, DebugLine, DebugAxes, DebugGrid, DebugPoint,
   BoxGeometry, SphereGeometry, ConeGeometry, PlaneGeometry, CircleGeometry,
   CylinderGeometry, TorusGeometry, TetrahedronGeometry, IcosahedronGeometry,
@@ -15,6 +15,8 @@ import { GlobalAudio, PositionalAudio } from '../audio.mjs';
 import { playAudio, pauseAudio, stopAudio, setAudioVolume, updateAudioConfig } from './audio.mjs';
 import { createRigidBody, removeRigidBody, getBodyTransform } from './physics.mjs';
 import { createDebugBox, createDebugSphere, createDebugLine, createDebugAxes, createDebugGrid, createDebugPoint, updatePerformanceStats, setRenderStats } from './debug.mjs';
+import { createThreeCamera } from './camera.mjs';
+import { setCamera } from './effects.mjs';
 
 // Cache of Three.js objects by ID
 const objectCache = new Map();
@@ -24,6 +26,9 @@ const mixerCache = new Map();
 
 // Cache of current animation actions by node ID (can be array for blending)
 const actionCache = new Map();
+
+// Cache of camera viewports by camera ID
+const cameraViewports = new Map();
 
 // Create Three.js geometry from geometry type
 export function createGeometry(geomType) {
@@ -303,6 +308,34 @@ export function applyPatch(scene, patch) {
       playAudio(id, node.buffer, node.config, node.audio_type);
       // Store a placeholder to track the audio node in cache
       threeObj = new THREE.Group(); // Empty group as placeholder
+    } else if (node instanceof Camera) {
+      // Create Three.js camera from Gleam camera config
+      threeObj = createThreeCamera(node.camera_type.projection);
+
+      // Apply camera position from Gleam config
+      const pos = node.camera_type.position;
+      threeObj.position.set(pos.x, pos.y, pos.z);
+
+      // Apply look_at from Gleam config
+      const lookAt = node.camera_type.look_at_target;
+      threeObj.lookAt(lookAt.x, lookAt.y, lookAt.z);
+
+      // Update projection matrix
+      threeObj.updateProjectionMatrix();
+
+      // Store viewport if specified
+      if (node.viewport && node.viewport[0]) {
+        const viewport = node.viewport[0];
+        cameraViewports.set(id, viewport);
+      } else {
+        cameraViewports.delete(id);
+      }
+
+      // If this camera is active, set it as the active camera for rendering
+      if (node.active) {
+        setCamera(threeObj);
+        console.log('[Renderer] Set active camera:', id);
+      }
     } else if (node instanceof DebugBox) {
       threeObj = createDebugBox(node.min, node.max, node.color);
     } else if (node instanceof DebugSphere) {
@@ -488,9 +521,68 @@ export function applyPatch(scene, patch) {
     } else {
       console.warn('[Renderer] Object not found or not an LOD:', id);
     }
+  } else if (patch instanceof UpdateCamera) {
+    const { id, camera_type } = patch;
+    const cameraObj = objectCache.get(id);
+    if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
+      // Update camera position
+      const pos = camera_type.position;
+      cameraObj.position.set(pos.x, pos.y, pos.z);
+
+      // Update look_at
+      const lookAt = camera_type.look_at_target;
+      cameraObj.lookAt(lookAt.x, lookAt.y, lookAt.z);
+
+      // Update camera projection parameters if they changed
+      const projection = camera_type.projection;
+      if (projection.fov !== undefined && cameraObj instanceof THREE.PerspectiveCamera) {
+        cameraObj.fov = projection.fov;
+        cameraObj.aspect = projection.aspect;
+        cameraObj.near = projection.near;
+        cameraObj.far = projection.far;
+      } else if (projection.left !== undefined && cameraObj instanceof THREE.OrthographicCamera) {
+        cameraObj.left = projection.left;
+        cameraObj.right = projection.right;
+        cameraObj.top = projection.top;
+        cameraObj.bottom = projection.bottom;
+        cameraObj.near = projection.near;
+        cameraObj.far = projection.far;
+      }
+
+      // Update projection matrix
+      cameraObj.updateProjectionMatrix();
+
+      console.log('[Renderer] Updated camera:', id);
+    } else {
+      console.warn('[Renderer] Camera not found:', id);
+    }
+  } else if (patch instanceof SetActiveCamera) {
+    const id = patch.id;
+    const cameraObj = objectCache.get(id);
+    if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
+      setCamera(cameraObj);
+      console.log('[Renderer] Switched to active camera:', id);
+    } else {
+      console.warn('[Renderer] Camera not found or not a camera:', id);
+    }
   } else {
     console.warn('Unknown patch type:', patch);
   }
+}
+
+/**
+ * Get all cameras with viewports for multi-viewport rendering
+ * Returns array of { camera, viewport: [x, y, width, height] }
+ */
+export function getCamerasWithViewports() {
+  const cameras = [];
+  for (const [id, viewport] of cameraViewports.entries()) {
+    const camera = objectCache.get(id);
+    if (camera) {
+      cameras.push({ camera, viewport });
+    }
+  }
+  return cameras;
 }
 
 // Update InstancedMesh transform matrices from Gleam InstanceTransform list

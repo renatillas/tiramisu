@@ -13,7 +13,11 @@ import tiramisu/transform
 import tiramisu/vec3
 
 pub type Model {
-  Model(camera_z: Float, show_performance: Bool)
+  Model(
+    camera_position: vec3.Vec3,
+    camera_target: vec3.Vec3,
+    show_performance: Bool,
+  )
 }
 
 pub type Msg {
@@ -21,24 +25,11 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 500.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 20.0, 30.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   game.run(
     width: 1280,
     height: 720,
     background: 0x0a0a1a,
-    camera: cam,
+    camera: option.None,
     init: init,
     update: update,
     view: view,
@@ -62,7 +53,14 @@ fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
   io.println("Watch triangle count drop as you move away!")
   io.println("")
 
-  #(Model(camera_z: 30.0, show_performance: True), effect.tick(Tick))
+  #(
+    Model(
+      camera_position: vec3.Vec3(0.0, 20.0, 30.0),
+      camera_target: vec3.Vec3(0.0, 0.0, 0.0),
+      show_performance: True,
+    ),
+    effect.tick(Tick),
+  )
 }
 
 fn update(
@@ -74,21 +72,19 @@ fn update(
     Tick -> {
       // Camera movement (W/S)
       let move_speed = 0.5
-      let mut_camera_z = model.camera_z
+      let vec3.Vec3(x, y, z) = model.camera_position
 
-      let camera_z = case
-        input.is_key_pressed(ctx.input, input.Custom("KeyW"))
-      {
-        True -> mut_camera_z -. move_speed
-        False -> mut_camera_z
+      let new_z = case input.is_key_pressed(ctx.input, input.Custom("KeyW")) {
+        True -> z -. move_speed
+        False -> z
       }
 
-      let camera_z = case
-        input.is_key_pressed(ctx.input, input.Custom("KeyS"))
-      {
-        True -> camera_z +. move_speed
-        False -> camera_z
+      let new_z = case input.is_key_pressed(ctx.input, input.Custom("KeyS")) {
+        True -> new_z +. move_speed
+        False -> new_z
       }
+
+      let new_camera_position = vec3.Vec3(x, y, new_z)
 
       // Toggle performance stats
       let p_pressed = input.is_key_just_pressed(ctx.input, input.Custom("KeyP"))
@@ -121,24 +117,47 @@ fn update(
             <> " | Tris: "
             <> int.to_string(stats.triangles)
             <> " | Camera Z: "
-            <> float.to_string(camera_z),
+            <> float.to_string(new_z),
           )
         }
         False -> Nil
       }
 
       #(
-        Model(camera_z: camera_z, show_performance: show_performance),
-        effect.batch([
-          effect.tick(Tick),
-          effect.update_camera_position(vec3.Vec3(0.0, 20.0, camera_z)),
-        ]),
+        Model(
+          camera_position: new_camera_position,
+          camera_target: model.camera_target,
+          show_performance: show_performance,
+        ),
+        effect.tick(Tick),
       )
     }
   }
 }
 
-fn view(_model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.SceneNode) {
+  // Camera setup
+  let assert Ok(cam) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1280.0 /. 720.0,
+      near: 0.1,
+      far: 500.0,
+    )
+
+  let cam =
+    cam
+    |> camera.set_position(model.camera_position)
+    |> camera.look(at: model.camera_target)
+
+  let camera_node =
+    scene.Camera(
+      id: "main_camera",
+      camera_type: cam,
+      transform: transform.identity(),
+      active: True,
+    )
+
   let lights = [
     scene.Light(
       id: "ambient",
@@ -252,5 +271,5 @@ fn view(_model: Model) -> List(scene.SceneNode) {
   let ground =
     scene.DebugGrid(id: "ground", size: 400.0, divisions: 40, color: 0x444444)
 
-  list.flatten([lights, lod_objects, [ground]])
+  list.flatten([[camera_node], lights, lod_objects, [ground]])
 }

@@ -47,7 +47,7 @@ pub fn main() -> Nil {
     width: 1200,
     height: 800,
     background: 0x0a0a1a,
-    camera: cam,
+    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,

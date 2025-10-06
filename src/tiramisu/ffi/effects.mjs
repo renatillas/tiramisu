@@ -1,10 +1,14 @@
 // Effects for game loop integration
 
-// Store reference to the camera (set by game.mjs)
+// Store reference to the camera (set by renderer.mjs)
 let currentCamera = null;
 
 export function setCamera(camera) {
   currentCamera = camera;
+}
+
+export function getCamera() {
+  return currentCamera;
 }
 
 /**

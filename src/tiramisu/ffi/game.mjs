@@ -1,13 +1,12 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
 import * as inputCapture from './input_capture.mjs';
-import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform, updateMixers, syncPhysicsTransforms } from './renderer.mjs';
+import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform, updateMixers, syncPhysicsTransforms, getCamerasWithViewports } from './renderer.mjs';
 import { AddNode, diff } from '../scene.mjs';
-import { updateCamera as updateInternalCamera, getInternalCamera } from './camera.mjs';
 import { toList } from '../../../gleam_stdlib/gleam.mjs';
 import { stepWorld, getBodyTransform } from './physics.mjs';
 import { startPerformanceMonitoring, updatePerformanceStats, setRenderStats } from './debug.mjs';
-import { setCamera } from './effects.mjs';
+import { setCamera, getCamera } from './effects.mjs';
 
 /**
  * Create a Three.js scene with background color
@@ -46,6 +45,15 @@ export function applyInitialScene(scene, nodes) {
 }
 
 /**
+ * Initialize camera from Gleam camera config (for backwards compatibility)
+ */
+export function initializeCamera(camera) {
+  // This is now deprecated - cameras should be scene nodes
+  // But kept for backwards compatibility with existing examples
+  console.warn('[Game] initializeCamera is deprecated. Use Camera scene nodes instead.');
+}
+
+/**
  * Start the immutable game loop with effect system
  */
 export function startLoop(
@@ -55,7 +63,6 @@ export function startLoop(
   context,
   scene,
   renderer,
-  camera,
   update,
   view,
 ) {
@@ -68,12 +75,9 @@ export function startLoop(
     messageQueue.push(msg);
   };
 
-  // Initialize internal camera with initial config
-  updateInternalCamera(context.camera);
-
-  // Set camera reference for effects (use the actual Three.js camera)
-  const threeCamera = getInternalCamera();
-  setCamera(threeCamera);
+  // Note: Camera is now initialized either via:
+  // 1. initializeCamera() call (backwards compatibility) before startLoop
+  // 2. Camera scene nodes in the initial scene (applyInitialScene already handled)
 
   // Initialize performance monitoring
   startPerformanceMonitoring();
@@ -127,13 +131,37 @@ export function startLoop(
     // Update animation mixers
     updateMixers(deltaTime);
 
-    // Note: We don't call updateInternalCamera every frame because:
-    // 1. The camera config is immutable and doesn't change
-    // 2. Effects (like update_camera_position) directly modify the Three.js camera
-    // 3. Calling updateInternalCamera would overwrite effect changes
+    // Clear the entire canvas first
+    renderer.setScissorTest(false);
+    renderer.clear();
 
-    // Render with internal Three.js camera
-    renderer.render(scene, getInternalCamera());
+    // Get canvas dimensions
+    const canvas = renderer.domElement;
+    const canvasWidth = canvas.clientWidth;
+    const canvasHeight = canvas.clientHeight;
+
+    // Render main camera (active camera without viewport)
+    const activeCamera = getCamera();
+    if (activeCamera) {
+      renderer.setScissorTest(false);
+      renderer.setViewport(0, 0, canvasWidth, canvasHeight);
+      renderer.render(scene, activeCamera);
+    } else {
+      console.warn('[Game] No active camera found. Add a Camera scene node with active=True.');
+    }
+
+    // Render viewport cameras (picture-in-picture)
+    const viewportCameras = getCamerasWithViewports();
+    if (viewportCameras.length > 0) {
+      renderer.setScissorTest(true);
+      for (const { camera, viewport } of viewportCameras) {
+        const [x, y, width, height] = viewport;
+        renderer.setViewport(x, y, width, height);
+        renderer.setScissor(x, y, width, height);
+        renderer.render(scene, camera);
+      }
+      renderer.setScissorTest(false);
+    }
 
     // Update performance stats
     updatePerformanceStats(deltaTime);
