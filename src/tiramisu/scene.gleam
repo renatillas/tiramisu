@@ -3,7 +3,7 @@ import gleam/dict
 import gleam/list
 import gleam/option.{type Option}
 import gleam/order
-import gleam/result
+import gleam/set
 import tiramisu/audio.{type AudioBuffer, type AudioConfig, type AudioType}
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
@@ -320,97 +320,159 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
   let prev_dict = flatten_scene(previous)
   let curr_dict = flatten_scene(current)
 
-  let prev_ids = dict.keys(prev_dict)
-  let curr_ids = dict.keys(curr_dict)
+  // Early exit: if both scenes are empty, no patches needed
+  let prev_size = dict.size(prev_dict)
+  let curr_size = dict.size(curr_dict)
+  case prev_size == 0 && curr_size == 0 {
+    True -> []
+    False -> {
+      // Convert to sets for O(log n) lookups instead of O(n) list.contains
+      let prev_ids = dict.keys(prev_dict)
+      let curr_ids = dict.keys(curr_dict)
+      let prev_id_set = set.from_list(prev_ids)
+      let curr_id_set = set.from_list(curr_ids)
 
-  // Find removals: IDs in previous but not in current
-  let removals =
-    list.filter(prev_ids, fn(id) { !list.contains(curr_ids, id) })
-    |> list.map(fn(id) { RemoveNode(id) })
+      // Find removals: IDs in previous but not in current
+      let removals =
+        list.filter(prev_ids, fn(id) { !set.contains(curr_id_set, id) })
+        |> list.map(fn(id) { RemoveNode(id) })
 
-  // Find nodes that exist in both but have changed parents (need remove + add)
-  let #(parent_changed_ids, same_parent_ids) =
-    list.filter(curr_ids, fn(id) { list.contains(prev_ids, id) })
-    |> list.partition(fn(id) {
-      case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-        Ok(NodeWithParent(_, prev_parent)), Ok(NodeWithParent(_, curr_parent)) ->
-          prev_parent != curr_parent
-        _, _ -> False
+      // Find nodes that exist in both but have changed parents (need remove + add)
+      let #(parent_changed_ids, same_parent_ids) =
+        list.filter(curr_ids, fn(id) { set.contains(prev_id_set, id) })
+        |> list.partition(fn(id) {
+          case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+            Ok(NodeWithParent(_, prev_parent)), Ok(NodeWithParent(_, curr_parent)) ->
+              prev_parent != curr_parent
+            _, _ -> False
+          }
+        })
+
+      // For nodes with changed parents, treat as remove + add
+      let parent_change_removals =
+        list.map(parent_changed_ids, fn(id) { RemoveNode(id) })
+
+      let parent_change_additions =
+        list.filter_map(parent_changed_ids, fn(id) {
+          case dict.get(curr_dict, id) {
+            Ok(NodeWithParent(node, parent_id)) ->
+              Ok(AddNode(id, node, parent_id))
+            Error(_) -> Error(Nil)
+          }
+        })
+
+      // Find additions: IDs in current but not in previous
+      // Sort additions so parents are added before children
+      let additions =
+        list.filter(curr_ids, fn(id) { !set.contains(prev_id_set, id) })
+        |> list.filter_map(fn(id) {
+          case dict.get(curr_dict, id) {
+            Ok(NodeWithParent(node, parent_id)) ->
+              Ok(AddNode(id, node, parent_id))
+            Error(_) -> Error(Nil)
+          }
+        })
+        |> list.append(parent_change_additions)
+        |> sort_patches_by_hierarchy(curr_dict)
+
+      // Find updates: IDs in both with same parent, compare node properties
+      let updates =
+        list.flat_map(same_parent_ids, fn(id) {
+          case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+            Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
+              compare_nodes(id, prev_node, curr_node)
+            _, _ -> []
+          }
+        })
+
+      // Batch patches by type for optimal renderer processing:
+      // 1. Removals first (free resources)
+      // 2. Updates (modify existing)
+      // 3. Additions last (create new, already sorted by hierarchy)
+      batch_patches(removals, parent_change_removals, updates, additions)
+    }
+  }
+}
+
+/// Batch patches by type for optimal rendering order
+fn batch_patches(
+  removals: List(Patch),
+  parent_change_removals: List(Patch),
+  updates: List(Patch),
+  additions: List(Patch),
+) -> List(Patch) {
+  // Group updates by type for better cache locality
+  let #(transform_updates, other_updates) =
+    list.partition(updates, fn(patch) {
+      case patch {
+        UpdateTransform(_, _) -> True
+        _ -> False
       }
     })
 
-  // For nodes with changed parents, treat as remove + add
-  let parent_change_removals =
-    list.map(parent_changed_ids, fn(id) { RemoveNode(id) })
-
-  let parent_change_additions =
-    list.filter_map(parent_changed_ids, fn(id) {
-      case dict.get(curr_dict, id) {
-        Ok(NodeWithParent(node, parent_id)) -> Ok(AddNode(id, node, parent_id))
-        Error(_) -> Error(Nil)
+  let #(material_updates, remaining_updates) =
+    list.partition(other_updates, fn(patch) {
+      case patch {
+        UpdateMaterial(_, _) -> True
+        _ -> False
       }
     })
 
-  // Find additions: IDs in current but not in previous
-  // Sort additions so parents are added before children
-  let additions =
-    list.filter(curr_ids, fn(id) { !list.contains(prev_ids, id) })
-    |> list.filter_map(fn(id) {
-      case dict.get(curr_dict, id) {
-        Ok(NodeWithParent(node, parent_id)) -> Ok(AddNode(id, node, parent_id))
-        Error(_) -> Error(Nil)
-      }
-    })
-    |> list.append(parent_change_additions)
-    |> sort_patches_by_hierarchy(curr_dict)
-
-  // Find updates: IDs in both with same parent, compare node properties
-  let updates =
-    list.flat_map(same_parent_ids, fn(id) {
-      case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-        Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
-          compare_nodes(id, prev_node, curr_node)
-        _, _ -> []
+  let #(geometry_updates, misc_updates) =
+    list.partition(remaining_updates, fn(patch) {
+      case patch {
+        UpdateGeometry(_, _) -> True
+        _ -> False
       }
     })
 
-  list.flatten([removals, parent_change_removals, additions, updates])
+  // Optimal order: removals → transform updates → material updates → geometry updates → misc → additions
+  list.flatten([
+    removals,
+    parent_change_removals,
+    transform_updates,
+    material_updates,
+    geometry_updates,
+    misc_updates,
+    additions,
+  ])
 }
 
 /// Sort AddNode patches so that parents are added before their children
+/// Optimized: pre-compute depths as tuples to avoid dict lookups in comparator
 fn sort_patches_by_hierarchy(
   patches: List(Patch),
   node_dict: dict.Dict(String, NodeWithParent),
 ) -> List(Patch) {
-  // Build a depth map for each node
-  let depth_map =
-    list.fold(patches, dict.new(), fn(acc, patch) {
+  // Pre-compute (depth, patch) tuples for efficient sorting
+  let patches_with_depth =
+    list.map(patches, fn(patch) {
       case patch {
-        AddNode(id, _, parent_id) -> {
+        AddNode(_, _, parent_id) -> {
           let depth = calculate_depth(parent_id, node_dict, 0)
-          dict.insert(acc, id, depth)
+          #(depth, patch)
         }
-        _ -> acc
+        _ -> #(0, patch)
       }
     })
 
-  // Sort patches by depth (lower depth = closer to root = added first)
-  list.sort(patches, fn(a, b) {
-    case a, b {
-      AddNode(id_a, _, _), AddNode(id_b, _, _) -> {
-        let depth_a = dict.get(depth_map, id_a) |> result.unwrap(0)
-        let depth_b = dict.get(depth_map, id_b) |> result.unwrap(0)
-        case depth_a < depth_b {
-          True -> order.Lt
-          False ->
-            case depth_a > depth_b {
-              True -> order.Gt
-              False -> order.Eq
-            }
+  // Sort tuples by depth (O(n log n) without dict lookups)
+  list.sort(patches_with_depth, fn(a, b) {
+    let #(depth_a, _) = a
+    let #(depth_b, _) = b
+    case depth_a < depth_b {
+      True -> order.Lt
+      False ->
+        case depth_a > depth_b {
+          True -> order.Gt
+          False -> order.Eq
         }
-      }
-      _, _ -> order.Eq
     }
+  })
+  // Extract patches from tuples
+  |> list.map(fn(tuple) {
+    let #(_, patch) = tuple
+    patch
   })
 }
 
@@ -433,73 +495,154 @@ fn calculate_depth(
 
 /// Compare two nodes and generate update patches
 fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
+  // Fast path: if nodes are structurally equal, skip all field comparisons
+  case prev == curr {
+    True -> []
+    False -> compare_nodes_detailed(id, prev, curr)
+  }
+}
+
+/// Detailed comparison of node properties (called only when nodes differ)
+/// Uses accumulator pattern to avoid empty list allocations
+fn compare_nodes_detailed(
+  id: String,
+  prev: SceneNode,
+  curr: SceneNode,
+) -> List(Patch) {
   case prev, curr {
     Mesh(_, prev_geom, prev_mat, prev_trans, prev_phys),
       Mesh(_, curr_geom, curr_mat, curr_trans, curr_phys)
-    -> {
-      []
-      |> list.append(case prev_trans != curr_trans {
-        True -> [UpdateTransform(id, curr_trans)]
-        False -> []
-      })
-      |> list.append(case prev_mat != curr_mat {
-        True -> [UpdateMaterial(id, curr_mat)]
-        False -> []
-      })
-      |> list.append(case prev_geom != curr_geom {
-        True -> [UpdateGeometry(id, curr_geom)]
-        False -> []
-      })
-      |> list.append(case prev_phys != curr_phys {
-        True -> [UpdatePhysics(id, curr_phys)]
-        False -> []
-      })
-    }
+    ->
+      compare_mesh_fields(
+        id,
+        prev_geom,
+        prev_mat,
+        prev_trans,
+        prev_phys,
+        curr_geom,
+        curr_mat,
+        curr_trans,
+        curr_phys,
+      )
 
-    Light(_, prev_light, prev_trans), Light(_, curr_light, curr_trans) -> {
-      []
-      |> list.append(case prev_trans != curr_trans {
-        True -> [UpdateTransform(id, curr_trans)]
-        False -> []
-      })
-      |> list.append(case prev_light != curr_light {
-        True -> [UpdateLight(id, curr_light)]
-        False -> []
-      })
-    }
+    Light(_, prev_light, prev_trans), Light(_, curr_light, curr_trans) ->
+      compare_light_fields(id, prev_light, prev_trans, curr_light, curr_trans)
 
-    Group(_, prev_trans, _), Group(_, curr_trans, _) -> {
+    Group(_, prev_trans, _), Group(_, curr_trans, _) ->
       case prev_trans != curr_trans {
         True -> [UpdateTransform(id, curr_trans)]
         False -> []
       }
-    }
 
     Model3D(_, _, prev_trans, prev_anim, prev_phys),
       Model3D(_, _, curr_trans, curr_anim, curr_phys)
-    -> {
-      []
-      |> list.append(case prev_trans != curr_trans {
-        True -> [UpdateTransform(id, curr_trans)]
-        False -> []
-      })
-      |> list.append(case prev_anim != curr_anim {
-        True -> [UpdateAnimation(id, curr_anim)]
-        False -> []
-      })
-      |> list.append(case prev_phys != curr_phys {
-        True -> [UpdatePhysics(id, curr_phys)]
-        False -> []
-      })
-    }
+    ->
+      compare_model3d_fields(
+        id,
+        prev_trans,
+        prev_anim,
+        prev_phys,
+        curr_trans,
+        curr_anim,
+        curr_phys,
+      )
 
-    Audio(_, _, prev_config, _), Audio(_, _, curr_config, _) -> {
+    Audio(_, _, prev_config, _), Audio(_, _, curr_config, _) ->
       case prev_config != curr_config {
         True -> [UpdateAudio(id, curr_config)]
         False -> []
       }
-    }
 
     _, _ -> []
   }
+}
+
+/// Compare Mesh fields using accumulator pattern (no empty list allocations)
+fn compare_mesh_fields(
+  id: String,
+  prev_geom: GeometryType,
+  prev_mat: MaterialType,
+  prev_trans: transform.Transform,
+  prev_phys: option.Option(RigidBody),
+  curr_geom: GeometryType,
+  curr_mat: MaterialType,
+  curr_trans: transform.Transform,
+  curr_phys: option.Option(RigidBody),
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_trans != curr_trans {
+    True -> [UpdateTransform(id, curr_trans), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_mat != curr_mat {
+    True -> [UpdateMaterial(id, curr_mat), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_geom != curr_geom {
+    True -> [UpdateGeometry(id, curr_geom), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_phys != curr_phys {
+    True -> [UpdatePhysics(id, curr_phys), ..patches]
+    False -> patches
+  }
+
+  patches
+}
+
+/// Compare Light fields using accumulator pattern
+fn compare_light_fields(
+  id: String,
+  prev_light: LightType,
+  prev_trans: transform.Transform,
+  curr_light: LightType,
+  curr_trans: transform.Transform,
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_trans != curr_trans {
+    True -> [UpdateTransform(id, curr_trans), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_light != curr_light {
+    True -> [UpdateLight(id, curr_light), ..patches]
+    False -> patches
+  }
+
+  patches
+}
+
+/// Compare Model3D fields using accumulator pattern
+fn compare_model3d_fields(
+  id: String,
+  prev_trans: transform.Transform,
+  prev_anim: option.Option(AnimationPlayback),
+  prev_phys: option.Option(RigidBody),
+  curr_trans: transform.Transform,
+  curr_anim: option.Option(AnimationPlayback),
+  curr_phys: option.Option(RigidBody),
+) -> List(Patch) {
+  let patches = []
+
+  let patches = case prev_trans != curr_trans {
+    True -> [UpdateTransform(id, curr_trans), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_anim != curr_anim {
+    True -> [UpdateAnimation(id, curr_anim), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_phys != curr_phys {
+    True -> [UpdatePhysics(id, curr_phys), ..patches]
+    False -> patches
+  }
+
+  patches
 }

@@ -1,4 +1,3 @@
-import gleam/float
 import tiramisu/animation
 import tiramisu/transform
 import tiramisu/vec3

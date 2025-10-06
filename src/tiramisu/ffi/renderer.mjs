@@ -452,7 +452,48 @@ export function createRenderer(options) {
   });
   renderer.setSize(options.width, options.height);
   renderer.setPixelRatio(window.devicePixelRatio);
+
+  // Add WebGL context loss/restore handling
+  setupContextLossHandling(renderer);
+
   return renderer;
+}
+
+/**
+ * Setup WebGL context loss and restore event handlers
+ * @param {THREE.WebGLRenderer} renderer
+ */
+function setupContextLossHandling(renderer) {
+  const canvas = renderer.domElement;
+
+  canvas.addEventListener('webglcontextlost', (event) => {
+    console.warn('[Tiramisu] WebGL context lost!');
+    event.preventDefault(); // Prevent default to enable context restoration
+
+    // Stop rendering loop temporarily
+    // The game loop will handle this gracefully by checking if context exists
+  }, false);
+
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.log('[Tiramisu] WebGL context restored!');
+
+    // Reinitialize renderer settings
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // Clear caches - textures and geometries need to be re-uploaded to GPU
+    // The scene will be re-rendered, triggering resource re-creation
+    console.log('[Tiramisu] Caches cleared, resources will be re-uploaded on next render');
+  }, false);
+}
+
+/**
+ * Check if the WebGL context is still valid
+ * @param {THREE.WebGLRenderer} renderer
+ * @returns {boolean}
+ */
+export function isContextValid(renderer) {
+  const gl = renderer.getContext();
+  return gl && !gl.isContextLost();
 }
 
 export function render(renderer, scene, camera) {

@@ -211,3 +211,83 @@ export function getAudioListener() {
   }
   return audioListener;
 }
+
+/**
+ * Dispose of a Three.js texture and free GPU memory
+ * @param {THREE.Texture} texture - The texture to dispose
+ */
+export function disposeTexture(texture) {
+  if (texture && texture.dispose) {
+    texture.dispose();
+    console.log('[Tiramisu] Texture disposed');
+  }
+}
+
+/**
+ * Dispose of a Three.js BufferGeometry and free GPU memory
+ * @param {THREE.BufferGeometry} geometry - The geometry to dispose
+ */
+export function disposeGeometry(geometry) {
+  if (geometry && geometry.dispose) {
+    geometry.dispose();
+    console.log('[Tiramisu] Geometry disposed');
+  }
+}
+
+/**
+ * Dispose of a Three.js Material and free GPU memory
+ * @param {THREE.Material} material - The material to dispose
+ */
+export function disposeMaterial(material) {
+  if (material) {
+    // Dispose of material textures if they exist
+    if (material.map) material.map.dispose();
+    if (material.lightMap) material.lightMap.dispose();
+    if (material.bumpMap) material.bumpMap.dispose();
+    if (material.normalMap) material.normalMap.dispose();
+    if (material.specularMap) material.specularMap.dispose();
+    if (material.envMap) material.envMap.dispose();
+    if (material.alphaMap) material.alphaMap.dispose();
+    if (material.aoMap) material.aoMap.dispose();
+    if (material.displacementMap) material.displacementMap.dispose();
+    if (material.emissiveMap) material.emissiveMap.dispose();
+    if (material.gradientMap) material.gradientMap.dispose();
+    if (material.metalnessMap) material.metalnessMap.dispose();
+    if (material.roughnessMap) material.roughnessMap.dispose();
+
+    // Dispose of the material itself
+    material.dispose();
+    console.log('[Tiramisu] Material disposed');
+  }
+}
+
+/**
+ * Dispose of an Object3D recursively (geometry, materials, textures, children)
+ * @param {THREE.Object3D} object - The object to dispose
+ */
+export function disposeObject3D(object) {
+  if (!object) return;
+
+  // Dispose geometry
+  if (object.geometry) {
+    object.geometry.dispose();
+  }
+
+  // Dispose material(s)
+  if (object.material) {
+    if (Array.isArray(object.material)) {
+      object.material.forEach(material => disposeMaterial(material));
+    } else {
+      disposeMaterial(object.material);
+    }
+  }
+
+  // Recursively dispose children
+  if (object.children) {
+    for (const child of object.children) {
+      disposeObject3D(child);
+    }
+  }
+
+  console.log('[Tiramisu] Object3D disposed');
+}
