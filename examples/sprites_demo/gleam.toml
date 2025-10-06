@@ -1,0 +1,15 @@
+name = "sprites_demo"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.63.0 and < 2.0.0"
+gleam_javascript = ">= 1.0.0 and < 2.0.0"
+gleam_community_maths = ">= 2.0.0 and < 3.0.0"
+tiramisu = { path = "../.." }
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.0.2 and <= 3.0.0"
+
+[tools.lustre.html]
+scripts = [{ type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\" } }" }]

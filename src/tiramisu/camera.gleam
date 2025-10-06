@@ -1,11 +1,12 @@
 import gleam/bool
 import gleam/int
+import tiramisu/math/vec3
 
 /// Opaque immutable camera configuration
 pub opaque type Camera {
   Camera(
-    position: #(Float, Float, Float),
-    look_at_target: #(Float, Float, Float),
+    position: vec3.Vec3,
+    look_at_target: vec3.Vec3,
     projection: CameraProjection,
   )
 }
@@ -46,8 +47,8 @@ pub fn perspective(
   use <- bool.guard(near >=. far, Error(NearFarConflict(near, far)))
 
   Ok(Camera(
-    position: #(0.0, 0.0, 0.0),
-    look_at_target: #(0.0, 0.0, 0.0),
+    position: vec3.zero(),
+    look_at_target: vec3.zero(),
     projection: Perspective(fov: fov, aspect: aspect, near: near, far: far),
   ))
 }
@@ -61,8 +62,8 @@ pub fn orthographic(
   far far: Float,
 ) -> Camera {
   Camera(
-    position: #(0.0, 0.0, 0.0),
-    look_at_target: #(0.0, 0.0, 0.0),
+    position: vec3.zero(),
+    look_at_target: vec3.zero(),
     projection: Orthographic(
       left: left,
       right: right,
@@ -74,17 +75,12 @@ pub fn orthographic(
   )
 }
 
-pub fn set_position(
-  camera: Camera,
-  x x: Float,
-  y y: Float,
-  z z: Float,
-) -> Camera {
-  Camera(..camera, position: #(x, y, z))
+pub fn set_position(camera: Camera, position position: vec3.Vec3) -> Camera {
+  Camera(..camera, position:)
 }
 
-pub fn look_at(camera: Camera, x x: Float, y y: Float, z z: Float) -> Camera {
-  Camera(..camera, look_at_target: #(x, y, z))
+pub fn look(camera: Camera, at look_at_target: vec3.Vec3) -> Camera {
+  Camera(..camera, look_at_target:)
 }
 
 pub fn camera_2d(width: Int, height: Int) -> Camera {
@@ -101,7 +97,7 @@ pub fn camera_2d(width: Int, height: Int) -> Camera {
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(0.0, 0.0, 10.0)
+  |> set_position(vec3.Vec3(0.0, 0.0, 10.0))
 }
 
 /// Create a 2D camera that matches screen pixels (0,0 at top-left)
@@ -117,7 +113,7 @@ pub fn camera_2d_screen_space(width: Int, height: Int) -> Camera {
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(w /. 2.0, 0.0 -. h /. 2.0, 10.0)
+  |> set_position(vec3.Vec3(w /. 2.0, 0.0 -. h /. 2.0, 10.0))
 }
 
 pub fn camera_2d_with_bounds(
@@ -134,5 +130,5 @@ pub fn camera_2d_with_bounds(
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(0.0, 0.0, 10.0)
+  |> set_position(vec3.Vec3(0.0, 0.0, 10.0))
 }

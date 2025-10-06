@@ -15,11 +15,15 @@ export function updateCamera(cameraConfig) {
   }
 
   // Update position
-  const [x, y, z] = position;
+  const x = position.x
+  const y = position.y
+  const z = position.z
   internalCamera.position.set(x, y, z);
 
   // Update look at
-  const [lx, ly, lz] = look_at_target;
+  const lx = look_at_target.x
+  const ly = look_at_target.y
+  const lz = look_at_target.z
   internalCamera.lookAt(lx, ly, lz);
 
   // Update projection matrix

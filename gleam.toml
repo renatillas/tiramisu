@@ -1,5 +1,5 @@
 name = "tiramisu"
-version = "0.0.1"
+version = "0.0.2"
 target = "javascript"
 
 # Fill out these fields if you intend to generate HTML documentation or publish

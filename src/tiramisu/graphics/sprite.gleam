@@ -1,5 +1,6 @@
 import gleam/option
 import tiramisu/scene.{type Texture}
+import tiramisu/transform
 
 /// Create a 2D sprite mesh node from a texture
 pub fn mesh(
@@ -17,7 +18,7 @@ pub fn mesh(
       map: option.Some(texture),
     )
 
-  scene.Mesh(id, geometry, material, scene.identity_transform())
+  scene.Mesh(id, geometry, material, transform.identity(), option.None)
 }
 
 /// Create a square sprite mesh node with equal width and height

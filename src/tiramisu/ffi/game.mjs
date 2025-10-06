@@ -1,9 +1,12 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
 import * as inputCapture from './input_capture.mjs';
-import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform } from './renderer_ffi.mjs';
+import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform, updateMixers, syncPhysicsTransforms } from './renderer.mjs';
 import { AddNode, diff } from '../scene.mjs';
 import { updateCamera as updateInternalCamera, getInternalCamera } from './camera.mjs';
+import { toList } from '../../../gleam_stdlib/gleam.mjs';
+import { stepWorld, getBodyTransform } from './physics.mjs';
+import { startPerformanceMonitoring, updatePerformanceStats, setRenderStats } from './debug.mjs';
 
 /**
  * Create a Three.js scene with background color
@@ -34,15 +37,11 @@ export function initializeInputSystems(canvas) {
  * Apply initial scene nodes to Three.js scene
  */
 export function applyInitialScene(scene, nodes) {
-  // Convert Gleam list to JS array
-  const nodeArray = gleamListToArray(nodes);
-
-  // Convert nodes to AddNode patches and apply them
-  // This ensures objects are added to the objectCache for later updates
-  nodeArray.forEach(node => {
-    const patch = new AddNode(node.id, node, undefined);
-    applyPatch(scene, patch);
-  });
+  // Use diff with empty previous scene to generate proper patches
+  // This ensures hierarchy is respected and parent_id is set correctly
+  const emptyList = toList([]);
+  const patches = diff(emptyList, nodes);
+  applyPatches(scene, patches);
 }
 
 /**
@@ -70,6 +69,9 @@ export function startLoop(
 
   // Initialize internal camera with initial config
   updateInternalCamera(context.camera);
+
+  // Initialize performance monitoring
+  startPerformanceMonitoring();
 
   // Run initial effect
   runEffect(effect, dispatch);
@@ -111,11 +113,24 @@ export function startLoop(
 
     currentNodes = newNodes;
 
+    // Step physics simulation
+    stepWorld(deltaTime);
+
+    // Sync physics transforms to Three.js objects
+    syncPhysicsTransforms();
+
+    // Update animation mixers
+    updateMixers(deltaTime);
+
     // Update internal Three.js camera from immutable config
     updateInternalCamera(newContext.camera);
 
     // Render with internal Three.js camera
     renderer.render(scene, getInternalCamera());
+
+    // Update performance stats
+    updatePerformanceStats(deltaTime);
+    setRenderStats(renderer.info);
 
     // Clear per-frame input state
     inputCapture.clearInputFrameState();

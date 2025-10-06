@@ -1,0 +1,14 @@
+name = "effects_system"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.63.0 and < 2.0.0"
+tiramisu = { path = "../.." }
+plinth = ">= 0.7.2 and < 1.0.0"
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.0.2 and <= 3.0.0"
+
+[tools.lustre.html]
+scripts = [{ type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\" } }" }]

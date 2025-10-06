@@ -2,10 +2,18 @@ import gleam/bool
 import gleam/dict
 import gleam/list
 import gleam/option.{type Option}
-import tiramisu/math/vec3
+import gleam/order
+import gleam/result
+import tiramisu/math/vec3.{type Vec3}
+import tiramisu/object3d.{type AnimationPlayback, type Object3D}
+import tiramisu/physics.{type RigidBody}
+import tiramisu/transform
 
 /// Opaque type for Three.js textures
 pub type Texture
+
+/// Opaque type for Three.js BufferGeometry (for loaded geometries)
+pub type BufferGeometry
 
 /// Validation errors for scene node creation
 pub type ValidationError {
@@ -16,11 +24,6 @@ pub type ValidationError {
   InvalidRoughness(Float)
   InvalidIntensity(Float)
   InvalidLinewidth(Float)
-}
-
-/// Transform represents position, rotation, and scale
-pub type Transform {
-  Transform(position: vec3.Vec3, rotation: vec3.Vec3, scale: vec3.Vec3)
 }
 
 /// Geometry types
@@ -44,6 +47,7 @@ pub type GeometryType {
   )
   TetrahedronGeometry(radius: Float, detail: Int)
   IcosahedronGeometry(radius: Float, detail: Int)
+  CustomGeometry(BufferGeometry)
 }
 
 /// Material types
@@ -93,116 +97,25 @@ pub type SceneNode {
     id: String,
     geometry: GeometryType,
     material: MaterialType,
-    transform: Transform,
+    transform: transform.Transform,
+    physics: option.Option(RigidBody),
   )
-  Group(id: String, transform: Transform, children: List(SceneNode))
-  Light(id: String, light_type: LightType, transform: Transform)
-}
-
-/// Helper to create a default transform
-pub fn identity_transform() -> Transform {
-  Transform(
-    position: vec3.Vec3(0.0, 0.0, 0.0),
-    rotation: vec3.Vec3(0.0, 0.0, 0.0),
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
+  Group(id: String, transform: transform.Transform, children: List(SceneNode))
+  Light(id: String, light_type: LightType, transform: transform.Transform)
+  Model3D(
+    id: String,
+    object: Object3D,
+    transform: transform.Transform,
+    animation: option.Option(AnimationPlayback),
+    physics: option.Option(RigidBody),
   )
-}
-
-/// Helper to create a transform with just position
-pub fn transform_at(x: Float, y: Float, z: Float) -> Transform {
-  Transform(
-    position: vec3.Vec3(x, y, z),
-    rotation: vec3.Vec3(0.0, 0.0, 0.0),
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  )
-}
-
-/// Helper to update position in a transform
-pub fn set_position(transform: Transform, position: vec3.Vec3) -> Transform {
-  Transform(..transform, position:)
-}
-
-/// Helper to update rotation in a transform
-pub fn set_rotation(transform: Transform, rotation: vec3.Vec3) -> Transform {
-  Transform(..transform, rotation:)
-}
-
-/// Helper to update scale in a transform
-pub fn set_scale(transform: Transform, scale: vec3.Vec3) -> Transform {
-  Transform(..transform, scale:)
-}
-
-/// Linearly interpolate between two transforms
-pub fn lerp_transform(from: Transform, to: Transform, t: Float) -> Transform {
-  Transform(
-    position: vec3.lerp(from.position, to.position, t),
-    rotation: vec3.lerp(from.rotation, to.rotation, t),
-    scale: vec3.lerp(from.scale, to.scale, t),
-  )
-}
-
-/// Compose two transforms (apply second transform after first)
-pub fn compose_transform(first: Transform, second: Transform) -> Transform {
-  Transform(
-    position: vec3.add(first.position, second.position),
-    rotation: vec3.add(first.rotation, second.rotation),
-    scale: vec3.Vec3(
-      first.scale.x *. second.scale.x,
-      first.scale.y *. second.scale.y,
-      first.scale.z *. second.scale.z,
-    ),
-  )
-}
-
-/// Create a transform that looks at a target position from a source position
-pub fn look_at_transform(
-  from: vec3.Vec3,
-  to: vec3.Vec3,
-  up: vec3.Vec3,
-) -> Transform {
-  // Calculate forward direction
-  let forward = vec3.normalize(vec3.subtract(to, from))
-
-  // Calculate right direction
-  let right = vec3.normalize(vec3.cross(up, forward))
-
-  // Calculate actual up direction
-  let _actual_up = vec3.cross(forward, right)
-
-  // Convert to Euler angles (simplified - works for most cases)
-  // This is a simplified version; for production you'd want a full matrix-to-euler conversion
-  let yaw = case forward.x == 0.0 && forward.z == 0.0 {
-    True -> 0.0
-    False -> {
-      let assert Ok(result) =
-        vec3.angle(
-          vec3.Vec3(0.0, 0.0, 1.0),
-          vec3.Vec3(forward.x, 0.0, forward.z),
-        )
-      case forward.x <. 0.0 {
-        True -> 0.0 -. result
-        False -> result
-      }
-    }
-  }
-
-  let pitch = {
-    let assert Ok(result) =
-      vec3.angle(vec3.Vec3(forward.x, 0.0, forward.z), forward)
-    case forward.y <. 0.0 {
-      True -> 0.0 -. result
-      False -> result
-    }
-  }
-
-  // Roll is typically 0 for look-at transforms
-  let roll = 0.0
-
-  Transform(
-    position: from,
-    rotation: vec3.Vec3(pitch, yaw, roll),
-    scale: vec3.one(),
-  )
+  // Debug visualization nodes
+  DebugBox(id: String, min: Vec3, max: Vec3, color: Int)
+  DebugSphere(id: String, center: Vec3, radius: Float, color: Int)
+  DebugLine(id: String, from: Vec3, to: Vec3, color: Int)
+  DebugAxes(id: String, origin: Vec3, size: Float)
+  DebugGrid(id: String, size: Float, divisions: Int, color: Int)
+  DebugPoint(id: String, position: Vec3, size: Float, color: Int)
 }
 
 // --- Validated Geometry Constructors ---
@@ -362,10 +275,12 @@ pub fn sprite_material(
 pub type Patch {
   AddNode(id: String, node: SceneNode, parent_id: option.Option(String))
   RemoveNode(id: String)
-  UpdateTransform(id: String, transform: Transform)
+  UpdateTransform(id: String, transform: transform.Transform)
   UpdateMaterial(id: String, material: MaterialType)
   UpdateGeometry(id: String, geometry: GeometryType)
   UpdateLight(id: String, light_type: LightType)
+  UpdateAnimation(id: String, animation: option.Option(AnimationPlayback))
+  UpdatePhysics(id: String, physics: option.Option(RigidBody))
 }
 
 type NodeWithParent {
@@ -382,23 +297,13 @@ fn flatten_scene_helper(
   acc: dict.Dict(String, NodeWithParent),
 ) -> dict.Dict(String, NodeWithParent) {
   list.fold(nodes, acc, fn(acc, node) {
-    let node_id = get_node_id(node)
-    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id))
+    let acc = dict.insert(acc, node.id, NodeWithParent(node, parent_id))
     case node {
       Group(_, _, children) ->
-        flatten_scene_helper(children, option.Some(node_id), acc)
+        flatten_scene_helper(children, option.Some(node.id), acc)
       _ -> acc
     }
   })
-}
-
-/// Get the ID from a scene node
-fn get_node_id(node: SceneNode) -> String {
-  case node {
-    Mesh(id, ..) -> id
-    Group(id, ..) -> id
-    Light(id, ..) -> id
-  }
 }
 
 @internal
@@ -414,7 +319,31 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
     list.filter(prev_ids, fn(id) { !list.contains(curr_ids, id) })
     |> list.map(fn(id) { RemoveNode(id) })
 
+  // Find nodes that exist in both but have changed parents (need remove + add)
+  let #(parent_changed_ids, same_parent_ids) =
+    list.filter(curr_ids, fn(id) { list.contains(prev_ids, id) })
+    |> list.partition(fn(id) {
+      case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+        Ok(NodeWithParent(_, prev_parent)), Ok(NodeWithParent(_, curr_parent)) ->
+          prev_parent != curr_parent
+        _, _ -> False
+      }
+    })
+
+  // For nodes with changed parents, treat as remove + add
+  let parent_change_removals =
+    list.map(parent_changed_ids, fn(id) { RemoveNode(id) })
+
+  let parent_change_additions =
+    list.filter_map(parent_changed_ids, fn(id) {
+      case dict.get(curr_dict, id) {
+        Ok(NodeWithParent(node, parent_id)) -> Ok(AddNode(id, node, parent_id))
+        Error(_) -> Error(Nil)
+      }
+    })
+
   // Find additions: IDs in current but not in previous
+  // Sort additions so parents are added before children
   let additions =
     list.filter(curr_ids, fn(id) { !list.contains(prev_ids, id) })
     |> list.filter_map(fn(id) {
@@ -423,11 +352,12 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
         Error(_) -> Error(Nil)
       }
     })
+    |> list.append(parent_change_additions)
+    |> sort_patches_by_hierarchy(curr_dict)
 
-  // Find updates: IDs in both, compare node properties
+  // Find updates: IDs in both with same parent, compare node properties
   let updates =
-    list.filter(curr_ids, fn(id) { list.contains(prev_ids, id) })
-    |> list.flat_map(fn(id) {
+    list.flat_map(same_parent_ids, fn(id) {
       case dict.get(prev_dict, id), dict.get(curr_dict, id) {
         Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
           compare_nodes(id, prev_node, curr_node)
@@ -435,14 +365,68 @@ pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) 
       }
     })
 
-  list.flatten([removals, additions, updates])
+  list.flatten([removals, parent_change_removals, additions, updates])
+}
+
+/// Sort AddNode patches so that parents are added before their children
+fn sort_patches_by_hierarchy(
+  patches: List(Patch),
+  node_dict: dict.Dict(String, NodeWithParent),
+) -> List(Patch) {
+  // Build a depth map for each node
+  let depth_map =
+    list.fold(patches, dict.new(), fn(acc, patch) {
+      case patch {
+        AddNode(id, _, parent_id) -> {
+          let depth = calculate_depth(parent_id, node_dict, 0)
+          dict.insert(acc, id, depth)
+        }
+        _ -> acc
+      }
+    })
+
+  // Sort patches by depth (lower depth = closer to root = added first)
+  list.sort(patches, fn(a, b) {
+    case a, b {
+      AddNode(id_a, _, _), AddNode(id_b, _, _) -> {
+        let depth_a = dict.get(depth_map, id_a) |> result.unwrap(0)
+        let depth_b = dict.get(depth_map, id_b) |> result.unwrap(0)
+        case depth_a < depth_b {
+          True -> order.Lt
+          False ->
+            case depth_a > depth_b {
+              True -> order.Gt
+              False -> order.Eq
+            }
+        }
+      }
+      _, _ -> order.Eq
+    }
+  })
+}
+
+/// Calculate the depth of a node in the hierarchy (0 = root)
+fn calculate_depth(
+  parent_id: option.Option(String),
+  node_dict: dict.Dict(String, NodeWithParent),
+  current_depth: Int,
+) -> Int {
+  case parent_id {
+    option.None -> current_depth
+    option.Some(id) ->
+      case dict.get(node_dict, id) {
+        Ok(NodeWithParent(_, parent_parent_id)) ->
+          calculate_depth(parent_parent_id, node_dict, current_depth + 1)
+        Error(_) -> current_depth + 1
+      }
+  }
 }
 
 /// Compare two nodes and generate update patches
 fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
   case prev, curr {
-    Mesh(_, prev_geom, prev_mat, prev_trans),
-      Mesh(_, curr_geom, curr_mat, curr_trans)
+    Mesh(_, prev_geom, prev_mat, prev_trans, prev_phys),
+      Mesh(_, curr_geom, curr_mat, curr_trans, curr_phys)
     -> {
       []
       |> list.append(case prev_trans != curr_trans {
@@ -455,6 +439,10 @@ fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
       })
       |> list.append(case prev_geom != curr_geom {
         True -> [UpdateGeometry(id, curr_geom)]
+        False -> []
+      })
+      |> list.append(case prev_phys != curr_phys {
+        True -> [UpdatePhysics(id, curr_phys)]
         False -> []
       })
     }
@@ -476,6 +464,24 @@ fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
         True -> [UpdateTransform(id, curr_trans)]
         False -> []
       }
+    }
+
+    Model3D(_, _, prev_trans, prev_anim, prev_phys),
+      Model3D(_, _, curr_trans, curr_anim, curr_phys)
+    -> {
+      []
+      |> list.append(case prev_trans != curr_trans {
+        True -> [UpdateTransform(id, curr_trans)]
+        False -> []
+      })
+      |> list.append(case prev_anim != curr_anim {
+        True -> [UpdateAnimation(id, curr_anim)]
+        False -> []
+      })
+      |> list.append(case prev_phys != curr_phys {
+        True -> [UpdatePhysics(id, curr_phys)]
+        False -> []
+      })
     }
 
     _, _ -> []

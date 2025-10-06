@@ -142,6 +142,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
         scale: vec3.Vec3(model.cube_scale, model.cube_scale, model.cube_scale),
       ),
+      physics: option.None,
     ),
   ]
 
@@ -169,6 +170,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
           rotation: vec3.Vec3(0.0, 0.0, 0.0),
           scale: vec3.Vec3(1.0, 1.0, 1.0),
         ),
+        physics: option.None,
       )
     })
 

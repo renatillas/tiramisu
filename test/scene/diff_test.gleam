@@ -1,6 +1,8 @@
 import gleam/list
 import gleam/option
+import tiramisu/math/vec3
 import tiramisu/scene
+import tiramisu/transform
 
 // Test: empty to empty diff produces no patches
 pub fn empty_to_empty_test() {
@@ -16,7 +18,8 @@ pub fn add_mesh_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -35,7 +38,8 @@ pub fn remove_mesh_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let current = []
@@ -55,7 +59,8 @@ pub fn no_changes_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(nodes, nodes)
@@ -69,7 +74,8 @@ pub fn update_transform_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.transform_at(0.0, 0.0, 0.0),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
+      physics: option.None,
     ),
   ]
   let current = [
@@ -77,7 +83,8 @@ pub fn update_transform_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.transform_at(1.0, 2.0, 3.0),
+      transform: transform.at(position: vec3.Vec3(1.0, 2.0, 3.0)),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -100,7 +107,8 @@ pub fn update_material_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let current = [
@@ -108,7 +116,8 @@ pub fn update_material_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -130,7 +139,8 @@ pub fn update_geometry_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let current = [
@@ -138,7 +148,8 @@ pub fn update_geometry_test() {
       id: "cube1",
       geometry: scene.SphereGeometry(1.5, 32, 32),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -157,7 +168,7 @@ pub fn add_light_test() {
     scene.Light(
       id: "light1",
       light_type: scene.AmbientLight(0xffffff, 1.0),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -175,14 +186,14 @@ pub fn update_light_test() {
     scene.Light(
       id: "light1",
       light_type: scene.AmbientLight(0xffffff, 0.5),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
     ),
   ]
   let current = [
     scene.Light(
       id: "light1",
       light_type: scene.AmbientLight(0xffffff, 1.0),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -201,13 +212,15 @@ pub fn multiple_changes_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
     scene.Mesh(
       id: "cube2",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let current = [
@@ -215,13 +228,15 @@ pub fn multiple_changes_test() {
       id: "cube1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: scene.transform_at(1.0, 0.0, 0.0),
+      transform: transform.at(vec3.Vec3(1.0, 0.0, 0.0)),
+      physics: option.None,
     ),
     scene.Mesh(
       id: "cube3",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0x0000ff, False, 1.0, option.None),
-      transform: scene.identity_transform(),
+      transform: transform.identity(),
+      physics: option.None,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -234,12 +249,13 @@ pub fn multiple_changes_test() {
 pub fn group_test() {
   let previous = []
   let current = [
-    scene.Group(id: "group1", transform: scene.identity_transform(), children: [
+    scene.Group(id: "group1", transform: transform.identity(), children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: scene.identity_transform(),
+        transform: transform.identity(),
+        physics: option.None,
       ),
     ]),
   ]

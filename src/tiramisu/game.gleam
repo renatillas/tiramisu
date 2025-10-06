@@ -3,7 +3,7 @@
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/input.{type InputState}
-import tiramisu/renderer
+import tiramisu/internal/renderer
 import tiramisu/scene.{type SceneNode}
 
 /// Internal Three.js Scene type (opaque)

@@ -1,3 +1,4 @@
+import gleam/javascript/promise.{type Promise}
 import gleam/list
 
 /// Effect system for managing side effects in Tiramisu
@@ -37,6 +38,15 @@ pub fn map(effect: Effect(a), f: fn(a) -> b) -> Effect(b) {
   Effect(perform: fn(dispatch) {
     let Effect(perform) = effect
     perform(fn(msg) { dispatch(f(msg)) })
+  })
+}
+
+/// Create an effect from a Promise
+/// When the promise resolves, it will dispatch the resulting message
+pub fn from_promise(p: Promise(msg)) -> Effect(msg) {
+  Effect(perform: fn(dispatch) {
+    promise.tap(p, dispatch)
+    Nil
   })
 }
 
