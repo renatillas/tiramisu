@@ -105,12 +105,11 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
     |> result.map(fn(camera) {
       camera
-      |> camera.set_position(vec3.Vec3(0.0, 0.0, 10.0))
-      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
       |> scene.Camera(
         id: "main-camera",
-        transform: transform.identity,
+        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
         active: True,
+        look_at: option.None,
         viewport: option.None,
         camera: _,
       )
@@ -120,7 +119,10 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights =
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.5),
+      light: {
+        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 1.5)
+        light
+      },
       transform: transform.identity,
     )
     |> list.wrap
@@ -138,13 +140,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
             scene.Mesh(
               id: "sprite1",
-              geometry: scene.PlaneGeometry(2.0, 2.0),
-              material: scene.BasicMaterial(
-                color: 0xffffff,
-                transparent: True,
-                opacity: 1.0,
-                map: option.Some(tex),
-              ),
+              geometry: {
+                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                geometry
+              },
+              material: {
+                let assert Ok(material) =
+                  scene.basic_material(
+                    color: 0xffffff,
+                    transparent: True,
+                    opacity: 1.0,
+                    map: option.Some(tex),
+                    normal_map: option.None,
+                  )
+                material
+              },
               transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
               physics: option.None,
             )
@@ -156,13 +166,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
             let y = 3.0 *. maths.sin(0.0 -. model.rotation)
             scene.Mesh(
               id: "sprite2",
-              geometry: scene.PlaneGeometry(2.0, 2.0),
-              material: scene.BasicMaterial(
-                color: 0xffffff,
-                transparent: True,
-                opacity: 1.0,
-                map: option.Some(tex),
-              ),
+              geometry: {
+                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                geometry
+              },
+              material: {
+                let assert Ok(material) =
+                  scene.basic_material(
+                    color: 0xffffff,
+                    transparent: True,
+                    opacity: 1.0,
+                    map: option.Some(tex),
+                    normal_map: option.None,
+                  )
+                material
+              },
               transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
               physics: option.None,
             )
@@ -172,13 +190,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
           |> result.map(fn(tex) {
             scene.Mesh(
               id: "sprite3",
-              geometry: scene.PlaneGeometry(1.5, 1.5),
-              material: scene.BasicMaterial(
-                color: 0xffffff,
-                transparent: True,
-                opacity: 1.0,
-                map: option.Some(tex),
-              ),
+              geometry: {
+                let assert Ok(geometry) = scene.plane(width: 1.5, height: 1.5)
+                geometry
+              },
+              material: {
+                let assert Ok(material) =
+                  scene.basic_material(
+                    color: 0xffffff,
+                    transparent: True,
+                    opacity: 1.0,
+                    map: option.Some(tex),
+                    normal_map: option.None,
+                  )
+                material
+              },
               transform: transform.Transform(
                 position: vec3.Vec3(0.0, 0.0, 0.0),
                 rotation: vec3.Vec3(0.0, 0.0, model.rotation *. 2.0),
@@ -193,13 +219,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
             let y = maths.sin(model.rotation *. 2.0) *. 2.0
             scene.Mesh(
               id: "sprite4",
-              geometry: scene.PlaneGeometry(2.0, 2.0),
-              material: scene.BasicMaterial(
-                color: 0xffffff,
-                transparent: True,
-                opacity: 1.0,
-                map: option.Some(tex),
-              ),
+              geometry: {
+                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                geometry
+              },
+              material: {
+                let assert Ok(material) =
+                  scene.basic_material(
+                    color: 0xffffff,
+                    transparent: True,
+                    opacity: 1.0,
+                    map: option.Some(tex),
+                    normal_map: option.None,
+                  )
+                material
+              },
               transform: transform.at(position: vec3.Vec3(0.0, y +. 4.0, 0.0)),
               physics: option.None,
             )

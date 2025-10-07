@@ -127,7 +127,7 @@ fn update(
 
 fn view(model: Model) -> List(scene.SceneNode) {
   // Camera setup
-  let assert Ok(cam) =
+  let assert Ok(camera) =
     camera.perspective(
       field_of_view: 75.0,
       aspect: 1280.0 /. 720.0,
@@ -135,16 +135,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 500.0,
     )
 
-  let camera =
-    cam
-    |> camera.set_position(model.camera_position)
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   let camera_node =
     scene.Camera(
       id: "main_camera",
       camera:,
-      transform: transform.identity,
+      transform: transform.at(model.camera_position),
+      look_at: option.None,
       active: True,
       viewport: option.None,
     )
@@ -152,12 +148,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
+      light: {
+        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.7),
+      light: {
+        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.7)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(50.0, 50.0, 50.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -177,15 +179,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let high_detail =
         scene.Mesh(
           id: "high_" <> int.to_string(i),
-          geometry: scene.IcosahedronGeometry(5.0, 3),
-          material: scene.StandardMaterial(
-            color: 0x00ff00,
-            // Green for high detail
-            metalness: 0.3,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 3)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0x00ff00,
+                // Green for high detail
+                metalness: 0.3,
+                roughness: 0.6,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.identity,
           physics: option.None,
         )
@@ -193,15 +202,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let medium_detail =
         scene.Mesh(
           id: "medium_" <> int.to_string(i),
-          geometry: scene.IcosahedronGeometry(5.0, 2),
-          material: scene.StandardMaterial(
-            color: 0xffff00,
-            // Yellow for medium detail
-            metalness: 0.3,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 2)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xffff00,
+                // Yellow for medium detail
+                metalness: 0.3,
+                roughness: 0.6,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.identity,
           physics: option.None,
         )
@@ -209,15 +225,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let low_detail =
         scene.Mesh(
           id: "low_" <> int.to_string(i),
-          geometry: scene.IcosahedronGeometry(5.0, 1),
-          material: scene.StandardMaterial(
-            color: 0xff8800,
-            // Orange for low detail
-            metalness: 0.3,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 1)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xff8800,
+                // Orange for low detail
+                metalness: 0.3,
+                roughness: 0.6,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.identity,
           physics: option.None,
         )
@@ -225,14 +248,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let billboard =
         scene.Mesh(
           id: "billboard_" <> int.to_string(i),
-          geometry: scene.PlaneGeometry(8.0, 8.0),
-          material: scene.BasicMaterial(
-            color: 0xff0000,
-            // Red for billboard
-            transparent: False,
-            opacity: 1.0,
-            map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) = scene.plane(width: 8.0, height: 8.0)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.basic_material(
+                color: 0xff0000,
+                // Red for billboard
+                transparent: False,
+                opacity: 1.0,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.identity,
           physics: option.None,
         )

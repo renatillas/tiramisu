@@ -19,45 +19,40 @@ pub type Condition(ctx) {
 }
 
 /// Transition between two states
-pub type Transition(ctx) {
+pub type Transition(state, ctx) {
   Transition(
-    from: String,
-    to: String,
+    from: state,
+    to: state,
     condition: Condition(ctx),
     blend_duration: Float,
   )
 }
 
 /// An animation state with its configuration
-pub type State {
-  State(id: String, animation: Animation, is_looping: Bool)
+pub type State(state) {
+  State(id: state, animation: Animation, is_looping: Bool)
 }
 
 /// The current state of a running state machine
-pub type StateMachineState {
+pub type StateMachineState(state) {
   /// Playing a single state
-  Playing(state: String, elapsed: Float)
+  Playing(state: state, elapsed: Float)
   /// Blending between two states
-  Blending(
-    from: String,
-    to: String,
-    blend_progress: Float,
-    blend_duration: Float,
-  )
+  Blending(from: state, to: state, blend_progress: Float, blend_duration: Float)
 }
 
 /// An animation state machine
-pub opaque type StateMachine(ctx) {
+pub opaque type StateMachine(state, ctx) {
   StateMachine(
-    states: Dict(String, State),
-    transitions: List(Transition(ctx)),
-    current: StateMachineState,
+    states: Dict(state, State(state)),
+    transitions: List(Transition(state, ctx)),
+    current: StateMachineState(state),
     default_blend: Float,
   )
 }
 
 /// Create a new state machine with a starting state
-pub fn new(initial_state: String) -> StateMachine(ctx) {
+pub fn new(initial_state: state) -> StateMachine(state, ctx) {
   StateMachine(
     states: dict.new(),
     transitions: [],
@@ -68,42 +63,42 @@ pub fn new(initial_state: String) -> StateMachine(ctx) {
 
 /// Add a state to the state machine
 pub fn add_state(
-  machine: StateMachine(ctx),
-  id: String,
+  machine: StateMachine(state, ctx),
+  id: state,
   animation: Animation,
   looping looping: Bool,
-) -> StateMachine(ctx) {
+) -> StateMachine(state, ctx) {
   let state = State(id: id, animation: animation, is_looping: looping)
   StateMachine(..machine, states: dict.insert(machine.states, id, state))
 }
 
 /// Add a transition between two states
 pub fn add_transition(
-  machine: StateMachine(ctx),
-  from from: String,
-  to to: String,
+  machine: StateMachine(state, ctx),
+  from from: state,
+  to to: state,
   condition condition: Condition(ctx),
   blend_duration blend_duration: Float,
-) -> StateMachine(ctx) {
+) -> StateMachine(state, ctx) {
   let transition = Transition(from, to, condition, blend_duration)
   StateMachine(..machine, transitions: [transition, ..machine.transitions])
 }
 
 /// Set the default blend duration for transitions
 pub fn set_default_blend(
-  machine: StateMachine(ctx),
+  machine: StateMachine(state, ctx),
   duration: Float,
-) -> StateMachine(ctx) {
+) -> StateMachine(state, ctx) {
   StateMachine(..machine, default_blend: duration)
 }
 
 /// Update the state machine (should be called every frame)
 /// Returns updated state machine and whether a transition occurred
 pub fn update(
-  machine: StateMachine(ctx),
+  machine: StateMachine(state, ctx),
   context: ctx,
   delta_time: Float,
-) -> #(StateMachine(ctx), Bool) {
+) -> #(StateMachine(state, ctx), Bool) {
   case machine.current {
     Playing(state_id, elapsed) -> {
       let new_elapsed = elapsed +. delta_time
@@ -156,7 +151,9 @@ pub fn update(
 
 /// Get the current animation(s) to play
 /// Returns a single animation or blend information
-pub fn get_current_animation(machine: StateMachine(ctx)) -> AnimationOutput {
+pub fn get_current_animation(
+  machine: StateMachine(state, ctx),
+) -> AnimationOutput {
   case machine.current {
     Playing(state_id, _) -> {
       case dict.get(machine.states, state_id) {
@@ -193,10 +190,10 @@ pub type AnimationOutput {
 
 /// Manually trigger a transition to a specific state
 pub fn transition_to(
-  machine: StateMachine(ctx),
-  target: String,
+  machine: StateMachine(state, ctx),
+  target: state,
   blend_duration: Option(Float),
-) -> StateMachine(ctx) {
+) -> StateMachine(state, ctx) {
   let blend = option.unwrap(blend_duration, machine.default_blend)
 
   case machine.current {
@@ -211,7 +208,7 @@ pub fn transition_to(
 }
 
 /// Get the current state ID
-pub fn current_state(machine: StateMachine(ctx)) -> String {
+pub fn current_state(machine: StateMachine(state, ctx)) -> state {
   case machine.current {
     Playing(state_id, _) -> state_id
     Blending(_, to, _, _) -> to
@@ -219,7 +216,7 @@ pub fn current_state(machine: StateMachine(ctx)) -> String {
 }
 
 /// Check if currently blending
-pub fn is_blending(machine: StateMachine(ctx)) -> Bool {
+pub fn is_blending(machine: StateMachine(state, ctx)) -> Bool {
   case machine.current {
     Playing(..) -> False
     Blending(..) -> True
@@ -227,7 +224,7 @@ pub fn is_blending(machine: StateMachine(ctx)) -> Bool {
 }
 
 /// Get blend progress (0.0 to 1.0) if blending
-pub fn blend_progress(machine: StateMachine(ctx)) -> Option(Float) {
+pub fn blend_progress(machine: StateMachine(state, ctx)) -> Option(Float) {
   case machine.current {
     Playing(..) -> option.None
     Blending(_, _, progress, duration) -> option.Some(progress /. duration)
@@ -238,10 +235,10 @@ pub fn blend_progress(machine: StateMachine(ctx)) -> Option(Float) {
 
 /// Find a valid transition from the current state
 fn find_valid_transition(
-  machine: StateMachine(ctx),
-  from_state: String,
+  machine: StateMachine(state, ctx),
+  from_state: state,
   context: ctx,
-) -> Result(Transition(ctx), Nil) {
+) -> Result(Transition(state, ctx), Nil) {
   machine.transitions
   |> list.find(fn(transition) {
     transition.from == from_state
@@ -260,22 +257,25 @@ fn check_condition(condition: Condition(ctx), context: ctx) -> Bool {
 }
 
 /// Get a state by ID
-pub fn get_state(machine: StateMachine(ctx), id: String) -> Result(State, Nil) {
+pub fn get_state(
+  machine: StateMachine(state, ctx),
+  id: state,
+) -> Result(State(state), Nil) {
   dict.get(machine.states, id)
 }
 
 /// Get all state IDs
-pub fn state_ids(machine: StateMachine(ctx)) -> List(String) {
+pub fn state_ids(machine: StateMachine(state, ctx)) -> List(state) {
   dict.keys(machine.states)
 }
 
 /// Get the number of states
-pub fn state_count(machine: StateMachine(ctx)) -> Int {
+pub fn state_count(machine: StateMachine(state, ctx)) -> Int {
   dict.size(machine.states)
 }
 
 /// Get the number of transitions
-pub fn transition_count(machine: StateMachine(ctx)) -> Int {
+pub fn transition_count(machine: StateMachine(state, ctx)) -> Int {
   list.length(machine.transitions)
 }
 

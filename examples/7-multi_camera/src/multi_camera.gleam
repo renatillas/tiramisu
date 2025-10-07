@@ -182,16 +182,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 200.0,
     )
 
-  let cam_topdown =
-    cam_topdown
-    |> camera.set_position(vec3.Vec3(0.0, 80.0, 0.1))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   let camera_topdown =
     scene.Camera(
       id: "camera_topdown",
       camera: cam_topdown,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: model.current_view == TopDown,
       viewport: option.None,
     )
@@ -205,16 +201,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 200.0,
     )
 
-  let cam_side =
-    cam_side
-    |> camera.set_position(vec3.Vec3(60.0, 10.0, 0.0))
-    |> camera.look(at: vec3.Vec3(0.0, 20.0, 0.0))
-
   let camera_side =
     scene.Camera(
       id: "camera_side",
       camera: cam_side,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 20.0, 0.0)),
       active: model.current_view == Side,
       viewport: option.None,
     )
@@ -228,16 +220,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 200.0,
     )
 
-  let cam_firstperson =
-    cam_firstperson
-    |> camera.set_position(vec3.Vec3(-18.0, 3.0, 18.0))
-    |> camera.look(at: vec3.Vec3(0.0, 6.0, 0.0))
-
   let camera_firstperson =
     scene.Camera(
       id: "camera_firstperson",
       camera: cam_firstperson,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 6.0, 0.0)),
       active: model.current_view == FirstPerson,
       viewport: option.None,
     )
@@ -255,16 +243,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 200.0,
     )
 
-  let cam_orbiting =
-    cam_orbiting
-    |> camera.set_position(vec3.Vec3(orbit_x, 25.0, orbit_z))
-    |> camera.look(at: vec3.Vec3(0.0, 6.0, 0.0))
-
   let camera_orbiting =
     scene.Camera(
       id: "camera_orbiting",
       camera: cam_orbiting,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: model.current_view == Orbiting,
       viewport: option.None,
     )
@@ -272,19 +256,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let assert Ok(cam_overlay) =
     camera.perspective(field_of_view: 50.0, aspect: 1.0, near: 0.1, far: 200.0)
 
-  let cam_overlay =
-    cam_overlay
-    |> camera.set_position(vec3.Vec3(0.0, 80.0, 0.1))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   let camera_overlay =
     scene.Camera(
       id: "camera_overlay",
       camera: cam_overlay,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: False,
-      // Overlay camera is never the "active" main camera
-      // Bottom-right corner: 250x250 pixels, 30px from edges
       viewport: option.Some(#(1280 - 250 - 30, 30, 250, 250)),
     )
 
@@ -292,12 +270,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(30.0, 40.0, 30.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -312,14 +298,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let rotating_cube =
     scene.Mesh(
       id: "rotating_cube",
-      geometry: scene.BoxGeometry(4.0, 4.0, 4.0),
-      material: scene.StandardMaterial(
-        color: 0xff6b6b,
-        metalness: 0.3,
-        roughness: 0.4,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 4.0, height: 4.0, depth: 4.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xff6b6b,
+            metalness: 0.3,
+            roughness: 0.4,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 6.0, 0.0),
         rotation: vec3.Vec3(model.rotation, model.rotation *. 0.7, 0.0),
@@ -332,14 +325,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let ground =
     scene.Mesh(
       id: "ground",
-      geometry: scene.PlaneGeometry(100.0, 100.0),
-      material: scene.StandardMaterial(
-        color: 0x2d3561,
-        metalness: 0.0,
-        roughness: 0.8,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) = scene.plane(width: 100.0, height: 100.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x2d3561,
+            metalness: 0.0,
+            roughness: 0.8,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 0.0, 0.0),
         rotation: vec3.Vec3(-1.5708, 0.0, 0.0),
@@ -361,14 +361,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
       scene.Mesh(
         id: "sphere_" <> int.to_string(i),
-        geometry: scene.SphereGeometry(2.0, 16, 16),
-        material: scene.StandardMaterial(
-          color: 0x4ecdc4,
-          metalness: 0.5,
-          roughness: 0.3,
-          map: option.None,
-          normal_map: option.None,
-        ),
+        geometry: {
+          let assert Ok(geometry) =
+            scene.sphere(radius: 2.0, width_segments: 16, height_segments: 16)
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            scene.standard_material(
+              color: 0x4ecdc4,
+              metalness: 0.5,
+              roughness: 0.3,
+              map: option.None,
+              normal_map: option.None,
+            )
+          material
+        },
         transform: transform.Transform(
           position: vec3.Vec3(x, 3.0, z),
           rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -382,14 +390,27 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let pillars = [
     scene.Mesh(
       id: "pillar_1",
-      geometry: scene.CylinderGeometry(1.0, 1.0, 12.0, 8),
-      material: scene.StandardMaterial(
-        color: 0xf9ca24,
-        metalness: 0.2,
-        roughness: 0.6,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.cylinder(
+            radius_top: 1.0,
+            radius_bottom: 1.0,
+            height: 12.0,
+            radial_segments: 8,
+          )
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xf9ca24,
+            metalness: 0.2,
+            roughness: 0.6,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(25.0, 6.0, 25.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -399,14 +420,27 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "pillar_2",
-      geometry: scene.CylinderGeometry(1.0, 1.0, 12.0, 8),
-      material: scene.StandardMaterial(
-        color: 0xf9ca24,
-        metalness: 0.2,
-        roughness: 0.6,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.cylinder(
+            radius_top: 1.0,
+            radius_bottom: 1.0,
+            height: 12.0,
+            radial_segments: 8,
+          )
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xf9ca24,
+            metalness: 0.2,
+            roughness: 0.6,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(-25.0, 6.0, 25.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -416,14 +450,27 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "pillar_3",
-      geometry: scene.CylinderGeometry(1.0, 1.0, 12.0, 8),
-      material: scene.StandardMaterial(
-        color: 0xf9ca24,
-        metalness: 0.2,
-        roughness: 0.6,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.cylinder(
+            radius_top: 1.0,
+            radius_bottom: 1.0,
+            height: 12.0,
+            radial_segments: 8,
+          )
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xf9ca24,
+            metalness: 0.2,
+            roughness: 0.6,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(25.0, 6.0, -25.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -433,14 +480,27 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "pillar_4",
-      geometry: scene.CylinderGeometry(1.0, 1.0, 12.0, 8),
-      material: scene.StandardMaterial(
-        color: 0xf9ca24,
-        metalness: 0.2,
-        roughness: 0.6,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.cylinder(
+            radius_top: 1.0,
+            radius_bottom: 1.0,
+            height: 12.0,
+            radial_segments: 8,
+          )
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xf9ca24,
+            metalness: 0.2,
+            roughness: 0.6,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(-25.0, 6.0, -25.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),

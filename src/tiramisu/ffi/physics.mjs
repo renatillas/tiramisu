@@ -5,6 +5,9 @@
 
 import RAPIER from '@dimforge/rapier3d-compat';
 import { toList } from '../../../gleam_stdlib/gleam.mjs';
+import { Some, None } from '../../../gleam_stdlib/gleam/option.mjs';
+import { Transform } from '../transform.mjs';
+import { Vec3 } from '../../../vec/vec/vec3.mjs';
 
 // Initialize Rapier (must be called before creating world)
 await RAPIER.init();
@@ -27,6 +30,7 @@ export function initWorld(config) {
   };
 
   physicsWorld = new RAPIER.World(gravity);
+  console.log('[Physics] Physics world initialized with gravity:', gravity);
 }
 
 /**
@@ -47,8 +51,11 @@ export function stepWorld(deltaTime) {
  */
 export function createRigidBody(id, bodyConfig, transform) {
   if (!physicsWorld) {
+    console.warn('[Physics] createRigidBody called but physicsWorld is null:', id);
     return;
   }
+
+  console.log('[Physics] Creating rigid body:', id, 'at position:', transform.position);
 
   // Create rigid body descriptor based on type
   let bodyDesc;
@@ -151,10 +158,12 @@ export function removeRigidBody(id) {
  */
 export function getBodyTransform(id) {
   const body = bodyMap.get(id);
-  if (!body) return { 0: undefined }; // Gleam None representation
+  if (!body) {
+    return new None();
+  }
 
   const translation = body.translation();
-  const rotation = body.rotation();
+  const quaternion = body.rotation();
 
   // Convert quaternion to Euler angles (simplified, may have gimbal lock issues)
   // For now, just use quaternion as-is
@@ -163,14 +172,13 @@ export function getBodyTransform(id) {
   const eulerY = 0; // Placeholder
   const eulerZ = 0; // Placeholder
 
-  // Return Some(Transform)
-  return {
-    0: { // Some wrapper
-      position: { x: translation.x, y: translation.y, z: translation.z },
-      rotation: { x: eulerX, y: eulerY, z: eulerZ },
-      scale: { x: 1.0, y: 1.0, z: 1.0 } // Physics doesn't affect scale
-    }
-  };
+  // Return Some(Transform) - properly constructed Gleam types
+  const position = new Vec3(translation.x, translation.y, translation.z);
+  const rotation = new Vec3(eulerX, eulerY, eulerZ);
+  const scale = new Vec3(1.0, 1.0, 1.0);
+  const transform = new Transform(position, rotation, scale);
+
+  return new Some(transform);
 }
 
 /**
@@ -216,10 +224,10 @@ export function setVelocity(id, velocity) {
  */
 export function getVelocity(id) {
   const body = bodyMap.get(id);
-  if (!body) return { 0: undefined }; // Gleam None
+  if (!body) return new None();
 
   const vel = body.linvel();
-  return { 0: { x: vel.x, y: vel.y, z: vel.z } }; // Gleam Some(Vec3)
+  return new Some(new Vec3(vel.x, vel.y, vel.z));
 }
 
 /**

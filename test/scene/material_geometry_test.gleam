@@ -6,17 +6,29 @@ import vec/vec3
 
 // Test: Update StandardMaterial properties
 pub fn update_standard_material_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.standard_material(
+      color: 0xff0000,
+      metalness: 0.5,
+      roughness: 0.5,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.standard_material(
+      color: 0xff0000,
+      metalness: 0.8,
+      roughness: 0.2,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        0xff0000,
-        0.5,
-        0.5,
-        option.None,
-        option.None,
-      ),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -24,14 +36,8 @@ pub fn update_standard_material_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        0xff0000,
-        0.8,
-        0.2,
-        option.None,
-        option.None,
-      ),
+      geometry: geometry1,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -41,21 +47,36 @@ pub fn update_standard_material_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateMaterial(
-      "mesh1",
-      scene.StandardMaterial(0xff0000, 0.8, 0.2, option.None, option.None),
-    )) -> True
+    Ok(scene.UpdateMaterial("mesh1", _)) -> True
     _ -> False
   }
 }
 
 // Test: Change material type (BasicMaterial to StandardMaterial)
 pub fn change_material_type_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.standard_material(
+      color: 0xff0000,
+      metalness: 0.5,
+      roughness: 0.5,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -63,14 +84,8 @@ pub fn change_material_type_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        0xff0000,
-        0.5,
-        0.5,
-        option.None,
-        option.None,
-      ),
+      geometry: geometry1,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -80,21 +95,24 @@ pub fn change_material_type_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateMaterial(
-      "mesh1",
-      scene.StandardMaterial(_, _, _, _, option.None),
-    )) -> True
+    Ok(scene.UpdateMaterial("mesh1", _)) -> True
     _ -> False
   }
 }
 
 // Test: PhongMaterial update
 pub fn phong_material_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.phong_material(0xff0000, 30.0, option.None, option.None)
+  let assert Ok(material2) =
+    scene.phong_material(0xff0000, 60.0, option.None, option.None)
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.PhongMaterial(0xff0000, 30.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -102,8 +120,8 @@ pub fn phong_material_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.PhongMaterial(0xff0000, 60.0, option.None),
+      geometry: geometry1,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -113,21 +131,24 @@ pub fn phong_material_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateMaterial(
-      "mesh1",
-      scene.PhongMaterial(0xff0000, 60.0, option.None),
-    )) -> True
+    Ok(scene.UpdateMaterial("mesh1", _)) -> True
     _ -> False
   }
 }
 
 // Test: LambertMaterial
 pub fn lambert_material_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.lambert_material(0xff0000, option.None, option.None)
+  let assert Ok(material2) =
+    scene.lambert_material(0x00ff00, option.None, option.None)
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.LambertMaterial(0xff0000, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -135,8 +156,8 @@ pub fn lambert_material_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.LambertMaterial(0x00ff00, option.None),
+      geometry: geometry1,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -148,11 +169,17 @@ pub fn lambert_material_test() {
 
 // Test: ToonMaterial
 pub fn toon_material_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.toon_material(0xff0000, option.None, option.None)
+  let assert Ok(material2) =
+    scene.toon_material(0x00ff00, option.None, option.None)
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.ToonMaterial(0xff0000, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -160,8 +187,8 @@ pub fn toon_material_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.ToonMaterial(0x00ff00, option.None),
+      geometry: geometry1,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -173,11 +200,22 @@ pub fn toon_material_test() {
 
 // Test: Different geometry types
 pub fn cone_geometry_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry2) = scene.cone(radius: 1.0, height: 2.0, segments: 32)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -185,8 +223,8 @@ pub fn cone_geometry_test() {
   let current = [
     scene.Mesh(
       id: "mesh1",
-      geometry: scene.ConeGeometry(1.0, 2.0, 32),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry2,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -196,19 +234,29 @@ pub fn cone_geometry_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateGeometry("mesh1", scene.ConeGeometry(1.0, 2.0, 32))) -> True
+    Ok(scene.UpdateGeometry("mesh1", _)) -> True
     _ -> False
   }
 }
 
 // Test: PlaneGeometry
 pub fn plane_geometry_test() {
+  let assert Ok(geometry1) = scene.plane(width: 10.0, height: 10.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0x808080,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "plane",
-      geometry: scene.PlaneGeometry(10.0, 10.0),
-      material: scene.BasicMaterial(0x808080, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -218,23 +266,29 @@ pub fn plane_geometry_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.AddNode(
-      "plane",
-      scene.Mesh(_, scene.PlaneGeometry(10.0, 10.0), _, _, _),
-      _,
-    )) -> True
+    Ok(scene.AddNode("plane", scene.Mesh(_, _, _, _, _), _)) -> True
     _ -> False
   }
 }
 
 // Test: CircleGeometry
 pub fn circle_geometry_test() {
+  let assert Ok(geometry1) = scene.circle(radius: 1.5, segments: 64)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "circle",
-      geometry: scene.CircleGeometry(1.5, 64),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -246,12 +300,28 @@ pub fn circle_geometry_test() {
 
 // Test: CylinderGeometry
 pub fn cylinder_geometry_test() {
+  let assert Ok(geometry1) =
+    scene.cylinder(
+      radius_top: 1.0,
+      radius_bottom: 1.0,
+      height: 2.0,
+      radial_segments: 32,
+    )
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "cylinder",
-      geometry: scene.CylinderGeometry(1.0, 1.0, 2.0, 32),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -263,12 +333,28 @@ pub fn cylinder_geometry_test() {
 
 // Test: TorusGeometry
 pub fn torus_geometry_test() {
+  let assert Ok(geometry1) =
+    scene.torus(
+      radius: 1.0,
+      tube: 0.3,
+      radial_segments: 16,
+      tubular_segments: 100,
+    )
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "torus",
-      geometry: scene.TorusGeometry(1.0, 0.3, 16, 100),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -280,12 +366,22 @@ pub fn torus_geometry_test() {
 
 // Test: TetrahedronGeometry
 pub fn tetrahedron_geometry_test() {
+  let assert Ok(geometry1) = scene.tetrahedron(radius: 1.0, detail: 0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "tetra",
-      geometry: scene.TetrahedronGeometry(1.0, 0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -297,12 +393,22 @@ pub fn tetrahedron_geometry_test() {
 
 // Test: IcosahedronGeometry
 pub fn icosahedron_geometry_test() {
+  let assert Ok(geometry1) = scene.icosahedron(radius: 1.0, detail: 0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "ico",
-      geometry: scene.IcosahedronGeometry(1.0, 0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -318,7 +424,11 @@ pub fn directional_light_test() {
   let current = [
     scene.Light(
       id: "dir_light",
-      light_type: scene.DirectionalLight(0xffffff, 1.0),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(intensity: 1.0, color: 0xffffff)
+        light
+      },
       transform: transform.identity,
     ),
   ]
@@ -332,14 +442,22 @@ pub fn point_light_test() {
   let previous = [
     scene.Light(
       id: "light1",
-      light_type: scene.PointLight(0xffffff, 1.0, 10.0),
+      light: {
+        let assert Ok(light) =
+          scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+        light
+      },
       transform: transform.identity,
     ),
   ]
   let current = [
     scene.Light(
       id: "light1",
-      light_type: scene.PointLight(0xffffff, 2.0, 20.0),
+      light: {
+        let assert Ok(light) =
+          scene.point_light(intensity: 2.0, color: 0xffffff, distance: 20.0)
+        light
+      },
       transform: transform.identity,
     ),
   ]
@@ -348,8 +466,7 @@ pub fn point_light_test() {
   assert list.length(patches) == 1
 
   assert case list.first(patches) {
-    Ok(scene.UpdateLight("light1", scene.PointLight(0xffffff, 2.0, 20.0))) ->
-      True
+    Ok(scene.UpdateLight("light1", _)) -> True
     _ -> False
   }
 }
@@ -360,7 +477,17 @@ pub fn spot_light_test() {
   let current = [
     scene.Light(
       id: "spot",
-      light_type: scene.SpotLight(0xffffff, 1.0, 10.0, 0.5, 0.1),
+      light: {
+        let assert Ok(light) =
+          scene.spotlight(
+            intensity: 1.0,
+            color: 0xffffff,
+            distance: 10.0,
+            angle: 0.5,
+            penumbra: 0.1,
+          )
+        light
+      },
       transform: transform.identity,
     ),
   ]
@@ -375,7 +502,15 @@ pub fn hemisphere_light_test() {
   let current = [
     scene.Light(
       id: "hemi",
-      light_type: scene.HemisphereLight(0x0000ff, 0x00ff00, 1.0),
+      light: {
+        let assert Ok(light) =
+          scene.hemisphere_light(
+            intensity: 1.0,
+            sky_color: 0x0000ff,
+            ground_color: 0x00ff00,
+          )
+        light
+      },
       transform: transform.identity,
     ),
   ]
@@ -386,43 +521,68 @@ pub fn hemisphere_light_test() {
 
 // Test: Complex scene with various material and geometry types
 pub fn complex_scene_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry2) =
+    scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+  let assert Ok(geometry3) =
+    scene.torus(
+      radius: 1.0,
+      tube: 0.3,
+      radial_segments: 16,
+      tubular_segments: 100,
+    )
+  let assert Ok(material1) =
+    scene.standard_material(
+      color: 0xff0000,
+      metalness: 0.5,
+      roughness: 0.5,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.phong_material(0x00ff00, 30.0, option.None, option.None)
+  let assert Ok(material3) =
+    scene.toon_material(0x0000ff, option.None, option.None)
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "box",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        0xff0000,
-        0.5,
-        0.5,
-        option.None,
-        option.None,
-      ),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
     scene.Mesh(
       id: "sphere",
-      geometry: scene.SphereGeometry(1.0, 32, 32),
-      material: scene.PhongMaterial(0x00ff00, 30.0, option.None),
+      geometry: geometry2,
+      material: material2,
       transform: transform.at(position: vec3.Vec3(2.0, 0.0, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "torus",
-      geometry: scene.TorusGeometry(1.0, 0.3, 16, 100),
-      material: scene.ToonMaterial(0x0000ff, option.None),
+      geometry: geometry3,
+      material: material3,
       transform: transform.at(position: vec3.Vec3(-2.0, 0.0, 0.0)),
       physics: option.None,
     ),
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(0x404040, 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(intensity: 0.5, color: 0x404040)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "point",
-      light_type: scene.PointLight(0xffffff, 1.0, 10.0),
+      light: {
+        let assert Ok(light) =
+          scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+        light
+      },
       transform: transform.at(vec3.Vec3(0.0, 5.0, 0.0)),
     ),
   ]

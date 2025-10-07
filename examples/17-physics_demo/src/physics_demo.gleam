@@ -56,8 +56,8 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
-  let assert Ok(cam) =
+fn view(_model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
     camera.perspective(
       field_of_view: 75.0,
       aspect: 1200.0 /. 800.0,
@@ -65,14 +65,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 1000.0,
     )
 
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 5.0, 15.0))
-    |> camera.look(at: vec3.Vec3(0.0, 2.0, 0.0))
-    |> scene.Camera(
+  let camera =
+    scene.Camera(
       id: "main_camera",
-      camera: _,
-      transform: transform.identity,
+      camera:,
+      transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
     )
@@ -80,12 +78,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 2.0),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 2.0)
+        light
+      },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
     ),
   ]
@@ -94,14 +100,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let ground =
     scene.Mesh(
       id: "ground",
-      geometry: scene.BoxGeometry(20.0, 0.2, 20.0),
-      material: scene.StandardMaterial(
-        color: 0x808080,
-        metalness: 0.3,
-        roughness: 0.7,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.box(width: 20.0, height: 0.2, depth: 20.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x808080,
+            metalness: 0.3,
+            roughness: 0.7,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
         physics.rigid_body(physics.Fixed, physics.Box(20.0, 0.2, 20.0))
@@ -113,15 +127,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let cube1 =
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        color: 0xff4444,
-        metalness: 0.2,
-        roughness: 0.8,
-        map: option.None,
-        normal_map: option.None,
-      ),
-      transform: case physics.get_transform(model.physics_world, "cube1") {
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0xff4444,
+            metalness: 0.2,
+            roughness: 0.8,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
+      transform: case physics.get_transform("cube1") {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(-2.0, 5.0, 0.0))
       },
@@ -136,15 +157,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let cube2 =
     scene.Mesh(
       id: "cube2",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        color: 0x44ff44,
-        metalness: 0.2,
-        roughness: 0.8,
-        map: option.None,
-        normal_map: option.None,
-      ),
-      transform: case physics.get_transform(model.physics_world, "cube2") {
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x44ff44,
+            metalness: 0.2,
+            roughness: 0.8,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
+      transform: case physics.get_transform("cube2") {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(0.0, 7.0, 0.0))
       },
@@ -159,15 +187,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let cube3 =
     scene.Mesh(
       id: "cube3",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        color: 0x4444ff,
-        metalness: 0.2,
-        roughness: 0.8,
-        map: option.None,
-        normal_map: option.None,
-      ),
-      transform: case physics.get_transform(model.physics_world, "cube3") {
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x4444ff,
+            metalness: 0.2,
+            roughness: 0.8,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
+      transform: case physics.get_transform("cube3") {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(2.0, 9.0, 0.0))
       },
@@ -179,5 +214,5 @@ fn view(model: Model) -> List(scene.SceneNode) {
       ),
     )
 
-  [cam, ground, cube1, cube2, cube3, ..lights]
+  [camera, ground, cube1, cube2, cube3, ..lights]
 }

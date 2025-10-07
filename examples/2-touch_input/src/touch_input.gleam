@@ -16,6 +16,8 @@ pub type Model {
     cube_position: vec3.Vec3(Float),
     cube_scale: Float,
     touch_spheres: List(TouchSphere),
+    canvas_width: Float,
+    canvas_height: Float,
   )
 }
 
@@ -29,8 +31,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 800,
-    height: 600,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -38,12 +39,14 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       cube_position: vec3.Vec3(0.0, 0.0, -5.0),
       cube_scale: 1.0,
       touch_spheres: [],
+      canvas_width: ctx.canvas_width,
+      canvas_height: ctx.canvas_height,
     )
   #(model, effect.tick(Tick))
 }
@@ -66,9 +69,9 @@ fn update(
       // Single touch: move cube to touch position
       let new_position = case touches {
         [first, ..] -> {
-          // Map touch coordinates to 3D space
-          let x = { first.x -. 400.0 } /. 100.0
-          let y = { 300.0 -. first.y } /. 100.0
+          // Map touch coordinates to 3D space using actual canvas dimensions
+          let x = { first.x -. ctx.canvas_width /. 2.0 } /. 100.0
+          let y = { ctx.canvas_height /. 2.0 -. first.y } /. 100.0
           vec3.Vec3(x, y, -5.0)
         }
         [] -> model.cube_position
@@ -98,6 +101,8 @@ fn update(
           cube_position: new_position,
           cube_scale: new_scale,
           touch_spheres: spheres,
+          canvas_width: ctx.canvas_width,
+          canvas_height: ctx.canvas_height,
         )
 
       #(new_model, effect.tick(Tick))
@@ -107,29 +112,33 @@ fn update(
 
 fn view(model: Model) -> List(scene.SceneNode) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 800.0 /. 600.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let camera =
     scene.Camera(
       id: "main",
       camera:,
       transform: transform.identity,
       active: True,
+      look_at: option.None,
       viewport: option.None,
     )
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(5.0, 5.0, 5.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -141,14 +150,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let main_cube = [
     scene.Mesh(
       id: "cube",
-      geometry: scene.BoxGeometry(width: 2.0, height: 2.0, depth: 2.0),
-      material: scene.StandardMaterial(
-        color: 0x4ecdc4,
-        metalness: 0.3,
-        roughness: 0.4,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(box) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        box
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x4ecdc4,
+            metalness: 0.3,
+            roughness: 0.4,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: model.cube_position,
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -161,22 +177,27 @@ fn view(model: Model) -> List(scene.SceneNode) {
   // Create visual indicators for each touch point
   let touch_indicators =
     list.map(model.touch_spheres, fn(touch) {
-      let x = { touch.x -. 400.0 } /. 100.0
-      let y = { 300.0 -. touch.y } /. 100.0
+      let x = { touch.x -. model.canvas_width /. 2.0 } /. 100.0
+      let y = { model.canvas_height /. 2.0 -. touch.y } /. 100.0
 
       scene.Mesh(
         id: "touch-" <> int.to_string(touch.id),
-        geometry: scene.SphereGeometry(
-          radius: 0.3,
-          width_segments: 16,
-          height_segments: 16,
-        ),
-        material: scene.BasicMaterial(
-          color: 0xff00ff,
-          transparent: True,
-          opacity: 0.7,
-          map: option.None,
-        ),
+        geometry: {
+          let assert Ok(sphere) =
+            scene.sphere(radius: 0.3, width_segments: 16, height_segments: 16)
+          sphere
+        },
+        material: {
+          let assert Ok(material) =
+            scene.basic_material(
+              color: 0xff00ff,
+              transparent: True,
+              opacity: 0.7,
+              map: option.None,
+              normal_map: option.None,
+            )
+          material
+        },
         transform: transform.Transform(
           position: vec3.Vec3(x, y, -3.0),
           rotation: vec3.Vec3(0.0, 0.0, 0.0),

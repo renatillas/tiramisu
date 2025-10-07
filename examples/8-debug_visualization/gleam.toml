@@ -20,3 +20,6 @@ proxy_to = "./priv"
 scripts = [
   { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
 ]
+stylesheets = [
+  { content = "body { margin: 0; padding: 0; overflow: hidden; }" }
+]

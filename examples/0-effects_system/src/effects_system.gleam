@@ -11,14 +11,19 @@ import tiramisu/camera
 import tiramisu/effect
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(cubes: List(Cube), next_id: Int)
 }
 
 pub type Cube {
-  Cube(id: Int, position: vec3.Vec3, velocity: vec3.Vec3, color: Int)
+  Cube(
+    id: Int,
+    position: vec3.Vec3(Float),
+    velocity: vec3.Vec3(Float),
+    color: Int,
+  )
 }
 
 pub type Msg {
@@ -28,8 +33,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -119,22 +123,16 @@ fn list_at(list: List(a), index: Int) -> Result(a, Nil) {
 
 fn view(model: Model) -> List(scene.SceneNode) {
   let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 5.0, 20.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+  let assert Ok(box_geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+
   let camera_node =
     scene.Camera(
       id: "main_camera",
       camera: cam,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
+      look_at: option.None,
       active: True,
       viewport: option.None,
     )
@@ -142,12 +140,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(intensity: 0.6, color: 0xffffff)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(intensity: 0.8, color: 0xffffff)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(10.0, 10.0, 10.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -158,16 +164,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   let cubes =
     list.map(model.cubes, fn(cube) {
-      scene.Mesh(
-        id: "cube-" <> int.to_string(cube.id),
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.StandardMaterial(
+      let assert Ok(cube_material) =
+        scene.standard_material(
           color: cube.color,
           metalness: 0.3,
           roughness: 0.5,
           map: option.None,
           normal_map: option.None,
-        ),
+        )
+
+      scene.Mesh(
+        id: "cube-" <> int.to_string(cube.id),
+        geometry: box_geometry,
+        material: cube_material,
         transform: transform.Transform(
           position: cube.position,
           rotation: vec3.Vec3(

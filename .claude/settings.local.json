@@ -16,7 +16,9 @@
       "Bash(if grep -q \"camera: cam,\" \"$file\")",
       "Bash(echo:*)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(for file in examples/{7..19}-*/src/*.gleam example-games/*/src/*.gleam)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

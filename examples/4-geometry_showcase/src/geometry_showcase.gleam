@@ -61,12 +61,11 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   let camera =
     camera
-    |> camera.set_position(vec3.Vec3(0.0, 5.0, 20.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
     |> scene.Camera(
       id: "main_camera",
       camera: _,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
+      look_at: option.None,
       active: True,
       viewport: option.None,
     )
@@ -74,12 +73,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(10.0, 10.0, 10.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -89,69 +96,43 @@ fn view(model: Model) -> List(scene.SceneNode) {
   ]
 
   // Grid layout: 3 rows x 3 columns
+  let assert Ok(box_geom) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+  let assert Ok(sphere_geom) =
+    scene.sphere(radius: 1.2, width_segments: 32, height_segments: 32)
+  let assert Ok(cone_geom) = scene.cone(radius: 1.0, height: 2.0, segments: 32)
+  let assert Ok(plane_geom) = scene.plane(width: 2.5, height: 2.5)
+  let assert Ok(circle_geom) = scene.circle(radius: 1.3, segments: 32)
+  let assert Ok(cylinder_geom) =
+    scene.cylinder(
+      radius_top: 1.0,
+      radius_bottom: 1.0,
+      height: 2.0,
+      radial_segments: 32,
+    )
+  let assert Ok(torus_geom) =
+    scene.torus(
+      radius: 1.0,
+      tube: 0.4,
+      radial_segments: 16,
+      tubular_segments: 32,
+    )
+  let assert Ok(tetrahedron_geom) = scene.tetrahedron(radius: 1.5, detail: 0)
+  let assert Ok(icosahedron_geom) = scene.icosahedron(radius: 1.3, detail: 0)
+
   let geometries = [
     // Row 1
-    create_mesh(
-      "box",
-      scene.BoxGeometry(2.0, 2.0, 2.0),
-      -8.0,
-      4.0,
-      model.rotation,
-      0xff6b6b,
-    ),
-    create_mesh(
-      "sphere",
-      scene.SphereGeometry(1.2, 32, 32),
-      0.0,
-      4.0,
-      model.rotation,
-      0x4ecdc4,
-    ),
-    create_mesh(
-      "cone",
-      scene.ConeGeometry(1.0, 2.0, 32),
-      8.0,
-      4.0,
-      model.rotation,
-      0xffe66d,
-    ),
+    create_mesh("box", box_geom, -8.0, 4.0, model.rotation, 0xff6b6b),
+    create_mesh("sphere", sphere_geom, 0.0, 4.0, model.rotation, 0x4ecdc4),
+    create_mesh("cone", cone_geom, 8.0, 4.0, model.rotation, 0xffe66d),
     // Row 2
-    create_mesh(
-      "plane",
-      scene.PlaneGeometry(2.5, 2.5),
-      -8.0,
-      0.0,
-      model.rotation,
-      0x95e1d3,
-    ),
-    create_mesh(
-      "circle",
-      scene.CircleGeometry(1.3, 32),
-      0.0,
-      0.0,
-      model.rotation,
-      0xf38181,
-    ),
-    create_mesh(
-      "cylinder",
-      scene.CylinderGeometry(1.0, 1.0, 2.0, 32),
-      8.0,
-      0.0,
-      model.rotation,
-      0xa8e6cf,
-    ),
+    create_mesh("plane", plane_geom, -8.0, 0.0, model.rotation, 0x95e1d3),
+    create_mesh("circle", circle_geom, 0.0, 0.0, model.rotation, 0xf38181),
+    create_mesh("cylinder", cylinder_geom, 8.0, 0.0, model.rotation, 0xa8e6cf),
     // Row 3
-    create_mesh(
-      "torus",
-      scene.TorusGeometry(1.0, 0.4, 16, 32),
-      -8.0,
-      -4.0,
-      model.rotation,
-      0xdcedc1,
-    ),
+    create_mesh("torus", torus_geom, -8.0, -4.0, model.rotation, 0xdcedc1),
     create_mesh(
       "tetrahedron",
-      scene.TetrahedronGeometry(1.5, 0),
+      tetrahedron_geom,
       0.0,
       -4.0,
       model.rotation,
@@ -159,7 +140,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     create_mesh(
       "icosahedron",
-      scene.IcosahedronGeometry(1.3, 0),
+      icosahedron_geom,
       8.0,
       -4.0,
       model.rotation,
@@ -172,22 +153,25 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
 fn create_mesh(
   id: String,
-  geometry: scene.GeometryType,
+  geometry: scene.Geometry,
   x: Float,
   y: Float,
   rotation: Float,
   color: Int,
 ) -> scene.SceneNode {
-  scene.Mesh(
-    id: id,
-    geometry: geometry,
-    material: scene.StandardMaterial(
+  let assert Ok(material) =
+    scene.standard_material(
       color: color,
       metalness: 0.2,
       roughness: 0.6,
       map: option.None,
       normal_map: option.None,
-    ),
+    )
+
+  scene.Mesh(
+    id: id,
+    geometry: geometry,
+    material: material,
     transform: transform.Transform(
       position: vec3.Vec3(x, y, 0.0),
       rotation: vec3.Vec3(rotation *. 0.5, rotation, rotation *. 0.3),

@@ -9,7 +9,7 @@
 import gleam/option
 import tiramisu
 import tiramisu/camera
-import tiramisu/effect.{type Effect}
+import tiramisu/effect
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
@@ -30,8 +30,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 800,
-    height: 600,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -39,7 +38,7 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
   let model =
     Model(
       position: vec3.Vec3(0.0, 0.0, -5.0),
@@ -54,7 +53,7 @@ fn update(
   model: Model,
   msg: Msg,
   ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+) -> #(Model, effect.Effect(Msg)) {
   case msg {
     Tick -> {
       // Keyboard movement (WASD)
@@ -122,28 +121,32 @@ fn update(
 
 fn view(model: Model) -> List(scene.SceneNode) {
   let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 800.0 /. 600.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   [
     scene.Camera(
       id: "main_camera",
       camera: cam,
       transform: transform.identity,
       viewport: option.None,
+      look_at: option.None,
       active: True,
     ),
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(5.0, 5.0, 5.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -152,14 +155,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "cube",
-      geometry: scene.BoxGeometry(width: 2.0, height: 2.0, depth: 2.0),
-      material: scene.StandardMaterial(
-        color: model.color,
-        metalness: 0.3,
-        roughness: 0.4,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(box) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        box
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: model.color,
+            metalness: 0.3,
+            roughness: 0.4,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: model.position,
         rotation: model.rotation,

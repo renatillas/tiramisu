@@ -353,29 +353,49 @@ fn game_view(model: GameModel) {
             far: 1000.0,
           )
         cam
-        |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-        |> camera.set_position(vec3.Vec3(0.0, 0.0, 20.0))
       },
-      transform: transform.at(vec3.Vec3(0.0, 0.0, 0.0)),
+      transform: transform.at(vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
+      look_at: option.None,
       viewport: None,
     ),
     // Lights
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(0xffffff, 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(0xffffff, 0.8),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        light
+      },
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Rotating cube
     scene.Mesh(
       id: "cube",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(0x4ecdc4, 0.5, 0.3, None, None),
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x4ecdc4,
+            metalness: 0.5,
+            roughness: 0.3,
+            map: None,
+            normal_map: None,
+          )
+        material
+      },
       transform: transform.identity
         |> transform.set_position(model.position)
         |> transform.set_rotation(vec3.Vec3(

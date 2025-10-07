@@ -99,11 +99,18 @@ export function startLoop(
     // Capture input state snapshot
     const inputState = INPUT_CAPTURE.captureInputState();
 
-    // Update context with new delta and input
+    // Get canvas dimensions
+    const canvas = renderer.domElement;
+    const canvasWidth = canvas.clientWidth;
+    const canvasHeight = canvas.clientHeight;
+
+    // Update context with new delta, input, and canvas dimensions
     const newContext = {
       ...context,
       delta_time: deltaTime,
       input: inputState,
+      canvas_width: canvasWidth,
+      canvas_height: canvasHeight,
     };
 
     // Process all messages in queue
@@ -143,11 +150,6 @@ export function startLoop(
     // Clear the entire canvas first
     renderer.setScissorTest(false);
     renderer.clear();
-
-    // Get canvas dimensions
-    const canvas = renderer.domElement;
-    const canvasWidth = canvas.clientWidth;
-    const canvasHeight = canvas.clientHeight;
 
     // Render main camera (active camera without viewport)
     const activeCamera = CAMERA.getCamera();
@@ -197,16 +199,20 @@ function runEffect(effect, dispatch) {
   }
 }
 
-// --- Helper Functions ---
+/**
+ * Get the current canvas dimensions from the renderer
+ * @param {THREE.WebGLRenderer} renderer
+ * @returns {[number, number]} [width, height] as a tuple
+ */
+export function getCanvasDimensions(renderer) {
+  const canvas = renderer.domElement;
+  return [canvas.clientWidth, canvas.clientHeight];
+}
 
-function gleamListToArray(gleamList) {
-  const result = [];
-  let current = gleamList;
-
-  while (current && current.head !== undefined) {
-    result.push(current.head);
-    current = current.tail;
-  }
-
-  return result;
+/**
+ * Get the current window aspect ratio
+ * @returns {number} width / height
+ */
+export function getWindowAspectRatio() {
+  return window.innerWidth / window.innerHeight;
 }

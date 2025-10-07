@@ -6,20 +6,25 @@ import vec/vec3
 
 // Test: Parent group is added before children in patches
 pub fn parent_before_children_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry2) = scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(material2) = scene.basic_material(color: 0x00ff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+
   let previous = []
   let current = [
     scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
-        geometry: scene.SphereGeometry(1.0, 32, 32),
-        material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+        geometry: geometry2,
+        material: material2,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -62,6 +67,9 @@ pub fn parent_before_children_test() {
 
 // Test: Deeply nested hierarchy is added in correct order
 pub fn deeply_nested_ordering_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+
   let previous = []
   let current = [
     scene.Group(id: "root", transform: transform.identity, children: [
@@ -69,8 +77,8 @@ pub fn deeply_nested_ordering_test() {
         scene.Group(id: "level2", transform: transform.identity, children: [
           scene.Mesh(
             id: "leaf",
-            geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-            material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+            geometry: geometry1,
+            material: material1,
             transform: transform.identity,
             physics: option.None,
           ),
@@ -125,13 +133,17 @@ pub fn deeply_nested_ordering_test() {
 
 // Test: Multiple groups at same level can be in any order
 pub fn sibling_groups_ordering_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(material2) = scene.basic_material(color: 0x00ff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+
   let previous = []
   let current = [
     scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -139,8 +151,8 @@ pub fn sibling_groups_ordering_test() {
     scene.Group(id: "group2", transform: transform.identity, children: [
       scene.Mesh(
         id: "child2",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material2,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -192,20 +204,27 @@ pub fn sibling_groups_ordering_test() {
 
 // Test: Complex hierarchy with moon orbiting planet orbiting sun
 pub fn solar_system_ordering_test() {
+  let assert Ok(geometry1) = scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+  let assert Ok(geometry2) = scene.sphere(radius: 0.5, width_segments: 32, height_segments: 32)
+  let assert Ok(geometry3) = scene.sphere(radius: 0.2, width_segments: 16, height_segments: 16)
+  let assert Ok(material1) = scene.basic_material(color: 0xffff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(material2) = scene.basic_material(color: 0x4ecdc4, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(material3) = scene.basic_material(color: 0xcccccc, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+
   let previous = []
   let current = [
     scene.Mesh(
       id: "sun",
-      geometry: scene.SphereGeometry(1.5, 32, 32),
-      material: scene.BasicMaterial(0xffff00, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
     scene.Group(id: "planet_orbit", transform: transform.identity, children: [
       scene.Mesh(
         id: "planet",
-        geometry: scene.SphereGeometry(0.5, 32, 32),
-        material: scene.BasicMaterial(0x4ecdc4, False, 1.0, option.None),
+        geometry: geometry2,
+        material: material2,
         transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0)),
         physics: option.None,
       ),
@@ -215,8 +234,8 @@ pub fn solar_system_ordering_test() {
         children: [
           scene.Mesh(
             id: "moon",
-            geometry: scene.SphereGeometry(0.2, 16, 16),
-            material: scene.BasicMaterial(0xcccccc, False, 1.0, option.None),
+            geometry: geometry3,
+            material: material3,
             transform: transform.at(position: vec3.Vec3(1.0, 0.0, 0.0)),
             physics: option.None,
           ),

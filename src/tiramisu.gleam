@@ -57,6 +57,7 @@
 //// }
 //// ```
 
+import gleam/option.{type Option}
 import tiramisu/effect
 import tiramisu/input
 import tiramisu/internal/renderer
@@ -66,14 +67,45 @@ import tiramisu/scene
 @internal
 pub type Scene
 
+/// Canvas dimensions for the game window.
+///
+/// Used with `tiramisu.run()` to specify the size of the game canvas.
+/// If not provided (None), the game will run in fullscreen mode.
+///
+/// ## Example
+///
+/// ```gleam
+/// import gleam/option.{None, Some}
+/// import tiramisu
+///
+/// // Fullscreen mode
+/// tiramisu.run(
+///   dimensions: None,
+///   background: 0x111111,
+///   // ...
+/// )
+///
+/// // Fixed size
+/// tiramisu.run(
+///   dimensions: Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
+///   background: 0x111111,
+///   // ...
+/// )
+/// ```
+pub type Dimensions {
+  Dimensions(width: Float, height: Float)
+}
+
 /// Game context passed to init and update functions.
 ///
-/// Contains timing information and input state for the current frame.
+/// Contains timing information, input state, and canvas dimensions for the current frame.
 ///
 /// ## Fields
 ///
 /// - `delta_time`: Time in seconds since the last frame (useful for frame-rate independent movement)
 /// - `input`: Current input state (keyboard, mouse, touch)
+/// - `canvas_width`: Current canvas width in pixels (useful for coordinate conversion)
+/// - `canvas_height`: Current canvas height in pixels (useful for coordinate conversion)
 ///
 /// ## Example
 ///
@@ -83,6 +115,10 @@ pub type Scene
 ///   let speed = 5.0
 ///   let new_x = model.x +. speed *. ctx.delta_time
 ///
+///   // Convert screen coordinates to world space
+///   let world_x = { screen_x -. ctx.canvas_width /. 2.0 } /. 100.0
+///   let world_y = { ctx.canvas_height /. 2.0 -. screen_y } /. 100.0
+///
 ///   // Check if space key is pressed
 ///   case input.is_key_down(ctx.input, "Space") {
 ///     True -> jump(model)
@@ -91,7 +127,12 @@ pub type Scene
 /// }
 /// ```
 pub type Context {
-  Context(delta_time: Float, input: input.InputState)
+  Context(
+    delta_time: Float,
+    input: input.InputState,
+    canvas_width: Float,
+    canvas_height: Float,
+  )
 }
 
 /// Initialize and run the game loop.
@@ -101,8 +142,7 @@ pub type Context {
 ///
 /// ## Parameters
 ///
-/// - `width`: Canvas width in pixels
-/// - `height`: Canvas height in pixels
+/// - `dimensions`: Canvas dimensions (width and height). Use `None` for fullscreen mode.
 /// - `background`: Background color as hex integer (e.g., 0x111111 for dark gray)
 /// - `init`: Function to create initial game state and effect
 /// - `update`: Function to update state based on messages
@@ -116,6 +156,7 @@ pub type Context {
 /// ## Example
 ///
 /// ```gleam
+/// import gleam/option.{None, Some}
 /// import tiramisu
 /// import tiramisu/camera
 /// import tiramisu/effect
@@ -132,9 +173,9 @@ pub type Context {
 /// }
 ///
 /// pub fn main() {
+///   // Fullscreen mode
 ///   tiramisu.run(
-///     width: 800,
-///     height: 600,
+///     dimensions: None,
 ///     background: 0x111111,
 ///     init: fn(_ctx) {
 ///       #(Model(rotation: 0.0), effect.batch([
@@ -172,8 +213,7 @@ pub type Context {
 /// }
 /// ```
 pub fn run(
-  width width: Int,
-  height height: Int,
+  dimensions dimensions: Option(Dimensions),
   background background: Int,
   init init: fn(Context) -> #(state, effect.Effect(msg)),
   update update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
@@ -184,14 +224,28 @@ pub fn run(
     renderer.create(renderer.RendererOptions(
       antialias: True,
       alpha: False,
-      width: width,
-      height: height,
+      dimensions: dimensions
+        |> option.map(fn(dimensions) {
+          renderer.Dimensions(
+            height: dimensions.height,
+            width: dimensions.width,
+          )
+        }),
     ))
 
   let scene_obj = create_scene(background)
 
+  // Get initial canvas dimensions
+  let #(initial_width, initial_height) = get_canvas_dimensions(renderer_obj)
+
   // Initial context with empty input
-  let initial_context = Context(delta_time: 0.0, input: input.new())
+  let initial_context =
+    Context(
+      delta_time: 0.0,
+      input: input.new(),
+      canvas_width: initial_width,
+      canvas_height: initial_height,
+    )
 
   // Initialize game state
   let #(initial_state, initial_effect) = init(initial_context)
@@ -234,6 +288,9 @@ fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
 @external(javascript, "./tiramisu.ffi.mjs", "applyInitialScene")
 fn apply_initial_scene(scene: Scene, nodes: List(scene.SceneNode)) -> Nil
 
+@external(javascript, "./tiramisu.ffi.mjs", "getCanvasDimensions")
+fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
+
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
   state: state,
@@ -245,3 +302,28 @@ fn start_loop(
   update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
   view: fn(state) -> List(scene.SceneNode),
 ) -> Nil
+
+/// Get the current window aspect ratio (width / height).
+///
+/// Useful for creating cameras that match the viewport dimensions,
+/// especially when using fullscreen mode (width: 0, height: 0).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/camera
+///
+/// pub fn view(model: Model) {
+///   let aspect = tiramisu.get_window_aspect_ratio()
+///   let assert Ok(cam) = camera.perspective(
+///     field_of_view: 75.0,
+///     aspect: aspect,
+///     near: 0.1,
+///     far: 1000.0,
+///   )
+///   // ... rest of scene
+/// }
+/// ```
+@external(javascript, "./tiramisu.ffi.mjs", "getWindowAspectRatio")
+pub fn get_window_aspect_ratio() -> Float

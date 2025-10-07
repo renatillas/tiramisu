@@ -19,43 +19,45 @@ const actionCache = new Map();
 // Cache of camera viewports by camera ID
 const cameraViewports = new Map();
 
-// Create Three.js geometry from geometry type
-export function createGeometry(geomType) {
-  if (geomType instanceof SCENE_GLEAM.BoxGeometry) {
-    return new THREE.BoxGeometry(geomType.width, geomType.height, geomType.depth);
-  } else if (geomType instanceof SCENE_GLEAM.SphereGeometry) {
-    return new THREE.SphereGeometry(geomType.radius, geomType.width_segments, geomType.height_segments);
-  } else if (geomType instanceof SCENE_GLEAM.ConeGeometry) {
-    return new THREE.ConeGeometry(geomType.radius, geomType.height, geomType.segments);
-  } else if (geomType instanceof SCENE_GLEAM.PlaneGeometry) {
-    return new THREE.PlaneGeometry(geomType.width, geomType.height);
-  } else if (geomType instanceof SCENE_GLEAM.CircleGeometry) {
-    return new THREE.CircleGeometry(geomType.radius, geomType.segments);
-  } else if (geomType instanceof SCENE_GLEAM.CylinderGeometry) {
-    return new THREE.CylinderGeometry(
-      geomType.radius_top,
-      geomType.radius_bottom,
-      geomType.height,
-      geomType.radial_segments
-    );
-  } else if (geomType instanceof SCENE_GLEAM.TorusGeometry) {
-    return new THREE.TorusGeometry(
-      geomType.radius,
-      geomType.tube,
-      geomType.radial_segments,
-      geomType.tubular_segments
-    );
-  } else if (geomType instanceof SCENE_GLEAM.TetrahedronGeometry) {
-    return new THREE.TetrahedronGeometry(geomType.radius, geomType.detail);
-  } else if (geomType instanceof SCENE_GLEAM.IcosahedronGeometry) {
-    return new THREE.IcosahedronGeometry(geomType.radius, geomType.detail);
-  } else if (geomType instanceof SCENE_GLEAM.CustomGeometry) {
-    // CustomGeometry wraps a Three.js BufferGeometry directly
-    return geomType[0]; // Extract the BufferGeometry from the wrapper
-  } else {
-    console.warn('Unknown geometry type:', geomType);
-    return new THREE.BoxGeometry(1, 1, 1);
-  }
+export function createBoxGeometry(width, height, depth) {
+  return new THREE.BoxGeometry(width, height, depth);
+}
+
+export function createSphereGeometry(radius, widthSegments, heightSegments) {
+  return new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+}
+
+export function createConeGeometry(radius, height, segments) {
+  return new THREE.ConeGeometry(radius, height, segments);
+}
+
+export function createPlaneGeometry(width, height) {
+  return new THREE.PlaneGeometry(width, height);
+}
+
+export function createCircleGeometry(radius, segments) {
+  return new THREE.CircleGeometry(radius, segments);
+}
+
+export function createCylinderGeometry(radiusTop, radiusBottom, height, radialSegments) {
+  return new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments);
+}
+
+export function createTorusGeometry(radius, tube, radialSegments, tubularSegments) {
+  return new THREE.TorusGeometry(radius, tube, radialSegments, tubularSegments);
+}
+
+export function createTetrahedronGeometry(radius, detail) {
+  return new THREE.TetrahedronGeometry(radius, detail);
+}
+
+export function createIcosahedronGeometry(radius, detail) {
+  return new THREE.IcosahedronGeometry(radius, detail);
+}
+
+export function createCustomGeometry(buffer) {
+  // buffer is already a Three.js BufferGeometry
+  return buffer;
 }
 
 // Helper to extract texture from Option
@@ -68,95 +70,108 @@ function getTexture(optionTexture) {
   return null;
 }
 
-// Create Three.js material from material type
-export function createMaterial(matType) {
-  if (matType instanceof SCENE_GLEAM.BasicMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.MeshBasicMaterial({
-      color: matType.color,
-      transparent: matType.transparent,
-      opacity: matType.opacity,
-      map: map
-    });
-  } else if (matType instanceof SCENE_GLEAM.StandardMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.MeshStandardMaterial({
-      color: matType.color,
-      metalness: matType.metalness,
-      roughness: matType.roughness,
-      map: map
-    });
-  } else if (matType instanceof SCENE_GLEAM.PhongMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.MeshPhongMaterial({
-      color: matType.color,
-      shininess: matType.shininess,
-      map: map
-    });
-  } else if (matType instanceof SCENE_GLEAM.LambertMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.MeshLambertMaterial({
-      color: matType.color,
-      map: map
-    });
-  } else if (matType instanceof SCENE_GLEAM.ToonMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.MeshToonMaterial({
-      color: matType.color,
-      map: map
-    });
-  } else if (matType instanceof SCENE_GLEAM.LineMaterial) {
-    return new THREE.LineBasicMaterial({
-      color: matType.color,
-      linewidth: matType.linewidth
-    });
-  } else if (matType instanceof SCENE_GLEAM.SpriteMaterial) {
-    const map = getTexture(matType.map);
-    return new THREE.SpriteMaterial({
-      color: matType.color,
-      transparent: matType.transparent,
-      opacity: matType.opacity,
-      map: map
-    });
-  } else {
-    console.warn('Unknown material type:', matType);
-    return new THREE.MeshBasicMaterial({ color: 0xffffff });
-  }
+// Individual material creation functions (called from Gleam)
+export function createBasicMaterial(color, transparent, opacity, map, normalMap) {
+  return new THREE.MeshBasicMaterial({
+    color,
+    transparent,
+    opacity,
+    map: getTexture(map),
+    normalMap: getTexture(normalMap)
+  });
 }
 
-// Create Three.js light from light type
-export function createLight(lightType) {
-  if (lightType instanceof SCENE_GLEAM.AmbientLight) {
-    return new THREE.AmbientLight(lightType.color, lightType.intensity);
-  } else if (lightType instanceof SCENE_GLEAM.DirectionalLight) {
-    return new THREE.DirectionalLight(lightType.color, lightType.intensity);
-  } else if (lightType instanceof SCENE_GLEAM.PointLight) {
-    return new THREE.PointLight(lightType.color, lightType.intensity, lightType.distance);
-  } else if (lightType instanceof SCENE_GLEAM.SpotLight) {
-    return new THREE.SpotLight(
-      lightType.color,
-      lightType.intensity,
-      lightType.distance,
-      lightType.angle,
-      lightType.penumbra
-    );
-  } else if (lightType instanceof SCENE_GLEAM.HemisphereLight) {
-    return new THREE.HemisphereLight(
-      lightType.sky_color,
-      lightType.ground_color,
-      lightType.intensity
-    );
-  } else {
-    console.warn('Unknown light type:', lightType);
-    return new THREE.AmbientLight(0xffffff, 1);
-  }
+export function createStandardMaterial(color, metalness, roughness, map, normalMap) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    metalness,
+    roughness,
+    map: getTexture(map),
+    normalMap: getTexture(normalMap)
+  });
 }
+
+export function createPhongMaterial(color, shininess, map, normalMap) {
+  return new THREE.MeshPhongMaterial({
+    color,
+    shininess,
+    map: getTexture(map),
+    normalMap: getTexture(normalMap)
+  });
+}
+
+export function createLambertMaterial(color, map, normalMap) {
+  return new THREE.MeshLambertMaterial({
+    color,
+    map: getTexture(map),
+    normalMap: getTexture(normalMap)
+  });
+}
+
+export function createToonMaterial(color, map, normalMap) {
+  return new THREE.MeshToonMaterial({
+    color,
+    map: getTexture(map),
+    normalMap: getTexture(normalMap)
+  });
+}
+
+export function createLineMaterial(color, linewidth) {
+  return new THREE.LineBasicMaterial({
+    color,
+    linewidth
+  });
+}
+
+export function createSpriteMaterial(color, transparent, opacity, map, normalMap) {
+  return new THREE.SpriteMaterial({
+    color,
+    transparent,
+    opacity,
+    map: getTexture(map)
+  });
+}
+
+// Individual light creation functions (called from Gleam)
+export function createAmbientLight(intensity, color) {
+  return new THREE.AmbientLight(color, intensity);
+}
+
+export function createDirectionalLight(intensity, color) {
+  return new THREE.DirectionalLight(color, intensity);
+}
+
+export function createPointLight(intensity, color, distance) {
+  return new THREE.PointLight(color, intensity, distance);
+}
+
+export function createSpotLight(intensity, color, distance, angle, penumbra) {
+  return new THREE.SpotLight(color, intensity, distance, angle, penumbra);
+}
+
+export function createHemisphereLight(intensity, skyColor, groundColor) {
+  return new THREE.HemisphereLight(skyColor, groundColor, intensity);
+}
+
 
 // Apply transform to Three.js object
 export function applyTransform(object, transform) {
   object.position.set(transform.position.x, transform.position.y, transform.position.z);
   object.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
   object.scale.set(transform.scale.x, transform.scale.y, transform.scale.z);
+}
+
+// Apply camera lookAt with proper handling of nested transforms
+// The lookAt target is treated as a world-space position
+function applyCameraLookAt(camera, lookAtTarget) {
+  // Update world matrix to get proper world position
+  camera.updateMatrixWorld(true);
+
+  // The lookAt target is always in world space
+  const lookAtWorld = new THREE.Vector3(lookAtTarget.x, lookAtTarget.y, lookAtTarget.z);
+
+  // Three.js lookAt expects world coordinates, so we can use it directly
+  camera.lookAt(lookAtWorld);
 }
 
 // Setup animation (single or blended) for a Model3D
@@ -213,8 +228,8 @@ export function applyPatch(scene, patch) {
     let threeObj;
 
     if (node instanceof SCENE_GLEAM.Mesh) {
-      const geometry = createGeometry(node.geometry);
-      const material = createMaterial(node.material);
+      const geometry = SCENE_GLEAM.create_geometry(node.geometry);
+      const material = SCENE_GLEAM.create_material(node.material);
       threeObj = new THREE.Mesh(geometry, material);
       applyTransform(threeObj, node.transform);
 
@@ -223,8 +238,8 @@ export function applyPatch(scene, patch) {
         PHYSICS.createRigidBody(id, node.physics[0], node.transform);
       }
     } else if (node instanceof SCENE_GLEAM.InstancedMesh) {
-      const geometry = createGeometry(node.geometry);
-      const material = createMaterial(node.material);
+      const geometry = SCENE_GLEAM.create_geometry(node.geometry);
+      const material = SCENE_GLEAM.create_material(node.material);
 
       // Convert Gleam list to array to get count
       const instancesArray = Array.from(node.instances);
@@ -235,7 +250,7 @@ export function applyPatch(scene, patch) {
       // Set transform matrix for each instance
       updateInstancedMeshTransforms(threeObj, node.instances);
     } else if (node instanceof SCENE_GLEAM.Light) {
-      threeObj = createLight(node.light_type);
+      threeObj = SCENE_GLEAM.create_light(node.light);
       applyTransform(threeObj, node.transform);
     } else if (node instanceof SCENE_GLEAM.Group) {
       threeObj = new THREE.Group();
@@ -254,8 +269,8 @@ export function applyPatch(scene, patch) {
         let levelObj;
 
         if (levelNode instanceof SCENE_GLEAM.Mesh) {
-          const geometry = createGeometry(levelNode.geometry);
-          const material = createMaterial(levelNode.material);
+          const geometry = SCENE_GLEAM.create_geometry(levelNode.geometry);
+          const material = SCENE_GLEAM.create_material(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
         } else if (levelNode instanceof SCENE_GLEAM.Group) {
@@ -299,15 +314,19 @@ export function applyPatch(scene, patch) {
       threeObj = new THREE.Group(); // Empty group as placeholder
     } else if (node instanceof SCENE_GLEAM.Camera) {
       // Create Three.js camera from Gleam camera config
-      threeObj = CAMERA.createThreeCamera(node.camera.projection);
+      // Pass viewport if specified to calculate correct aspect ratio
+      const viewport = node.viewport && node.viewport[0] ? node.viewport[0] : null;
+      threeObj = CAMERA.createThreeCamera(node.camera.projection, viewport);
 
-      // Apply camera position from Gleam config
-      const pos = node.camera.position;
-      threeObj.position.set(pos.x, pos.y, pos.z);
+      // Apply node transform (position and rotation)
+      applyTransform(threeObj, node.transform);
 
-      // Apply look_at from Gleam config
-      const lookAt = node.camera.look_at_target;
-      threeObj.lookAt(lookAt.x, lookAt.y, lookAt.z);
+      // Store lookAt target to apply after adding to scene (if provided)
+      // (we need to know the parent transform first)
+      if (node.look_at && node.look_at[0]) {
+        threeObj.userData.lookAtTarget = node.look_at[0];
+        threeObj.userData.needsLookAtUpdate = true;
+      }
 
       // Update projection matrix
       threeObj.updateProjectionMatrix();
@@ -355,6 +374,12 @@ export function applyPatch(scene, patch) {
       } else {
         scene.add(threeObj);
       }
+
+      // Apply camera lookAt after adding to scene (for nested transforms)
+      if (threeObj.userData && threeObj.userData.needsLookAtUpdate) {
+        applyCameraLookAt(threeObj, threeObj.userData.lookAtTarget);
+        delete threeObj.userData.needsLookAtUpdate;
+      }
     }
   } else if (patch instanceof SCENE_GLEAM.RemoveNode) {
     const id = patch.id;
@@ -383,26 +408,35 @@ export function applyPatch(scene, patch) {
     const obj = objectCache.get(id);
     if (obj) {
       applyTransform(obj, transform);
+      // Force update world matrix for this object and all children
+      // This ensures cameras and other children move with their parents
+      obj.updateMatrixWorld(true);
+
+      // If this is a camera with a lookAt target, reapply it after moving
+      if ((obj instanceof THREE.PerspectiveCamera || obj instanceof THREE.OrthographicCamera) &&
+          obj.userData && obj.userData.lookAtTarget) {
+        applyCameraLookAt(obj, obj.userData.lookAtTarget);
+      }
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateMaterial) {
     const { id, material } = patch;
     const obj = objectCache.get(id);
     if (obj && obj.material) {
       obj.material.dispose();
-      obj.material = createMaterial(material);
+      obj.material = SCENE_GLEAM.create_material(material);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateGeometry) {
     const { id, geometry } = patch;
     const obj = objectCache.get(id);
     if (obj && obj.geometry) {
       obj.geometry.dispose();
-      obj.geometry = createGeometry(geometry);
+      obj.geometry = SCENE_GLEAM.create_geometry(geometry);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateLight) {
-    const { id, light_type } = patch;
+    const { id, light } = patch;
     const oldLight = objectCache.get(id);
     if (oldLight) {
-      const newLight = createLight(light_type);
+      const newLight = SCENE_GLEAM.create_light(light);
       newLight.position.copy(oldLight.position);
       newLight.rotation.copy(oldLight.rotation);
       newLight.scale.copy(oldLight.scale);
@@ -490,8 +524,8 @@ export function applyPatch(scene, patch) {
         let levelObj;
 
         if (levelNode instanceof SCENE_GLEAM.Mesh) {
-          const geometry = createGeometry(levelNode.geometry);
-          const material = createMaterial(levelNode.material);
+          const geometry = SCENE_GLEAM.create_geometry(levelNode.geometry);
+          const material = SCENE_GLEAM.create_material(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
         } else if (levelNode instanceof SCENE_GLEAM.Group) {
@@ -511,16 +545,13 @@ export function applyPatch(scene, patch) {
       console.warn('[Renderer] Object not found or not an LOD:', id);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateCamera) {
-    const { id, camera_type } = patch;
+    const { id, camera_type, look_at } = patch;
     const cameraObj = objectCache.get(id);
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
-      // Update camera position
-      const pos = camera_type.position;
-      cameraObj.position.set(pos.x, pos.y, pos.z);
-
-      // Update look_at
-      const lookAt = camera_type.look_at_target;
-      cameraObj.lookAt(lookAt.x, lookAt.y, lookAt.z);
+      // Update look_at (handle nested transforms) if provided
+      if (look_at && look_at[0]) {
+        applyCameraLookAt(cameraObj, look_at[0]);
+      }
 
       // Update camera projection parameters if they changed
       const projection = camera_type.projection;
@@ -650,11 +681,43 @@ export function createRenderer(options) {
     antialias: options.antialias,
     alpha: options.alpha,
   });
-  renderer.setSize(options.width, options.height);
+
+  // Check if dimensions is None (Gleam's None is an empty object/falsy)
+  // or if dimensions[0] exists (Some(Dimensions))
+  let width, height, isFullscreen;
+
+  if (options.dimensions && options.dimensions[0]) {
+    // Some(Dimensions) - use specified dimensions
+    const dims = options.dimensions[0];
+    width = dims.width;
+    height = dims.height;
+    isFullscreen = false;
+  } else {
+    // None - use fullscreen
+    width = window.innerWidth;
+    height = window.innerHeight;
+    isFullscreen = true;
+  }
+
+  renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio);
 
   // Add WebGL context loss/restore handling
   setupContextLossHandling(renderer);
+
+  // If fullscreen mode, add resize listener
+  if (isFullscreen) {
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      // Update camera aspect ratio if it's a perspective camera
+      const camera = CAMERA.getCamera();
+      if (camera && camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
+    });
+  }
 
   return renderer;
 }

@@ -176,7 +176,7 @@ fn compute_instances(time: Float) -> List(transform.Transform) {
 
 fn view(model: Model) -> List(scene.SceneNode) {
   // Camera setup
-  let assert Ok(cam) =
+  let assert Ok(camera) =
     camera.perspective(
       field_of_view: 75.0,
       aspect: 1280.0 /. 720.0,
@@ -184,16 +184,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 1000.0,
     )
 
-  let camera =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 0.0, 60.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
   let camera_node =
     scene.Camera(
       id: "main_camera",
       camera:,
-      transform: transform.identity,
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 60.0)),
+      look_at: option.None,
       active: True,
       viewport: option.None,
     )
@@ -201,12 +197,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.3),
+      light: {
+        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.3)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.5),
+      light: {
+        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(50.0, 50.0, 50.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -222,14 +224,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let instanced_cubes =
     scene.InstancedMesh(
       id: "cubes_instanced",
-      geometry: scene.BoxGeometry(0.8, 0.8, 0.8),
-      material: scene.StandardMaterial(
-        color: 0x4ecdc4,
-        metalness: 0.2,
-        roughness: 0.6,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) = scene.box(width: 0.8, height: 0.8, depth: 0.8)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x4ecdc4,
+            metalness: 0.2,
+            roughness: 0.6,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       instances: instances,
     )
 

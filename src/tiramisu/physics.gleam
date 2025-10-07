@@ -20,12 +20,10 @@ pub opaque type PhysicsWorld {
 }
 
 /// Internal state tracking for a physics body
+/// Stores only the body configuration metadata
+/// Transforms are always queried directly from Rapier
 type PhysicsBodyState {
-  PhysicsBodyState(
-    body: RigidBody,
-    // Current transform from physics simulation
-    current_transform: Transform,
-  )
+  PhysicsBodyState(body: RigidBody)
 }
 
 // --- Public Types ---
@@ -147,28 +145,19 @@ pub fn step(world: PhysicsWorld, delta_time: Float) -> PhysicsWorld {
   // Get all body IDs that exist in Rapier
   let all_body_ids = get_all_body_ids_ffi()
 
-  // Sync all bodies from Rapier to PhysicsWorld
+  // Sync body registry - add any bodies that exist in Rapier but not in our dict
+  // This handles bodies created via scene patches
   let updated_bodies =
     list.fold(all_body_ids, world.bodies, fn(bodies_dict, id) {
-      case get_body_transform_ffi(id) {
-        option.Some(transform) -> {
-          // Get existing body config or create placeholder
-          let body_config = case dict.get(bodies_dict, id) {
-            Ok(state) -> state.body
-            Error(_) -> {
-              // Body exists in Rapier but not tracked yet
-              // This happens on first frame after patch creates it
-              // Use a placeholder - the actual config is in Rapier
-              rigid_body(Dynamic, Box(1.0, 1.0, 1.0))
-            }
-          }
-          let new_state =
-            PhysicsBodyState(body: body_config, current_transform: transform)
-          dict.insert(bodies_dict, id, new_state)
-        }
-        option.None -> {
-          // Body not found in Rapier
-          bodies_dict
+      case dict.has_key(bodies_dict, id) {
+        True -> bodies_dict
+        False -> {
+          // Body exists in Rapier but not tracked yet
+          // This happens on first frame after patch creates it
+          // Use a placeholder config - the actual config is in Rapier
+          let placeholder_body = rigid_body(Dynamic, Box(1.0, 1.0, 1.0))
+          let state = PhysicsBodyState(body: placeholder_body)
+          dict.insert(bodies_dict, id, state)
         }
       }
     })
@@ -176,36 +165,32 @@ pub fn step(world: PhysicsWorld, delta_time: Float) -> PhysicsWorld {
   PhysicsWorld(bodies: updated_bodies)
 }
 
-/// Get the current transform of a physics body
-/// Use this to sync physics transforms back to your scene graph
-pub fn get_transform(world: PhysicsWorld, id: String) -> Result(Transform, Nil) {
-  case dict.get(world.bodies, id) {
-    Ok(state) -> Ok(state.current_transform)
-    Error(_) -> Error(Nil)
+/// Get the current transform of a rigid body.
+///
+/// Queries the physics simulation directly, so it always returns the latest position
+/// even for bodies that were just created in the current frame.
+///
+/// ## Example
+///
+/// ```gleam
+/// let cube_transform = case physics.get_transform("cube1") {
+///   Ok(t) -> t
+///   Error(_) -> transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
+/// }
+/// ```
+pub fn get_transform(id: String) -> Result(Transform, Nil) {
+  case get_body_transform_ffi(id) {
+    option.Some(transform) -> Ok(transform)
+    option.None -> Error(Nil)
   }
 }
 
-/// Register a physics body in the world
-/// Call this when you create a scene node with physics
+/// Register a physics body in the world.
+///
+/// **Note:** You typically don't need to call this manually! Bodies are automatically
+/// created when you add scene nodes with physics. This function is mainly for advanced
+/// use cases where you need to manually create physics bodies outside of the scene graph.
 pub fn register_body(
-  world: PhysicsWorld,
-  id: String,
-  body: RigidBody,
-  initial_transform: Transform,
-) -> PhysicsWorld {
-  let state = PhysicsBodyState(body: body, current_transform: initial_transform)
-  PhysicsWorld(bodies: dict.insert(world.bodies, id, state))
-}
-
-/// Unregister a physics body from the world
-pub fn unregister_body(world: PhysicsWorld, id: String) -> PhysicsWorld {
-  PhysicsWorld(bodies: dict.delete(world.bodies, id))
-}
-
-// --- Body Management (internal, used by diff/patch) ---
-
-/// Add a body to the physics world (internal use)
-pub fn add_body(
   world: PhysicsWorld,
   id: String,
   body: RigidBody,
@@ -214,16 +199,20 @@ pub fn add_body(
   // Create body in Rapier via FFI
   create_rigid_body_ffi(id, body, initial_transform)
 
-  // Track it in our state
-  let state = PhysicsBodyState(body: body, current_transform: initial_transform)
+  // Track it in our state (stores body config metadata)
+  let state = PhysicsBodyState(body: body)
   PhysicsWorld(bodies: dict.insert(world.bodies, id, state))
 }
 
-/// Remove a body from the physics world (internal use)
+/// Unregister a physics body from the world
+pub fn unregister_body(world: PhysicsWorld, id: String) -> PhysicsWorld {
+  remove_body(world, id)
+}
+
+@internal
 pub fn remove_body(world: PhysicsWorld, id: String) -> PhysicsWorld {
   // Remove from Rapier via FFI
   remove_rigid_body_ffi(id)
-
   // Remove from our tracking
   PhysicsWorld(bodies: dict.delete(world.bodies, id))
 }
@@ -235,9 +224,14 @@ pub fn update_body(
   body: RigidBody,
 ) -> PhysicsWorld {
   case dict.get(world.bodies, id) {
-    Ok(state) -> {
+    Ok(_state) -> {
+      // Query current transform from Rapier before removing
+      let current_transform = case get_body_transform_ffi(id) {
+        option.Some(transform) -> transform
+        option.None -> transform.identity
+      }
       let world = remove_body(world, id)
-      add_body(world, id, body, state.current_transform)
+      register_body(world, id, body, current_transform)
     }
     Error(_) -> world
   }

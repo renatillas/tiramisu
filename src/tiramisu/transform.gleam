@@ -52,7 +52,7 @@ pub const identity = Transform(
 /// ## Example
 ///
 /// ```gleam
-/// let t = transform.at(vec3.Vec3(5.0, 0.0, -3.0))
+/// let t = transform.at(position: vec3.Vec3(5.0, 0.0, -3.0))
 /// // Object positioned at (5, 0, -3)
 /// ```
 pub fn at(position position: vec3.Vec3(Float)) -> Transform {

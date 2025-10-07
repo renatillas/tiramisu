@@ -18,9 +18,15 @@ import tiramisu/state_machine
 import tiramisu/transform
 import vec/vec3
 
+pub type State {
+  Idle
+  Walking
+  Crouching
+}
+
 pub type LoadState {
   Loading
-  Loaded(asset.GLTFData, state_machine.StateMachine(tiramisu.Context))
+  Loaded(asset.GLTFData, state_machine.StateMachine(State, tiramisu.Context))
   Failed(String)
 }
 
@@ -125,10 +131,10 @@ fn update(
 /// Create an animation state machine for the character
 fn create_state_machine(
   data: asset.GLTFData,
-) -> state_machine.StateMachine(tiramisu.Context) {
+) -> state_machine.StateMachine(State, tiramisu.Context) {
   // Get animation clips (assume model has at least 2 animations)
   case data.animations {
-    [idle_clip, walk_clip, ..rest] -> {
+    [idle_clip, walk_clip, crouching_clip, ..] -> {
       // Create state machine
       let idle_anim =
         object3d.new_animation(idle_clip)
@@ -138,59 +144,49 @@ fn create_state_machine(
         object3d.new_animation(walk_clip)
         |> object3d.set_loop(object3d.LoopRepeat)
 
-      let machine =
-        state_machine.new("idle")
-        |> state_machine.add_state("idle", idle_anim, looping: True)
-        |> state_machine.add_state("walk", walk_anim, looping: True)
-        |> state_machine.add_transition(
-          from: "idle",
-          to: "walk",
-          condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
-            input.is_key_pressed(ctx.input, input.KeyW)
-          }),
-          blend_duration: 0.3,
-        )
-        |> state_machine.add_transition(
-          from: "walk",
-          to: "idle",
-          condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
-            !input.is_key_pressed(ctx.input, input.KeyW)
-          }),
-          blend_duration: 0.3,
-        )
+      let crouching_anim =
+        object3d.new_animation(crouching_clip)
+        |> object3d.set_loop(object3d.LoopRepeat)
 
-      // Add run animation if available
-      case rest {
-        [run_clip, ..] -> {
-          let run_anim =
-            object3d.new_animation(run_clip)
-            |> object3d.set_loop(object3d.LoopRepeat)
-
-          machine
-          |> state_machine.add_state("run", run_anim, looping: True)
-          |> state_machine.add_transition(
-            from: "walk",
-            to: "run",
-            condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
-              input.is_key_pressed(ctx.input, input.ShiftLeft)
-            }),
-            blend_duration: 0.2,
-          )
-          |> state_machine.add_transition(
-            from: "run",
-            to: "walk",
-            condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
-              !input.is_key_pressed(ctx.input, input.ShiftLeft)
-            }),
-            blend_duration: 0.2,
-          )
-        }
-        [] -> machine
-      }
+      state_machine.new(Idle)
+      |> state_machine.add_state(Idle, idle_anim, looping: True)
+      |> state_machine.add_state(Walking, walk_anim, looping: True)
+      |> state_machine.add_state(Crouching, crouching_anim, looping: True)
+      |> state_machine.add_transition(
+        from: Idle,
+        to: Walking,
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+          input.is_key_pressed(ctx.input, input.KeyW)
+        }),
+        blend_duration: 0.3,
+      )
+      |> state_machine.add_transition(
+        from: Walking,
+        to: Idle,
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+          !input.is_key_pressed(ctx.input, input.KeyW)
+        }),
+        blend_duration: 0.3,
+      )
+      |> state_machine.add_transition(
+        from: Walking,
+        to: Crouching,
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+          input.is_key_pressed(ctx.input, input.ShiftLeft)
+        }),
+        blend_duration: 0.2,
+      )
+      |> state_machine.add_transition(
+        from: Crouching,
+        to: Walking,
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+          !input.is_key_pressed(ctx.input, input.ShiftLeft)
+        }),
+        blend_duration: 0.2,
+      )
     }
     _ -> {
-      io.println("Not enough animations for state machine")
-      state_machine.new("default")
+      state_machine.new(Idle)
     }
   }
 }
@@ -205,13 +201,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
     |> result.map(fn(camera) {
       camera
-      |> camera.set_position(vec3.Vec3(0.0, 1.5, 20.0))
-      |> camera.look(at: vec3.Vec3(0.0, 1.0, 0.0))
       |> scene.Camera(
         id: "main",
         camera: _,
+        look_at: option.None,
         active: True,
-        transform: transform.identity,
+        transform: transform.at(position: vec3.Vec3(0.0, 1.5, 20.0)),
         viewport: option.None,
       )
     })
@@ -219,12 +214,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 2.0),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 2.0)
+        light
+      },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
     ),
   ]
@@ -235,12 +238,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let loading_cube =
         scene.Mesh(
           id: "loading",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.PhongMaterial(
-            color: 0x4ecdc4,
-            shininess: 30.0,
-            map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) =
+              scene.box(width: 1.0, height: 1.0, depth: 1.0)
+            geometry
+          },
+          material: {
+            let assert Ok(scene) =
+              scene.phong_material(0x4ecdc4, 30.0, option.None, option.None)
+            scene
+          },
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
@@ -256,14 +263,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let error_cube =
         scene.Mesh(
           id: "error",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.StandardMaterial(
-            color: 0xff0000,
-            metalness: 0.5,
-            roughness: 0.5,
-            map: option.None,
-            normal_map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) =
+              scene.box(width: 1.0, height: 1.0, depth: 1.0)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xff0000,
+                metalness: 0.5,
+                roughness: 0.5,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(0.0, model.rotation, 0.0),

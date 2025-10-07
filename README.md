@@ -67,7 +67,7 @@ fn view(model: Model) {
       id: "cube",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.StandardMaterial(color: 0x00ff00),
-      transform: transform.new()
+      transform: transform.identity
         |> transform.rotate_y(model.rotation),
     ),
   ]

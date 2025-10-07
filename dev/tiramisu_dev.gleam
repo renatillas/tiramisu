@@ -113,6 +113,16 @@ pub type ScenePair {
 // --- Helper Functions ---
 
 fn create_flat_scene(count: Int) -> List(scene.SceneNode) {
+  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(red_material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   list.range(0, count - 1)
   |> list.map(fn(i) {
     let id = "node_" <> int.to_string(i)
@@ -120,8 +130,8 @@ fn create_flat_scene(count: Int) -> List(scene.SceneNode) {
 
     scene.Mesh(
       id: id,
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: box_geo,
+      material: red_material,
       transform: transform.at(position: vec3.Vec3(x, 0.0, 0.0)),
       physics: option.None,
     )
@@ -129,6 +139,16 @@ fn create_flat_scene(count: Int) -> List(scene.SceneNode) {
 }
 
 fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.SceneNode) {
+  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(red_material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   list.range(0, count - 1)
   |> list.map(fn(i) {
     let id = "node_" <> int.to_string(i)
@@ -136,8 +156,8 @@ fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.SceneNode) 
 
     scene.Mesh(
       id: id,
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: box_geo,
+      material: red_material,
       transform: transform.at(position: vec3.Vec3(x, 0.0, 0.0)),
       physics: option.None,
     )
@@ -149,12 +169,22 @@ fn create_nested_scene(depth: Int) -> List(scene.SceneNode) {
 }
 
 fn create_nested_group(depth: Int, current: Int) -> scene.SceneNode {
+  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(red_material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   case current >= depth {
     True ->
       scene.Mesh(
         id: "leaf_" <> int.to_string(current),
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: box_geo,
+        material: red_material,
         transform: transform.identity,
         physics: option.None,
       )

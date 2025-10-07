@@ -49,26 +49,37 @@ fn view(model: Model) -> List(scene.SceneNode) {
   [
     scene.Camera(
       id: "camera",
-      camera: camera.camera_2d(800, 600, distance: 10.0),
-      transform: transform.identity,
+      camera: camera.camera_2d(800, 600),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
+      look_at: option.None,
       viewport: option.None,
     ),
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.0),
+      light: {
+        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 1.0)
+        light
+      },
       transform: transform.identity,
     ),
     // Center square
     scene.Mesh(
       id: "center",
-      geometry: scene.PlaneGeometry(50.0, 50.0),
-      material: scene.BasicMaterial(
-        color: 0x4ecdc4,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geom) = scene.plane(width: 50.0, height: 50.0)
+        geom
+      },
+      material: {
+        let assert Ok(mat) = scene.basic_material(
+          color: 0x4ecdc4,
+          transparent: False,
+          opacity: 1.0,
+          map: option.None,
+          normal_map: option.None,
+        )
+        mat
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 0.0, 0.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -79,13 +90,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
     // Grid of squares in 2D space
     scene.Mesh(
       id: "top-left",
-      geometry: scene.PlaneGeometry(30.0, 30.0),
-      material: scene.BasicMaterial(
-        color: 0xff6b6b,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        geom
+      },
+      material: {
+        let assert Ok(mat) = scene.basic_material(
+          color: 0xff6b6b,
+          transparent: False,
+          opacity: 1.0,
+          map: option.None,
+          normal_map: option.None,
+        )
+        mat
+      },
       transform: transform.Transform(
         position: vec3.Vec3(-150.0, 150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
@@ -95,13 +113,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "top-right",
-      geometry: scene.PlaneGeometry(30.0, 30.0),
-      material: scene.BasicMaterial(
-        color: 0xffe66d,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        geom
+      },
+      material: {
+        let assert Ok(mat) = scene.basic_material(
+          color: 0xffe66d,
+          transparent: False,
+          opacity: 1.0,
+          map: option.None,
+          normal_map: option.None,
+        )
+        mat
+      },
       transform: transform.Transform(
         position: vec3.Vec3(150.0, 150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
@@ -111,13 +136,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "bottom-left",
-      geometry: scene.PlaneGeometry(30.0, 30.0),
-      material: scene.BasicMaterial(
-        color: 0x95e1d3,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        geom
+      },
+      material: {
+        let assert Ok(mat) = scene.basic_material(
+          color: 0x95e1d3,
+          transparent: False,
+          opacity: 1.0,
+          map: option.None,
+          normal_map: option.None,
+        )
+        mat
+      },
       transform: transform.Transform(
         position: vec3.Vec3(-150.0, -150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),
@@ -127,13 +159,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
     scene.Mesh(
       id: "bottom-right",
-      geometry: scene.PlaneGeometry(30.0, 30.0),
-      material: scene.BasicMaterial(
-        color: 0xf38181,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        geom
+      },
+      material: {
+        let assert Ok(mat) = scene.basic_material(
+          color: 0xf38181,
+          transparent: False,
+          opacity: 1.0,
+          map: option.None,
+          normal_map: option.None,
+        )
+        mat
+      },
       transform: transform.Transform(
         position: vec3.Vec3(150.0, -150.0, -1.0),
         rotation: vec3.Vec3(0.0, 0.0, model.time),

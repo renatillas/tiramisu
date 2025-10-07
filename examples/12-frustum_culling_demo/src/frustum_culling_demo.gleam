@@ -111,12 +111,11 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
     |> result.map(fn(cam) {
       cam
-      |> camera.set_position(vec3.Vec3(0.0, 20.0, 80.0))
-      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
       |> scene.Camera(
         id: "main-camera",
         camera: _,
-        transform: transform.identity,
+        transform: transform.at(position: vec3.Vec3(0.0, 20.0, 80.0)),
+        look_at: option.None,
         active: True,
         viewport: option.None,
       )
@@ -125,12 +124,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
+      light: {
+        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.6),
+      light: {
+        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.6)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(50.0, 50.0, 50.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -166,14 +171,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
       scene.Mesh(
         id: "cube_" <> int.to_string(i),
-        geometry: scene.BoxGeometry(2.0, 2.0, 2.0),
-        material: scene.StandardMaterial(
-          color: 0x4a9eff,
-          metalness: 0.3,
-          roughness: 0.7,
-          map: option.None,
-          normal_map: option.None,
-        ),
+        geometry: {
+          let assert Ok(geometry) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            scene.standard_material(
+              color: 0x4a9eff,
+              metalness: 0.3,
+              roughness: 0.7,
+              map: option.None,
+              normal_map: option.None,
+            )
+          material
+        },
         transform: transform.Transform(
           position: vec3.Vec3(orbit_x, fy, orbit_z),
           rotation: vec3.Vec3(rotation, rotation *. 0.7, rotation *. 0.3),
@@ -187,14 +199,21 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let ground =
     scene.Mesh(
       id: "ground",
-      geometry: scene.PlaneGeometry(200.0, 200.0),
-      material: scene.StandardMaterial(
-        color: 0x1a1a2e,
-        metalness: 0.0,
-        roughness: 1.0,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) = scene.plane(width: 200.0, height: 200.0)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.standard_material(
+            color: 0x1a1a2e,
+            metalness: 0.0,
+            roughness: 1.0,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, -50.0, 0.0),
         rotation: vec3.Vec3(-1.5708, 0.0, 0.0),

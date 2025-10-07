@@ -24,14 +24,24 @@ pub fn empty_group_test() {
 
 // Test: Very deep nesting (10 levels)
 pub fn very_deep_nesting_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
 
   // Create 10-level deep hierarchy
   let level9 =
     scene.Mesh(
       id: "level9",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry1,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     )
@@ -96,6 +106,16 @@ pub fn very_deep_nesting_test() {
 
 // Test: Wide hierarchy (many children in one group)
 pub fn wide_hierarchy_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
 
   // Create 20 children in one group
@@ -104,8 +124,8 @@ pub fn wide_hierarchy_test() {
     |> list.map(fn(i) {
       scene.Mesh(
         id: "child" <> int.to_string(i),
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       )
@@ -149,20 +169,34 @@ pub fn wide_hierarchy_test() {
 
 // Test: Mixed node types as children
 pub fn mixed_node_types_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
 
   let current = [
     scene.Group(id: "mixed_group", transform: transform.identity, children: [
       scene.Mesh(
         id: "mesh_child",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
       scene.Light(
         id: "light_child",
-        light_type: scene.PointLight(0xffffff, 1.0, 10.0),
+        light: {
+          let assert Ok(light) =
+            scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+          light
+        },
         transform: transform.identity,
       ),
       scene.Group(
@@ -196,13 +230,23 @@ pub fn mixed_node_types_test() {
 
 // Test: Removing node from middle of hierarchy orphans children
 pub fn remove_middle_node_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "grandparent", transform: transform.identity, children: [
       scene.Group(id: "parent", transform: transform.identity, children: [
         scene.Mesh(
           id: "child",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+          geometry: geometry1,
+          material: material1,
           transform: transform.identity,
           physics: option.None,
         ),
@@ -251,12 +295,22 @@ pub fn remove_middle_node_test() {
 
 // Test: Moving node between parents (uses RemoveNode + AddNode)
 pub fn move_node_between_parents_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "parent1", transform: transform.identity, children: [
       scene.Mesh(
         id: "movable",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -269,8 +323,8 @@ pub fn move_node_between_parents_test() {
     scene.Group(id: "parent2", transform: transform.identity, children: [
       scene.Mesh(
         id: "movable",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -309,12 +363,30 @@ pub fn move_node_between_parents_test() {
 
 // Test: Adding children to existing group
 pub fn add_children_to_existing_group_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -325,15 +397,15 @@ pub fn add_children_to_existing_group_test() {
     scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material2,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -359,19 +431,37 @@ pub fn add_children_to_existing_group_test() {
 
 // Test: Removing all children from group
 pub fn remove_all_children_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material2,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -398,12 +488,22 @@ pub fn remove_all_children_test() {
 
 // Test: Transform updates propagate through nested groups
 pub fn nested_transform_updates_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -417,8 +517,8 @@ pub fn nested_transform_updates_test() {
       children: [
         scene.Mesh(
           id: "child",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+          geometry: geometry1,
+          material: material1,
           transform: transform.identity,
           physics: option.None,
         ),
@@ -445,14 +545,32 @@ pub fn nested_transform_updates_test() {
 
 // Test: Sibling groups with different children
 pub fn sibling_groups_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
 
   let current = [
     scene.Group(id: "sibling1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -460,8 +578,8 @@ pub fn sibling_groups_test() {
     scene.Group(id: "sibling2", transform: transform.identity, children: [
       scene.Mesh(
         id: "child2",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material2,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -504,6 +622,24 @@ pub fn sibling_groups_test() {
 
 // Test: Group containing nested groups with same ID pattern
 pub fn same_id_pattern_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = []
 
   let current = [
@@ -511,8 +647,8 @@ pub fn same_id_pattern_test() {
       scene.Group(id: "group_1", transform: transform.identity, children: [
         scene.Mesh(
           id: "mesh_1",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+          geometry: geometry1,
+          material: material1,
           transform: transform.identity,
           physics: option.None,
         ),
@@ -520,8 +656,8 @@ pub fn same_id_pattern_test() {
       scene.Group(id: "group_2", transform: transform.identity, children: [
         scene.Mesh(
           id: "mesh_2",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+          geometry: geometry1,
+          material: material2,
           transform: transform.identity,
           physics: option.None,
         ),
@@ -565,13 +701,23 @@ pub fn same_id_pattern_test() {
 
 // Test: Removing parent but keeping grandparent and moving children up
 pub fn restructure_hierarchy_test() {
+  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+
   let previous = [
     scene.Group(id: "grandparent", transform: transform.identity, children: [
       scene.Group(id: "parent", transform: transform.identity, children: [
         scene.Mesh(
           id: "child",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+          geometry: geometry1,
+          material: material1,
           transform: transform.identity,
           physics: option.None,
         ),
@@ -583,8 +729,8 @@ pub fn restructure_hierarchy_test() {
     scene.Group(id: "grandparent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry1,
+        material: material1,
         transform: transform.identity,
         physics: option.None,
       ),

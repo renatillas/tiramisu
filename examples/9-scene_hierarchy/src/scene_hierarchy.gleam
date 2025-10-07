@@ -57,13 +57,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
     |> result.map(fn(camera) {
       camera
-      |> camera.set_position(vec3.Vec3(0.0, 5.0, 15.0))
-      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
       |> scene.Camera(
         id: "main-camera",
         camera: _,
         active: True,
-        transform: transform.identity,
+        transform: transform.at(position: vec3.Vec3(0.0, 5.0, 15.0)),
+        look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
         viewport: option.None,
       )
       |> list.wrap
@@ -72,16 +71,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0x404040, intensity: 10.0),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0x404040, intensity: 10.0)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "point",
-      light_type: scene.PointLight(
-        color: 0xffffff,
-        intensity: 10.5,
-        distance: 100.0,
-      ),
+      light: {
+        let assert Ok(light) =
+          scene.point_light(color: 0xffffff, intensity: 10.5, distance: 100.0)
+        light
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 0.0, 0.0),
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -94,13 +97,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let sun = [
     scene.Mesh(
       id: "sun",
-      geometry: scene.SphereGeometry(1.5, 32, 32),
-      material: scene.BasicMaterial(
-        color: 0xffff00,
-        transparent: False,
-        opacity: 1.0,
-        map: option.None,
-      ),
+      geometry: {
+        let assert Ok(geometry) =
+          scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          scene.basic_material(
+            color: 0xffff00,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+            normal_map: option.None,
+          )
+        material
+      },
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 0.0, 0.0),
         rotation: vec3.Vec3(0.0, model.rotation, 0.0),
@@ -124,14 +136,26 @@ fn view(model: Model) -> List(scene.SceneNode) {
         children: [
           scene.Mesh(
             id: "planet1",
-            geometry: scene.SphereGeometry(0.5, 32, 32),
-            material: scene.StandardMaterial(
-              color: 0x4ecdc4,
-              metalness: 0.3,
-              roughness: 0.7,
-              map: option.None,
-              normal_map: option.None,
-            ),
+            geometry: {
+              let assert Ok(geometry) =
+                scene.sphere(
+                  radius: 0.5,
+                  width_segments: 32,
+                  height_segments: 32,
+                )
+              geometry
+            },
+            material: {
+              let assert Ok(material) =
+                scene.standard_material(
+                  color: 0x4ecdc4,
+                  metalness: 0.3,
+                  roughness: 0.7,
+                  map: option.None,
+                  normal_map: option.None,
+                )
+              material
+            },
             transform: transform.Transform(
               position: vec3.Vec3(4.0, 0.0, 0.0),
               rotation: vec3.Vec3(0.0, model.rotation *. 2.0, 0.0),
@@ -150,13 +174,26 @@ fn view(model: Model) -> List(scene.SceneNode) {
             children: [
               scene.Mesh(
                 id: "moon1",
-                geometry: scene.SphereGeometry(0.2, 16, 16),
-                material: scene.BasicMaterial(
-                  color: 0xcccccc,
-                  transparent: False,
-                  opacity: 1.0,
-                  map: option.None,
-                ),
+                geometry: {
+                  let assert Ok(geometry) =
+                    scene.sphere(
+                      radius: 0.2,
+                      width_segments: 16,
+                      height_segments: 16,
+                    )
+                  geometry
+                },
+                material: {
+                  let assert Ok(material) =
+                    scene.basic_material(
+                      color: 0xcccccc,
+                      transparent: False,
+                      opacity: 1.0,
+                      map: option.None,
+                      normal_map: option.None,
+                    )
+                  material
+                },
                 transform: transform.Transform(
                   position: vec3.Vec3(1.0, 0.0, 0.0),
                   rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -179,14 +216,26 @@ fn view(model: Model) -> List(scene.SceneNode) {
         children: [
           scene.Mesh(
             id: "planet2",
-            geometry: scene.SphereGeometry(0.7, 32, 32),
-            material: scene.StandardMaterial(
-              color: 0xff6b6b,
-              metalness: 0.5,
-              roughness: 0.5,
-              map: option.None,
-              normal_map: option.None,
-            ),
+            geometry: {
+              let assert Ok(geometry) =
+                scene.sphere(
+                  radius: 0.7,
+                  width_segments: 32,
+                  height_segments: 32,
+                )
+              geometry
+            },
+            material: {
+              let assert Ok(material) =
+                scene.standard_material(
+                  color: 0xff6b6b,
+                  metalness: 0.5,
+                  roughness: 0.5,
+                  map: option.None,
+                  normal_map: option.None,
+                )
+              material
+            },
             transform: transform.Transform(
               position: vec3.Vec3(7.0, 0.0, 0.0),
               rotation: vec3.Vec3(0.0, model.rotation, 0.0),

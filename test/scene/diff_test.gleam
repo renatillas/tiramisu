@@ -13,11 +13,20 @@ pub fn empty_to_empty_test() {
 // Test: adding a single mesh
 pub fn add_mesh_test() {
   let previous = []
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let current = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -33,11 +42,20 @@ pub fn add_mesh_test() {
 
 // Test: removing a single mesh
 pub fn remove_mesh_test() {
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let previous = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -54,11 +72,20 @@ pub fn remove_mesh_test() {
 
 // Test: no changes produces no patches
 pub fn no_changes_test() {
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let nodes = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -69,11 +96,20 @@ pub fn no_changes_test() {
 
 // Test: updating transform
 pub fn update_transform_test() {
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let previous = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.None,
     ),
@@ -81,8 +117,8 @@ pub fn update_transform_test() {
   let current = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material,
       transform: transform.at(position: vec3.Vec3(1.0, 2.0, 3.0)),
       physics: option.None,
     ),
@@ -102,11 +138,28 @@ pub fn update_transform_test() {
 
 // Test: updating material
 pub fn update_material_test() {
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let previous = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material1,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -114,8 +167,8 @@ pub fn update_material_test() {
   let current = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+      geometry: geometry,
+      material: material2,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -124,21 +177,29 @@ pub fn update_material_test() {
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(scene.UpdateMaterial(
-      "cube1",
-      scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-    )) -> True
+    Ok(scene.UpdateMaterial("cube1", _)) -> True
     _ -> False
   }
 }
 
 // Test: updating geometry
 pub fn update_geometry_test() {
+  let assert Ok(box_geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(sphere_geometry) =
+    scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let previous = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: box_geometry,
+      material: material,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -146,8 +207,8 @@ pub fn update_geometry_test() {
   let current = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.SphereGeometry(1.5, 32, 32),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: sphere_geometry,
+      material: material,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -156,7 +217,7 @@ pub fn update_geometry_test() {
 
   assert list.length(patches) == 1
   assert case list.first(patches) {
-    Ok(scene.UpdateGeometry("cube1", scene.SphereGeometry(1.5, 32, 32))) -> True
+    Ok(scene.UpdateGeometry("cube1", _)) -> True
     _ -> False
   }
 }
@@ -167,7 +228,11 @@ pub fn add_light_test() {
   let current = [
     scene.Light(
       id: "light1",
-      light_type: scene.AmbientLight(0xffffff, 1.0),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(intensity: 1.0, color: 0xffffff)
+        light
+      },
       transform: transform.identity,
     ),
   ]
@@ -185,40 +250,75 @@ pub fn update_light_test() {
   let previous = [
     scene.Light(
       id: "light1",
-      light_type: scene.AmbientLight(0xffffff, 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(intensity: 0.5, color: 0xffffff)
+        light
+      },
       transform: transform.identity,
     ),
   ]
   let current = [
     scene.Light(
       id: "light1",
-      light_type: scene.AmbientLight(0xffffff, 1.0),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(intensity: 1.0, color: 0xffffff)
+        light
+      },
       transform: transform.identity,
     ),
   ]
   let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
+  let assert Ok(ambient_light) =
+    scene.ambient_light(intensity: 1.0, color: 0xffffff)
   assert case list.first(patches) {
-    Ok(scene.UpdateLight("light1", scene.AmbientLight(0xffffff, 1.0))) -> True
+    Ok(scene.UpdateLight("light1", light)) -> light == ambient_light
     _ -> False
   }
 }
 
 // Test: multiple changes
 pub fn multiple_changes_test() {
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material_red) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material_green) =
+    scene.basic_material(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material_blue) =
+    scene.basic_material(
+      color: 0x0000ff,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let previous = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material_red,
       transform: transform.identity,
       physics: option.None,
     ),
     scene.Mesh(
       id: "cube2",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+      geometry: geometry,
+      material: material_green,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -226,15 +326,15 @@ pub fn multiple_changes_test() {
   let current = [
     scene.Mesh(
       id: "cube1",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+      geometry: geometry,
+      material: material_red,
       transform: transform.at(vec3.Vec3(1.0, 0.0, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "cube3",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.BasicMaterial(0x0000ff, False, 1.0, option.None),
+      geometry: geometry,
+      material: material_blue,
       transform: transform.identity,
       physics: option.None,
     ),
@@ -248,12 +348,21 @@ pub fn multiple_changes_test() {
 // Test: group node
 pub fn group_test() {
   let previous = []
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) =
+    scene.basic_material(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
   let current = [
     scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
-        geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-        material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+        geometry: geometry,
+        material: material,
         transform: transform.identity,
         physics: option.None,
       ),

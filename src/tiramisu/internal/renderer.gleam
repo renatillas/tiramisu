@@ -1,3 +1,5 @@
+import gleam/option.{type Option}
+
 pub type DomElement
 
 pub type WebGLRenderer
@@ -8,9 +10,14 @@ pub type Scene
 /// Internal Three.js Camera type (not exposed to users)
 pub type ThreeCamera
 
+/// Canvas dimensions
+pub type Dimensions {
+  Dimensions(width: Float, height: Float)
+}
+
 /// Configuration options for the renderer
 pub type RendererOptions {
-  RendererOptions(antialias: Bool, alpha: Bool, width: Int, height: Int)
+  RendererOptions(antialias: Bool, alpha: Bool, dimensions: Option(Dimensions))
 }
 
 /// Create a new WebGL renderer

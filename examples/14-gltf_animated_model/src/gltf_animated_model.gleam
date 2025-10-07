@@ -166,11 +166,10 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
     |> result.map(fn(camera) {
       camera
-      |> camera.set_position(vec3.Vec3(0.0, 2.0, 10.0))
-      |> camera.look(at: vec3.Vec3(0.0, 1.0, 0.0))
       |> scene.Camera(
         id: "main-camera",
-        transform: transform.identity,
+        transform: transform.at(position: vec3.Vec3(0.0, 2.0, 10.0)),
+        look_at: option.None,
         active: True,
         viewport: option.None,
         camera: _,
@@ -181,12 +180,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let lights = [
     scene.Light(
       id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
+      light: {
+        let assert Ok(light) =
+          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        light
+      },
       transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 2.0),
+      light: {
+        let assert Ok(light) =
+          scene.directional_light(color: 0xffffff, intensity: 2.0)
+        light
+      },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
     ),
   ]
@@ -197,12 +204,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let loading_cube =
         scene.Mesh(
           id: "loading",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.PhongMaterial(
-            color: 0x4ecdc4,
-            shininess: 30.0,
-            map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) =
+              scene.box(width: 1.0, height: 1.0, depth: 1.0)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.phong_material(0x4ecdc4, 30.0, option.None, option.None)
+            material
+          },
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
@@ -219,14 +230,22 @@ fn view(model: Model) -> List(scene.SceneNode) {
       let error_cube =
         scene.Mesh(
           id: "error",
-          geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-          material: scene.StandardMaterial(
-            color: 0xff0000,
-            metalness: 0.5,
-            roughness: 0.5,
-            map: option.None,
-            normal_map: option.None,
-          ),
+          geometry: {
+            let assert Ok(geometry) =
+              scene.box(width: 1.0, height: 1.0, depth: 1.0)
+            geometry
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xff0000,
+                metalness: 0.5,
+                roughness: 0.5,
+                map: option.None,
+                normal_map: option.None,
+              )
+            material
+          },
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(0.0, model.rotation, 0.0),

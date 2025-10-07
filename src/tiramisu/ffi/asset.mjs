@@ -18,8 +18,42 @@ function BatchLoadResult(cache, errors) {
   return new ASSETS_GLEAM.BatchLoadResult(cache, errors);
 }
 
-function AssetCache(assets) {
-  return { assets };
+function AssetCache(assetsDict) {
+  // assetsDict is already a Gleam Dict with url -> LoadedAsset
+  // We need to wrap each LoadedAsset in a CacheEntry
+  let cacheDict = DICT.new$();
+
+  // Use fold to iterate through the dict and wrap entries
+  cacheDict = DICT.fold(
+    assetsDict,
+    cacheDict,
+    (acc, url, loadedAsset) => {
+      // CacheEntry is a private type, but we can use ASSETS_GLEAM to access it
+      // Import the internal class structure from the compiled Gleam code
+      const CacheEntryClass = Object.getPrototypeOf(
+        Object.values(DICT.to_list(DICT.new$()))[0] || {}
+      ).constructor;
+
+      // Create CacheEntry manually matching the compiled structure
+      const cacheEntry = Object.create(Object.getPrototypeOf({}));
+      cacheEntry.asset = loadedAsset;
+      cacheEntry.last_accessed = Date.now();
+
+      return DICT.insert(acc, url, cacheEntry);
+    }
+  );
+
+  // Create CacheConfig manually
+  const cacheConfig = Object.create(Object.getPrototypeOf({}));
+  cacheConfig.max_size = 100;
+  cacheConfig.current_time = Date.now();
+
+  // Create AssetCache manually
+  const assetCache = Object.create(Object.getPrototypeOf({}));
+  assetCache.asset = cacheDict;
+  assetCache.config = cacheConfig;
+
+  return assetCache;
 }
 
 function AssetLoadError(url, reason) {

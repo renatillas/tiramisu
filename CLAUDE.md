@@ -119,3 +119,88 @@ Three.js provides a **professional foundation** that:
 - **Type Safety**: Gleam's type system + opaque types for Three.js objects
 - **Testing**: Gleam's built-in test framework
 - **Future Physics**: Rapier physics engine (WASM)
+
+## Project Configuration
+
+### Standard gleam.toml Setup
+
+All Tiramisu projects should include this configuration in their `gleam.toml`:
+
+```toml
+[tools.lustre.html]
+scripts = [
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
+]
+stylesheets = [
+  { content = "body { margin: 0; padding: 0; overflow: hidden; }" }
+]
+```
+
+**Key components:**
+- `scripts` with importmap: Provides CDN imports for Three.js and Rapier physics
+- `stylesheets`: Removes default body margin/padding and prevents scrollbars for fullscreen games
+
+### Canvas Dimensions
+
+When calling `tiramisu.run()`, use:
+- `dimensions: None` for fullscreen mode (recommended for games)
+- `dimensions: Some(tiramisu.Dimensions(width: 800.0, height: 600.0))` for fixed size
+
+**Example:**
+```gleam
+import gleam/option.{None, Some}
+import tiramisu
+
+pub fn main() {
+  // Fullscreen mode
+  tiramisu.run(
+    dimensions: None,
+    background: 0x1a1a2e,
+    init: init,
+    update: update,
+    view: view,
+  )
+}
+```
+
+### Camera Setup
+
+Cameras automatically calculate aspect ratio from viewport or window dimensions:
+
+```gleam
+import tiramisu/camera
+
+// Aspect ratio is calculated automatically
+let assert Ok(cam) = camera.perspective(
+  field_of_view: 75.0,
+  near: 0.1,
+  far: 1000.0,
+)
+```
+
+### Game Context
+
+The `Context` passed to `init()` and `update()` contains:
+- `delta_time`: Time in seconds since last frame (for frame-rate independent movement)
+- `input`: Current input state (keyboard, mouse, touch)
+- `canvas_width`: Current canvas width in pixels
+- `canvas_height`: Current canvas height in pixels
+
+The canvas dimensions are automatically updated on window resize in fullscreen mode, making them ideal for coordinate conversion:
+
+```gleam
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+  case msg {
+    TouchMove(x, y) -> {
+      // Convert screen coordinates to world space
+      let world_x = { x -. ctx.canvas_width /. 2.0 } /. 100.0
+      let world_y = { ctx.canvas_height /. 2.0 -. y } /. 100.0
+
+      // Update model with converted coordinates
+      Model(..model, position: vec3.Vec3(world_x, world_y, 0.0))
+    }
+  }
+}
+```
+
+For cameras with custom viewports, the aspect ratio uses the viewport dimensions. For main cameras, it uses the window dimensions (which update automatically on resize in fullscreen mode).

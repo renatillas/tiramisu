@@ -32,7 +32,7 @@
 ////     ),
 ////     scene.Light(
 ////       id: "sun",
-////       light_type: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
+////       light: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
 ////       transform: transform.identity,
 ////     ),
 ////   ]
@@ -62,31 +62,11 @@ pub type Texture
 /// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
 pub type BufferGeometry
 
-/// Validation errors returned by geometry and material constructors.
-///
-/// These errors help catch invalid parameters at creation time instead of runtime.
-pub type ValidationError {
-  /// Dimension parameter (width, height, radius, etc.) is invalid (must be > 0)
-  InvalidDimension(String, Float)
-  /// Segment count parameter is invalid (typically must be >= 3)
-  InvalidSegmentCount(String, Int)
-  /// Opacity must be between 0.0 and 1.0
-  InvalidOpacity(Float)
-  /// Metalness must be between 0.0 and 1.0
-  InvalidMetalness(Float)
-  /// Roughness must be between 0.0 and 1.0
-  InvalidRoughness(Float)
-  /// Light intensity must be positive
-  InvalidIntensity(Float)
-  /// Line width must be positive
-  InvalidLinewidth(Float)
-}
-
 /// 3D geometry types supported by the engine.
 ///
 /// Each variant represents a different primitive shape or custom geometry.
 /// Use the validated constructor functions like `box()`, `sphere()`, etc.
-pub type GeometryType {
+pub opaque type Geometry {
   BoxGeometry(width: Float, height: Float, depth: Float)
   SphereGeometry(radius: Float, width_segments: Int, height_segments: Int)
   ConeGeometry(radius: Float, height: Float, segments: Int)
@@ -120,37 +100,53 @@ pub type GeometryType {
 /// - `LambertMaterial`, `ToonMaterial`: Fast, simple lighting
 /// - `PhongMaterial`: Medium, specular highlights
 /// - `StandardMaterial`: Physically-based, most realistic but slower
-pub type MaterialType {
+pub opaque type Material {
   /// Unlit material (no lighting calculations). Fast and useful for flat-shaded objects.
   BasicMaterial(
     color: Int,
+    map: Option(Texture),
+    normal_map: Option(Texture),
     transparent: Bool,
     opacity: Float,
-    map: Option(Texture),
   )
   /// Physically-based material with metalness/roughness workflow. Most realistic.
   StandardMaterial(
     color: Int,
-    metalness: Float,
-    roughness: Float,
     map: Option(Texture),
     normal_map: Option(Texture),
+    metalness: Float,
+    roughness: Float,
   )
   /// Shiny material with specular highlights (like plastic or ceramic).
-  PhongMaterial(color: Int, shininess: Float, map: Option(Texture))
+  PhongMaterial(
+    color: Int,
+    map: Option(Texture),
+    normal_map: Option(Texture),
+    shininess: Float,
+  )
   /// Matte material (like cloth or wood). Non-shiny diffuse lighting.
-  LambertMaterial(color: Int, map: Option(Texture))
+  LambertMaterial(color: Int, map: Option(Texture), normal_map: Option(Texture))
   /// Cartoon-style material with banded shading.
-  ToonMaterial(color: Int, map: Option(Texture))
+  ToonMaterial(color: Int, map: Option(Texture), normal_map: Option(Texture))
   /// Material for rendering lines.
   LineMaterial(color: Int, linewidth: Float)
   /// Material for 2D sprites that always face the camera.
   SpriteMaterial(
     color: Int,
+    map: Option(Texture),
+    normal_map: Option(Texture),
     transparent: Bool,
     opacity: Float,
-    map: Option(Texture),
   )
+}
+
+pub type MaterialError {
+  InvalidMaterialColor(Int)
+  InvalidMaterialOpacity(Float)
+  InvalidMaterialRoughness(Float)
+  InvalidMaterialMetalness(Float)
+  InvalidMaterialLinewidth(Float)
+  InvalidMaterialShininess(Float)
 }
 
 /// Light types for illuminating the scene.
@@ -158,23 +154,100 @@ pub type MaterialType {
 /// Different lights have different performance impacts and visual characteristics.
 /// Most games use a combination of ambient + directional for outdoor scenes,
 /// or ambient + point/spot for indoor scenes.
-pub type LightType {
+pub opaque type Light {
   /// Global ambient light (affects all objects equally, no direction).
-  AmbientLight(color: Int, intensity: Float)
+  AmbientLight(intensity: Float, color: Int)
   /// Directional light like the sun (parallel rays, infinite distance).
-  DirectionalLight(color: Int, intensity: Float)
+  DirectionalLight(intensity: Float, color: Int)
   /// Point light that radiates in all directions (like a light bulb).
-  PointLight(color: Int, intensity: Float, distance: Float)
+  PointLight(intensity: Float, color: Int, distance: Float)
   /// Cone-shaped spotlight (like a flashlight or stage light).
   SpotLight(
-    color: Int,
     intensity: Float,
+    color: Int,
     distance: Float,
     angle: Float,
     penumbra: Float,
   )
   /// Hemisphere light with different colors for sky and ground (outdoor ambient).
-  HemisphereLight(sky_color: Int, ground_color: Int, intensity: Float)
+  HemisphereLight(intensity: Float, sky_color: Int, ground_color: Int)
+}
+
+pub type LightError {
+  InvalidLightIntensity(Float)
+  InvalidLightColor(Int)
+  InvalidLightDistance(Float)
+}
+
+pub fn ambient_light(
+  intensity intensity: Float,
+  color color: Int,
+) -> Result(Light, LightError) {
+  use <- bool.guard(intensity <. 0.0, Error(InvalidLightIntensity(intensity)))
+  use <- bool.guard(
+    color < 0 && color > 0xffffff,
+    Error(InvalidLightColor(color)),
+  )
+  Ok(AmbientLight(intensity:, color:))
+}
+
+pub fn directional_light(
+  intensity intensity: Float,
+  color color: Int,
+) -> Result(Light, LightError) {
+  use <- bool.guard(intensity <. 0.0, Error(InvalidLightIntensity(intensity)))
+  use <- bool.guard(
+    color < 0 && color > 0xffffff,
+    Error(InvalidLightColor(color)),
+  )
+  Ok(DirectionalLight(intensity:, color:))
+}
+
+pub fn point_light(
+  intensity intensity: Float,
+  color color: Int,
+  distance distance: Float,
+) -> Result(Light, LightError) {
+  use <- bool.guard(intensity <. 0.0, Error(InvalidLightIntensity(intensity)))
+  use <- bool.guard(
+    color < 0 && color > 0xffffff,
+    Error(InvalidLightColor(color)),
+  )
+  use <- bool.guard(distance <. 0.0, Error(InvalidLightDistance(distance)))
+  Ok(PointLight(intensity:, color:, distance:))
+}
+
+pub fn spotlight(
+  intensity intensity: Float,
+  color color: Int,
+  distance distance: Float,
+  angle angle: Float,
+  penumbra penumbra: Float,
+) -> Result(Light, LightError) {
+  use <- bool.guard(intensity <. 0.0, Error(InvalidLightIntensity(intensity)))
+  use <- bool.guard(
+    color < 0 && color > 0xffffff,
+    Error(InvalidLightColor(color)),
+  )
+  use <- bool.guard(distance <. 0.0, Error(InvalidLightDistance(distance)))
+  Ok(SpotLight(intensity:, color:, distance:, angle:, penumbra:))
+}
+
+pub fn hemisphere_light(
+  intensity intensity: Float,
+  sky_color sky_color: Int,
+  ground_color ground_color: Int,
+) -> Result(Light, LightError) {
+  use <- bool.guard(intensity <. 0.0, Error(InvalidLightIntensity(intensity)))
+  use <- bool.guard(
+    sky_color < 0 && sky_color > 0xffffff,
+    Error(InvalidLightColor(sky_color)),
+  )
+  use <- bool.guard(
+    ground_color < 0 && ground_color > 0xffffff,
+    Error(InvalidLightColor(sky_color)),
+  )
+  Ok(HemisphereLight(intensity:, sky_color:, ground_color:))
 }
 
 /// Level of Detail (LOD) configuration.
@@ -255,8 +328,8 @@ pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
 pub type SceneNode {
   Mesh(
     id: String,
-    geometry: GeometryType,
-    material: MaterialType,
+    geometry: Geometry,
+    material: Material,
     transform: transform.Transform,
     physics: option.Option(RigidBody),
   )
@@ -264,12 +337,12 @@ pub type SceneNode {
   /// Much more efficient than creating individual Mesh nodes for identical objects
   InstancedMesh(
     id: String,
-    geometry: GeometryType,
-    material: MaterialType,
+    geometry: Geometry,
+    material: Material,
     instances: List(transform.Transform),
   )
   Group(id: String, transform: transform.Transform, children: List(SceneNode))
-  Light(id: String, light_type: LightType, transform: transform.Transform)
+  Light(id: String, light: Light, transform: transform.Transform)
   /// Camera - defines a viewpoint in the scene
   /// Only one camera can be active at a time for rendering (when viewport is None)
   /// Use effect.set_active_camera(id) to switch between cameras
@@ -278,6 +351,9 @@ pub type SceneNode {
     id: String,
     camera: camera.Camera,
     transform: transform.Transform,
+    /// Optional look-at target in world space. If None, camera uses transform rotation.
+    /// If Some, camera will orient itself to look at the target point.
+    look_at: option.Option(vec3.Vec3(Float)),
     active: Bool,
     /// Optional viewport: (x, y, width, height) in pixels
     /// If None, camera fills entire canvas (only when active=True)
@@ -309,6 +385,17 @@ pub type SceneNode {
   DebugPoint(id: String, position: Vec3(Float), size: Float, color: Int)
 }
 
+pub type GeometryError {
+  InvalidGeometryWidth(width: Float)
+  InvalidGeometryHeight(height: Float)
+  InvalidGeometryDepth(depth: Float)
+  InvalidGeometryRadius(radius: Float)
+  InvalidGeometryTube(tube: Float)
+  InvalidGeometrySegmentCountWidth(count: Int)
+  InvalidGeometrySegmentCountHeight(count: Int)
+  InvalidGeometrySegmentCount(count: Int)
+}
+
 // --- Validated Geometry Constructors ---
 
 /// Create a validated box geometry.
@@ -325,10 +412,10 @@ pub fn box(
   width width: Float,
   height height: Float,
   depth depth: Float,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(width <=. 0.0, Error(InvalidDimension("width", width)))
-  use <- bool.guard(height <=. 0.0, Error(InvalidDimension("height", height)))
-  use <- bool.guard(depth <=. 0.0, Error(InvalidDimension("depth", depth)))
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(width <=. 0.0, Error(InvalidGeometryWidth(width)))
+  use <- bool.guard(height <=. 0.0, Error(InvalidGeometryHeight(height)))
+  use <- bool.guard(depth <=. 0.0, Error(InvalidGeometryDepth(depth)))
 
   Ok(BoxGeometry(width, height, depth))
 }
@@ -348,18 +435,54 @@ pub fn sphere(
   radius radius: Float,
   width_segments width_segments: Int,
   height_segments height_segments: Int,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(radius <=. 0.0, Error(InvalidDimension("radius", radius)))
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
   use <- bool.guard(
     width_segments < 3,
-    Error(InvalidSegmentCount("width_segments", width_segments)),
+    Error(InvalidGeometrySegmentCountWidth(width_segments)),
   )
   use <- bool.guard(
     height_segments < 2,
-    Error(InvalidSegmentCount("height_segments", height_segments)),
+    Error(InvalidGeometrySegmentCountHeight(height_segments)),
   )
 
   Ok(SphereGeometry(radius, width_segments, height_segments))
+}
+
+pub fn cone(
+  radius radius: Float,
+  height height: Float,
+  segments segments: Int,
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
+  use <- bool.guard(height <=. 0.0, Error(InvalidGeometryHeight(height)))
+  use <- bool.guard(segments < 3, Error(InvalidGeometrySegmentCount(segments)))
+
+  Ok(ConeGeometry(radius, height, segments))
+}
+
+pub fn plane(
+  width width: Float,
+  height height: Float,
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(width <=. 0.0, Error(InvalidGeometryWidth(width)))
+  use <- bool.guard(height <=. 0.0, Error(InvalidGeometryHeight(height)))
+
+  Ok(PlaneGeometry(width, height))
+}
+
+pub fn circle(
+  radius radius: Float,
+  segments segments: Int,
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
+  use <- bool.guard(segments < 3, Error(InvalidGeometrySegmentCount(segments)))
+
+  Ok(CircleGeometry(radius, segments))
+}
+
+pub fn custom_geometry(geometry geometry: BufferGeometry) -> Geometry {
+  CustomGeometry(geometry)
 }
 
 /// Create a validated cylinder geometry.
@@ -378,19 +501,16 @@ pub fn cylinder(
   radius_bottom radius_bottom: Float,
   height height: Float,
   radial_segments radial_segments: Int,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(
-    radius_top <. 0.0,
-    Error(InvalidDimension("radius_top", radius_top)),
-  )
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius_top <. 0.0, Error(InvalidGeometryRadius(radius_top)))
   use <- bool.guard(
     radius_bottom <. 0.0,
-    Error(InvalidDimension("radius_bottom", radius_bottom)),
+    Error(InvalidGeometryRadius(radius_bottom)),
   )
-  use <- bool.guard(height <=. 0.0, Error(InvalidDimension("height", height)))
+  use <- bool.guard(height <=. 0.0, Error(InvalidGeometryHeight(height)))
   use <- bool.guard(
     radial_segments < 3,
-    Error(InvalidSegmentCount("radial_segments", radial_segments)),
+    Error(InvalidGeometrySegmentCount(radial_segments)),
   )
 
   Ok(CylinderGeometry(radius_top, radius_bottom, height, radial_segments))
@@ -408,16 +528,16 @@ pub fn torus(
   tube tube: Float,
   radial_segments radial_segments: Int,
   tubular_segments tubular_segments: Int,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(radius <=. 0.0, Error(InvalidDimension("radius", radius)))
-  use <- bool.guard(tube <=. 0.0, Error(InvalidDimension("tube", tube)))
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
+  use <- bool.guard(tube <=. 0.0, Error(InvalidGeometryTube(tube)))
   use <- bool.guard(
     radial_segments < 3,
-    Error(InvalidSegmentCount("radial_segments", radial_segments)),
+    Error(InvalidGeometrySegmentCount(radial_segments)),
   )
   use <- bool.guard(
     tubular_segments < 3,
-    Error(InvalidSegmentCount("tubular_segments", tubular_segments)),
+    Error(InvalidGeometrySegmentCount(tubular_segments)),
   )
 
   Ok(TorusGeometry(radius, tube, radial_segments, tubular_segments))
@@ -435,9 +555,9 @@ pub fn torus(
 pub fn tetrahedron(
   radius radius: Float,
   detail detail: Int,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(radius <=. 0.0, Error(InvalidDimension("radius", radius)))
-  use <- bool.guard(detail < 0, Error(InvalidSegmentCount("detail", detail)))
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
+  use <- bool.guard(detail < 0, Error(InvalidGeometrySegmentCount(detail)))
 
   Ok(TetrahedronGeometry(radius, detail))
 }
@@ -454,9 +574,9 @@ pub fn tetrahedron(
 pub fn icosahedron(
   radius radius: Float,
   detail detail: Int,
-) -> Result(GeometryType, ValidationError) {
-  use <- bool.guard(radius <=. 0.0, Error(InvalidDimension("radius", radius)))
-  use <- bool.guard(detail < 0, Error(InvalidSegmentCount("detail", detail)))
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(radius <=. 0.0, Error(InvalidGeometryRadius(radius)))
+  use <- bool.guard(detail < 0, Error(InvalidGeometrySegmentCount(detail)))
 
   Ok(IcosahedronGeometry(radius, detail))
 }
@@ -476,13 +596,19 @@ pub fn basic_material(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
-) -> Result(MaterialType, ValidationError) {
+  map map: option.Option(Texture),
+  normal_map normal_map: option.Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
   use <- bool.guard(
     opacity <. 0.0 || opacity >. 1.0,
-    Error(InvalidOpacity(opacity)),
+    Error(InvalidMaterialOpacity(opacity)),
   )
 
-  Ok(BasicMaterial(color, transparent, opacity, option.None))
+  Ok(BasicMaterial(color:, transparent:, opacity:, map:, normal_map:))
 }
 
 /// Create a validated physically-based (PBR) standard material.
@@ -501,17 +627,23 @@ pub fn standard_material(
   color color: Int,
   metalness metalness: Float,
   roughness roughness: Float,
-) -> Result(MaterialType, ValidationError) {
+  map map: option.Option(Texture),
+  normal_map normal_map: option.Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
   use <- bool.guard(
     metalness <. 0.0 || metalness >. 1.0,
-    Error(InvalidMetalness(metalness)),
+    Error(InvalidMaterialMetalness(metalness)),
   )
   use <- bool.guard(
     roughness <. 0.0 || roughness >. 1.0,
-    Error(InvalidRoughness(roughness)),
+    Error(InvalidMaterialRoughness(roughness)),
   )
 
-  Ok(StandardMaterial(color, metalness, roughness, option.None, option.None))
+  Ok(StandardMaterial(color:, metalness:, roughness:, map:, normal_map:))
 }
 
 /// Create a validated line material for rendering lines.
@@ -524,8 +656,15 @@ pub fn standard_material(
 pub fn line_material(
   color color: Int,
   linewidth linewidth: Float,
-) -> Result(MaterialType, ValidationError) {
-  use <- bool.guard(linewidth <=. 0.0, Error(InvalidLinewidth(linewidth)))
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
+  use <- bool.guard(
+    linewidth <=. 0.0,
+    Error(InvalidMaterialLinewidth(linewidth)),
+  )
 
   Ok(LineMaterial(color, linewidth))
 }
@@ -543,13 +682,60 @@ pub fn sprite_material(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
-) -> Result(MaterialType, ValidationError) {
+  map map: option.Option(Texture),
+  normal_map normal_map: option.Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
   use <- bool.guard(
     opacity <. 0.0 || opacity >. 1.0,
-    Error(InvalidOpacity(opacity)),
+    Error(InvalidMaterialOpacity(opacity)),
   )
 
-  Ok(SpriteMaterial(color, transparent, opacity, option.None))
+  Ok(SpriteMaterial(color:, transparent:, opacity:, map:, normal_map:))
+}
+
+pub fn lambert_material(
+  color color: Int,
+  map map: Option(Texture),
+  normal_map normal_map: Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
+  Ok(LambertMaterial(color:, map:, normal_map:))
+}
+
+pub fn phong_material(
+  color color: Int,
+  shininess shininess: Float,
+  map map: Option(Texture),
+  normal_map normal_map: Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
+  use <- bool.guard(
+    shininess <. 0.0,
+    Error(InvalidMaterialShininess(shininess)),
+  )
+  Ok(PhongMaterial(color:, shininess:, map:, normal_map:))
+}
+
+pub fn toon_material(
+  color color: Int,
+  map map: Option(Texture),
+  normal_map normal_map: Option(Texture),
+) -> Result(Material, MaterialError) {
+  use <- bool.guard(
+    color < 0x000000 || color > 0xffffff,
+    Error(InvalidMaterialColor(color)),
+  )
+  Ok(ToonMaterial(color:, map:, normal_map:))
 }
 
 @internal
@@ -557,15 +743,19 @@ pub type Patch {
   AddNode(id: String, node: SceneNode, parent_id: option.Option(String))
   RemoveNode(id: String)
   UpdateTransform(id: String, transform: transform.Transform)
-  UpdateMaterial(id: String, material: MaterialType)
-  UpdateGeometry(id: String, geometry: GeometryType)
-  UpdateLight(id: String, light_type: LightType)
+  UpdateMaterial(id: String, material: Material)
+  UpdateGeometry(id: String, geometry: Geometry)
+  UpdateLight(id: String, light: Light)
   UpdateAnimation(id: String, animation: option.Option(AnimationPlayback))
   UpdatePhysics(id: String, physics: option.Option(RigidBody))
   UpdateAudio(id: String, config: AudioConfig)
   UpdateInstances(id: String, instances: List(transform.Transform))
   UpdateLODLevels(id: String, levels: List(LODLevel))
-  UpdateCamera(id: String, camera_type: camera.Camera)
+  UpdateCamera(
+    id: String,
+    camera_type: camera.Camera,
+    look_at: option.Option(vec3.Vec3(Float)),
+  )
   SetActiveCamera(id: String)
 }
 
@@ -838,17 +1028,19 @@ fn compare_nodes_detailed(
         False -> []
       }
 
-    Camera(_, prev_cam, prev_trans, prev_active, prev_viewport),
-      Camera(_, curr_cam, curr_trans, curr_active, curr_viewport)
+    Camera(_, prev_cam, prev_trans, prev_look_at, prev_active, prev_viewport),
+      Camera(_, curr_cam, curr_trans, curr_look_at, curr_active, curr_viewport)
     ->
       compare_camera_fields(
         id,
         prev_cam,
         prev_trans,
+        prev_look_at,
         prev_active,
         prev_viewport,
         curr_cam,
         curr_trans,
+        curr_look_at,
         curr_active,
         curr_viewport,
       )
@@ -882,12 +1074,12 @@ fn compare_nodes_detailed(
 /// Compare Mesh fields using accumulator pattern (no empty list allocations)
 fn compare_mesh_fields(
   id: String,
-  prev_geom: GeometryType,
-  prev_mat: MaterialType,
+  prev_geom: Geometry,
+  prev_mat: Material,
   prev_trans: transform.Transform,
   prev_phys: option.Option(RigidBody),
-  curr_geom: GeometryType,
-  curr_mat: MaterialType,
+  curr_geom: Geometry,
+  curr_mat: Material,
   curr_trans: transform.Transform,
   curr_phys: option.Option(RigidBody),
 ) -> List(Patch) {
@@ -919,11 +1111,11 @@ fn compare_mesh_fields(
 /// Compare InstancedMesh fields using accumulator pattern
 fn compare_instanced_mesh_fields(
   id: String,
-  prev_geom: GeometryType,
-  prev_mat: MaterialType,
+  prev_geom: Geometry,
+  prev_mat: Material,
   prev_instances: List(transform.Transform),
-  curr_geom: GeometryType,
-  curr_mat: MaterialType,
+  curr_geom: Geometry,
+  curr_mat: Material,
   curr_instances: List(transform.Transform),
 ) -> List(Patch) {
   let patches = []
@@ -949,9 +1141,9 @@ fn compare_instanced_mesh_fields(
 /// Compare Light fields using accumulator pattern
 fn compare_light_fields(
   id: String,
-  prev_light: LightType,
+  prev_light: Light,
   prev_trans: transform.Transform,
-  curr_light: LightType,
+  curr_light: Light,
   curr_trans: transform.Transform,
 ) -> List(Patch) {
   let patches = []
@@ -997,10 +1189,12 @@ fn compare_camera_fields(
   id: String,
   prev_cam: camera.Camera,
   prev_trans: transform.Transform,
+  prev_look_at: option.Option(vec3.Vec3(Float)),
   prev_active: Bool,
   prev_viewport: option.Option(#(Int, Int, Int, Int)),
   curr_cam: camera.Camera,
   curr_trans: transform.Transform,
+  curr_look_at: option.Option(vec3.Vec3(Float)),
   curr_active: Bool,
   curr_viewport: option.Option(#(Int, Int, Int, Int)),
 ) -> List(Patch) {
@@ -1011,9 +1205,13 @@ fn compare_camera_fields(
     False -> patches
   }
 
-  // If camera config or viewport changed, emit UpdateCamera patch
-  let patches = case prev_cam != curr_cam || prev_viewport != curr_viewport {
-    True -> [UpdateCamera(id, curr_cam), ..patches]
+  // If camera config, look_at, or viewport changed, emit UpdateCamera patch
+  let patches = case
+    prev_cam != curr_cam
+    || prev_look_at != curr_look_at
+    || prev_viewport != curr_viewport
+  {
+    True -> [UpdateCamera(id, curr_cam, curr_look_at), ..patches]
     False -> patches
   }
 
@@ -1055,3 +1253,184 @@ fn compare_model3d_fields(
 
   patches
 }
+
+pub fn create_geometry(geometry: Geometry) -> Nil {
+  case geometry {
+    BoxGeometry(width:, height:, depth:) ->
+      create_box_geometry(width, height, depth)
+    CircleGeometry(radius:, segments:) ->
+      create_circle_geometry(radius, segments)
+    ConeGeometry(radius:, height:, segments:) ->
+      create_cone_geometry(radius, height, segments)
+    CustomGeometry(buffer) -> create_custom_geometry(buffer)
+    CylinderGeometry(radius_top:, radius_bottom:, height:, radial_segments:) ->
+      create_cylinder_geometry(
+        radius_top,
+        radius_bottom,
+        height,
+        radial_segments,
+      )
+    IcosahedronGeometry(radius:, detail:) ->
+      create_icosahedron_geometry(radius, detail)
+    PlaneGeometry(width:, height:) -> create_plane_geometry(width, height)
+    SphereGeometry(radius:, width_segments:, height_segments:) ->
+      create_sphere_geometry(radius, width_segments, height_segments)
+    TetrahedronGeometry(radius:, detail:) ->
+      create_tetrahedron_geometry(radius, detail)
+    TorusGeometry(radius:, tube:, radial_segments:, tubular_segments:) ->
+      create_torus_geometry(radius, tube, radial_segments, tubular_segments)
+  }
+}
+
+@external(javascript, "./ffi/renderer.mjs", "createCustomGeometry")
+fn create_custom_geometry(buffer: BufferGeometry) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createConeGeometry")
+fn create_cone_geometry(radius: Float, height: Float, segments: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createCircleGeometry")
+fn create_circle_geometry(radius: Float, segments: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createBoxGeometry")
+fn create_box_geometry(width: Float, height: Float, depth: Float) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createCylinderGeometry")
+fn create_cylinder_geometry(
+  radius_top: Float,
+  radius_bottom: Float,
+  height: Float,
+  radial_segments: Int,
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createIcosahedronGeometry")
+fn create_icosahedron_geometry(radius: Float, detail: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createPlaneGeometry")
+fn create_plane_geometry(width: Float, height: Float) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createSphereGeometry")
+fn create_sphere_geometry(
+  radius: Float,
+  width_segments: Int,
+  height_segments: Int,
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createTetrahedronGeometry")
+fn create_tetrahedron_geometry(radius: Float, detail: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createTorusGeometry")
+fn create_torus_geometry(
+  radius: Float,
+  tube: Float,
+  radial_segments: Int,
+  tubular_segments: Int,
+) -> Nil
+
+pub fn create_material(material: Material) -> Nil {
+  case material {
+    BasicMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
+      create_basic_material(color, transparent, opacity, map, normal_map)
+    StandardMaterial(color:, map:, normal_map:, metalness:, roughness:) ->
+      create_standard_material(color, metalness, roughness, map, normal_map)
+    PhongMaterial(color:, map:, normal_map:, shininess:) ->
+      create_phong_material(color, shininess, map, normal_map)
+    LambertMaterial(color:, map:, normal_map:) ->
+      create_lambert_material(color, map, normal_map)
+    ToonMaterial(color:, map:, normal_map:) ->
+      create_toon_material(color, map, normal_map)
+    LineMaterial(color:, linewidth:) -> create_line_material(color, linewidth)
+    SpriteMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
+      create_sprite_material(color, transparent, opacity, map, normal_map)
+  }
+}
+
+@external(javascript, "./ffi/renderer.mjs", "createBasicMaterial")
+fn create_basic_material(
+  color: Int,
+  transparent: Bool,
+  opacity: Float,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createStandardMaterial")
+fn create_standard_material(
+  color: Int,
+  metalness: Float,
+  roughness: Float,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createPhongMaterial")
+fn create_phong_material(
+  color: Int,
+  shininess: Float,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createLambertMaterial")
+fn create_lambert_material(
+  color: Int,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createToonMaterial")
+fn create_toon_material(
+  color: Int,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createLineMaterial")
+fn create_line_material(color: Int, linewidth: Float) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createSpriteMaterial")
+fn create_sprite_material(
+  color: Int,
+  transparent: Bool,
+  opacity: Float,
+  map: Option(Texture),
+  normal_map: Option(Texture),
+) -> Nil
+
+pub fn create_light(light: Light) -> Nil {
+  case light {
+    AmbientLight(intensity:, color:) -> create_ambient_light(intensity, color)
+    DirectionalLight(intensity:, color:) ->
+      create_directional_light(intensity, color)
+    PointLight(intensity:, color:, distance:) ->
+      create_point_light(intensity, color, distance)
+    SpotLight(intensity:, color:, distance:, angle:, penumbra:) ->
+      create_spot_light(intensity, color, distance, angle, penumbra)
+    HemisphereLight(intensity:, sky_color:, ground_color:) ->
+      create_hemisphere_light(intensity, sky_color, ground_color)
+  }
+}
+
+@external(javascript, "./ffi/renderer.mjs", "createAmbientLight")
+fn create_ambient_light(intensity: Float, color: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createDirectionalLight")
+fn create_directional_light(intensity: Float, color: Int) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createPointLight")
+fn create_point_light(intensity: Float, color: Int, distance: Float) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createSpotLight")
+fn create_spot_light(
+  intensity: Float,
+  color: Int,
+  distance: Float,
+  angle: Float,
+  penumbra: Float,
+) -> Nil
+
+@external(javascript, "./ffi/renderer.mjs", "createHemisphereLight")
+fn create_hemisphere_light(
+  intensity: Float,
+  sky_color: Int,
+  ground_color: Int,
+) -> Nil
