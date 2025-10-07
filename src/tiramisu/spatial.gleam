@@ -1,10 +1,30 @@
-/// Spatial partitioning data structures for efficient spatial queries
-///
-/// Provides octree and AABB (Axis-Aligned Bounding Box) for:
-/// - Finding objects within a region
-/// - Finding nearby objects
-/// - Frustum culling optimization
-/// - Broad-phase collision detection
+//// Spatial partitioning data structures for efficient spatial queries.
+////
+//// Provides octree and AABB (Axis-Aligned Bounding Box) for:
+//// - Finding objects within a region (10-100x faster than linear search)
+//// - Finding nearby objects
+//// - Frustum culling optimization
+//// - Broad-phase collision detection
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/spatial
+////
+//// // Create octree for world bounds
+//// let world_bounds = spatial.aabb(
+////   min: vec3.Vec3(-100.0, -100.0, -100.0),
+////   max: vec3.Vec3(100.0, 100.0, 100.0),
+//// )
+//// let tree = spatial.new_octree(bounds: world_bounds, capacity: 8)
+////
+//// // Insert enemies
+//// let tree = spatial.insert(tree, enemy_pos, enemy_id)
+////
+//// // Find enemies near player
+//// let nearby = spatial.query_radius(tree, player_pos, radius: 10.0)
+//// ```
+
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import vec/vec3.{type Vec3}

@@ -1,23 +1,176 @@
-/// Immutable game loop with effect system
-/// Following Lustre's Model-View-Update architecture
+//// Tiramisu game engine main module - immutable game loop with effect system.
+////
+//// This module provides the core game loop following the Model-View-Update (MVU) architecture,
+//// inspired by Lustre. Your game state is immutable, and updates return new state along with effects.
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu
+//// import tiramisu/effect
+//// import tiramisu/scene
+//// import tiramisu/transform
+////
+//// type Model {
+////   Model(rotation: Float)
+//// }
+////
+//// type Msg {
+////   Frame
+//// }
+////
+//// pub fn main() {
+////   tiramisu.run(
+////     width: 800,
+////     height: 600,
+////     background: 0x111111,
+////     init: init,
+////     update: update,
+////     view: view,
+////   )
+//// }
+////
+//// fn init(_ctx: tiramisu.Context) {
+////   #(Model(rotation: 0.0), effect.none())
+//// }
+////
+//// fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+////   case msg {
+////     Frame -> {
+////       let new_rotation = model.rotation +. ctx.delta_time
+////       #(Model(rotation: new_rotation), effect.none())
+////     }
+////   }
+//// }
+////
+//// fn view(model: Model) {
+////   [
+////     scene.Mesh(
+////       id: "cube",
+////       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+////       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+////       transform: transform.identity()
+////         |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+////       physics: option.None,
+////     ),
+////   ]
+//// }
+//// ```
+
 import tiramisu/effect
 import tiramisu/input
 import tiramisu/internal/renderer
 import tiramisu/scene
 
 /// Internal Three.js Scene type (opaque)
-type Scene
+@internal
+pub type Scene
 
-/// Game context passed to init and update functions
+/// Game context passed to init and update functions.
+///
+/// Contains timing information and input state for the current frame.
+///
+/// ## Fields
+///
+/// - `delta_time`: Time in seconds since the last frame (useful for frame-rate independent movement)
+/// - `input`: Current input state (keyboard, mouse, touch)
+///
+/// ## Example
+///
+/// ```gleam
+/// fn update(model: Model, msg: Msg, ctx: Context) {
+///   // Move player based on delta time for smooth motion
+///   let speed = 5.0
+///   let new_x = model.x +. speed *. ctx.delta_time
+///
+///   // Check if space key is pressed
+///   case input.is_key_down(ctx.input, "Space") {
+///     True -> jump(model)
+///     False -> Model(..model, x: new_x)
+///   }
+/// }
+/// ```
 pub type Context {
   Context(delta_time: Float, input: input.InputState)
 }
 
-/// Initialize and run the game loop
+/// Initialize and run the game loop.
 ///
-/// The camera parameter is optional. If provided, it will initialize a default camera for
-/// backwards compatibility. If not provided, you must include a Camera scene node with
-/// active=True in your initial scene.
+/// This is the main entry point for your game. It sets up the renderer, initializes your game state,
+/// and starts the game loop. The loop will call your `update` and `view` functions each frame.
+///
+/// ## Parameters
+///
+/// - `width`: Canvas width in pixels
+/// - `height`: Canvas height in pixels
+/// - `background`: Background color as hex integer (e.g., 0x111111 for dark gray)
+/// - `init`: Function to create initial game state and effect
+/// - `update`: Function to update state based on messages
+/// - `view`: Function to render your game state as scene nodes
+///
+/// ## Camera Setup
+///
+/// You must include a `Camera` scene node with `active: True` in your initial scene.
+/// Use `effect.set_active_camera(id)` to switch between cameras at runtime.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/camera
+/// import tiramisu/effect
+/// import tiramisu/scene
+/// import tiramisu/transform
+/// import vec/vec3
+///
+/// type Model {
+///   Model(rotation: Float)
+/// }
+///
+/// type Msg {
+///   Tick
+/// }
+///
+/// pub fn main() {
+///   tiramisu.run(
+///     width: 800,
+///     height: 600,
+///     background: 0x111111,
+///     init: fn(_ctx) {
+///       #(Model(rotation: 0.0), effect.batch([
+///         effect.on_animation_frame(Tick),
+///       ]))
+///     },
+///     update: fn(model, msg, ctx) {
+///       case msg {
+///         Tick -> #(
+///           Model(rotation: model.rotation +. ctx.delta_time),
+///           effect.on_animation_frame(Tick),
+///         )
+///       }
+///     },
+///     view: fn(model) {
+///       [
+///         scene.Camera(
+///           id: "main-camera",
+///           camera: camera.perspective(fov: 75.0, near: 0.1, far: 1000.0),
+///           transform: transform.at(vec3.Vec3(0.0, 0.0, 5.0)),
+///           active: True,
+///           viewport: option.None,
+///         ),
+///         scene.Mesh(
+///           id: "cube",
+///           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+///           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+///           transform: transform.identity()
+///             |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+///           physics: option.None,
+///         ),
+///       ]
+///     },
+///   )
+/// }
+/// ```
 pub fn run(
   width width: Int,
   height height: Int,

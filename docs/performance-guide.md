@@ -24,7 +24,7 @@ Tiramisu includes several automatic performance optimizations:
 ```gleam
 // Cache the scene and return the same reference when paused
 pub type Model {
-  Model(paused: Bool, cached_scene: Option(List(SceneNode)), ...)
+  Model(paused: Bool, cached_scene: Option(List(SceneNode)), todo)
 }
 
 fn view(model: Model) -> List(SceneNode) {
@@ -76,13 +76,12 @@ let many_cubes = list.range(0, 999)
     scene.Mesh(
       id: "cube-" <> int.to_string(i),  // 1000 draw calls!
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(...),
-      transform: ...,
+      material: scene.StandardMaterial(todo),
+      transform: todo,
       physics: option.None,
     )
   })
 
-// Use InstancedMesh for massive performance boost:
 let instance_transforms = list.range(0, 999)
   |> list.map(fn(i) {
     transform.Transform(
@@ -95,7 +94,7 @@ let instance_transforms = list.range(0, 999)
 scene.InstancedMesh(
   id: "cubes",
   geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-  material: scene.StandardMaterial(...),
+  material: scene.StandardMaterial(todo),
   instances: instance_transforms,  // 1 draw call!
 )
 ```
@@ -199,14 +198,14 @@ let nearby_enemies = spatial.octree_query_radius(
 // ❌ Bad: Too many nodes
 let stars = list.range(0, 999)
   |> list.map(fn(i) {
-    scene.Mesh(id: "star-" <> int.to_string(i), ...)  // 1000 nodes!
+    scene.Mesh(id: "star-" <> int.to_string(i), todo)  // 1000 nodes!
   })
 
 // ✅ Good: Use InstancedMesh
 scene.InstancedMesh(
   id: "stars",
   geometry: scene.SphereGeometry(0.1, 8, 8),
-  material: scene.BasicMaterial(...),
+  material: scene.BasicMaterial(todo)
   instances: star_transforms,  // 1 node!
 )
 ```
@@ -223,7 +222,7 @@ pub type Model {
   Model(
     ui_dirty: Bool,
     cached_ui: List(SceneNode),
-    ...
+    todo
   )
 }
 
@@ -259,15 +258,15 @@ scene.Group(
 list.map(positions, fn(pos) {
   scene.Mesh(
     geometry: scene.BoxGeometry(1.0, 1.0, 1.0),  // New geometry each time!
-    material: scene.StandardMaterial(...),
-    ...
+    material: scene.StandardMaterial(todo),
+    todo
   )
 })
 
 // ✅ Good: Use InstancedMesh (shares geometry/material)
 scene.InstancedMesh(
   geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-  material: scene.StandardMaterial(...),
+  material: scene.StandardMaterial(todo),
   instances: transforms,
 )
 ```
@@ -288,13 +287,13 @@ scene.SphereGeometry(radius: 1.0, width_segments: 16, height_segments: 16)
 **1. Minimize real-time lights**
 ```gleam
 // ❌ Bad: Too many lights (expensive!)
-list.repeat(scene.PointLight(...), 50)  // 50 lights = slow
+list.repeat(scene.PointLight(todo), 50)  // 50 lights = slow
 
 // ✅ Good: Use ambient + 1-3 directional/point lights
 [
-  scene.Light(id: "ambient", light_type: scene.AmbientLight(...)),
-  scene.Light(id: "sun", light_type: scene.DirectionalLight(...)),
-  scene.Light(id: "key", light_type: scene.PointLight(...)),
+  scene.Light(id: "ambient", light_type: scene.AmbientLight(todo)),
+  scene.Light(id: "sun", light_type: scene.DirectionalLight(todo)),
+  scene.Light(id: "key", light_type: scene.PointLight(todo)),
 ]
 ```
 

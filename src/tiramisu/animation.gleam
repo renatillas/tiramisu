@@ -1,9 +1,35 @@
+//// Animation system - tweens and easing functions for smooth interpolation.
+////
+//// Provides easing functions and tween helpers for animating values over time.
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/animation
+////
+//// // Create a tween from 0 to 100 over 2 seconds
+//// let tween = animation.tween_float(
+////   from: 0.0,
+////   to: 100.0,
+////   duration: 2.0,
+////   easing: animation.EaseOutQuad,
+//// )
+////
+//// // Update in game loop
+//// let tween = animation.update_tween(tween, ctx.delta_time)
+//// let current_value = animation.tween_value(tween)
+//// let done = animation.is_tween_complete(tween)
+//// ```
+
 import gleam/float
 import gleam_community/maths
 import tiramisu/transform
 import vec/vec3
 
-/// Easing functions for smooth animations
+/// Easing functions for smooth animations.
+///
+/// Easing functions control the rate of change over time, making animations
+/// feel more natural. Use `ease()` to apply an easing function to a value in [0, 1].
 pub type Easing {
   Linear
   EaseInQuad

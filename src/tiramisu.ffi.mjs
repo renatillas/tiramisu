@@ -7,6 +7,7 @@ import * as GLEAM from '../../gleam_stdlib/gleam.mjs';
 import * as PHYSICS from './tiramisu/ffi/physics.mjs';
 import * as DEBUG from './tiramisu/ffi/debug.mjs';
 import * as CAMERA from './tiramisu/ffi/camera.mjs';
+import * as UI from './tiramisu/ffi/ui.mjs';
 
 /**
  * Create a Three.js scene with background color
@@ -74,6 +75,9 @@ export function startLoop(
   const dispatch = (msg) => {
     messageQueue.push(msg);
   };
+
+  // Register game dispatch with UI module for bidirectional messaging
+  UI.registerGame(dispatch);
 
   // Note: Camera is now initialized either via:
   // 1. initializeCamera() call (backwards compatibility) before startLoop

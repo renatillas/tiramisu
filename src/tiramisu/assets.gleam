@@ -1,7 +1,29 @@
-/// Asset Management System
-///
-/// Provides declarative asset loading with progress tracking, caching,
-/// and batch loading capabilities with LRU eviction.
+//// Asset Management System - loading and caching for textures, models, and audio.
+////
+//// Provides declarative asset loading with progress tracking, caching,
+//// and batch loading capabilities with LRU eviction.
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/assets
+////
+//// // Load a texture
+//// let load_effect = assets.load_texture("player.png")
+////   |> promise.map(fn(result) {
+////     case result {
+////       Ok(texture) -> TextureLoaded(texture)
+////       Error(err) -> LoadFailed(err)
+////     }
+////   })
+////   |> effect.from_promise
+////
+//// // Use with cache
+//// let cache = assets.new_cache()
+//// let cache = assets.insert_texture(cache, "player.png", texture)
+//// let texture = assets.get_texture(cache, "player.png")
+//// ```
+
 import gleam/dict.{type Dict}
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}

@@ -1,6 +1,34 @@
+//// Input module - keyboard, mouse, gamepad, and touch input handling.
+////
+//// Input state is automatically updated each frame and passed to your `update` function
+//// via the `Context`. Query the input state to respond to player actions.
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/input
+////
+//// fn update(model, msg, ctx) {
+////   // Check if player is pressing W to move forward
+////   let move_forward = case input.is_key_pressed(ctx.input, input.KeyW) {
+////     True -> 1.0
+////     False -> 0.0
+////   }
+////
+////   // Check mouse button
+////   let shooting = input.is_left_button_pressed(ctx.input)
+////
+////   // Update model based on input
+////   Model(..model, position: move_player(model.position, move_forward))
+//// }
+//// ```
+
 import gleam/list
 import gleam/result
 
+/// Input state for all input devices (automatically updated each frame).
+///
+/// Access via `context.input` in your `update` function.
 pub opaque type InputState {
   InputState(
     keyboard: KeyboardState,

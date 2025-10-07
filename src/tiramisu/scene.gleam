@@ -1,3 +1,44 @@
+//// Scene graph module - declarative 3D scene construction.
+////
+//// This module provides types and functions for building 3D scenes declaratively.
+//// Scenes are composed of `SceneNode` values that describe meshes, lights, cameras, and groups.
+////
+//// ## Core Concepts
+////
+//// - **Immutability**: Scene nodes are immutable values. Updates create new nodes.
+//// - **Hierarchy**: Use `Group` nodes to create parent-child relationships.
+//// - **Validation**: Geometry and material constructors return `Result` to catch invalid parameters.
+//// - **Performance**: Use `InstancedMesh` for many identical objects (1 draw call instead of thousands).
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/scene
+//// import tiramisu/transform
+//// import gleam/option
+//// import vec/vec3
+////
+//// pub fn view(model: Model) {
+////   let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+////   let assert Ok(material) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0)
+////
+////   [
+////     scene.Mesh(
+////       id: "player",
+////       geometry: geometry,
+////       material: material,
+////       transform: transform.at(vec3.Vec3(0.0, 1.0, 0.0)),
+////       physics: option.None,
+////     ),
+////     scene.Light(
+////       id: "sun",
+////       light_type: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
+////       transform: transform.identity(),
+////     ),
+////   ]
+//// }
+//// ```
+
 import gleam/bool
 import gleam/dict
 import gleam/list
@@ -11,24 +52,40 @@ import tiramisu/physics.{type RigidBody}
 import tiramisu/transform
 import vec/vec3.{type Vec3}
 
-/// Opaque type for Three.js textures
+/// Opaque type for Three.js textures.
+///
+/// Created via `assets.load_texture()` and used in materials.
 pub type Texture
 
-/// Opaque type for Three.js BufferGeometry (for loaded geometries)
+/// Opaque type for Three.js BufferGeometry.
+///
+/// Created by loading 3D models with `assets.load_stl()` or `assets.load_model()`.
 pub type BufferGeometry
 
-/// Validation errors for scene node creation
+/// Validation errors returned by geometry and material constructors.
+///
+/// These errors help catch invalid parameters at creation time instead of runtime.
 pub type ValidationError {
+  /// Dimension parameter (width, height, radius, etc.) is invalid (must be > 0)
   InvalidDimension(String, Float)
+  /// Segment count parameter is invalid (typically must be >= 3)
   InvalidSegmentCount(String, Int)
+  /// Opacity must be between 0.0 and 1.0
   InvalidOpacity(Float)
+  /// Metalness must be between 0.0 and 1.0
   InvalidMetalness(Float)
+  /// Roughness must be between 0.0 and 1.0
   InvalidRoughness(Float)
+  /// Light intensity must be positive
   InvalidIntensity(Float)
+  /// Line width must be positive
   InvalidLinewidth(Float)
 }
 
-/// Geometry types
+/// 3D geometry types supported by the engine.
+///
+/// Each variant represents a different primitive shape or custom geometry.
+/// Use the validated constructor functions like `box()`, `sphere()`, etc.
 pub type GeometryType {
   BoxGeometry(width: Float, height: Float, depth: Float)
   SphereGeometry(radius: Float, width_segments: Int, height_segments: Int)
@@ -52,14 +109,26 @@ pub type GeometryType {
   CustomGeometry(BufferGeometry)
 }
 
-/// Material types
+/// Material types for rendering objects.
+///
+/// Materials define how surfaces appear when rendered. Different materials
+/// have different performance characteristics and visual properties.
+///
+/// ## Performance
+///
+/// - `BasicMaterial`: Fastest, no lighting calculations
+/// - `LambertMaterial`, `ToonMaterial`: Fast, simple lighting
+/// - `PhongMaterial`: Medium, specular highlights
+/// - `StandardMaterial`: Physically-based, most realistic but slower
 pub type MaterialType {
+  /// Unlit material (no lighting calculations). Fast and useful for flat-shaded objects.
   BasicMaterial(
     color: Int,
     transparent: Bool,
     opacity: Float,
     map: Option(Texture),
   )
+  /// Physically-based material with metalness/roughness workflow. Most realistic.
   StandardMaterial(
     color: Int,
     metalness: Float,
@@ -67,10 +136,15 @@ pub type MaterialType {
     map: Option(Texture),
     normal_map: Option(Texture),
   )
+  /// Shiny material with specular highlights (like plastic or ceramic).
   PhongMaterial(color: Int, shininess: Float, map: Option(Texture))
+  /// Matte material (like cloth or wood). Non-shiny diffuse lighting.
   LambertMaterial(color: Int, map: Option(Texture))
+  /// Cartoon-style material with banded shading.
   ToonMaterial(color: Int, map: Option(Texture))
+  /// Material for rendering lines.
   LineMaterial(color: Int, linewidth: Float)
+  /// Material for 2D sprites that always face the camera.
   SpriteMaterial(
     color: Int,
     transparent: Bool,
@@ -79,11 +153,19 @@ pub type MaterialType {
   )
 }
 
-/// Light types
+/// Light types for illuminating the scene.
+///
+/// Different lights have different performance impacts and visual characteristics.
+/// Most games use a combination of ambient + directional for outdoor scenes,
+/// or ambient + point/spot for indoor scenes.
 pub type LightType {
+  /// Global ambient light (affects all objects equally, no direction).
   AmbientLight(color: Int, intensity: Float)
+  /// Directional light like the sun (parallel rays, infinite distance).
   DirectionalLight(color: Int, intensity: Float)
+  /// Point light that radiates in all directions (like a light bulb).
   PointLight(color: Int, intensity: Float, distance: Float)
+  /// Cone-shaped spotlight (like a flashlight or stage light).
   SpotLight(
     color: Int,
     intensity: Float,
@@ -91,20 +173,85 @@ pub type LightType {
     angle: Float,
     penumbra: Float,
   )
+  /// Hemisphere light with different colors for sky and ground (outdoor ambient).
   HemisphereLight(sky_color: Int, ground_color: Int, intensity: Float)
 }
 
-/// Level of Detail configuration - a mesh to show at a specific distance from camera
+/// Level of Detail (LOD) configuration.
+///
+/// Defines which mesh to display based on camera distance. Use with `LOD` scene node
+/// for automatic detail switching to improve performance.
+///
+/// ## Example
+///
+/// ```gleam
+/// scene.LOD(
+///   id: "tree",
+///   levels: [
+///     scene.lod_level(distance: 0.0, node: high_detail_mesh),   // 0-50 units
+///     scene.lod_level(distance: 50.0, node: medium_detail_mesh), // 50-100 units
+///     scene.lod_level(distance: 100.0, node: low_detail_mesh),   // 100+ units
+///   ],
+///   transform: transform.identity(),
+/// )
+/// ```
 pub type LODLevel {
   LODLevel(distance: Float, node: SceneNode)
 }
 
-/// Create an LOD level with a distance threshold and node
+/// Create an LOD level with a distance threshold and scene node.
+///
+/// Levels should be ordered from closest (distance: 0.0) to farthest.
+///
+/// ## Example
+///
+/// ```gleam
+/// let high_detail = scene.lod_level(distance: 0.0, node: detailed_mesh)
+/// let low_detail = scene.lod_level(distance: 100.0, node: simple_mesh)
+/// ```
 pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
   LODLevel(distance: distance, node: node)
 }
 
-/// Scene node - declarative description of 3D objects
+/// Scene node - the core building block of your 3D scene.
+///
+/// Scene nodes are immutable, declarative descriptions of objects in your game.
+/// Each frame, your `view()` function returns a list of scene nodes, and the engine
+/// efficiently updates only what changed.
+///
+/// ## Node Types
+///
+/// - **Mesh**: Standard 3D object (1 draw call per mesh)
+/// - **InstancedMesh**: Many identical objects (1 draw call total!)
+/// - **Group**: Container for organizing child nodes in a hierarchy
+/// - **Light**: Illuminates the scene
+/// - **Camera**: Defines viewpoint (must have at least one with `active: True`)
+/// - **LOD**: Switches detail levels based on distance
+/// - **Model3D**: Loaded 3D model with animations
+/// - **Audio**: Background or positional audio
+/// - **Debug***: Visualization helpers for development
+///
+/// ## Example
+///
+/// ```gleam
+/// pub fn view(model: Model) {
+///   [
+///     scene.Group(
+///       id: "player",
+///       transform: transform.at(model.position),
+///       children: [
+///         scene.Mesh(
+///           id: "player-body",
+///           geometry: scene.BoxGeometry(1.0, 2.0, 1.0),
+///           material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
+///           transform: transform.identity(),
+///           physics: option.Some(model.physics_body),
+///         ),
+///       ],
+///     ),
+///   ]
+/// }
+/// ```
 pub type SceneNode {
   Mesh(
     id: String,
@@ -164,7 +311,16 @@ pub type SceneNode {
 
 // --- Validated Geometry Constructors ---
 
-/// Create a validated box geometry
+/// Create a validated box geometry.
+///
+/// All dimensions must be positive (> 0).
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(cube) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+/// let assert Ok(wall) = scene.box(width: 10.0, height: 3.0, depth: 0.1)
+/// ```
 pub fn box(
   width width: Float,
   height height: Float,
@@ -177,7 +333,17 @@ pub fn box(
   Ok(BoxGeometry(width, height, depth))
 }
 
-/// Create a validated sphere geometry
+/// Create a validated sphere geometry.
+///
+/// Radius must be positive. Width segments >= 3, height segments >= 2.
+/// More segments = smoother sphere but more triangles.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(ball) = scene.sphere(radius: 1.0, width_segments: 32, height_segments: 16)
+/// let assert Ok(low_poly) = scene.sphere(radius: 1.0, width_segments: 8, height_segments: 6)
+/// ```
 pub fn sphere(
   radius radius: Float,
   width_segments width_segments: Int,
@@ -196,7 +362,17 @@ pub fn sphere(
   Ok(SphereGeometry(radius, width_segments, height_segments))
 }
 
-/// Create a validated cylinder geometry
+/// Create a validated cylinder geometry.
+///
+/// Both radii must be non-negative, height positive, radial segments >= 3.
+/// Set one radius to 0 to create a cone shape.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(cylinder) = scene.cylinder(radius_top: 1.0, radius_bottom: 1.0, height: 2.0, radial_segments: 32)
+/// let assert Ok(cone) = scene.cylinder(radius_top: 0.0, radius_bottom: 1.0, height: 2.0, radial_segments: 32)
+/// ```
 pub fn cylinder(
   radius_top radius_top: Float,
   radius_bottom radius_bottom: Float,
@@ -220,7 +396,13 @@ pub fn cylinder(
   Ok(CylinderGeometry(radius_top, radius_bottom, height, radial_segments))
 }
 
-/// Create a validated torus geometry
+/// Create a validated torus (donut) geometry.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(donut) = scene.torus(radius: 2.0, tube: 0.5, radial_segments: 16, tubular_segments: 100)
+/// ```
 pub fn torus(
   radius radius: Float,
   tube tube: Float,
@@ -241,7 +423,15 @@ pub fn torus(
   Ok(TorusGeometry(radius, tube, radial_segments, tubular_segments))
 }
 
-/// Create a validated tetrahedron geometry
+/// Create a validated tetrahedron (4-sided polyhedron) geometry.
+///
+/// Detail level controls subdivision (0 = no subdivision, higher = more triangles).
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(shape) = scene.tetrahedron(radius: 1.0, detail: 0)
+/// ```
 pub fn tetrahedron(
   radius radius: Float,
   detail detail: Int,
@@ -252,7 +442,15 @@ pub fn tetrahedron(
   Ok(TetrahedronGeometry(radius, detail))
 }
 
-/// Create a validated icosahedron geometry
+/// Create a validated icosahedron (20-sided polyhedron) geometry.
+///
+/// Detail level controls subdivision. Good for creating spheres with flat faces.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(shape) = scene.icosahedron(radius: 1.0, detail: 2)
+/// ```
 pub fn icosahedron(
   radius radius: Float,
   detail detail: Int,
@@ -263,6 +461,17 @@ pub fn icosahedron(
   Ok(IcosahedronGeometry(radius, detail))
 }
 
+/// Create a validated basic (unlit) material.
+///
+/// Basic materials don't react to lights, making them very fast to render.
+/// Opacity must be between 0.0 (fully transparent) and 1.0 (fully opaque).
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(red) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0)
+/// let assert Ok(glass) = scene.basic_material(color: 0x88ccff, transparent: True, opacity: 0.5)
+/// ```
 pub fn basic_material(
   color color: Int,
   transparent transparent: Bool,
@@ -276,6 +485,18 @@ pub fn basic_material(
   Ok(BasicMaterial(color, transparent, opacity, option.None))
 }
 
+/// Create a validated physically-based (PBR) standard material.
+///
+/// Standard materials use metalness/roughness workflow for realistic rendering.
+/// - Metalness: 0.0 = dielectric (plastic, wood), 1.0 = metal
+/// - Roughness: 0.0 = mirror-smooth, 1.0 = completely rough
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(gold) = scene.standard_material(color: 0xffd700, metalness: 1.0, roughness: 0.3)
+/// let assert Ok(plastic) = scene.standard_material(color: 0xff0000, metalness: 0.0, roughness: 0.5)
+/// ```
 pub fn standard_material(
   color color: Int,
   metalness metalness: Float,
@@ -293,6 +514,13 @@ pub fn standard_material(
   Ok(StandardMaterial(color, metalness, roughness, option.None, option.None))
 }
 
+/// Create a validated line material for rendering lines.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(line_mat) = scene.line_material(color: 0xff0000, linewidth: 2.0)
+/// ```
 pub fn line_material(
   color color: Int,
   linewidth linewidth: Float,
@@ -302,6 +530,15 @@ pub fn line_material(
   Ok(LineMaterial(color, linewidth))
 }
 
+/// Create a validated sprite material for 2D billboards.
+///
+/// Sprites always face the camera and are useful for particles, UI elements, etc.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(sprite_mat) = scene.sprite_material(color: 0xffffff, transparent: True, opacity: 0.8)
+/// ```
 pub fn sprite_material(
   color color: Int,
   transparent transparent: Bool,
