@@ -1,6 +1,9 @@
 name = "tiramisu"
 version = "1.0.0"
 target = "javascript"
+description = "A 3D game framework for building performant web games in Gleam"
+licences = ["MIT"]
+repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 
 [documentation]
 pages = [
@@ -10,9 +13,6 @@ pages = [
     { title = "Spatial Partitioning guide", path = "spatial_partitioning_guide.html", source = "./docs/spatial-partitioning-guide.md" },
 ]
 
-description = ""
-licences = ["MIT"]
-repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 
 [dependencies]
 gleam_stdlib = ">= 0.64.0 and < 2.0.0"

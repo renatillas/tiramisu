@@ -104,9 +104,9 @@ scripts = [
 
 ## 📚 Documentation
 
-- [**Getting Started**](./getting_started.html) - Your first Tiramisu game
-- [**Scene Graph Guide**](./scene_graph_guide.html) - Understanding scene hierarchies
-- [**Performance Guide**](./performance_guide.html) - Optimization techniques
+- [**Getting Started**](https://hexdocs.pm/tiramisu/getting_started.html) - Your first Tiramisu game
+- [**Scene Graph Guide**](https://hexdocs.pm/tiramisu/scene_graph_guide.html) - Understanding scene hierarchies
+- [**Performance Guide**](https://hexdocs.pm/tiramisu/performance_guide.html) - Optimization techniques
 - [**API Reference**](https://hexdocs.pm/tiramisu/) - Complete API documentation
 
 ---
