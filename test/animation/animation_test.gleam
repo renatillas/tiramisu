@@ -1,6 +1,6 @@
 import tiramisu/animation
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // --- Easing Function Tests ---
 

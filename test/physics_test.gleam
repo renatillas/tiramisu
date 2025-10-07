@@ -1,6 +1,6 @@
 import tiramisu/physics
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // Test: Register and get transform
 pub fn register_and_get_transform_test() {

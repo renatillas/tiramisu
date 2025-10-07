@@ -2,7 +2,7 @@ import gleam/list
 import gleam/option
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // Test: Update StandardMaterial properties
 pub fn update_standard_material_test() {

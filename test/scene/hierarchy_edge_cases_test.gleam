@@ -3,7 +3,7 @@ import gleam/list
 import gleam/option
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // Test: Empty groups should be created correctly
 pub fn empty_group_test() {

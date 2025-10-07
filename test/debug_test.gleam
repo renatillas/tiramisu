@@ -1,7 +1,8 @@
 import tiramisu/debug
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
+import vec/vec3f
 
 pub fn bounding_box_creates_debug_box_test() {
   let min = vec3.Vec3(0.0, 0.0, 0.0)
@@ -84,7 +85,7 @@ pub fn box_from_transform_test() {
   let t =
     transform.Transform(
       position: vec3.Vec3(5.0, 5.0, 5.0),
-      rotation: vec3.zero(),
+      rotation: vec3f.zero,
       scale: vec3.Vec3(2.0, 4.0, 6.0),
     )
 

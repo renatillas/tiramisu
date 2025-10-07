@@ -6,59 +6,10 @@ import gleamy/bench
 import tiramisu/animation
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
-
-pub type Vec3Pair {
-  Vec3Pair(a: vec3.Vec3, b: vec3.Vec3)
-}
+import vec/vec3
 
 pub fn main() {
   // Benchmark Vec3 operations that return Vec3
-  io.println("=== Vec3 Operations (return Vec3) ===")
-  bench.run(
-    [
-      bench.Input(
-        "Vec3 pair",
-        Vec3Pair(vec3.Vec3(1.0, 2.0, 3.0), vec3.Vec3(4.0, 5.0, 6.0)),
-      ),
-    ],
-    [
-      bench.Function("add", fn(pair: Vec3Pair) { vec3.add(pair.a, pair.b) }),
-      bench.Function("subtract", fn(pair: Vec3Pair) {
-        vec3.subtract(pair.a, pair.b)
-      }),
-      bench.Function("scale", fn(pair: Vec3Pair) { vec3.scale(pair.a, 2.5) }),
-      bench.Function("normalize", fn(pair: Vec3Pair) { vec3.normalize(pair.a) }),
-      bench.Function("cross", fn(pair: Vec3Pair) { vec3.cross(pair.a, pair.b) }),
-      bench.Function("lerp", fn(pair: Vec3Pair) {
-        vec3.lerp(pair.a, pair.b, 0.5)
-      }),
-    ],
-    [bench.Duration(100), bench.Warmup(10)],
-  )
-  |> bench.table([bench.IPS, bench.Min, bench.Mean])
-  |> io.println
-
-  // Benchmark Vec3 operations that return Float
-  io.println("\n=== Vec3 Operations (return Float) ===")
-  bench.run(
-    [
-      bench.Input(
-        "Vec3 pair",
-        Vec3Pair(vec3.Vec3(1.0, 2.0, 3.0), vec3.Vec3(4.0, 5.0, 6.0)),
-      ),
-    ],
-    [
-      bench.Function("dot", fn(pair: Vec3Pair) { vec3.dot(pair.a, pair.b) }),
-      bench.Function("distance", fn(pair: Vec3Pair) {
-        vec3.distance(pair.a, pair.b)
-      }),
-    ],
-    [bench.Duration(100), bench.Warmup(10)],
-  )
-  |> bench.table([bench.IPS, bench.Min, bench.Mean])
-  |> io.println
-
   bench.run(
     [
       bench.Input(

@@ -116,11 +116,16 @@ export function startLoop(
     // Generate new scene nodes
     const newNodes = view(currentState);
 
-    // Diff and patch
-    const patches = SCENE_GLEAM.diff(currentNodes, newNodes);
-    RENDERER.applyPatches(scene, patches);
+    // Dirty flagging optimization: skip diff if scene hasn't changed (referential equality)
+    // This is extremely fast for static scenes where view() returns the same list reference
+    if (currentNodes !== newNodes) {
+      // Diff and patch
+      const patches = SCENE_GLEAM.diff(currentNodes, newNodes);
+      RENDERER.applyPatches(scene, patches);
 
-    currentNodes = newNodes;
+      currentNodes = newNodes;
+    }
+    // else: Scene unchanged, skip diff entirely (massive speedup for static/paused scenes)
 
     // Step physics simulation
     PHYSICS.stepWorld(deltaTime);

@@ -1,9 +1,9 @@
 # Phase 5: Advanced Features - Progress Tracker
 
-## Current Status: 🚀 **65% Complete**
+## Current Status: 🚀 **70% Complete**
 
-**Last Updated:** 2025-01-06
-**Test Count:** 196 tests (was 117, target 200+) ✅
+**Last Updated:** 2025-01-07
+**Test Count:** 231 tests (was 117, target 200+) ✅
 
 ---
 
@@ -11,8 +11,8 @@
 
 | Category | Status | Progress |
 |----------|--------|----------|
-| Performance Optimization | 🔄 In Progress | 70% (9/13 major optimizations) |
-| Full Test Suite | ✅ Complete | 100% (79 tests added - exceeded goal!) |
+| Performance Optimization | 🔄 In Progress | 77% (10/13 major optimizations) |
+| Full Test Suite | ✅ Complete | 100% (114 tests added - far exceeded goal!) |
 | Full Documentation | Not Started | 0% |
 
 ---
@@ -68,7 +68,7 @@
   - Context validity checking with `isContextValid()` FFI
   - Located in `/src/tiramisu/ffi/renderer.mjs`
 
-### 1.3 Scene Graph Optimization (2/4) ✅
+### 1.3 Scene Graph Optimization (4/4) ✅
 - [x] **Optimize diff algorithm for large scenes** ✅
   - Replaced O(n) `list.contains` with O(log n) `set.contains` lookups
   - Added early exit for empty scenes
@@ -87,8 +87,20 @@
   - **Learning:** Hash overhead > comparison savings for common case
   - **Decision:** Reverted - kept 7x improvement from set-based lookups
   - **See:** `/docs/SCENE_DIFF_PHASE_2_PLAN.md` for detailed analysis
-- [ ] Spatial partitioning (octree/quadtree) for collision detection
-- [ ] Dirty flagging at scene level (future: separate static/dynamic layers)
+- [x] **Dirty flagging at game loop level** ✅
+  - Referential equality check in game loop before calling `diff()`
+  - If `view()` returns same list reference, skip diff entirely
+  - **Benefit:** Infinite speedup for static/paused scenes (0ms diff time)
+  - **Use case:** Games with static backgrounds, paused states, menu screens
+  - **Implementation:** `/src/tiramisu.ffi.mjs` line 121
+- [x] **Spatial partitioning with Octree** ✅
+  - Complete octree implementation for 3D spatial queries
+  - AABB (Axis-Aligned Bounding Box) collision detection
+  - Query by region, radius, or get all items
+  - Automatic subdivision when capacity exceeded
+  - **Use cases:** Find nearby objects, broad-phase collision, region queries
+  - **API:** `/src/tiramisu/spatial.gleam`
+  - **Tests:** 20 comprehensive tests (231 total tests now)
 
 ### 1.4 Audio Optimization (0/3)
 - [ ] Audio source pooling
@@ -113,7 +125,7 @@
 
 ## 2. Full Test Suite (100%) ✅
 
-**Current:** 201 tests | **Target:** 200+ tests | **Progress:** +84 tests
+**Current:** 231 tests | **Target:** 200+ tests | **Progress:** +114 tests
 
 ### 2.1 Increase Coverage (5/6) ✅
 - [x] **Audio system tests** (playback, spatial audio, config updates) - **12 tests added!**

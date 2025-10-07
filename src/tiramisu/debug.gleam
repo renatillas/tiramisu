@@ -2,12 +2,13 @@ import gleam/int
 import gleam/list
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3.{type Vec3}
+import vec/vec3.{type Vec3}
+import vec/vec3f
 
 pub fn bounding_box(
   id: String,
-  min: Vec3,
-  max: Vec3,
+  min: Vec3(Float),
+  max: Vec3(Float),
   color: Int,
 ) -> scene.SceneNode {
   scene.DebugBox(id, min, max, color)
@@ -15,29 +16,34 @@ pub fn bounding_box(
 
 pub fn sphere(
   id: String,
-  center: Vec3,
+  center: Vec3(Float),
   radius: Float,
   color: Int,
 ) -> scene.SceneNode {
   scene.DebugSphere(id, center, radius, color)
 }
 
-pub fn line(id: String, from: Vec3, to: Vec3, color: Int) -> scene.SceneNode {
+pub fn line(
+  id: String,
+  from: Vec3(Float),
+  to: Vec3(Float),
+  color: Int,
+) -> scene.SceneNode {
   scene.DebugLine(id, from, to, color)
 }
 
 pub fn ray(
   id: String,
-  origin: Vec3,
-  direction: Vec3,
+  origin: Vec3(Float),
+  direction: Vec3(Float),
   length: Float,
   color: Int,
 ) -> scene.SceneNode {
-  let end = vec3.add(origin, vec3.scale(direction, length))
+  let end = vec3f.add(origin, vec3f.scale(direction, length))
   scene.DebugLine(id, origin, end, color)
 }
 
-pub fn axes(id: String, origin: Vec3, size: Float) -> scene.SceneNode {
+pub fn axes(id: String, origin: Vec3(Float), size: Float) -> scene.SceneNode {
   scene.DebugAxes(id, origin, size)
 }
 
@@ -52,7 +58,7 @@ pub fn grid(
 
 pub fn point(
   id: String,
-  position: Vec3,
+  position: Vec3(Float),
   size: Float,
   color: Int,
 ) -> scene.SceneNode {
@@ -88,7 +94,7 @@ pub fn box_from_transform(
 /// Create multiple lines forming a path through points
 pub fn path(
   id_prefix: String,
-  points: List(Vec3),
+  points: List(Vec3(Float)),
   color: Int,
 ) -> List(scene.SceneNode) {
   create_path_lines(id_prefix, points, color, 0, [])
@@ -96,7 +102,7 @@ pub fn path(
 
 fn create_path_lines(
   prefix: String,
-  points: List(Vec3),
+  points: List(Vec3(Float)),
   color: Int,
   index: Int,
   acc: List(scene.SceneNode),
@@ -116,7 +122,7 @@ fn create_path_lines(
 
 pub fn cross(
   id: String,
-  position: Vec3,
+  position: Vec3(Float),
   size: Float,
   color: Int,
 ) -> List(scene.SceneNode) {

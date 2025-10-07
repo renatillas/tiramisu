@@ -9,7 +9,7 @@ import gleam/dict.{type Dict}
 import gleam/list
 import gleam/option.{type Option}
 import tiramisu/transform.{type Transform}
-import tiramisu/vec3.{type Vec3}
+import vec/vec3.{type Vec3}
 
 // --- Opaque Types ---
 
@@ -78,7 +78,7 @@ pub type RigidBody {
 pub type WorldConfig {
   WorldConfig(
     /// Gravity vector (typically Vec3(0.0, -9.81, 0.0))
-    gravity: Vec3,
+    gravity: Vec3(Float),
   )
 }
 
@@ -246,22 +246,22 @@ pub fn update_body(
 // --- Forces and Impulses ---
 
 /// Apply a force to a rigid body (use in update function)
-pub fn apply_force(id: String, force: Vec3) -> Nil {
+pub fn apply_force(id: String, force: Vec3(Float)) -> Nil {
   apply_force_ffi(id, force)
 }
 
 /// Apply an impulse to a rigid body (use in update function)
-pub fn apply_impulse(id: String, impulse: Vec3) -> Nil {
+pub fn apply_impulse(id: String, impulse: Vec3(Float)) -> Nil {
   apply_impulse_ffi(id, impulse)
 }
 
 /// Set the velocity of a rigid body (use in update function)
-pub fn set_velocity(id: String, velocity: Vec3) -> Nil {
+pub fn set_velocity(id: String, velocity: Vec3(Float)) -> Nil {
   set_velocity_ffi(id, velocity)
 }
 
 /// Get the velocity of a rigid body
-pub fn get_velocity(id: String) -> Option(Vec3) {
+pub fn get_velocity(id: String) -> Option(Vec3(Float)) {
   get_velocity_ffi(id)
 }
 
@@ -287,16 +287,16 @@ fn remove_rigid_body_ffi(id: String) -> Nil
 fn get_body_transform_ffi(id: String) -> Option(Transform)
 
 @external(javascript, "./ffi/physics.mjs", "applyForce")
-fn apply_force_ffi(id: String, force: Vec3) -> Nil
+fn apply_force_ffi(id: String, force: Vec3(Float)) -> Nil
 
 @external(javascript, "./ffi/physics.mjs", "applyImpulse")
-fn apply_impulse_ffi(id: String, impulse: Vec3) -> Nil
+fn apply_impulse_ffi(id: String, impulse: Vec3(Float)) -> Nil
 
 @external(javascript, "./ffi/physics.mjs", "setVelocity")
-fn set_velocity_ffi(id: String, velocity: Vec3) -> Nil
+fn set_velocity_ffi(id: String, velocity: Vec3(Float)) -> Nil
 
 @external(javascript, "./ffi/physics.mjs", "getVelocity")
-fn get_velocity_ffi(id: String) -> Option(Vec3)
+fn get_velocity_ffi(id: String) -> Option(Vec3(Float))
 
 @external(javascript, "./ffi/physics.mjs", "getAllBodyIds")
 fn get_all_body_ids_ffi() -> List(String)

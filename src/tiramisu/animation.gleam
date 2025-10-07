@@ -1,7 +1,7 @@
 import gleam/float
 import gleam_community/maths
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 /// Easing functions for smooth animations
 pub type Easing {
@@ -125,17 +125,21 @@ pub fn tween_float(
   tween(start, end, duration, easing, fn(a, b, t) { a +. { b -. a } *. t })
 }
 
-/// Tween a Vec3 value
 pub fn tween_vec3(
-  start: vec3.Vec3,
-  end: vec3.Vec3,
+  start: vec3.Vec3(Float),
+  end: vec3.Vec3(Float),
   duration: Float,
   easing: Easing,
-) -> Tween(vec3.Vec3) {
-  tween(start, end, duration, easing, vec3.lerp)
+) -> Tween(vec3.Vec3(Float)) {
+  tween(start, end, duration, easing, fn(a, b, t) {
+    vec3.Vec3(
+      a.x +. { b.x -. a.x } *. t,
+      a.y +. { b.y -. a.y } *. t,
+      a.z +. { b.z -. a.z } *. t,
+    )
+  })
 }
 
-/// Tween a Transform
 pub fn tween_transform(
   start: transform.Transform,
   end: transform.Transform,

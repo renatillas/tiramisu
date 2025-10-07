@@ -1,9 +1,5 @@
-/// Audio System
-///
-/// Provides audio playback with support for both 2D (global) and 3D (positional) audio.
-/// Uses the Web Audio API via THREE.js Audio classes.
 import gleam/option.{type Option}
-import tiramisu/vec3.{type Vec3}
+import vec/vec3
 
 // --- Public Types ---
 
@@ -163,7 +159,7 @@ pub type AudioNode {
     id: String,
     config: AudioConfig,
     audio_type: AudioType,
-    position: Option(Vec3),
+    position: Option(vec3.Vec3(Float)),
   )
 }
 
@@ -181,7 +177,7 @@ pub fn global_audio(id: String, config: AudioConfig) -> AudioNode {
 pub fn positional_audio(
   id: String,
   config: AudioConfig,
-  position: Vec3,
+  position: vec3.Vec3(Float),
 ) -> AudioNode {
   AudioNode(
     id: id,
@@ -195,7 +191,7 @@ pub fn positional_audio(
 pub fn positional_audio_custom(
   id: String,
   config: AudioConfig,
-  position: Vec3,
+  position: vec3.Vec3(Float),
   audio_type: AudioType,
 ) -> AudioNode {
   AudioNode(

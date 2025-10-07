@@ -2,7 +2,7 @@ import gleam/list
 import gleam/option
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // Test: Parent group is added before children in patches
 pub fn parent_before_children_test() {

@@ -1,11 +1,12 @@
 import gleam/bool
 import gleam/int
-import tiramisu/vec3
+import vec/vec3
+import vec/vec3f
 
 pub opaque type Camera {
   Camera(
-    position: vec3.Vec3,
-    look_at_target: vec3.Vec3,
+    position: vec3.Vec3(Float),
+    look_at_target: vec3.Vec3(Float),
     projection: CameraProjection,
   )
 }
@@ -46,8 +47,8 @@ pub fn perspective(
   use <- bool.guard(near >=. far, Error(NearFarConflict(near, far)))
 
   Ok(Camera(
-    position: vec3.zero(),
-    look_at_target: vec3.zero(),
+    position: vec3f.zero,
+    look_at_target: vec3f.zero,
     projection: Perspective(fov: fov, aspect: aspect, near: near, far: far),
   ))
 }
@@ -61,8 +62,8 @@ pub fn orthographic(
   far far: Float,
 ) -> Camera {
   Camera(
-    position: vec3.zero(),
-    look_at_target: vec3.zero(),
+    position: vec3f.zero,
+    look_at_target: vec3f.zero,
     projection: Orthographic(
       left: left,
       right: right,
@@ -128,10 +129,13 @@ pub fn camera_2d_with_bounds(
   |> set_position(vec3.Vec3(0.0, 0.0, distance))
 }
 
-pub fn set_position(camera: Camera, position position: vec3.Vec3) -> Camera {
+pub fn set_position(
+  camera: Camera,
+  position position: vec3.Vec3(Float),
+) -> Camera {
   Camera(..camera, position:)
 }
 
-pub fn look(camera: Camera, at look_at_target: vec3.Vec3) -> Camera {
+pub fn look(camera: Camera, at look_at_target: vec3.Vec3(Float)) -> Camera {
   Camera(..camera, look_at_target:)
 }

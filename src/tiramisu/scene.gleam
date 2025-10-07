@@ -9,7 +9,7 @@ import tiramisu/camera
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
 import tiramisu/transform
-import tiramisu/vec3.{type Vec3}
+import vec/vec3.{type Vec3}
 
 /// Opaque type for Three.js textures
 pub type Texture
@@ -154,12 +154,12 @@ pub type SceneNode {
     audio_type: AudioType,
   )
   // Debug visualization nodes
-  DebugBox(id: String, min: Vec3, max: Vec3, color: Int)
-  DebugSphere(id: String, center: Vec3, radius: Float, color: Int)
-  DebugLine(id: String, from: Vec3, to: Vec3, color: Int)
-  DebugAxes(id: String, origin: Vec3, size: Float)
+  DebugBox(id: String, min: Vec3(Float), max: Vec3(Float), color: Int)
+  DebugSphere(id: String, center: Vec3(Float), radius: Float, color: Int)
+  DebugLine(id: String, from: Vec3(Float), to: Vec3(Float), color: Int)
+  DebugAxes(id: String, origin: Vec3(Float), size: Float)
   DebugGrid(id: String, size: Float, divisions: Int, color: Int)
-  DebugPoint(id: String, position: Vec3, size: Float, color: Int)
+  DebugPoint(id: String, position: Vec3(Float), size: Float, color: Int)
 }
 
 // --- Validated Geometry Constructors ---
