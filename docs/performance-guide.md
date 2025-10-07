@@ -118,7 +118,7 @@ scene.InstancedMesh(
 ```gleam
 scene.LOD(
   id: "tree",
-  transform: transform.identity(),
+  transform: transform.identity,
   levels: [
     // High detail (0-10 units from camera)
     spatial.lod_level(distance: 0.0, node: high_poly_tree),

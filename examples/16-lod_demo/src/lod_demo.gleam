@@ -3,21 +3,17 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
+import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
-  Model(
-    camera_position: vec3.Vec3,
-    camera_target: vec3.Vec3,
-    show_performance: Bool,
-  )
+  Model(camera_position: vec3.Vec3(Float), show_performance: Bool)
 }
 
 pub type Msg {
@@ -25,18 +21,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  game.run(
+  tiramisu.run(
     width: 1280,
     height: 720,
     background: 0x0a0a1a,
-    camera: option.None,
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
   io.println("=== Level of Detail (LOD) Demo ===")
   io.println("")
   io.println("LOD automatically switches mesh detail based on distance:")
@@ -54,11 +49,7 @@ fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
   io.println("")
 
   #(
-    Model(
-      camera_position: vec3.Vec3(0.0, 20.0, 30.0),
-      camera_target: vec3.Vec3(0.0, 0.0, 0.0),
-      show_performance: True,
-    ),
+    Model(camera_position: vec3.Vec3(0.0, 20.0, 30.0), show_performance: True),
     effect.tick(Tick),
   )
 }
@@ -66,7 +57,7 @@ fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
 fn update(
   model: Model,
   msg: Msg,
-  ctx: GameContext,
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg)) {
   case msg {
     Tick -> {
@@ -126,7 +117,6 @@ fn update(
       #(
         Model(
           camera_position: new_camera_position,
-          camera_target: model.camera_target,
           show_performance: show_performance,
         ),
         effect.tick(Tick),
@@ -145,16 +135,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 500.0,
     )
 
-  let cam =
+  let camera =
     cam
     |> camera.set_position(model.camera_position)
-    |> camera.look(at: model.camera_target)
+    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
 
   let camera_node =
     scene.Camera(
       id: "main_camera",
-      camera_type: cam,
-      transform: transform.identity(),
+      camera:,
+      transform: transform.identity,
       active: True,
       viewport: option.None,
     )
@@ -163,7 +153,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -196,7 +186,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             map: option.None,
             normal_map: option.None,
           ),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         )
 
@@ -212,7 +202,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             map: option.None,
             normal_map: option.None,
           ),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         )
 
@@ -228,7 +218,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             map: option.None,
             normal_map: option.None,
           ),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         )
 
@@ -243,7 +233,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             opacity: 1.0,
             map: option.None,
           ),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         )
 

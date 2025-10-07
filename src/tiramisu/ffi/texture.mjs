@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as GLEAM from '../../gleam.mjs';
-import * as ASSETS_GLEAM from '../assets.mjs';
+import * as ASSETS_GLEAM from '../asset.mjs';
 
 // Promise-based texture loading
 export function loadTextureAsync(url) {

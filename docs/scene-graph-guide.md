@@ -165,7 +165,7 @@ scene.ToonMaterial(
 scene.Light(
   id: "ambient",
   light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
-  transform: transform.identity(),
+  transform: transform.identity,
 )
 ```
 
@@ -227,7 +227,7 @@ scene.Light(
     ground_color: 0x553311,
     intensity: 0.6,
   ),
-  transform: transform.identity(),
+  transform: transform.identity,
 )
 ```
 
@@ -251,7 +251,7 @@ let cam = cam
 scene.Camera(
   id: "main",
   camera: cam,
-  transform: transform.identity(),
+  transform: transform.identity,
   active: True,  // This camera is used for rendering
   viewport: option.None,
 )
@@ -271,7 +271,7 @@ let assert Ok(cam) = camera.orthographic(
 scene.Camera(
   id: "2d_cam",
   camera: cam,
-  transform: transform.identity(),
+  transform: transform.identity,
   active: True,
   viewport: option.None,
 )
@@ -284,7 +284,7 @@ scene.Camera(
   scene.Camera(
     id: "main",
     camera: main_cam,
-    transform: transform.identity(),
+    transform: transform.identity,
     active: True,
     viewport: option.None,
   ),
@@ -313,7 +313,7 @@ scene.Group(
       id: "player_body",
       geometry: scene.BoxGeometry(1.0, 2.0, 1.0),
       material: scene.StandardMaterial(...),
-      transform: transform.identity(),  // Relative to parent
+      transform: transform.identity,  // Relative to parent
       physics: option.None,
     ),
     // Weapon (attached to player)
@@ -358,7 +358,7 @@ Every node has a transform (position, rotation, scale):
 import tiramisu/transform
 
 // Identity (default: origin, no rotation, scale 1)
-transform.identity()
+transform.identity
 
 // Position only
 transform.at(position: vec3.Vec3(10.0, 0.0, 5.0))
@@ -433,7 +433,7 @@ scene.LOD(
         id: "building_high",
         geometry: complex_geometry,  // 10,000 triangles
         material: detailed_material,
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ),
@@ -444,7 +444,7 @@ scene.LOD(
         id: "building_medium",
         geometry: medium_geometry,  // 2,000 triangles
         material: simple_material,
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ),
@@ -455,7 +455,7 @@ scene.LOD(
         id: "building_low",
         geometry: low_geometry,  // 500 triangles
         material: simple_material,
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ),
@@ -471,7 +471,7 @@ scene.LOD(
           opacity: 0.8,
           map: option.Some(building_texture),
         ),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ),
@@ -546,7 +546,7 @@ let static_mesh = scene.Mesh(
   id: "wall",
   geometry: scene.BoxGeometry(10.0, 5.0, 1.0),
   material: scene.StandardMaterial(color: 0x808080, ...),
-  transform: transform.identity(),
+  transform: transform.identity,
   physics: option.None,
 )
 

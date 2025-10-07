@@ -55,7 +55,7 @@
   - `assets.dispose_texture()` - Dispose textures and free GPU memory
   - `assets.dispose_geometry()` - Dispose geometries and free GPU memory
   - `assets.dispose_object3d()` - Recursively dispose Object3D with all children/materials
-  - FFI functions in `/src/tiramisu/ffi/assets.mjs`
+  - FFI functions in `/src/tiramisu/ffi/asset.mjs`
 - [x] **Asset cache size limits and eviction strategies** ✅
   - LRU (Least Recently Used) cache eviction policy
   - Default max size: 100 assets (configurable with `new_cache_with_size()`)

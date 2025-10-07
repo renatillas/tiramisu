@@ -17,7 +17,7 @@ pub fn update_standard_material_test() {
         option.None,
         option.None,
       ),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -32,7 +32,7 @@ pub fn update_standard_material_test() {
         option.None,
         option.None,
       ),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -56,7 +56,7 @@ pub fn change_material_type_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -71,7 +71,7 @@ pub fn change_material_type_test() {
         option.None,
         option.None,
       ),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -95,7 +95,7 @@ pub fn phong_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.PhongMaterial(0xff0000, 30.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -104,7 +104,7 @@ pub fn phong_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.PhongMaterial(0xff0000, 60.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -128,7 +128,7 @@ pub fn lambert_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.LambertMaterial(0xff0000, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -137,7 +137,7 @@ pub fn lambert_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.LambertMaterial(0x00ff00, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -153,7 +153,7 @@ pub fn toon_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.ToonMaterial(0xff0000, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -162,7 +162,7 @@ pub fn toon_material_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.ToonMaterial(0x00ff00, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -178,7 +178,7 @@ pub fn cone_geometry_test() {
       id: "mesh1",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -187,7 +187,7 @@ pub fn cone_geometry_test() {
       id: "mesh1",
       geometry: scene.ConeGeometry(1.0, 2.0, 32),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -209,7 +209,7 @@ pub fn plane_geometry_test() {
       id: "plane",
       geometry: scene.PlaneGeometry(10.0, 10.0),
       material: scene.BasicMaterial(0x808080, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -235,7 +235,7 @@ pub fn circle_geometry_test() {
       id: "circle",
       geometry: scene.CircleGeometry(1.5, 64),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -252,7 +252,7 @@ pub fn cylinder_geometry_test() {
       id: "cylinder",
       geometry: scene.CylinderGeometry(1.0, 1.0, 2.0, 32),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -269,7 +269,7 @@ pub fn torus_geometry_test() {
       id: "torus",
       geometry: scene.TorusGeometry(1.0, 0.3, 16, 100),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -286,7 +286,7 @@ pub fn tetrahedron_geometry_test() {
       id: "tetra",
       geometry: scene.TetrahedronGeometry(1.0, 0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -303,7 +303,7 @@ pub fn icosahedron_geometry_test() {
       id: "ico",
       geometry: scene.IcosahedronGeometry(1.0, 0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]
@@ -319,7 +319,7 @@ pub fn directional_light_test() {
     scene.Light(
       id: "dir_light",
       light_type: scene.DirectionalLight(0xffffff, 1.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -333,14 +333,14 @@ pub fn point_light_test() {
     scene.Light(
       id: "light1",
       light_type: scene.PointLight(0xffffff, 1.0, 10.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
   ]
   let current = [
     scene.Light(
       id: "light1",
       light_type: scene.PointLight(0xffffff, 2.0, 20.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -361,7 +361,7 @@ pub fn spot_light_test() {
     scene.Light(
       id: "spot",
       light_type: scene.SpotLight(0xffffff, 1.0, 10.0, 0.5, 0.1),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -376,7 +376,7 @@ pub fn hemisphere_light_test() {
     scene.Light(
       id: "hemi",
       light_type: scene.HemisphereLight(0x0000ff, 0x00ff00, 1.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
   ]
   let patches = scene.diff(previous, current)
@@ -398,7 +398,7 @@ pub fn complex_scene_test() {
         option.None,
         option.None,
       ),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
     scene.Mesh(
@@ -418,7 +418,7 @@ pub fn complex_scene_test() {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(0x404040, 0.5),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "point",

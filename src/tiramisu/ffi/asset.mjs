@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import * as GLEAM from '../../../gleam_stdlib/gleam.mjs';
 import * as DICT from '../../../gleam_stdlib/gleam/dict.mjs';
-import * as ASSETS_GLEAM from '../assets.mjs';
+import * as ASSETS_GLEAM from '../asset.mjs';
 import * as GLTF from './gltf.mjs';
 import * as TEXTURE from './texture.mjs';
 import * as STL from './stl.mjs';

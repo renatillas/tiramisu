@@ -7,12 +7,12 @@ import tiramisu/transform
 pub fn nested_group_parent_test() {
   let previous = []
   let current = [
-    scene.Group(id: "parent_group", transform: transform.identity(), children: [
+    scene.Group(id: "parent_group", transform: transform.identity, children: [
       scene.Mesh(
         id: "child_mesh",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -42,13 +42,13 @@ pub fn nested_group_parent_test() {
 pub fn deeply_nested_groups_test() {
   let previous = []
   let current = [
-    scene.Group(id: "root", transform: transform.identity(), children: [
-      scene.Group(id: "level1", transform: transform.identity(), children: [
+    scene.Group(id: "root", transform: transform.identity, children: [
+      scene.Group(id: "level1", transform: transform.identity, children: [
         scene.Mesh(
           id: "leaf",
           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         ),
       ]),
@@ -92,19 +92,19 @@ pub fn deeply_nested_groups_test() {
 pub fn multiple_children_test() {
   let previous = []
   let current = [
-    scene.Group(id: "container", transform: transform.identity(), children: [
+    scene.Group(id: "container", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
         geometry: scene.SphereGeometry(1.0, 32, 32),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -143,7 +143,7 @@ pub fn root_level_no_parent_test() {
       id: "root_mesh",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
   ]

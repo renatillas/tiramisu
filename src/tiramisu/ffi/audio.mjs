@@ -3,7 +3,7 @@
 /// Handles audio source control (play, pause, stop, volume, etc.)
 /// Uses THREE.Audio and THREE.PositionalAudio
 import * as THREE from 'three';
-import { getAudioListener } from './assets.mjs';
+import { getAudioListener } from './asset.mjs';
 
 // Global registry of audio sources by ID
 const audioSources = new Map();

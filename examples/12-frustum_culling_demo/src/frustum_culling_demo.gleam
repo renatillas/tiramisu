@@ -1,31 +1,18 @@
-/// Frustum Culling Demo
-///
-/// Demonstrates automatic frustum culling in Three.js - only rendering visible objects.
-///
-/// This demo creates a large grid of 1000 cubes spread across 100x100 units.
-/// Only cubes within the camera's view frustum are actually rendered, saving performance.
-///
-/// Controls:
-/// - WASD: Move camera forward/back/left/right
-/// - Arrow Keys: Look around
-/// - P: Toggle performance stats
-/// - F: Toggle showing all cubes (orange) vs only frustum-visible (green)
-///
-/// Watch the draw calls and triangle count change as you look around!
 import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
+import gleam/result
 import gleam_community/maths
+import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(show_performance: Bool, time: Float)
@@ -36,31 +23,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 10.0, 50.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1280,
     height: 720,
     background: 0x000510,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   io.println("=== Frustum Culling Demo ===")
   io.println("")
   io.println("This demo shows automatic frustum culling:")
@@ -75,7 +48,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(Model(show_performance: True, time: 0.0), effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       // Toggle performance stats
@@ -125,11 +102,31 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1280.0 /. 720.0,
+      near: 0.1,
+      far: 200.0,
+    )
+    |> result.map(fn(cam) {
+      cam
+      |> camera.set_position(vec3.Vec3(0.0, 20.0, 80.0))
+      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+      |> scene.Camera(
+        id: "main-camera",
+        camera: _,
+        transform: transform.identity,
+        active: True,
+        viewport: option.None,
+      )
+      |> list.wrap
+    })
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -206,6 +203,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       ),
       physics: option.None,
     )
+    |> list.wrap
 
-  list.flatten([lights, cubes, [ground]])
+  list.flatten([camera, lights, cubes, ground])
 }

@@ -1,6 +1,6 @@
 import gleam/list
 import gleam/option
-import tiramisu/assets
+import tiramisu/asset
 import tiramisu/audio
 import tiramisu/scene
 
@@ -8,61 +8,61 @@ import tiramisu/scene
 
 // Test: Create new cache
 pub fn new_cache_test() {
-  let cache = assets.new_cache()
-  assert assets.cache_size(cache) == 0
+  let cache = asset.new_cache()
+  assert asset.cache_size(cache) == 0
 }
 
 // Test: Cache size after operations
 pub fn cache_size_test() {
-  let cache = assets.new_cache()
-  assert assets.cache_size(cache) == 0
+  let cache = asset.new_cache()
+  assert asset.cache_size(cache) == 0
 
-  // Can't actually load assets in tests (FFI), so we'll test insert
+  // Can't actually load asset in tests (FFI), so we'll test insert
   let texture = unsafe_mock_texture()
-  let loaded_asset = assets.loaded_texture(texture)
-  let cache = assets.insert_asset(cache, "test.png", loaded_asset)
+  let loaded_asset = asset.loaded_texture(texture)
+  let cache = asset.insert_asset(cache, "test.png", loaded_asset)
 
-  assert assets.cache_size(cache) == 1
+  assert asset.cache_size(cache) == 1
 }
 
 // Test: Check if asset is cached
 pub fn is_cached_test() {
-  let cache = assets.new_cache()
-  assert !assets.is_cached(cache, "test.png")
+  let cache = asset.new_cache()
+  assert !asset.is_cached(cache, "test.png")
 
   let texture = unsafe_mock_texture()
-  let loaded_asset = assets.loaded_texture(texture)
-  let cache = assets.insert_asset(cache, "test.png", loaded_asset)
+  let loaded_asset = asset.loaded_texture(texture)
+  let cache = asset.insert_asset(cache, "test.png", loaded_asset)
 
-  assert assets.is_cached(cache, "test.png")
+  assert asset.is_cached(cache, "test.png")
 }
 
 // Test: Check non-existent asset
 pub fn is_cached_not_found_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
-  let loaded_asset = assets.loaded_texture(texture)
-  let cache = assets.insert_asset(cache, "exists.png", loaded_asset)
+  let loaded_asset = asset.loaded_texture(texture)
+  let cache = asset.insert_asset(cache, "exists.png", loaded_asset)
 
-  assert !assets.is_cached(cache, "missing.png")
+  assert !asset.is_cached(cache, "missing.png")
 }
 
 // Test: Clear cache
 pub fn clear_cache_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
-  let loaded_asset = assets.loaded_texture(texture)
-  let cache = assets.insert_asset(cache, "test.png", loaded_asset)
+  let loaded_asset = asset.loaded_texture(texture)
+  let cache = asset.insert_asset(cache, "test.png", loaded_asset)
 
-  assert assets.cache_size(cache) == 1
+  assert asset.cache_size(cache) == 1
 
-  let cache = assets.clear_cache(cache)
-  assert assets.cache_size(cache) == 0
+  let cache = asset.clear_cache(cache)
+  assert asset.cache_size(cache) == 0
 }
 
-// Test: Insert multiple assets
-pub fn insert_multiple_assets_test() {
-  let cache = assets.new_cache()
+// Test: Insert multiple asset
+pub fn insert_multiple_asset_test() {
+  let cache = asset.new_cache()
 
   let texture1 = unsafe_mock_texture()
   let texture2 = unsafe_mock_texture()
@@ -70,26 +70,26 @@ pub fn insert_multiple_assets_test() {
 
   let cache =
     cache
-    |> assets.insert_asset("texture1.png", assets.loaded_texture(texture1))
-    |> assets.insert_asset("texture2.png", assets.loaded_texture(texture2))
-    |> assets.insert_asset("audio.mp3", assets.loaded_audio(audio))
+    |> asset.insert_asset("texture1.png", asset.loaded_texture(texture1))
+    |> asset.insert_asset("texture2.png", asset.loaded_texture(texture2))
+    |> asset.insert_asset("audio.mp3", asset.loaded_audio(audio))
 
-  assert assets.cache_size(cache) == 3
-  assert assets.is_cached(cache, "texture1.png")
-  assert assets.is_cached(cache, "texture2.png")
-  assert assets.is_cached(cache, "audio.mp3")
+  assert asset.cache_size(cache) == 3
+  assert asset.is_cached(cache, "texture1.png")
+  assert asset.is_cached(cache, "texture2.png")
+  assert asset.is_cached(cache, "audio.mp3")
 }
 
 // --- Asset Retrieval Tests ---
 
 // Test: Get texture from cache (success)
 pub fn get_texture_success_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
   let cache =
-    assets.insert_asset(cache, "test.png", assets.loaded_texture(texture))
+    asset.insert_asset(cache, "test.png", asset.loaded_texture(texture))
 
-  let result = assets.get_texture(cache, "test.png")
+  let result = asset.get_texture(cache, "test.png")
   assert case result {
     Ok(_) -> True
     Error(_) -> False
@@ -98,39 +98,37 @@ pub fn get_texture_success_test() {
 
 // Test: Get texture not found
 pub fn get_texture_not_found_test() {
-  let cache = assets.new_cache()
-  let result = assets.get_texture(cache, "missing.png")
+  let cache = asset.new_cache()
+  let result = asset.get_texture(cache, "missing.png")
 
   assert case result {
-    Error(assets.AssetNotFound("missing.png")) -> True
+    Error(asset.AssetNotFound("missing.png")) -> True
     _ -> False
   }
 }
 
 // Test: Get texture with wrong type
 pub fn get_texture_wrong_type_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let audio = unsafe_mock_audio()
-  let cache =
-    assets.insert_asset(cache, "audio.mp3", assets.loaded_audio(audio))
+  let cache = asset.insert_asset(cache, "audio.mp3", asset.loaded_audio(audio))
 
   // Try to get as texture (wrong type)
-  let result = assets.get_texture(cache, "audio.mp3")
+  let result = asset.get_texture(cache, "audio.mp3")
 
   assert case result {
-    Error(assets.InvalidAssetType("audio.mp3")) -> True
+    Error(asset.InvalidAssetType("audio.mp3")) -> True
     _ -> False
   }
 }
 
 // Test: Get audio from cache (success)
 pub fn get_audio_success_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let audio = unsafe_mock_audio()
-  let cache =
-    assets.insert_asset(cache, "sound.mp3", assets.loaded_audio(audio))
+  let cache = asset.insert_asset(cache, "sound.mp3", asset.loaded_audio(audio))
 
-  let result = assets.get_audio(cache, "sound.mp3")
+  let result = asset.get_audio(cache, "sound.mp3")
   assert case result {
     Ok(_) -> True
     Error(_) -> False
@@ -139,39 +137,38 @@ pub fn get_audio_success_test() {
 
 // Test: Get audio not found
 pub fn get_audio_not_found_test() {
-  let cache = assets.new_cache()
-  let result = assets.get_audio(cache, "missing.mp3")
+  let cache = asset.new_cache()
+  let result = asset.get_audio(cache, "missing.mp3")
 
   assert case result {
-    Error(assets.AssetNotFound("missing.mp3")) -> True
+    Error(asset.AssetNotFound("missing.mp3")) -> True
     _ -> False
   }
 }
 
 // Test: Get audio with wrong type
 pub fn get_audio_wrong_type_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
   let cache =
-    assets.insert_asset(cache, "image.png", assets.loaded_texture(texture))
+    asset.insert_asset(cache, "image.png", asset.loaded_texture(texture))
 
   // Try to get as audio (wrong type)
-  let result = assets.get_audio(cache, "image.png")
+  let result = asset.get_audio(cache, "image.png")
 
   assert case result {
-    Error(assets.InvalidAssetType("image.png")) -> True
+    Error(asset.InvalidAssetType("image.png")) -> True
     _ -> False
   }
 }
 
 // Test: Get STL from cache (success)
 pub fn get_stl_success_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let geometry = unsafe_mock_geometry()
-  let cache =
-    assets.insert_asset(cache, "model.stl", assets.loaded_stl(geometry))
+  let cache = asset.insert_asset(cache, "model.stl", asset.loaded_stl(geometry))
 
-  let result = assets.get_stl(cache, "model.stl")
+  let result = asset.get_stl(cache, "model.stl")
   assert case result {
     Ok(_) -> True
     Error(_) -> False
@@ -180,39 +177,38 @@ pub fn get_stl_success_test() {
 
 // Test: Get STL not found
 pub fn get_stl_not_found_test() {
-  let cache = assets.new_cache()
-  let result = assets.get_stl(cache, "missing.stl")
+  let cache = asset.new_cache()
+  let result = asset.get_stl(cache, "missing.stl")
 
   assert case result {
-    Error(assets.AssetNotFound("missing.stl")) -> True
+    Error(asset.AssetNotFound("missing.stl")) -> True
     _ -> False
   }
 }
 
 // Test: Get STL with wrong type
 pub fn get_stl_wrong_type_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let audio = unsafe_mock_audio()
-  let cache =
-    assets.insert_asset(cache, "sound.mp3", assets.loaded_audio(audio))
+  let cache = asset.insert_asset(cache, "sound.mp3", asset.loaded_audio(audio))
 
   // Try to get as STL (wrong type)
-  let result = assets.get_stl(cache, "sound.mp3")
+  let result = asset.get_stl(cache, "sound.mp3")
 
   assert case result {
-    Error(assets.InvalidAssetType("sound.mp3")) -> True
+    Error(asset.InvalidAssetType("sound.mp3")) -> True
     _ -> False
   }
 }
 
 // Test: Try get (returns Option)
 pub fn try_get_some_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
   let cache =
-    assets.insert_asset(cache, "test.png", assets.loaded_texture(texture))
+    asset.insert_asset(cache, "test.png", asset.loaded_texture(texture))
 
-  let result = assets.try_get(cache, "test.png")
+  let result = asset.try_get(cache, "test.png")
   assert case result {
     option.Some(_) -> True
     option.None -> False
@@ -221,8 +217,8 @@ pub fn try_get_some_test() {
 
 // Test: Try get None
 pub fn try_get_none_test() {
-  let cache = assets.new_cache()
-  let result = assets.try_get(cache, "missing.png")
+  let cache = asset.new_cache()
+  let result = asset.try_get(cache, "missing.png")
 
   assert case result {
     option.None -> True
@@ -232,24 +228,24 @@ pub fn try_get_none_test() {
 
 // Test: Get cached URLs (empty)
 pub fn cached_urls_empty_test() {
-  let cache = assets.new_cache()
-  let urls = assets.cached_urls(cache)
+  let cache = asset.new_cache()
+  let urls = asset.cached_urls(cache)
 
   assert urls == []
 }
 
 // Test: Get cached URLs (multiple)
 pub fn cached_urls_multiple_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture = unsafe_mock_texture()
   let audio = unsafe_mock_audio()
 
   let cache =
     cache
-    |> assets.insert_asset("texture.png", assets.loaded_texture(texture))
-    |> assets.insert_asset("sound.mp3", assets.loaded_audio(audio))
+    |> asset.insert_asset("texture.png", asset.loaded_texture(texture))
+    |> asset.insert_asset("sound.mp3", asset.loaded_audio(audio))
 
-  let urls = assets.cached_urls(cache)
+  let urls = asset.cached_urls(cache)
 
   assert list.length(urls) == 2
   assert list.contains(urls, "texture.png")
@@ -258,68 +254,68 @@ pub fn cached_urls_multiple_test() {
 
 // Test: Asset types are distinct
 pub fn asset_types_distinct_test() {
-  let model_asset = assets.ModelAsset("model.glb")
-  let texture_asset = assets.TextureAsset("texture.png")
-  let audio_asset = assets.AudioAsset("audio.mp3")
-  let stl_asset = assets.STLAsset("model.stl")
+  let model_asset = asset.ModelAsset("model.glb")
+  let texture_asset = asset.TextureAsset("texture.png")
+  let audio_asset = asset.AudioAsset("audio.mp3")
+  let stl_asset = asset.STLAsset("model.stl")
 
   // These are different types
   assert case model_asset {
-    assets.ModelAsset(_) -> True
+    asset.ModelAsset(_) -> True
   }
 
   assert case texture_asset {
-    assets.TextureAsset(_) -> True
+    asset.TextureAsset(_) -> True
   }
 
   assert case audio_asset {
-    assets.AudioAsset(_) -> True
+    asset.AudioAsset(_) -> True
   }
 
   assert case stl_asset {
-    assets.STLAsset(_) -> True
+    asset.STLAsset(_) -> True
   }
 }
 
 // Test: Error types
 pub fn error_types_test() {
-  let load_error = assets.AssetLoadError("file.png", "Network error")
-  let not_found_error = assets.AssetNotFound("missing.png")
-  let invalid_type_error = assets.InvalidAssetType("wrong.png")
+  let load_error = asset.AssetLoadError("file.png", "Network error")
+  let not_found_error = asset.AssetNotFound("missing.png")
+  let invalid_type_error = asset.InvalidAssetType("wrong.png")
 
   assert case load_error {
-    assets.AssetLoadError(url, reason) ->
+    asset.AssetLoadError(url, reason) ->
       url == "file.png" && reason == "Network error"
   }
 
   assert case not_found_error {
-    assets.AssetNotFound(url) -> url == "missing.png"
+    asset.AssetNotFound(url) -> url == "missing.png"
   }
 
   assert case invalid_type_error {
-    assets.InvalidAssetType(url) -> url == "wrong.png"
+    asset.InvalidAssetType(url) -> url == "wrong.png"
   }
 }
 
 // Test: Overwriting cached asset
 pub fn overwrite_cached_asset_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let texture1 = unsafe_mock_texture()
   let texture2 = unsafe_mock_texture()
 
   // Insert first texture
   let cache =
-    assets.insert_asset(cache, "texture.png", assets.loaded_texture(texture1))
-  assert assets.cache_size(cache) == 1
+    asset.insert_asset(cache, "texture.png", asset.loaded_texture(texture1))
+  assert asset.cache_size(cache) == 1
 
   // Overwrite with second texture
   let cache =
-    assets.insert_asset(cache, "texture.png", assets.loaded_texture(texture2))
-  assert assets.cache_size(cache) == 1
+    asset.insert_asset(cache, "texture.png", asset.loaded_texture(texture2))
+  assert asset.cache_size(cache) == 1
   // Still only one entry
 
   // Should be able to retrieve it
-  let result = assets.get_texture(cache, "texture.png")
+  let result = asset.get_texture(cache, "texture.png")
   assert case result {
     Ok(_) -> True
     Error(_) -> False
@@ -328,27 +324,27 @@ pub fn overwrite_cached_asset_test() {
 
 // Test: BatchLoadResult structure
 pub fn batch_load_result_test() {
-  let cache = assets.new_cache()
+  let cache = asset.new_cache()
   let errors = [
-    assets.AssetLoadError("file1.png", "Network error"),
-    assets.AssetNotFound("file2.png"),
+    asset.AssetLoadError("file1.png", "Network error"),
+    asset.AssetNotFound("file2.png"),
   ]
 
-  let result = assets.BatchLoadResult(cache: cache, errors: errors)
+  let result = asset.BatchLoadResult(cache: cache, errors: errors)
 
   assert case result {
-    assets.BatchLoadResult(c, e) ->
-      assets.cache_size(c) == 0 && list.length(e) == 2
+    asset.BatchLoadResult(c, e) ->
+      asset.cache_size(c) == 0 && list.length(e) == 2
   }
 }
 
 // Test: LoadProgress structure
 pub fn load_progress_test() {
   let progress =
-    assets.LoadProgress(loaded: 5, total: 10, current_url: "test.png")
+    asset.LoadProgress(loaded: 5, total: 10, current_url: "test.png")
 
   assert case progress {
-    assets.LoadProgress(loaded, total, url) ->
+    asset.LoadProgress(loaded, total, url) ->
       loaded == 5 && total == 10 && url == "test.png"
   }
 }

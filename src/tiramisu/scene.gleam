@@ -33,7 +33,7 @@
 ////     scene.Light(
 ////       id: "sun",
 ////       light_type: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
-////       transform: transform.identity(),
+////       transform: transform.identity,
 ////     ),
 ////   ]
 //// }
@@ -54,12 +54,12 @@ import vec/vec3.{type Vec3}
 
 /// Opaque type for Three.js textures.
 ///
-/// Created via `assets.load_texture()` and used in materials.
+/// Created via `asset.load_texture()` and used in materials.
 pub type Texture
 
 /// Opaque type for Three.js BufferGeometry.
 ///
-/// Created by loading 3D models with `assets.load_stl()` or `assets.load_model()`.
+/// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
 pub type BufferGeometry
 
 /// Validation errors returned by geometry and material constructors.
@@ -192,7 +192,7 @@ pub type LightType {
 ///     scene.lod_level(distance: 50.0, node: medium_detail_mesh), // 50-100 units
 ///     scene.lod_level(distance: 100.0, node: low_detail_mesh),   // 100+ units
 ///   ],
-///   transform: transform.identity(),
+///   transform: transform.identity,
 /// )
 /// ```
 pub type LODLevel {
@@ -244,7 +244,7 @@ pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
 ///           id: "player-body",
 ///           geometry: scene.BoxGeometry(1.0, 2.0, 1.0),
 ///           material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-///           transform: transform.identity(),
+///           transform: transform.identity,
 ///           physics: option.Some(model.physics_body),
 ///         ),
 ///       ],

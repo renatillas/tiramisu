@@ -4,16 +4,16 @@
 import gleam/dict.{type Dict}
 import gleam/javascript/promise
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam_community/maths
+import tiramisu
+import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
-import tiramisu/graphics/sprite
 import tiramisu/scene.{type Texture}
-import tiramisu/texture
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(
@@ -24,36 +24,23 @@ pub type Model {
 }
 
 pub type Msg {
+  NoOp
   Tick
   TextureLoaded(String, Texture)
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 0.0, 10.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   let model =
     Model(rotation: 0.0, textures: dict.new(), loading_complete: False)
 
@@ -70,10 +57,13 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
     list.map(sprite_urls, fn(item) {
       let #(name, url) = item
       effect.from_promise(
-        promise.map(texture.load(url), fn(result) {
+        promise.map(asset.load_texture(url), fn(result) {
           case result {
             Ok(tex) -> TextureLoaded(name, tex)
-            Error(_) -> echo Tick
+            Error(error) -> {
+              echo error
+              NoOp
+            }
           }
         }),
       )
@@ -82,8 +72,13 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(model, effect.batch([effect.tick(Tick), ..load_effects]))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
+    NoOp -> #(model, effect.none())
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
       #(Model(..model, rotation: new_rotation), effect.tick(Tick))
@@ -101,17 +96,38 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
-  let lights = [
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+    |> result.map(fn(camera) {
+      camera
+      |> camera.set_position(vec3.Vec3(0.0, 0.0, 10.0))
+      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+      |> scene.Camera(
+        id: "main-camera",
+        transform: transform.identity,
+        active: True,
+        viewport: option.None,
+        camera: _,
+      )
+      |> list.wrap
+    })
+
+  let lights =
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.5),
-      transform: transform.identity(),
-    ),
-  ]
+      transform: transform.identity,
+    )
+    |> list.wrap
 
   // Show loading text or sprites
   case model.loading_complete {
-    False -> lights
+    False -> list.flatten([camera, lights])
     True -> {
       let sprites = [
         // Emoji 1 - rotating in circle
@@ -120,57 +136,81 @@ fn view(model: Model) -> List(scene.SceneNode) {
             let x = 3.0 *. maths.cos(model.rotation)
             let y = 3.0 *. maths.sin(model.rotation)
 
-            sprite.mesh(id: "sprite1", texture: tex, width: 2.0, height: 2.0)
-            |> with_transform(transform.at(position: vec3.Vec3(x, y, 0.0)))
+            scene.Mesh(
+              id: "sprite1",
+              geometry: scene.PlaneGeometry(2.0, 2.0),
+              material: scene.BasicMaterial(
+                color: 0xffffff,
+                transparent: True,
+                opacity: 1.0,
+                map: option.Some(tex),
+              ),
+              transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
+              physics: option.None,
+            )
           }),
         // Emoji 2 - rotating opposite direction
         dict.get(model.textures, "emoji2")
           |> result.map(fn(tex) {
             let x = 3.0 *. maths.cos(0.0 -. model.rotation)
             let y = 3.0 *. maths.sin(0.0 -. model.rotation)
-            sprite.mesh(id: "sprite2", texture: tex, width: 2.0, height: 2.0)
-            |> with_transform(transform.at(position: vec3.Vec3(x, y, 0.0)))
+            scene.Mesh(
+              id: "sprite2",
+              geometry: scene.PlaneGeometry(2.0, 2.0),
+              material: scene.BasicMaterial(
+                color: 0xffffff,
+                transparent: True,
+                opacity: 1.0,
+                map: option.Some(tex),
+              ),
+              transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
+              physics: option.None,
+            )
           }),
         // Emoji 3 - center, spinning
         dict.get(model.textures, "emoji3")
           |> result.map(fn(tex) {
-            sprite.mesh(id: "sprite3", texture: tex, width: 1.5, height: 1.5)
-            |> with_transform(transform.Transform(
-              position: vec3.Vec3(0.0, 0.0, 0.0),
-              rotation: vec3.Vec3(0.0, 0.0, model.rotation *. 2.0),
-              scale: vec3.Vec3(1.0, 1.0, 1.0),
-            ))
+            scene.Mesh(
+              id: "sprite3",
+              geometry: scene.PlaneGeometry(1.5, 1.5),
+              material: scene.BasicMaterial(
+                color: 0xffffff,
+                transparent: True,
+                opacity: 1.0,
+                map: option.Some(tex),
+              ),
+              transform: transform.Transform(
+                position: vec3.Vec3(0.0, 0.0, 0.0),
+                rotation: vec3.Vec3(0.0, 0.0, model.rotation *. 2.0),
+                scale: vec3.Vec3(1.0, 1.0, 1.0),
+              ),
+              physics: option.None,
+            )
           }),
         // Emoji 4 - bouncing
         dict.get(model.textures, "emoji4")
           |> result.map(fn(tex) {
             let y = maths.sin(model.rotation *. 2.0) *. 2.0
-            sprite.mesh(id: "sprite4", texture: tex, width: 2.0, height: 2.0)
-            |> with_transform(
-              transform.at(position: vec3.Vec3(0.0, y +. 4.0, 0.0)),
+            scene.Mesh(
+              id: "sprite4",
+              geometry: scene.PlaneGeometry(2.0, 2.0),
+              material: scene.BasicMaterial(
+                color: 0xffffff,
+                transparent: True,
+                opacity: 1.0,
+                map: option.Some(tex),
+              ),
+              transform: transform.at(position: vec3.Vec3(0.0, y +. 4.0, 0.0)),
+              physics: option.None,
             )
           }),
       ]
 
       list.flatten([
+        camera,
         lights,
         result.values(sprites),
       ])
     }
-  }
-}
-
-// Helper function to update a scene node's transform
-fn with_transform(
-  node: scene.SceneNode,
-  new_transform: transform.Transform,
-) -> scene.SceneNode {
-  case node {
-    scene.Mesh(id, geometry, material, _, physics) ->
-      scene.Mesh(id, geometry, material, new_transform, physics)
-    scene.Group(id, _, children) -> scene.Group(id, new_transform, children)
-    scene.Light(id, light_type, _) -> scene.Light(id, light_type, new_transform)
-    scene.Model3D(id, object, _, animation, physics) ->
-      scene.Model3D(id, object, new_transform, animation, physics)
   }
 }

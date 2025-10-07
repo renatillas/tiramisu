@@ -3,17 +3,17 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
+import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(
-    cube_position: vec3.Vec3,
+    cube_position: vec3.Vec3(Float),
     cube_scale: Float,
     touch_spheres: List(TouchSphere),
   )
@@ -28,26 +28,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 800.0 /. 600.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  game.run(
+  tiramisu.run(
     width: 800,
     height: 600,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       cube_position: vec3.Vec3(0.0, 0.0, -5.0),
@@ -57,7 +48,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(model, effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       let touches = input.touches(ctx.input)
@@ -111,11 +106,26 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 800.0 /. 600.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+  let camera =
+    scene.Camera(
+      id: "main",
+      camera:,
+      transform: transform.identity,
+      active: True,
+      viewport: option.None,
+    )
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -176,5 +186,5 @@ fn view(model: Model) -> List(scene.SceneNode) {
       )
     })
 
-  list.flatten([lights, main_cube, touch_indicators])
+  list.flatten([[camera], lights, main_cube, touch_indicators])
 }

@@ -94,7 +94,7 @@ scene.Mesh(
     roughness: 0.5,
     map: option.None,
   ),
-  transform: transform.identity(),
+  transform: transform.identity,
 )
 ```
 

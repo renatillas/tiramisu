@@ -134,7 +134,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Camera(
       id: "main_camera",
       camera: cam,
-      transform: transform.identity(),
+      transform: transform.identity,
       active: True,
       viewport: option.None,
     )
@@ -143,7 +143,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",

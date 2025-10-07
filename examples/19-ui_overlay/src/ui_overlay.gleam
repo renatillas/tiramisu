@@ -64,14 +64,23 @@ pub fn main() {
 
 fn init(_flags) {
   // Register with Tiramisu to receive game state updates
-  #(UIModel(Menu, 0, 100.0), ui.register())
+  #(UIModel(Menu, 0, 100.0), ui.register_lustre())
 }
 
 fn update(model: UIModel, msg: UIMsg) {
   case msg {
-    StartGame -> #(UIModel(..model, state: Playing), ui.send_to_game(Resume))
-    PauseGame -> #(UIModel(..model, state: Paused), ui.send_to_game(Pause))
-    ResumeGame -> #(UIModel(..model, state: Playing), ui.send_to_game(Resume))
+    StartGame -> #(
+      UIModel(..model, state: Playing),
+      ui.dispatch_to_tiramisu(Resume),
+    )
+    PauseGame -> #(
+      UIModel(..model, state: Paused),
+      ui.dispatch_to_tiramisu(Pause),
+    )
+    ResumeGame -> #(
+      UIModel(..model, state: Playing),
+      ui.dispatch_to_tiramisu(Resume),
+    )
     UpdateScore(score) -> #(UIModel(..model, score: score), effect.none())
     UpdateHealth(health) -> #(UIModel(..model, health: health), effect.none())
   }
@@ -79,16 +88,13 @@ fn update(model: UIModel, msg: UIMsg) {
 
 fn view(model: UIModel) -> Element(UIMsg) {
   // UI overlay - positioned fixed to cover entire viewport and overlay Tiramisu canvas
-  html.div(
-    [class("fixed top-0 left-0 w-full h-full pointer-events-none")],
-    [
-      case model.state {
-        Menu -> menu_overlay()
-        Playing -> hud_overlay(model)
-        Paused -> pause_overlay(model)
-      },
-    ],
-  )
+  html.div([class("fixed top-0 left-0 w-full h-full pointer-events-none")], [
+    case model.state {
+      Menu -> menu_overlay()
+      Playing -> hud_overlay(model)
+      Paused -> pause_overlay(model)
+    },
+  ])
 }
 
 // --- UI Components ---
@@ -188,21 +194,18 @@ fn progress_bar(current: Float, max: Float, color: String) -> Element(UIMsg) {
   let percentage = { current /. max } *. 100.0
   let percentage_str = float.to_string(percentage)
 
-  html.div(
-    [class("w-[150px] h-5 bg-white/20 rounded-[3px] overflow-hidden")],
-    [
-      html.div(
-        [
-          class("h-full transition-[width] duration-300"),
-          attribute(
-            "style",
-            "width: " <> percentage_str <> "%; background: " <> color,
-          ),
-        ],
-        [],
-      ),
-    ],
-  )
+  html.div([class("w-[150px] h-5 bg-white/20 rounded-[3px] overflow-hidden")], [
+    html.div(
+      [
+        class("h-full transition-[width] duration-300"),
+        attribute(
+          "style",
+          "width: " <> percentage_str <> "%; background: " <> color,
+        ),
+      ],
+      [],
+    ),
+  ])
 }
 
 fn health_color(health: Float) -> String {
@@ -270,40 +273,40 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
           let new_rotation = model.rotation +. ctx.delta_time
 
           // Handle WASD movement
-      let move_speed = 3.0
-      let dx = case
-        input.is_key_pressed(ctx.input, input.KeyD),
-        input.is_key_pressed(ctx.input, input.KeyA)
-      {
-        True, False -> move_speed *. ctx.delta_time
-        False, True -> 0.0 -. move_speed *. ctx.delta_time
-        _, _ -> 0.0
-      }
+          let move_speed = 3.0
+          let dx = case
+            input.is_key_pressed(ctx.input, input.KeyD),
+            input.is_key_pressed(ctx.input, input.KeyA)
+          {
+            True, False -> move_speed *. ctx.delta_time
+            False, True -> 0.0 -. move_speed *. ctx.delta_time
+            _, _ -> 0.0
+          }
 
-      let dy = case
-        input.is_key_pressed(ctx.input, input.KeyW),
-        input.is_key_pressed(ctx.input, input.KeyS)
-      {
-        True, False -> move_speed *. ctx.delta_time
-        False, True -> 0.0 -. move_speed *. ctx.delta_time
-        _, _ -> 0.0
-      }
+          let dy = case
+            input.is_key_pressed(ctx.input, input.KeyW),
+            input.is_key_pressed(ctx.input, input.KeyS)
+          {
+            True, False -> move_speed *. ctx.delta_time
+            False, True -> 0.0 -. move_speed *. ctx.delta_time
+            _, _ -> 0.0
+          }
 
-      let new_position =
-        vec3.Vec3(
-          model.position.x +. dx,
-          model.position.y +. dy,
-          model.position.z,
-        )
+          let new_position =
+            vec3.Vec3(
+              model.position.x +. dx,
+              model.position.y +. dy,
+              model.position.z,
+            )
 
-      // Increase score when moving
-      let new_score = case dx, dy {
-        0.0, 0.0 -> model.score
-        _, _ -> model.score + 1
-      }
+          // Increase score when moving
+          let new_score = case dx, dy {
+            0.0, 0.0 -> model.score
+            _, _ -> model.score + 1
+          }
 
-      // Check for pause key
-      let should_pause = input.is_key_just_pressed(ctx.input, input.Space)
+          // Check for pause key
+          let should_pause = input.is_key_just_pressed(ctx.input, input.Space)
 
           let new_model =
             GameModel(
@@ -318,14 +321,14 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
           let effects = case should_pause {
             True -> [
               game_effect.tick(Tick),
-              ui.dispatch(UpdateScore(new_score)),
-              ui.dispatch(UpdateHealth(model.health)),
-              ui.dispatch(PauseGame),
+              ui.dispatch_to_lustre(UpdateScore(new_score)),
+              ui.dispatch_to_lustre(UpdateHealth(model.health)),
+              ui.dispatch_to_lustre(PauseGame),
             ]
             False -> [
               game_effect.tick(Tick),
-              ui.dispatch(UpdateScore(new_score)),
-              ui.dispatch(UpdateHealth(model.health)),
+              ui.dispatch_to_lustre(UpdateScore(new_score)),
+              ui.dispatch_to_lustre(UpdateHealth(model.health)),
             ]
           }
 
@@ -361,7 +364,7 @@ fn game_view(model: GameModel) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(0xffffff, 0.5),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -373,7 +376,7 @@ fn game_view(model: GameModel) {
       id: "cube",
       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
       material: scene.StandardMaterial(0x4ecdc4, 0.5, 0.3, None, None),
-      transform: transform.identity()
+      transform: transform.identity
         |> transform.set_position(model.position)
         |> transform.set_rotation(vec3.Vec3(
           model.rotation,

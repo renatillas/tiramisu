@@ -2,12 +2,12 @@
 ///
 /// Demonstrates 2D camera modes and orthographic projection
 import gleam/option
+import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(time: Float)
@@ -18,25 +18,25 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  // Use 2D camera centered at origin
-  let cam = camera.camera_2d(800, 600)
-
-  game.run(
+  tiramisu.run(
     width: 800,
     height: 600,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   #(Model(time: 0.0), effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       let new_time = model.time +. ctx.delta_time
@@ -47,10 +47,17 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 
 fn view(model: Model) -> List(scene.SceneNode) {
   [
+    scene.Camera(
+      id: "camera",
+      camera: camera.camera_2d(800, 600, distance: 10.0),
+      transform: transform.identity,
+      active: True,
+      viewport: option.None,
+    ),
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     // Center square
     scene.Mesh(

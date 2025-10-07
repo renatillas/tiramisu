@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import * as GLEAM from '../../gleam.mjs';
-import * as ASSETS_GLEAM from '../assets.mjs';
+import * as ASSETS_GLEAM from '../asset.mjs';
 
 // Helper to validate STL file format
 function validateSTLFile(data) {

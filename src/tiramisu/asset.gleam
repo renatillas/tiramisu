@@ -6,10 +6,10 @@
 //// ## Quick Example
 ////
 //// ```gleam
-//// import tiramisu/assets
+//// import tiramisu/asset
 ////
 //// // Load a texture
-//// let load_effect = assets.load_texture("player.png")
+//// let load_effect = asset.load_texture("player.png")
 ////   |> promise.map(fn(result) {
 ////     case result {
 ////       Ok(texture) -> TextureLoaded(texture)
@@ -19,9 +19,9 @@
 ////   |> effect.from_promise
 ////
 //// // Use with cache
-//// let cache = assets.new_cache()
-//// let cache = assets.insert_texture(cache, "player.png", texture)
-//// let texture = assets.get_texture(cache, "player.png")
+//// let cache = asset.new_cache()
+//// let cache = asset.insert_texture(cache, "player.png", texture)
+//// let texture = asset.get_texture(cache, "player.png")
 //// ```
 
 import gleam/dict.{type Dict}
@@ -46,7 +46,7 @@ pub type GLTFData {
   GLTFData(scene: Object3D, animations: List(AnimationClip))
 }
 
-/// Types of assets that can be loaded
+/// Types of asset that can be loaded
 pub type AssetType {
   /// GLTF/GLB 3D model
   ModelAsset(url: String)
@@ -111,15 +111,15 @@ pub type CacheConfig {
 
 /// Asset cache/registry with LRU eviction
 pub opaque type AssetCache {
-  AssetCache(assets: Dict(String, CacheEntry), config: CacheConfig)
+  AssetCache(asset: Dict(String, CacheEntry), config: CacheConfig)
 }
 
 // --- Cache Management ---
 
-/// Create a new empty asset cache with default max size (100 assets)
+/// Create a new empty asset cache with default max size (100 asset)
 pub fn new_cache() -> AssetCache {
   AssetCache(
-    assets: dict.new(),
+    asset: dict.new(),
     config: CacheConfig(max_size: 100, current_time: 0),
   )
 }
@@ -127,24 +127,24 @@ pub fn new_cache() -> AssetCache {
 /// Create a new empty asset cache with custom max size
 pub fn new_cache_with_size(max_size: Int) -> AssetCache {
   AssetCache(
-    assets: dict.new(),
+    asset: dict.new(),
     config: CacheConfig(max_size: max_size, current_time: 0),
   )
 }
 
-/// Get the number of cached assets
+/// Get the number of cached asset
 pub fn cache_size(cache: AssetCache) -> Int {
-  dict.size(cache.assets)
+  dict.size(cache.asset)
 }
 
 /// Check if an asset is cached
 pub fn is_cached(cache: AssetCache, url: String) -> Bool {
-  dict.has_key(cache.assets, url)
+  dict.has_key(cache.asset, url)
 }
 
-/// Clear all cached assets
+/// Clear all cached asset
 pub fn clear_cache(cache: AssetCache) -> AssetCache {
-  AssetCache(assets: dict.new(), config: cache.config)
+  AssetCache(asset: dict.new(), config: cache.config)
 }
 
 // --- Single Asset Loading ---
@@ -204,28 +204,28 @@ pub type BatchLoadResult {
   BatchLoadResult(cache: AssetCache, errors: List(AssetError))
 }
 
-/// Load multiple assets with progress tracking
-/// Returns a promise that resolves with the loaded assets and any errors
+/// Load multiple asset with progress tracking
+/// Returns a promise that resolves with the loaded asset and any errors
 pub fn load_batch(
-  assets: List(AssetType),
+  asset: List(AssetType),
   on_progress: fn(LoadProgress) -> Nil,
 ) -> Promise(BatchLoadResult) {
   // Convert list to array for FFI
-  let assets_array = array.from_list(assets)
-  load_batch_ffi(assets_array, on_progress)
+  let asset_array = array.from_list(asset)
+  load_batch_ffi(asset_array, on_progress)
 }
 
-/// Load multiple assets without progress tracking
-pub fn load_batch_simple(assets: List(AssetType)) -> Promise(BatchLoadResult) {
-  let assets_array = array.from_list(assets)
-  load_batch_ffi(assets_array, fn(_) { Nil })
+/// Load multiple asset without progress tracking
+pub fn load_batch_simple(asset: List(AssetType)) -> Promise(BatchLoadResult) {
+  let asset_array = array.from_list(asset)
+  load_batch_ffi(asset_array, fn(_) { Nil })
 }
 
 // --- Asset Retrieval ---
 
 /// Get a GLTF model from the cache (updates LRU timestamp)
 pub fn get_model(cache: AssetCache, url: String) -> Result(GLTFData, AssetError) {
-  case dict.get(cache.assets, url) {
+  case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedModel(data), _)) -> Ok(data)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
@@ -248,7 +248,7 @@ pub fn get_texture(
   cache: AssetCache,
   url: String,
 ) -> Result(Texture, AssetError) {
-  case dict.get(cache.assets, url) {
+  case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedTexture(tex), _)) -> Ok(tex)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
@@ -260,7 +260,7 @@ pub fn get_audio(
   cache: AssetCache,
   url: String,
 ) -> Result(AudioBuffer, AssetError) {
-  case dict.get(cache.assets, url) {
+  case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedAudio(audio), _)) -> Ok(audio)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
@@ -272,7 +272,7 @@ pub fn get_stl(
   cache: AssetCache,
   url: String,
 ) -> Result(BufferGeometry, AssetError) {
-  case dict.get(cache.assets, url) {
+  case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedSTL(geom), _)) -> Ok(geom)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
@@ -281,7 +281,7 @@ pub fn get_stl(
 
 /// Try to get any asset (returns Option)
 pub fn try_get(cache: AssetCache, url: String) -> Option(LoadedAsset) {
-  case dict.get(cache.assets, url) {
+  case dict.get(cache.asset, url) {
     Ok(CacheEntry(asset, _)) -> option.Some(asset)
     Error(_) -> option.None
   }
@@ -289,7 +289,7 @@ pub fn try_get(cache: AssetCache, url: String) -> Option(LoadedAsset) {
 
 /// Get all cached URLs
 pub fn cached_urls(cache: AssetCache) -> List(String) {
-  dict.keys(cache.assets)
+  dict.keys(cache.asset)
 }
 
 /// Insert a loaded asset into the cache manually
@@ -301,16 +301,16 @@ pub fn insert_asset(
 ) -> AssetCache {
   let new_time = cache.config.current_time + 1
   let entry = CacheEntry(asset, new_time)
-  let new_assets = dict.insert(cache.assets, url, entry)
+  let new_asset = dict.insert(cache.asset, url, entry)
 
   // Check if we need to evict
   let new_cache =
     AssetCache(
-      assets: new_assets,
+      asset: new_asset,
       config: CacheConfig(..cache.config, current_time: new_time),
     )
 
-  case dict.size(new_assets) > cache.config.max_size {
+  case dict.size(new_asset) > cache.config.max_size {
     True -> evict_lru(new_cache)
     False -> new_cache
   }
@@ -320,7 +320,7 @@ pub fn insert_asset(
 fn evict_lru(cache: AssetCache) -> AssetCache {
   // Find the URL with the oldest timestamp
   case
-    dict.to_list(cache.assets)
+    dict.to_list(cache.asset)
     |> list.sort(fn(a, b) {
       let #(_, CacheEntry(_, time_a)) = a
       let #(_, CacheEntry(_, time_b)) = b
@@ -336,8 +336,8 @@ fn evict_lru(cache: AssetCache) -> AssetCache {
     |> list.first
   {
     Ok(#(url_to_evict, _)) -> {
-      let new_assets = dict.delete(cache.assets, url_to_evict)
-      AssetCache(assets: new_assets, config: cache.config)
+      let new_asset = dict.delete(cache.asset, url_to_evict)
+      AssetCache(asset: new_asset, config: cache.config)
     }
     Error(_) -> cache
   }
@@ -362,22 +362,22 @@ pub fn dispose_object3d(object: Object3D) -> Nil {
 
 // --- FFI Functions ---
 
-@external(javascript, "./ffi/assets.mjs", "loadAudio")
+@external(javascript, "./ffi/asset.mjs", "loadAudio")
 fn load_audio_ffi(url: String) -> Promise(Result(AudioBuffer, String))
 
-@external(javascript, "./ffi/assets.mjs", "loadBatch")
+@external(javascript, "./ffi/asset.mjs", "loadBatch")
 fn load_batch_ffi(
-  assets: array.Array(AssetType),
+  asset: array.Array(AssetType),
   on_progress: fn(LoadProgress) -> Nil,
 ) -> Promise(BatchLoadResult)
 
-@external(javascript, "./ffi/assets.mjs", "disposeTexture")
+@external(javascript, "./ffi/asset.mjs", "disposeTexture")
 fn dispose_texture_ffi(texture: Texture) -> Nil
 
-@external(javascript, "./ffi/assets.mjs", "disposeGeometry")
+@external(javascript, "./ffi/asset.mjs", "disposeGeometry")
 fn dispose_geometry_ffi(geometry: BufferGeometry) -> Nil
 
-@external(javascript, "./ffi/assets.mjs", "disposeObject3D")
+@external(javascript, "./ffi/asset.mjs", "disposeObject3D")
 fn dispose_object3d_ffi(object: Object3D) -> Nil
 
 /// Load an STL file from a URL using Promises

@@ -33,7 +33,7 @@ pub fn unregister_body_test() {
     physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
 
   let body = physics.rigid_body(physics.Dynamic, physics.Box(1.0, 1.0, 1.0))
-  let initial_transform = transform.identity()
+  let initial_transform = transform.identity
 
   let world = physics.register_body(world, "test_body", body, initial_transform)
 
@@ -86,7 +86,7 @@ pub fn update_body_after_registration_test() {
     physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
 
   let body = physics.rigid_body(physics.Dynamic, physics.Box(1.0, 1.0, 1.0))
-  let world = physics.register_body(world, "test", body, transform.identity())
+  let world = physics.register_body(world, "test", body, transform.identity)
 
   // Update body properties
   let updated_body =

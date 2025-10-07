@@ -1,30 +1,23 @@
-/// Stress Test: 1000 Nodes
-///
-/// Performance benchmark with 1000 animated cubes
-///
-/// Controls:
-/// - SPACE: Toggle animation (all nodes update vs static scene)
-/// - P: Toggle performance stats in console
 import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
+import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(
     animate: Bool,
     time: Float,
     show_performance: Bool,
-    cached_instances: List(scene.InstanceTransform),
+    cached_instances: List(transform.Transform),
   )
 }
 
@@ -34,18 +27,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  game.run(
+  tiramisu.run(
     width: 1280,
     height: 720,
     background: 0x0a0a1a,
-    camera: option.None,
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   io.println("=== Stress Test: 1000 Nodes ===")
   io.println("Controls:")
   io.println("  SPACE - Toggle animation (test worst/best case)")
@@ -66,7 +58,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   )
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       // Check for key presses
@@ -152,7 +148,7 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 // Compute instances list for given time - extracted to be reusable
-fn compute_instances(time: Float) -> List(scene.InstanceTransform) {
+fn compute_instances(time: Float) -> List(transform.Transform) {
   list.range(0, 20_000)
   |> list.map(fn(i) {
     // Calculate grid position
@@ -170,7 +166,7 @@ fn compute_instances(time: Float) -> List(scene.InstanceTransform) {
     // Apply time-based rotation
     let rotation = time +. base_rotation
 
-    scene.instance(
+    transform.Transform(
       position: vec3.Vec3(fx, fy, fz),
       rotation: vec3.Vec3(rotation *. 0.5, rotation, rotation *. 0.3),
       scale: vec3.Vec3(1.0, 1.0, 1.0),
@@ -188,7 +184,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       far: 1000.0,
     )
 
-  let cam =
+  let camera =
     cam
     |> camera.set_position(vec3.Vec3(0.0, 0.0, 60.0))
     |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
@@ -196,16 +192,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_node =
     scene.Camera(
       id: "main_camera",
-      camera_type: cam,
-      transform: transform.identity(),
+      camera:,
+      transform: transform.identity,
       active: True,
+      viewport: option.None,
     )
 
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.3),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",

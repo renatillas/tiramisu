@@ -86,7 +86,7 @@ pub fn create_vec3_tween_test() {
 
 // Test: Create transform tween
 pub fn create_transform_tween_test() {
-  let start = transform.identity()
+  let start = transform.identity
   let end = transform.at(position: vec3.Vec3(5.0, 5.0, 5.0))
   let tw = animation.tween_transform(start, end, 1.5, animation.EaseInQuad)
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as GLEAM from '../../gleam.mjs';
-import * as ASSETS_GLEAM from '../assets.mjs';
+import * as ASSETS_GLEAM from '../asset.mjs';
 
 // Define GLTFData constructor to match Gleam type
 class GLTFData {

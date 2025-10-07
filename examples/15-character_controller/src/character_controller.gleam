@@ -6,20 +6,21 @@ import gleam/io
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
-import tiramisu/animation/state_machine
+import gleam/result
+import tiramisu
+import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
-import tiramisu/gltf
 import tiramisu/input
 import tiramisu/object3d
 import tiramisu/scene
+import tiramisu/state_machine
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type LoadState {
   Loading
-  Loaded(gltf.GLTFData, state_machine.StateMachine(GameContext))
+  Loaded(asset.GLTFData, state_machine.StateMachine(tiramisu.Context))
   Failed(String)
 }
 
@@ -29,36 +30,22 @@ pub type Model {
 
 pub type Msg {
   Tick
-  ModelLoaded(gltf.GLTFData)
-  LoadingFailed(gltf.GLTFError)
+  ModelLoaded(asset.GLTFData)
+  LoadingFailed(asset.LoadError)
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 2.0, 12.0))
-    |> camera.look(at: vec3.Vec3(0.0, 1.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
   // Load a GLTF file with animations
@@ -66,7 +53,7 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   // Good models: RobotExpressive.glb, Fox.glb from Khronos samples
   let load_effect =
     effect.from_promise(
-      promise.map(gltf.load("character.glb"), fn(result) {
+      promise.map(asset.load_gltf("character.glb"), fn(result) {
         case result {
           Ok(data) -> ModelLoaded(data)
           Error(error) -> LoadingFailed(error)
@@ -77,7 +64,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(model, effect.batch([effect.tick(Tick), load_effect]))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.3
@@ -99,13 +90,6 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
     }
 
     ModelLoaded(data) -> {
-      let animation_count = gltf.animation_count(data)
-      io.println(
-        "Loaded character with "
-        <> int.to_string(animation_count)
-        <> " animations",
-      )
-
       // Print animation names
       case data.animations {
         [] -> io.println("No animations found")
@@ -121,16 +105,16 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
       }
 
       // Create state machine with animations
-      let machine = create_state_machine(data, ctx)
+      let machine = create_state_machine(data)
 
       #(Model(..model, load_state: Loaded(data, machine)), effect.none())
     }
 
     LoadingFailed(error) -> {
       let error_msg = case error {
-        gltf.LoadError(msg) -> "Load error: " <> msg
-        gltf.InvalidUrl(url) -> "Invalid URL: " <> url
-        gltf.ParseError(msg) -> "Parse error: " <> msg
+        asset.LoadError(msg) -> "Load error: " <> msg
+        asset.InvalidUrl(url) -> "Invalid URL: " <> url
+        asset.ParseError(msg) -> "Parse error: " <> msg
       }
       io.println("Failed to load model: " <> error_msg)
       #(Model(..model, load_state: Failed(error_msg)), effect.none())
@@ -140,9 +124,8 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 
 /// Create an animation state machine for the character
 fn create_state_machine(
-  data: gltf.GLTFData,
-  _ctx: GameContext,
-) -> state_machine.StateMachine(GameContext) {
+  data: asset.GLTFData,
+) -> state_machine.StateMachine(tiramisu.Context) {
   // Get animation clips (assume model has at least 2 animations)
   case data.animations {
     [idle_clip, walk_clip, ..rest] -> {
@@ -162,7 +145,7 @@ fn create_state_machine(
         |> state_machine.add_transition(
           from: "idle",
           to: "walk",
-          condition: state_machine.Custom(fn(ctx: GameContext) {
+          condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
             input.is_key_pressed(ctx.input, input.KeyW)
           }),
           blend_duration: 0.3,
@@ -170,7 +153,7 @@ fn create_state_machine(
         |> state_machine.add_transition(
           from: "walk",
           to: "idle",
-          condition: state_machine.Custom(fn(ctx: GameContext) {
+          condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
             !input.is_key_pressed(ctx.input, input.KeyW)
           }),
           blend_duration: 0.3,
@@ -188,16 +171,16 @@ fn create_state_machine(
           |> state_machine.add_transition(
             from: "walk",
             to: "run",
-            condition: state_machine.Custom(fn(ctx: GameContext) {
-              input.is_key_pressed(ctx.input, input.Shift)
+            condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+              input.is_key_pressed(ctx.input, input.ShiftLeft)
             }),
             blend_duration: 0.2,
           )
           |> state_machine.add_transition(
             from: "run",
             to: "walk",
-            condition: state_machine.Custom(fn(ctx: GameContext) {
-              !input.is_key_pressed(ctx.input, input.Shift)
+            condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+              !input.is_key_pressed(ctx.input, input.ShiftLeft)
             }),
             blend_duration: 0.2,
           )
@@ -213,11 +196,31 @@ fn create_state_machine(
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+    |> result.map(fn(camera) {
+      camera
+      |> camera.set_position(vec3.Vec3(0.0, 1.5, 20.0))
+      |> camera.look(at: vec3.Vec3(0.0, 1.0, 0.0))
+      |> scene.Camera(
+        id: "main",
+        camera: _,
+        active: True,
+        transform: transform.identity,
+        viewport: option.None,
+      )
+    })
+
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -295,7 +298,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
           physics: option.None,
         )
 
-      [character, ..lights]
+      [camera, character, ..lights]
     }
   }
 }

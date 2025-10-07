@@ -145,7 +145,11 @@ pub fn orthographic(
 /// let cam = camera.camera_2d(width: 800, height: 600, distance: 5.0)
 /// // (0, 0) is screen center, positive Y is up
 /// ```
-pub fn camera_2d(width: Int, height: Int, distance: Float) -> Camera {
+pub fn camera_2d(
+  width width: Int,
+  height height: Int,
+  distance distance: Float,
+) -> Camera {
   let w = int.to_float(width)
   let h = int.to_float(height)
   let half_w = w /. 2.0

@@ -7,19 +7,19 @@ import vec/vec3
 // Test: Removing a group removes all its children
 pub fn remove_group_with_children_test() {
   let previous = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -62,13 +62,13 @@ pub fn remove_group_with_children_test() {
 // Test: Removing nested groups removes all descendants
 pub fn remove_nested_groups_test() {
   let previous = [
-    scene.Group(id: "root", transform: transform.identity(), children: [
-      scene.Group(id: "level1", transform: transform.identity(), children: [
+    scene.Group(id: "root", transform: transform.identity, children: [
+      scene.Group(id: "level1", transform: transform.identity, children: [
         scene.Mesh(
           id: "leaf",
           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         ),
       ]),
@@ -84,12 +84,12 @@ pub fn remove_nested_groups_test() {
 // Test: Update group transform
 pub fn update_group_transform_test() {
   let previous = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -103,7 +103,7 @@ pub fn update_group_transform_test() {
           id: "child1",
           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-          transform: transform.identity(),
+          transform: transform.identity,
           physics: option.None,
         ),
       ],
@@ -124,30 +124,30 @@ pub fn update_group_transform_test() {
 // Test: Add child to existing group
 pub fn add_child_to_existing_group_test() {
   let previous = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
   ]
   let current = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -166,30 +166,30 @@ pub fn add_child_to_existing_group_test() {
 // Test: Remove child from group (group remains)
 pub fn remove_child_from_group_test() {
   let previous = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
   ]
   let current = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -208,25 +208,25 @@ pub fn remove_child_from_group_test() {
 // Test: Moving a node from one group to another
 pub fn move_node_between_groups_test() {
   let previous = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "movable",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
-    scene.Group(id: "group2", transform: transform.identity(), children: []),
+    scene.Group(id: "group2", transform: transform.identity, children: []),
   ]
   let current = [
-    scene.Group(id: "group1", transform: transform.identity(), children: []),
-    scene.Group(id: "group2", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: []),
+    scene.Group(id: "group2", transform: transform.identity, children: [
       scene.Mesh(
         id: "movable",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -261,11 +261,7 @@ pub fn move_node_between_groups_test() {
 pub fn empty_group_test() {
   let previous = []
   let current = [
-    scene.Group(
-      id: "empty_group",
-      transform: transform.identity(),
-      children: [],
-    ),
+    scene.Group(id: "empty_group", transform: transform.identity, children: []),
   ]
   let patches = scene.diff(previous, current)
 
@@ -282,16 +278,16 @@ pub fn empty_group_test() {
 pub fn group_with_lights_test() {
   let previous = []
   let current = [
-    scene.Group(id: "light_group", transform: transform.identity(), children: [
+    scene.Group(id: "light_group", transform: transform.identity, children: [
       scene.Light(
         id: "light1",
         light_type: scene.PointLight(0xffffff, 1.0, 10.0),
-        transform: transform.identity(),
+        transform: transform.identity,
       ),
       scene.Light(
         id: "light2",
         light_type: scene.AmbientLight(0x404040, 0.5),
-        transform: transform.identity(),
+        transform: transform.identity,
       ),
     ]),
   ]

@@ -4,14 +4,14 @@ import gleam/io
 import gleam/list
 import gleam/option
 import gleam_community/maths
+import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type CameraView {
   TopDown
@@ -29,18 +29,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  game.run(
+  tiramisu.run(
     width: 1280,
     height: 720,
     background: 0x1a1a2e,
-    camera: option.None,
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
   io.println("=== Multi-Camera Demo ===")
   io.println("")
   io.println("This demo shows multiple cameras viewing the same scene.")
@@ -67,7 +66,7 @@ fn init(_ctx: GameContext) -> #(Model, effect.Effect(Msg)) {
 fn update(
   model: Model,
   msg: Msg,
-  ctx: GameContext,
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg)) {
   case msg {
     Tick -> {
@@ -191,8 +190,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_topdown =
     scene.Camera(
       id: "camera_topdown",
-      camera_type: cam_topdown,
-      transform: transform.identity(),
+      camera: cam_topdown,
+      transform: transform.identity,
       active: model.current_view == TopDown,
       viewport: option.None,
     )
@@ -214,8 +213,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_side =
     scene.Camera(
       id: "camera_side",
-      camera_type: cam_side,
-      transform: transform.identity(),
+      camera: cam_side,
+      transform: transform.identity,
       active: model.current_view == Side,
       viewport: option.None,
     )
@@ -237,8 +236,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_firstperson =
     scene.Camera(
       id: "camera_firstperson",
-      camera_type: cam_firstperson,
-      transform: transform.identity(),
+      camera: cam_firstperson,
+      transform: transform.identity,
       active: model.current_view == FirstPerson,
       viewport: option.None,
     )
@@ -264,21 +263,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_orbiting =
     scene.Camera(
       id: "camera_orbiting",
-      camera_type: cam_orbiting,
-      transform: transform.identity(),
+      camera: cam_orbiting,
+      transform: transform.identity,
       active: model.current_view == Orbiting,
       viewport: option.None,
     )
 
-  // 5. Overlay camera (bottom-right corner, always visible)
   let assert Ok(cam_overlay) =
-    camera.perspective(
-      field_of_view: 50.0,
-      aspect: 1.0,
-      // Square aspect for overlay
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 50.0, aspect: 1.0, near: 0.1, far: 200.0)
 
   let cam_overlay =
     cam_overlay
@@ -288,8 +280,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let camera_overlay =
     scene.Camera(
       id: "camera_overlay",
-      camera_type: cam_overlay,
-      transform: transform.identity(),
+      camera: cam_overlay,
+      transform: transform.identity,
       active: False,
       // Overlay camera is never the "active" main camera
       // Bottom-right corner: 250x250 pixels, 30px from edges
@@ -301,7 +293,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.4),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",

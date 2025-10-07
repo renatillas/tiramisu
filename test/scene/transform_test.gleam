@@ -3,7 +3,7 @@ import vec/vec3
 
 // Test: identity transform
 pub fn identity_transform_test() {
-  let t = transform.identity()
+  let t = transform.identity
   assert t.position == vec3.Vec3(0.0, 0.0, 0.0)
   assert t.rotation == vec3.Vec3(0.0, 0.0, 0.0)
   assert t.scale == vec3.Vec3(1.0, 1.0, 1.0)
@@ -19,7 +19,7 @@ pub fn transform_at_test() {
 
 // Test: set_position helper
 pub fn set_position_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_pos = vec3.Vec3(5.0, 10.0, 15.0)
   let updated = transform.set_position(t, new_pos)
 
@@ -30,7 +30,7 @@ pub fn set_position_test() {
 
 // Test: set_rotation helper
 pub fn set_rotation_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_rot = vec3.Vec3(1.5, 0.5, 2.0)
   let updated = transform.set_rotation(t, new_rot)
 
@@ -41,7 +41,7 @@ pub fn set_rotation_test() {
 
 // Test: set_scale helper
 pub fn set_scale_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_scale = vec3.Vec3(2.0, 3.0, 4.0)
   let updated = transform.set_scale(t, new_scale)
 
@@ -53,7 +53,7 @@ pub fn set_scale_test() {
 // Test: chaining transform updates
 pub fn chaining_test() {
   let t =
-    transform.identity()
+    transform.identity
     |> transform.set_position(vec3.Vec3(1.0, 2.0, 3.0))
     |> transform.set_rotation(vec3.Vec3(0.5, 1.0, 1.5))
     |> transform.set_scale(vec3.Vec3(2.0, 2.0, 2.0))
@@ -65,7 +65,7 @@ pub fn chaining_test() {
 
 // Test: immutability - original unchanged after updates
 pub fn immutability_test() {
-  let original = transform.identity()
+  let original = transform.identity
   let _updated = transform.set_position(original, vec3.Vec3(10.0, 20.0, 30.0))
 
   // Original should be unchanged

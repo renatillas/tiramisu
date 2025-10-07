@@ -2,14 +2,17 @@
 ///
 /// Demonstrates loading 3D models from STL files
 import gleam/javascript/promise
+import gleam/list
 import gleam/option
+import gleam/result
+import tiramisu
+import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/scene.{type BufferGeometry}
-import tiramisu/stl
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
+import vec/vec3f
 
 pub type LoadState {
   Loading
@@ -28,38 +31,24 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 5.0, 10.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
-  // Load an STL file from the assets directory
-  // Place your STL file in the Lustre assets folder
+  // Load an STL file from the asset directory
+  // Place your STL file in the Lustre asset folder
   let load_effect =
     effect.from_promise(
-      promise.map(stl.load("model.stl"), fn(result) {
+      promise.map(asset.load_stl("model.stl"), fn(result) {
         case result {
           Ok(geom) -> ModelLoaded(geom)
           Error(error) -> {
@@ -73,7 +62,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(model, effect.batch([effect.tick(Tick), load_effect]))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
@@ -91,11 +84,32 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+    |> result.map(fn(camera) {
+      camera
+      |> camera.set_position(vec3.Vec3(0.0, 5.0, 15.0))
+      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+      |> scene.Camera(
+        id: "main-camera",
+        camera: _,
+        transform: transform.identity,
+        active: True,
+        viewport: option.None,
+      )
+      |> list.wrap
+    })
+
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 1.0),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -123,7 +137,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
           ),
           physics: option.None,
         )
-      [loading_cube, ..lights]
+        |> list.wrap
+      list.flatten([camera, loading_cube, lights])
     }
 
     Failed -> {
@@ -146,13 +161,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
           ),
           physics: option.None,
         )
-      [error_cube, ..lights]
+        |> list.wrap
+      list.flatten([camera, error_cube, lights])
     }
 
     Loaded(geom) -> {
       // Show the loaded STL model
       let model_node =
-        scene.Group(id: "stl_group", transform: transform.identity(), children: [
+        scene.Group(id: "stl_group", transform: transform.identity, children: [
           scene.Mesh(
             id: "standard",
             geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
@@ -181,15 +197,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
               normal_map: option.None,
             ),
             transform: transform.Transform(
-              position: vec3.zero(),
+              position: vec3f.zero,
               rotation: vec3.Vec3(0.0, model.rotation, 0.0),
               scale: vec3.Vec3(0.1, 0.1, 0.1),
             ),
             physics: option.None,
           ),
         ])
+        |> list.wrap
 
-      [model_node, ..lights]
+      list.flatten([camera, model_node, lights])
     }
   }
 }

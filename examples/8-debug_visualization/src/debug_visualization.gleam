@@ -4,22 +4,23 @@ import gleam/io
 import gleam/list
 import gleam/option
 import gleam_community/maths
+import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/input
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
+import vec/vec3f
 
 pub type Model {
   Model(
     rotation: Float,
     debug_enabled: Bool,
     show_performance: Bool,
-    animated_position: vec3.Vec3,
-    path_points: List(vec3.Vec3),
+    animated_position: vec3.Vec3(Float),
+    path_points: List(vec3.Vec3(Float)),
   )
 }
 
@@ -30,31 +31,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(10.0, 10.0, 15.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x0a0a1a,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   io.println("Debug Visualization Example")
   io.println("Controls:")
   io.println("  D - Toggle debug visualizations")
@@ -72,7 +59,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(model, effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       // Animate rotation
@@ -158,11 +149,30 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+  let camera =
+    camera
+    |> camera.set_position(vec3.Vec3(10.0, 10.0, 15.0))
+    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+    |> scene.Camera(
+      id: "main_camera",
+      camera: _,
+      transform: transform.identity,
+      active: True,
+      viewport: option.None,
+    )
+    |> list.wrap
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -202,7 +212,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       ),
       transform: transform.Transform(
         position: vec3.Vec3(4.0, 1.5, 0.0),
-        rotation: vec3.zero(),
+        rotation: vec3f.zero,
         scale: vec3.Vec3(1.0, 1.0, 1.0),
       ),
       physics: option.None,
@@ -214,10 +224,10 @@ fn view(model: Model) -> List(scene.SceneNode) {
     False -> []
     True -> {
       // Grid at ground level
-      let grid = debug.grid("grid", 20.0, 20, debug.white)
+      let grid = debug.grid("grid", 20.0, 20, debug.color_white)
 
       // Coordinate axes at origin
-      let axes_origin = debug.axes("axes_origin", vec3.zero(), 2.0)
+      let axes_origin = debug.axes("axes_origin", vec3f.zero, 2.0)
 
       // Bounding box around cube
       let cube_bbox =
@@ -225,12 +235,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
           "cube_bbox",
           vec3.Vec3(-5.0, 0.0, -1.0),
           vec3.Vec3(-3.0, 2.0, 1.0),
-          debug.green,
+          debug.color_green,
         )
 
       // Wireframe sphere around actual sphere
       let sphere_debug =
-        debug.sphere("sphere_debug", vec3.Vec3(4.0, 1.5, 0.0), 2.0, debug.red)
+        debug.sphere(
+          "sphere_debug",
+          vec3.Vec3(4.0, 1.5, 0.0),
+          2.0,
+          debug.color_red,
+        )
 
       // Line between objects
       let connection_line =
@@ -238,50 +253,79 @@ fn view(model: Model) -> List(scene.SceneNode) {
           "connection",
           vec3.Vec3(-4.0, 1.0, 0.0),
           vec3.Vec3(4.0, 1.5, 0.0),
-          debug.cyan,
+          debug.color_cyan,
         )
 
       // Ray from origin pointing up
       let ray_up =
         debug.ray(
           "ray_up",
-          vec3.zero(),
+          vec3f.zero,
           vec3.Vec3(0.0, 1.0, 0.0),
           5.0,
-          debug.yellow,
+          debug.color_yellow,
         )
 
       // Animated point following circular path
       let moving_point =
-        debug.point("moving_point", model.animated_position, 0.3, debug.magenta)
+        debug.point(
+          "moving_point",
+          model.animated_position,
+          0.3,
+          debug.color_magenta,
+        )
 
       // Cross marker at moving point
       let cross_marker =
-        debug.cross("cross", model.animated_position, 0.8, debug.orange)
+        debug.cross("cross", model.animated_position, 0.8, debug.color_orange)
 
       // Axes at animated position
       let axes_moving = debug.axes("axes_moving", model.animated_position, 1.0)
 
       // Path showing trail
-      let trail = debug.path("trail", model.path_points, debug.blue)
+      let trail = debug.path("trail", model.path_points, debug.color_blue)
 
       // Corner markers
       let corners = [
-        debug.point("corner1", vec3.Vec3(8.0, 0.0, 8.0), 0.2, debug.purple),
-        debug.point("corner2", vec3.Vec3(-8.0, 0.0, 8.0), 0.2, debug.purple),
-        debug.point("corner3", vec3.Vec3(8.0, 0.0, -8.0), 0.2, debug.purple),
-        debug.point("corner4", vec3.Vec3(-8.0, 0.0, -8.0), 0.2, debug.purple),
+        debug.point(
+          "corner1",
+          vec3.Vec3(8.0, 0.0, 8.0),
+          0.2,
+          debug.color_purple,
+        ),
+        debug.point(
+          "corner2",
+          vec3.Vec3(-8.0, 0.0, 8.0),
+          0.2,
+          debug.color_purple,
+        ),
+        debug.point(
+          "corner3",
+          vec3.Vec3(8.0, 0.0, -8.0),
+          0.2,
+          debug.color_purple,
+        ),
+        debug.point(
+          "corner4",
+          vec3.Vec3(-8.0, 0.0, -8.0),
+          0.2,
+          debug.color_purple,
+        ),
       ]
 
       // Box from transform
       let transform_box =
         transform.Transform(
           position: vec3.Vec3(0.0, 5.0, 0.0),
-          rotation: vec3.zero(),
+          rotation: vec3f.zero,
           scale: vec3.Vec3(3.0, 1.0, 3.0),
         )
       let box_from_transform =
-        debug.box_from_transform("transform_box", transform_box, debug.yellow)
+        debug.box_from_transform(
+          "transform_box",
+          transform_box,
+          debug.color_yellow,
+        )
 
       list.flatten([
         [grid, axes_origin, cube_bbox, sphere_debug, connection_line],
@@ -293,5 +337,5 @@ fn view(model: Model) -> List(scene.SceneNode) {
     }
   }
 
-  list.flatten([lights, objects, debug_nodes])
+  list.flatten([camera, lights, objects, debug_nodes])
 }

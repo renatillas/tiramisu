@@ -4,12 +4,6 @@ Tiramisu is a type-safe 3D game engine for Gleam, built on Three.js. It follows 
 
 ## Installation
 
-### Prerequisites
-
-- [Gleam](https://gleam.run/) 1.0.0 or later
-- Node.js 18 or later
-- A modern web browser
-
 ### Create a New Project
 
 ```bash
@@ -19,18 +13,23 @@ cd my_game
 
 ### Add Tiramisu Dependency
 
-Add Tiramisu to your `gleam.toml`:
-
-```toml
-[dependencies]
-gleam_stdlib = ">= 0.44.0 and < 2.0.0"
-tiramisu = ">= 0.0.3 and < 1.0.0"
+```bash
+gleam add tiramisu
 ```
 
 Then install dependencies:
 
 ```bash
 gleam deps download
+```
+
+### Add additional configuration to your gleam.toml
+
+```toml
+[tools.lustre.html]
+scripts = [
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
+]
 ```
 
 ## Your First Game: Hello Cube
@@ -93,26 +92,25 @@ fn update(
 // Render the scene
 fn view(model: Model) -> List(scene.SceneNode) {
   // Create camera
-  let assert Ok(cam) =
+  let assert Ok(camera) =
     camera.perspective(
       field_of_view: 75.0,
       aspect: 800.0 /. 600.0,
       near: 0.1,
       far: 1000.0,
     )
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 0.0, 5.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  let camera_node =
-    scene.Camera(
-      id: "main",
-      camera: cam,
-      transform: transform.identity(),
-      active: True,
-      viewport: option.None,
-    )
+    |> result.map(fn(camera) {
+      camera
+      |> camera.set_position(vec3.Vec3(0.0, 0.0, 5.0))
+      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+      |> scene.Camera(
+        id: "main",
+        camera: _,
+        transform: transform.identity,
+        active: True,
+        viewport: option.None,
+      )
+  })
 
   // Create rotating cube
   let cube =
@@ -139,7 +137,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
-      transform: transform.identity(),
+      transform: transform.identity,
     )
 
   let directional =
@@ -160,8 +158,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
 ### Run Your Game
 
 ```bash
-gleam run -t javascript
+gleam run -m lustre/dev start
 ```
+
 
 Open your browser and navigate to the displayed URL. You should see a spinning teal cube!
 
@@ -246,73 +245,6 @@ transform.Transform(
 )
 
 // Or use the identity transform
-transform.identity()  // Position (0,0,0), no rotation, scale (1,1,1)
+transform.identity  // Position (0,0,0), no rotation, scale (1,1,1)
 ```
 
-## Project Structure
-
-A typical Tiramisu project looks like:
-
-```
-my_game/
-├── gleam.toml           # Project configuration
-├── src/
-│   ├── my_game.gleam    # Main game file
-│   └── my_game/         # Game modules
-│       ├── entities.gleam
-│       ├── levels.gleam
-│       └── physics.gleam
-├── assets/              # Game assets
-│   ├── models/
-│   ├── textures/
-│   └── audio/
-└── build/               # Compiled output
-```
-
-## Core Modules
-
-Tiramisu provides these core modules:
-
-- **tiramisu**: Game loop and initialization
-- **tiramisu/scene**: Scene nodes (meshes, lights, cameras)
-- **tiramisu/camera**: Camera types and configuration
-- **tiramisu/transform**: Position, rotation, scale
-- **tiramisu/vec3**: 3D vector math
-- **tiramisu/effect**: Side effect system
-- **tiramisu/input**: Keyboard, mouse, touch input
-- **tiramisu/assets**: Asset loading and caching
-- **tiramisu/physics**: Physics simulation (rigid bodies, colliders)
-- **tiramisu/audio**: 2D and 3D audio
-- **tiramisu/animation**: Tweens and animation state machines
-- **tiramisu/debug**: Debug visualization tools
-
-## What's Next?
-
-Now that you have a basic game running, explore these tutorials:
-
-1. **[Tutorial 1: Your First Game](./tutorial-1-first-game.md)** - Add keyboard input and interactivity
-2. **[Tutorial 2: Adding Physics](./tutorial-2-physics.md)** - Bouncing balls with gravity
-3. **[Tutorial 3: Loading Assets](./tutorial-3-assets.md)** - Load 3D models and textures
-4. **[Tutorial 4: Character Controller](./tutorial-4-character.md)** - WASD movement + animations
-5. **[Tutorial 5: Audio and Effects](./tutorial-5-audio.md)** - Sound effects + background music
-6. **[Tutorial 6: Building a Complete Game](./tutorial-6-complete-game.md)** - Simple 3D platformer
-
-## Examples
-
-Check out the `/examples` directory for working examples:
-
-- `0-effects_system` - Effect system with dynamic cube spawning
-- `1-keyboard_mouse_input` - Input handling
-- `3-materials_and_lights` - Material types and lighting
-- `4-geometry_showcase` - Built-in geometry types
-- `14-gltf_animated_model` - Loading animated 3D models
-- `17-physics_demo` - Physics simulation
-- `18-stress_test` - 20,000 instances at 60 FPS
-
-## Getting Help
-
-- **Examples**: See `/examples` for working code
-- **Guides**: Check `/docs` for in-depth guides
-- **API Docs**: Run `gleam docs build` to generate API documentation
-
-Happy game development! 🎮

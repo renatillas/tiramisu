@@ -19,7 +19,7 @@
 ////
 //// ```gleam
 //// // In Tiramisu update
-//// ui.dispatch(UpdateScore(new_score))
+//// ui.dispatch_to_lustre(UpdateScore(new_score))
 //// ```
 ////
 //// 3. Send messages from UI to game:
@@ -35,8 +35,8 @@ import tiramisu/effect as game_effect
 /// Register your Lustre app to receive messages from Tiramisu.
 ///
 /// Call this in your Lustre app's init function.
-pub fn register() -> effect.Effect(a) {
-  effect.from(fn(dispatch) { do_register_ui(dispatch) })
+pub fn register_lustre() -> effect.Effect(a) {
+  effect.from(fn(dispatch) { do_register_lustre(dispatch) })
 }
 
 /// Dispatch a message from Tiramisu game to Lustre UI.
@@ -52,13 +52,13 @@ pub fn register() -> effect.Effect(a) {
 ///     new_model,
 ///     effect.batch([
 ///       effect.tick(Tick),
-///       ui.dispatch(UpdateScore(model.score)),
+///       ui.dispatch_to_lustre(UpdateScore(model.score)),
 ///     ])
 ///   )
 /// }
 /// ```
-pub fn dispatch(msg: ui_msg) -> game_effect.Effect(game_msg) {
-  game_effect.from(fn(_dispatch) { do_dispatch_to_ui(msg) })
+pub fn dispatch_to_lustre(msg: ui_msg) -> game_effect.Effect(game_msg) {
+  game_effect.from(fn(_dispatch) { do_dispatch_to_lustre(msg) })
 }
 
 /// Send a message from Lustre UI to Tiramisu game.
@@ -73,24 +73,24 @@ pub fn dispatch(msg: ui_msg) -> game_effect.Effect(game_msg) {
 ///   case msg {
 ///     StartGame -> #(
 ///       Model(..model, playing: True),
-///       ui.send_to_game(Resume)
+///       ui.dispatch_to_tiramisu(Resume)
 ///     )
 ///     PauseGame -> #(
 ///       Model(..model, playing: False),
-///       ui.send_to_game(Pause)
+///       ui.dispatch_to_tiramisu(Pause)
 ///     )
 ///   }
 /// }
 /// ```
-pub fn send_to_game(msg: game_msg) -> effect.Effect(ui_msg) {
+pub fn dispatch_to_tiramisu(msg: game_msg) -> effect.Effect(ui_msg) {
   effect.from(fn(_dispatch) { do_dispatch_to_game(msg) })
 }
 
 @external(javascript, "./ffi/ui.mjs", "registerUI")
-fn do_register_ui(dispatch: fn(msg) -> Nil) -> Nil
+fn do_register_lustre(dispatch: fn(msg) -> Nil) -> Nil
 
 @external(javascript, "./ffi/ui.mjs", "dispatchToUI")
-fn do_dispatch_to_ui(msg: ui_msg) -> Nil
+fn do_dispatch_to_lustre(msg: ui_msg) -> Nil
 
 @external(javascript, "./ffi/ui.mjs", "dispatchToGame")
 fn do_dispatch_to_game(msg: game_msg) -> Nil

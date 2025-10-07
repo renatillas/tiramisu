@@ -7,7 +7,7 @@ import vec/vec3f
 
 // Test: identity transform
 pub fn identity_test() {
-  let t = transform.identity()
+  let t = transform.identity
   assert t.position == vec3f.zero
   assert t.rotation == vec3f.zero
   assert t.scale == vec3f.one
@@ -24,7 +24,7 @@ pub fn at_test() {
 
 // Test: set position
 pub fn set_position_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_pos = vec3.Vec3(5.0, 6.0, 7.0)
   let updated = transform.set_position(t, new_pos)
   assert updated.position == new_pos
@@ -34,7 +34,7 @@ pub fn set_position_test() {
 
 // Test: set rotation
 pub fn set_rotation_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_rot = vec3.Vec3(0.5, 1.0, 1.5)
   let updated = transform.set_rotation(t, new_rot)
   assert updated.position == vec3f.zero
@@ -44,7 +44,7 @@ pub fn set_rotation_test() {
 
 // Test: set scale
 pub fn set_scale_test() {
-  let t = transform.identity()
+  let t = transform.identity
   let new_scale = vec3.Vec3(2.0, 3.0, 4.0)
   let updated = transform.set_scale(t, new_scale)
   assert updated.position == vec3f.zero
@@ -91,10 +91,10 @@ pub fn compose_position_test() {
 // Test: compose transforms - scale multiplication
 pub fn compose_scale_test() {
   let t1 =
-    transform.identity()
+    transform.identity
     |> transform.set_scale(vec3.Vec3(2.0, 3.0, 4.0))
   let t2 =
-    transform.identity()
+    transform.identity
     |> transform.set_scale(vec3.Vec3(5.0, 6.0, 7.0))
   let result = transform.compose(t1, t2)
   assert result.scale.x == 10.0

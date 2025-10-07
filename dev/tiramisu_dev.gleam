@@ -155,14 +155,14 @@ fn create_nested_group(depth: Int, current: Int) -> scene.SceneNode {
         id: "leaf_" <> int.to_string(current),
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       )
 
     False ->
       scene.Group(
         id: "group_" <> int.to_string(current),
-        transform: transform.identity(),
+        transform: transform.identity,
         children: [create_nested_group(depth, current + 1)],
       )
   }

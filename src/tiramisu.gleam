@@ -49,7 +49,7 @@
 ////       id: "cube",
 ////       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
 ////       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-////       transform: transform.identity()
+////       transform: transform.identity
 ////         |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
 ////       physics: option.None,
 ////     ),
@@ -162,7 +162,7 @@ pub type Context {
 ///           id: "cube",
 ///           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
 ///           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-///           transform: transform.identity()
+///           transform: transform.identity
 ///             |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
 ///           physics: option.None,
 ///         ),

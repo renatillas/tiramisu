@@ -5,10 +5,10 @@ import tiramisu/camera
 import tiramisu/effect
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
-  Model(tween: animation.Tween(vec3.Vec3), current_easing: Int)
+  Model(tween: animation.Tween(vec3.Vec3(Float)), current_easing: Int)
 }
 
 pub type Msg {
@@ -133,7 +133,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",

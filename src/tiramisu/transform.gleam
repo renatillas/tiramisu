@@ -9,7 +9,7 @@
 //// import tiramisu/transform
 //// import vec/vec3
 ////
-//// let player_transform = transform.identity()
+//// let player_transform = transform.identity
 ////   |> transform.set_position(vec3.Vec3(0.0, 1.0, 0.0))
 ////   |> transform.set_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90 degrees in radians
 ////   |> transform.set_scale(vec3.Vec3(1.0, 2.0, 1.0))  // Tall player
@@ -38,12 +38,14 @@ pub type Transform {
 /// ## Example
 ///
 /// ```gleam
-/// let t = transform.identity()
+/// let t = transform.identity
 /// // position: (0, 0, 0), rotation: (0, 0, 0), scale: (1, 1, 1)
 /// ```
-pub fn identity() -> Transform {
-  Transform(position: vec3f.zero, rotation: vec3f.zero, scale: vec3f.one)
-}
+pub const identity = Transform(
+  position: vec3.Vec3(0.0, 0.0, 0.0),
+  rotation: vec3.Vec3(0.0, 0.0, 0.0),
+  scale: vec3.Vec3(1.0, 1.0, 1.0),
+)
 
 /// Create a transform at a specific position with default rotation and scale.
 ///
@@ -62,7 +64,7 @@ pub fn at(position position: vec3.Vec3(Float)) -> Transform {
 /// ## Example
 ///
 /// ```gleam
-/// let moved = transform.identity()
+/// let moved = transform.identity
 ///   |> transform.set_position(vec3.Vec3(1.0, 2.0, 3.0))
 /// ```
 pub fn set_position(
@@ -77,7 +79,7 @@ pub fn set_position(
 /// ## Example
 ///
 /// ```gleam
-/// let rotated = transform.identity()
+/// let rotated = transform.identity
 ///   |> transform.set_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90° turn around Y axis
 /// ```
 pub fn set_rotation(
@@ -92,7 +94,7 @@ pub fn set_rotation(
 /// ## Example
 ///
 /// ```gleam
-/// let scaled = transform.identity()
+/// let scaled = transform.identity
 ///   |> transform.set_scale(vec3.Vec3(2.0, 1.0, 2.0))  // Wide and deep, normal height
 /// ```
 pub fn set_scale(transform: Transform, scale: vec3.Vec3(Float)) -> Transform {

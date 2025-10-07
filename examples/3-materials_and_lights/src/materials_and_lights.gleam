@@ -1,11 +1,11 @@
 import gleam/list
 import gleam/option
+import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 pub type Model {
   Model(rotation: Float, light_intensity: Float)
@@ -16,35 +16,25 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(position: vec3.Vec3(0.0, 3.0, 15.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x0a0a0a,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   #(Model(rotation: 0.0, light_intensity: 1.0), effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
@@ -54,11 +44,31 @@ fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
 }
 
 fn view(model: Model) -> List(scene.SceneNode) {
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 75.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 1000.0,
+    )
+
+  let camera =
+    camera
+    |> camera.set_position(position: vec3.Vec3(0.0, 3.0, 15.0))
+    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
+  let camera =
+    scene.Camera(
+      id: "main_camera",
+      camera:,
+      transform: transform.identity,
+      active: True,
+      viewport: option.None,
+    )
   let lights = [
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0x404040, intensity: 0.3),
-      transform: transform.identity(),
+      transform: transform.identity,
     ),
     scene.Light(
       id: "directional",
@@ -190,5 +200,5 @@ fn view(model: Model) -> List(scene.SceneNode) {
     ),
   ]
 
-  list.flatten([lights, materials, ground])
+  list.flatten([[camera], lights, materials, ground])
 }

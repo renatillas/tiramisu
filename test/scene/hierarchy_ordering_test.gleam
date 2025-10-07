@@ -8,19 +8,19 @@ import vec/vec3
 pub fn parent_before_children_test() {
   let previous = []
   let current = [
-    scene.Group(id: "parent", transform: transform.identity(), children: [
+    scene.Group(id: "parent", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
       scene.Mesh(
         id: "child2",
         geometry: scene.SphereGeometry(1.0, 32, 32),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -64,14 +64,14 @@ pub fn parent_before_children_test() {
 pub fn deeply_nested_ordering_test() {
   let previous = []
   let current = [
-    scene.Group(id: "root", transform: transform.identity(), children: [
-      scene.Group(id: "level1", transform: transform.identity(), children: [
-        scene.Group(id: "level2", transform: transform.identity(), children: [
+    scene.Group(id: "root", transform: transform.identity, children: [
+      scene.Group(id: "level1", transform: transform.identity, children: [
+        scene.Group(id: "level2", transform: transform.identity, children: [
           scene.Mesh(
             id: "leaf",
             geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
             material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-            transform: transform.identity(),
+            transform: transform.identity,
             physics: option.None,
           ),
         ]),
@@ -127,21 +127,21 @@ pub fn deeply_nested_ordering_test() {
 pub fn sibling_groups_ordering_test() {
   let previous = []
   let current = [
-    scene.Group(id: "group1", transform: transform.identity(), children: [
+    scene.Group(id: "group1", transform: transform.identity, children: [
       scene.Mesh(
         id: "child1",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
-    scene.Group(id: "group2", transform: transform.identity(), children: [
+    scene.Group(id: "group2", transform: transform.identity, children: [
       scene.Mesh(
         id: "child2",
         geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
         material: scene.BasicMaterial(0x00ff00, False, 1.0, option.None),
-        transform: transform.identity(),
+        transform: transform.identity,
         physics: option.None,
       ),
     ]),
@@ -198,10 +198,10 @@ pub fn solar_system_ordering_test() {
       id: "sun",
       geometry: scene.SphereGeometry(1.5, 32, 32),
       material: scene.BasicMaterial(0xffff00, False, 1.0, option.None),
-      transform: transform.identity(),
+      transform: transform.identity,
       physics: option.None,
     ),
-    scene.Group(id: "planet_orbit", transform: transform.identity(), children: [
+    scene.Group(id: "planet_orbit", transform: transform.identity, children: [
       scene.Mesh(
         id: "planet",
         geometry: scene.SphereGeometry(0.5, 32, 32),
