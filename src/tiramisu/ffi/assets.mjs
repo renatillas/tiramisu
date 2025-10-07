@@ -2,29 +2,20 @@
 ///
 /// Handles audio loading and batch asset loading with progress tracking.
 import * as THREE from 'three';
-import { Ok, Error } from '../../../gleam_stdlib/gleam.mjs';
-import { toList } from '../../../gleam_stdlib/gleam.mjs';
-import { new$ as dictNew, insert as dictInsert } from '../../../gleam_stdlib/gleam/dict.mjs';
-import {
-  LoadProgress as GleamLoadProgress,
-  BatchLoadResult as GleamBatchLoadResult,
-  AssetError$AssetLoadError,
-  loaded_model,
-  loaded_texture,
-  loaded_audio,
-  loaded_stl
-} from '../assets.mjs';
-import { loadGLTFAsync } from './gltf.mjs';
-import { loadTextureAsync } from './texture.mjs';
-import { loadSTLAsync } from './stl.mjs';
+import * as GLEAM from '../../../gleam_stdlib/gleam.mjs';
+import * as DICT from '../../../gleam_stdlib/gleam/dict.mjs';
+import * as ASSETS_GLEAM from '../assets.mjs';
+import * as GLTF from './gltf.mjs';
+import * as TEXTURE from './texture.mjs';
+import * as STL from './stl.mjs';
 
 // Wrapper functions for Gleam types
 function LoadProgress(loaded, total, current_url) {
-  return new GleamLoadProgress(loaded, total, current_url);
+  return new ASSETS_GLEAM.LoadProgress(loaded, total, current_url);
 }
 
 function BatchLoadResult(cache, errors) {
-  return new GleamBatchLoadResult(cache, errors);
+  return new ASSETS_GLEAM.BatchLoadResult(cache, errors);
 }
 
 function AssetCache(assets) {
@@ -32,7 +23,7 @@ function AssetCache(assets) {
 }
 
 function AssetLoadError(url, reason) {
-  return AssetError$AssetLoadError(url, reason);
+  return ASSETS_GLEAM.AssetError$AssetLoadError(url, reason);
 }
 
 // Audio loader singleton
@@ -60,14 +51,14 @@ export function loadAudio(url) {
       // Success
       (audioBuffer) => {
         console.log(`[Tiramisu] Audio loaded: ${url}`);
-        resolve(new Ok(audioBuffer));
+        resolve(new GLEAM.Ok(audioBuffer));
       },
       // Progress (optional)
       undefined,
       // Error
       (error) => {
         console.error(`[Tiramisu] Audio load failed: ${url}`, error);
-        resolve(new Error(error.message || 'Failed to load audio'));
+        resolve(new GLEAM.Error(error.message || 'Failed to load audio'));
       }
     );
   });
@@ -82,7 +73,7 @@ export function loadAudio(url) {
 export function loadBatch(assets, onProgress) {
   const total = assets.length;
   let loaded = 0;
-  let loadedAssetsDict = dictNew(); // Create Gleam Dict
+  let loadedAssetsDict = DICT.new$(); // Create Gleam Dict
   const loadedResults = []; // Track loaded assets to insert into dict later
   const errors = [];
 
@@ -90,8 +81,8 @@ export function loadBatch(assets, onProgress) {
     // Empty batch, return immediately
     return Promise.resolve(
       BatchLoadResult(
-        AssetCache(dictNew()),
-        toList([]) // Convert empty array to Gleam List
+        AssetCache(DICT.new$()),
+        GLEAM.toList([]) // Convert empty array to Gleam List
       )
     );
   }
@@ -126,7 +117,7 @@ export function loadBatch(assets, onProgress) {
         const errorMsg = error.message || 'Unknown error';
         errors.push(AssetLoadError(url, errorMsg));
         onProgress(LoadProgress(loaded, total, url));
-        return new Error(errorMsg);
+        return new GLEAM.Error(errorMsg);
       });
   });
 
@@ -134,14 +125,14 @@ export function loadBatch(assets, onProgress) {
   return Promise.all(promises).then(() => {
     // Build Gleam Dict from loaded results
     for (const { url, asset } of loadedResults) {
-      loadedAssetsDict = dictInsert(loadedAssetsDict, url, asset);
+      loadedAssetsDict = DICT.insert(loadedAssetsDict, url, asset);
     }
 
     console.log(`[Tiramisu] Batch load complete: ${loadedResults.length}/${total} succeeded, ${errors.length} failed`);
 
     return BatchLoadResult(
       AssetCache(loadedAssetsDict),
-      toList(errors) // Convert JavaScript array to Gleam List
+      GLEAM.toList(errors) // Convert JavaScript array to Gleam List
     );
   });
 }
@@ -166,17 +157,17 @@ function loadAssetByType(asset) {
 
   if (typeName === 'ModelAsset') {
     // Load GLTF model
-    return loadGLTFAsync(url).then(result => {
+    return GLTF.loadGLTFAsync(url).then(result => {
       if (result.isOk()) {
-        return new Ok(loaded_model(result[0]));
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_model(result[0]));
       }
       return result;
     });
   } else if (typeName === 'TextureAsset') {
     // Load texture
-    return loadTextureAsync(url).then(result => {
+    return TEXTURE.loadTextureAsync(url).then(result => {
       if (result.isOk()) {
-        return new Ok(loaded_texture(result[0]));
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_texture(result[0]));
       }
       return result;
     });
@@ -184,20 +175,20 @@ function loadAssetByType(asset) {
     // Load audio
     return loadAudio(url).then(result => {
       if (result.isOk()) {
-        return new Ok(loaded_audio(result[0]));
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_audio(result[0]));
       }
       return result;
     });
   } else if (typeName === 'STLAsset') {
     // Load STL
-    return loadSTLAsync(url).then(result => {
+    return STL.loadSTLAsync(url).then(result => {
       if (result.isOk()) {
-        return new Ok(loaded_stl(result[0]));
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_stl(result[0]));
       }
       return result;
     });
   } else {
-    return Promise.resolve(new Error(`Unknown asset type: ${typeName}`));
+    return Promise.resolve(new GLEAM.Error(`Unknown asset type: ${typeName}`));
   }
 }
 

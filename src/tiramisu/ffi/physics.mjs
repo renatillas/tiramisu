@@ -47,7 +47,6 @@ export function stepWorld(deltaTime) {
  */
 export function createRigidBody(id, bodyConfig, transform) {
   if (!physicsWorld) {
-    console.error('[Physics] World not initialized');
     return;
   }
 

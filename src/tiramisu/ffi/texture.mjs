@@ -1,24 +1,12 @@
 import * as THREE from 'three';
-import { Ok, Error } from '../../gleam.mjs';
-
-// Define error constructors to match Gleam types
-class LoadError {
-  constructor(message) {
-    this.message = message;
-  }
-}
-
-class InvalidUrl {
-  constructor(url) {
-    this.url = url;
-  }
-}
+import * as GLEAM from '../../gleam.mjs';
+import * as ASSETS_GLEAM from '../assets.mjs';
 
 // Promise-based texture loading
 export function loadTextureAsync(url) {
   return new Promise((resolve) => {
     if (!url || url.trim() === '') {
-      resolve(new Error(new InvalidUrl(url)));
+      resolve(new GLEAM.Error(new ASSETS_GLEAM.InvalidUrl(url)));
       return;
     }
 
@@ -27,11 +15,11 @@ export function loadTextureAsync(url) {
     loader.load(
       url,
       (texture) => {
-        resolve(new Ok(texture));
+        resolve(new GLEAM.Ok(texture));
       },
       undefined,
       (error) => {
-        resolve(new Error(new LoadError(error.message || 'Failed to load texture')));
+        resolve(new GLEAM.Error(new ASSETS_GLEAM.LoadError(error.message || 'Failed to load texture')));
       }
     );
   });

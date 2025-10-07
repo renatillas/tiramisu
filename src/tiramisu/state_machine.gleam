@@ -7,10 +7,6 @@ import gleam/list
 import gleam/option.{type Option}
 import tiramisu/object3d.{type Animation}
 
-/// Unique identifier for a state
-pub type StateId =
-  String
-
 /// Condition for transitioning between states
 /// The generic parameter `ctx` allows you to pass context (like GameContext) to custom conditions
 pub type Condition(ctx) {
@@ -25,8 +21,8 @@ pub type Condition(ctx) {
 /// Transition between two states
 pub type Transition(ctx) {
   Transition(
-    from: StateId,
-    to: StateId,
+    from: String,
+    to: String,
     condition: Condition(ctx),
     blend_duration: Float,
   )
@@ -34,17 +30,17 @@ pub type Transition(ctx) {
 
 /// An animation state with its configuration
 pub type State {
-  State(id: StateId, animation: Animation, is_looping: Bool)
+  State(id: String, animation: Animation, is_looping: Bool)
 }
 
 /// The current state of a running state machine
 pub type StateMachineState {
   /// Playing a single state
-  Playing(state: StateId, elapsed: Float)
+  Playing(state: String, elapsed: Float)
   /// Blending between two states
   Blending(
-    from: StateId,
-    to: StateId,
+    from: String,
+    to: String,
     blend_progress: Float,
     blend_duration: Float,
   )
@@ -53,7 +49,7 @@ pub type StateMachineState {
 /// An animation state machine
 pub opaque type StateMachine(ctx) {
   StateMachine(
-    states: Dict(StateId, State),
+    states: Dict(String, State),
     transitions: List(Transition(ctx)),
     current: StateMachineState,
     default_blend: Float,
@@ -61,7 +57,7 @@ pub opaque type StateMachine(ctx) {
 }
 
 /// Create a new state machine with a starting state
-pub fn new(initial_state: StateId) -> StateMachine(ctx) {
+pub fn new(initial_state: String) -> StateMachine(ctx) {
   StateMachine(
     states: dict.new(),
     transitions: [],
@@ -73,7 +69,7 @@ pub fn new(initial_state: StateId) -> StateMachine(ctx) {
 /// Add a state to the state machine
 pub fn add_state(
   machine: StateMachine(ctx),
-  id: StateId,
+  id: String,
   animation: Animation,
   looping looping: Bool,
 ) -> StateMachine(ctx) {
@@ -84,8 +80,8 @@ pub fn add_state(
 /// Add a transition between two states
 pub fn add_transition(
   machine: StateMachine(ctx),
-  from from: StateId,
-  to to: StateId,
+  from from: String,
+  to to: String,
   condition condition: Condition(ctx),
   blend_duration blend_duration: Float,
 ) -> StateMachine(ctx) {
@@ -198,7 +194,7 @@ pub type AnimationOutput {
 /// Manually trigger a transition to a specific state
 pub fn transition_to(
   machine: StateMachine(ctx),
-  target: StateId,
+  target: String,
   blend_duration: Option(Float),
 ) -> StateMachine(ctx) {
   let blend = option.unwrap(blend_duration, machine.default_blend)
@@ -215,7 +211,7 @@ pub fn transition_to(
 }
 
 /// Get the current state ID
-pub fn current_state(machine: StateMachine(ctx)) -> StateId {
+pub fn current_state(machine: StateMachine(ctx)) -> String {
   case machine.current {
     Playing(state_id, _) -> state_id
     Blending(_, to, _, _) -> to
@@ -243,7 +239,7 @@ pub fn blend_progress(machine: StateMachine(ctx)) -> Option(Float) {
 /// Find a valid transition from the current state
 fn find_valid_transition(
   machine: StateMachine(ctx),
-  from_state: StateId,
+  from_state: String,
   context: ctx,
 ) -> Result(Transition(ctx), Nil) {
   machine.transitions
@@ -264,12 +260,12 @@ fn check_condition(condition: Condition(ctx), context: ctx) -> Bool {
 }
 
 /// Get a state by ID
-pub fn get_state(machine: StateMachine(ctx), id: StateId) -> Result(State, Nil) {
+pub fn get_state(machine: StateMachine(ctx), id: String) -> Result(State, Nil) {
   dict.get(machine.states, id)
 }
 
 /// Get all state IDs
-pub fn state_ids(machine: StateMachine(ctx)) -> List(StateId) {
+pub fn state_ids(machine: StateMachine(ctx)) -> List(String) {
   dict.keys(machine.states)
 }
 

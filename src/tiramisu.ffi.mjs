@@ -1,12 +1,12 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
-import * as inputCapture from './input_capture.mjs';
-import { applyPatches, applyPatch, createGeometry, createMaterial, createLight, applyTransform, updateMixers, syncPhysicsTransforms, getCamerasWithViewports } from './renderer.mjs';
-import { AddNode, diff } from '../scene.mjs';
-import { toList } from '../../../gleam_stdlib/gleam.mjs';
-import { stepWorld, getBodyTransform } from './physics.mjs';
-import { startPerformanceMonitoring, updatePerformanceStats, setRenderStats } from './debug.mjs';
-import { setCamera, getCamera } from './effects.mjs';
+import * as INPUT_CAPTURE from './tiramisu/ffi/input_capture.mjs';
+import * as RENDERER from './tiramisu/ffi/renderer.mjs';
+import * as SCENE_GLEAM from './tiramisu/scene.mjs';
+import * as GLEAM from '../../gleam_stdlib/gleam.mjs';
+import * as PHYSICS from './tiramisu/ffi/physics.mjs';
+import * as DEBUG from './tiramisu/ffi/debug.mjs';
+import * as CAMERA from './tiramisu/ffi/camera.mjs';
 
 /**
  * Create a Three.js scene with background color
@@ -28,9 +28,9 @@ export function appendToDom(canvas) {
  * Initialize all input systems
  */
 export function initializeInputSystems(canvas) {
-  inputCapture.initKeyboard();
-  inputCapture.initMouse(canvas);
-  inputCapture.initTouch(canvas);
+  INPUT_CAPTURE.initKeyboard();
+  INPUT_CAPTURE.initMouse(canvas);
+  INPUT_CAPTURE.initTouch(canvas);
 }
 
 /**
@@ -39,9 +39,9 @@ export function initializeInputSystems(canvas) {
 export function applyInitialScene(scene, nodes) {
   // Use diff with empty previous scene to generate proper patches
   // This ensures hierarchy is respected and parent_id is set correctly
-  const emptyList = toList([]);
-  const patches = diff(emptyList, nodes);
-  applyPatches(scene, patches);
+  const emptyList = GLEAM.toList([]);
+  const patches = SCENE_GLEAM.diff(emptyList, nodes);
+  RENDERER.applyPatches(scene, patches);
 }
 
 /**
@@ -80,7 +80,7 @@ export function startLoop(
   // 2. Camera scene nodes in the initial scene (applyInitialScene already handled)
 
   // Initialize performance monitoring
-  startPerformanceMonitoring();
+  DEBUG.startPerformanceMonitoring();
 
   // Run initial effect
   runEffect(effect, dispatch);
@@ -93,7 +93,7 @@ export function startLoop(
     lastTime = currentTime;
 
     // Capture input state snapshot
-    const inputState = inputCapture.captureInputState();
+    const inputState = INPUT_CAPTURE.captureInputState();
 
     // Update context with new delta and input
     const newContext = {
@@ -117,19 +117,19 @@ export function startLoop(
     const newNodes = view(currentState);
 
     // Diff and patch
-    const patches = diff(currentNodes, newNodes);
-    applyPatches(scene, patches);
+    const patches = SCENE_GLEAM.diff(currentNodes, newNodes);
+    RENDERER.applyPatches(scene, patches);
 
     currentNodes = newNodes;
 
     // Step physics simulation
-    stepWorld(deltaTime);
+    PHYSICS.stepWorld(deltaTime);
 
     // Sync physics transforms to Three.js objects
-    syncPhysicsTransforms();
+    RENDERER.syncPhysicsTransforms();
 
     // Update animation mixers
-    updateMixers(deltaTime);
+    RENDERER.updateMixers(deltaTime);
 
     // Clear the entire canvas first
     renderer.setScissorTest(false);
@@ -141,7 +141,7 @@ export function startLoop(
     const canvasHeight = canvas.clientHeight;
 
     // Render main camera (active camera without viewport)
-    const activeCamera = getCamera();
+    const activeCamera = CAMERA.getCamera();
     if (activeCamera) {
       renderer.setScissorTest(false);
       renderer.setViewport(0, 0, canvasWidth, canvasHeight);
@@ -151,7 +151,7 @@ export function startLoop(
     }
 
     // Render viewport cameras (picture-in-picture)
-    const viewportCameras = getCamerasWithViewports();
+    const viewportCameras = RENDERER.getCamerasWithViewports();
     if (viewportCameras.length > 0) {
       renderer.setScissorTest(true);
       for (const { camera, viewport } of viewportCameras) {
@@ -164,11 +164,11 @@ export function startLoop(
     }
 
     // Update performance stats
-    updatePerformanceStats(deltaTime);
-    setRenderStats(renderer.info);
+    DEBUG.updatePerformanceStats(deltaTime);
+    DEBUG.setRenderStats(renderer.info);
 
     // Clear per-frame input state
-    inputCapture.clearInputFrameState();
+    INPUT_CAPTURE.clearInputFrameState();
 
     // Continue loop
     requestAnimationFrame(gameLoop);

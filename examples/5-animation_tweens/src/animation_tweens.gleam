@@ -1,8 +1,8 @@
 import gleam/option
+import tiramisu
 import tiramisu/animation
 import tiramisu/camera
-import tiramisu/effect.{type Effect}
-import tiramisu/game.{type GameContext}
+import tiramisu/effect
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/vec3
@@ -16,31 +16,17 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  let assert Ok(cam) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-
-  let cam =
-    cam
-    |> camera.set_position(vec3.Vec3(0.0, 0.0, 15.0))
-    |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
-  game.run(
+  tiramisu.run(
     width: 1200,
     height: 800,
     background: 0x1a1a2e,
-    camera: option.Some(cam),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
   let tween =
     animation.tween_vec3(
       vec3.Vec3(-5.0, 0.0, 0.0),
@@ -52,7 +38,11 @@ fn init(_ctx: GameContext) -> #(Model, Effect(Msg)) {
   #(Model(tween: tween, current_easing: 0), effect.tick(Tick))
 }
 
-fn update(model: Model, msg: Msg, ctx: GameContext) -> #(Model, Effect(Msg)) {
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg)) {
   case msg {
     Tick -> {
       let updated_tween = animation.update_tween(model.tween, ctx.delta_time)
@@ -118,8 +108,28 @@ fn easing_name(index: Int) -> String {
 fn view(model: Model) -> List(scene.SceneNode) {
   let position = animation.get_tween_value(model.tween)
   let _ = easing_name(model.current_easing)
+  let assert Ok(camera) =
+    camera.perspective(
+      field_of_view: 45.0,
+      aspect: 1200.0 /. 800.0,
+      near: 0.1,
+      far: 100.0,
+    )
 
   [
+    scene.Camera(
+      id: "main_camera",
+      camera: camera
+        |> camera.set_position(vec3.Vec3(0.0, 0.0, 15.0))
+        |> camera.look(vec3.Vec3(0.0, 0.0, 0.0)),
+      transform: transform.Transform(
+        position: vec3.Vec3(0.0, 0.0, 15.0),
+        rotation: vec3.Vec3(0.0, 0.0, 0.0),
+        scale: vec3.Vec3(1.0, 1.0, 1.0),
+      ),
+      active: True,
+      viewport: option.None,
+    ),
     scene.Light(
       id: "ambient",
       light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.6),
@@ -134,7 +144,6 @@ fn view(model: Model) -> List(scene.SceneNode) {
         scale: vec3.Vec3(1.0, 1.0, 1.0),
       ),
     ),
-    // Animated sphere
     scene.Mesh(
       id: "sphere",
       geometry: scene.SphereGeometry(1.0, 32, 32),
@@ -152,7 +161,6 @@ fn view(model: Model) -> List(scene.SceneNode) {
       ),
       physics: option.None,
     ),
-    // Start marker
     scene.Mesh(
       id: "start",
       geometry: scene.BoxGeometry(0.5, 0.5, 0.5),
@@ -169,7 +177,6 @@ fn view(model: Model) -> List(scene.SceneNode) {
       ),
       physics: option.None,
     ),
-    // End marker
     scene.Mesh(
       id: "end",
       geometry: scene.BoxGeometry(0.5, 0.5, 0.5),

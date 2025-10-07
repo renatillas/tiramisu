@@ -1,22 +1,11 @@
 import * as THREE from 'three';
-import { AddNode, RemoveNode, UpdateTransform, UpdateMaterial, UpdateGeometry, UpdateLight, UpdateAnimation, UpdatePhysics, UpdateAudio, UpdateInstances, UpdateLODLevels, UpdateCamera, SetActiveCamera } from '../scene.mjs';
-import {
-  Mesh, InstancedMesh, Light, Group, LOD, Model3D, Audio, Camera,
-  DebugBox, DebugSphere, DebugLine, DebugAxes, DebugGrid, DebugPoint,
-  BoxGeometry, SphereGeometry, ConeGeometry, PlaneGeometry, CircleGeometry,
-  CylinderGeometry, TorusGeometry, TetrahedronGeometry, IcosahedronGeometry,
-  CustomGeometry,
-  BasicMaterial, StandardMaterial, PhongMaterial, LambertMaterial, ToonMaterial,
-  LineMaterial, SpriteMaterial,
-  AmbientLight, DirectionalLight, PointLight, SpotLight, HemisphereLight
-} from '../scene.mjs';
-import { LoopOnce, LoopRepeat, SingleAnimation, BlendedAnimations } from '../object3d.mjs';
-import { GlobalAudio, PositionalAudio } from '../audio.mjs';
-import { playAudio, pauseAudio, stopAudio, setAudioVolume, updateAudioConfig } from './audio.mjs';
-import { createRigidBody, removeRigidBody, getBodyTransform } from './physics.mjs';
-import { createDebugBox, createDebugSphere, createDebugLine, createDebugAxes, createDebugGrid, createDebugPoint, updatePerformanceStats, setRenderStats } from './debug.mjs';
-import { createThreeCamera } from './camera.mjs';
-import { setCamera } from './effects.mjs';
+import * as SCENE_GLEAM from '../scene.mjs';
+import * as OBJECT3D_GLEAM from '../object3d.mjs';
+import * as AUDIO_GLEAM from '../audio.mjs';
+import * as AUDIO from './audio.mjs';
+import * as PHYSICS from './physics.mjs';
+import * as DEBUG from './debug.mjs';
+import * as CAMERA from './camera.mjs';
 
 // Cache of Three.js objects by ID
 const objectCache = new Map();
@@ -32,35 +21,35 @@ const cameraViewports = new Map();
 
 // Create Three.js geometry from geometry type
 export function createGeometry(geomType) {
-  if (geomType instanceof BoxGeometry) {
+  if (geomType instanceof SCENE_GLEAM.BoxGeometry) {
     return new THREE.BoxGeometry(geomType.width, geomType.height, geomType.depth);
-  } else if (geomType instanceof SphereGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.SphereGeometry) {
     return new THREE.SphereGeometry(geomType.radius, geomType.width_segments, geomType.height_segments);
-  } else if (geomType instanceof ConeGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.ConeGeometry) {
     return new THREE.ConeGeometry(geomType.radius, geomType.height, geomType.segments);
-  } else if (geomType instanceof PlaneGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.PlaneGeometry) {
     return new THREE.PlaneGeometry(geomType.width, geomType.height);
-  } else if (geomType instanceof CircleGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.CircleGeometry) {
     return new THREE.CircleGeometry(geomType.radius, geomType.segments);
-  } else if (geomType instanceof CylinderGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.CylinderGeometry) {
     return new THREE.CylinderGeometry(
       geomType.radius_top,
       geomType.radius_bottom,
       geomType.height,
       geomType.radial_segments
     );
-  } else if (geomType instanceof TorusGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.TorusGeometry) {
     return new THREE.TorusGeometry(
       geomType.radius,
       geomType.tube,
       geomType.radial_segments,
       geomType.tubular_segments
     );
-  } else if (geomType instanceof TetrahedronGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.TetrahedronGeometry) {
     return new THREE.TetrahedronGeometry(geomType.radius, geomType.detail);
-  } else if (geomType instanceof IcosahedronGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.IcosahedronGeometry) {
     return new THREE.IcosahedronGeometry(geomType.radius, geomType.detail);
-  } else if (geomType instanceof CustomGeometry) {
+  } else if (geomType instanceof SCENE_GLEAM.CustomGeometry) {
     // CustomGeometry wraps a Three.js BufferGeometry directly
     return geomType[0]; // Extract the BufferGeometry from the wrapper
   } else {
@@ -81,7 +70,7 @@ function getTexture(optionTexture) {
 
 // Create Three.js material from material type
 export function createMaterial(matType) {
-  if (matType instanceof BasicMaterial) {
+  if (matType instanceof SCENE_GLEAM.BasicMaterial) {
     const map = getTexture(matType.map);
     return new THREE.MeshBasicMaterial({
       color: matType.color,
@@ -89,7 +78,7 @@ export function createMaterial(matType) {
       opacity: matType.opacity,
       map: map
     });
-  } else if (matType instanceof StandardMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.StandardMaterial) {
     const map = getTexture(matType.map);
     return new THREE.MeshStandardMaterial({
       color: matType.color,
@@ -97,31 +86,31 @@ export function createMaterial(matType) {
       roughness: matType.roughness,
       map: map
     });
-  } else if (matType instanceof PhongMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.PhongMaterial) {
     const map = getTexture(matType.map);
     return new THREE.MeshPhongMaterial({
       color: matType.color,
       shininess: matType.shininess,
       map: map
     });
-  } else if (matType instanceof LambertMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.LambertMaterial) {
     const map = getTexture(matType.map);
     return new THREE.MeshLambertMaterial({
       color: matType.color,
       map: map
     });
-  } else if (matType instanceof ToonMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.ToonMaterial) {
     const map = getTexture(matType.map);
     return new THREE.MeshToonMaterial({
       color: matType.color,
       map: map
     });
-  } else if (matType instanceof LineMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.LineMaterial) {
     return new THREE.LineBasicMaterial({
       color: matType.color,
       linewidth: matType.linewidth
     });
-  } else if (matType instanceof SpriteMaterial) {
+  } else if (matType instanceof SCENE_GLEAM.SpriteMaterial) {
     const map = getTexture(matType.map);
     return new THREE.SpriteMaterial({
       color: matType.color,
@@ -137,13 +126,13 @@ export function createMaterial(matType) {
 
 // Create Three.js light from light type
 export function createLight(lightType) {
-  if (lightType instanceof AmbientLight) {
+  if (lightType instanceof SCENE_GLEAM.AmbientLight) {
     return new THREE.AmbientLight(lightType.color, lightType.intensity);
-  } else if (lightType instanceof DirectionalLight) {
+  } else if (lightType instanceof SCENE_GLEAM.DirectionalLight) {
     return new THREE.DirectionalLight(lightType.color, lightType.intensity);
-  } else if (lightType instanceof PointLight) {
+  } else if (lightType instanceof SCENE_GLEAM.PointLight) {
     return new THREE.PointLight(lightType.color, lightType.intensity, lightType.distance);
-  } else if (lightType instanceof SpotLight) {
+  } else if (lightType instanceof SCENE_GLEAM.SpotLight) {
     return new THREE.SpotLight(
       lightType.color,
       lightType.intensity,
@@ -151,7 +140,7 @@ export function createLight(lightType) {
       lightType.angle,
       lightType.penumbra
     );
-  } else if (lightType instanceof HemisphereLight) {
+  } else if (lightType instanceof SCENE_GLEAM.HemisphereLight) {
     return new THREE.HemisphereLight(
       lightType.sky_color,
       lightType.ground_color,
@@ -182,31 +171,31 @@ function setupAnimation(id, mixer, animPlayback) {
     }
   }
 
-  if (animPlayback instanceof SingleAnimation) {
+  if (animPlayback instanceof OBJECT3D_GLEAM.SingleAnimation) {
     // Single animation
     const animConfig = animPlayback[0]; // Extract Animation from SingleAnimation
     const action = mixer.clipAction(animConfig.clip);
-    action.setLoop(animConfig.loop instanceof LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
+    action.setLoop(animConfig.loop instanceof OBJECT3D_GLEAM.LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
     action.timeScale = animConfig.speed;
     action.weight = animConfig.weight;
     action.play();
 
     actionCache.set(id, action);
     console.log('[Renderer] Playing single animation for Model3D:', id);
-  } else if (animPlayback instanceof BlendedAnimations) {
+  } else if (animPlayback instanceof OBJECT3D_GLEAM.BlendedAnimations) {
     // Blended animations
     const fromAnim = animPlayback.from;
     const toAnim = animPlayback.to;
     const blendFactor = animPlayback.blend_factor;
 
     const fromAction = mixer.clipAction(fromAnim.clip);
-    fromAction.setLoop(fromAnim.loop instanceof LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
+    fromAction.setLoop(fromAnim.loop instanceof OBJECT3D_GLEAM.LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
     fromAction.timeScale = fromAnim.speed;
     fromAction.weight = (1.0 - blendFactor) * fromAnim.weight;
     fromAction.play();
 
     const toAction = mixer.clipAction(toAnim.clip);
-    toAction.setLoop(toAnim.loop instanceof LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
+    toAction.setLoop(toAnim.loop instanceof OBJECT3D_GLEAM.LoopRepeat ? THREE.LoopRepeat : THREE.LoopOnce);
     toAction.timeScale = toAnim.speed;
     toAction.weight = blendFactor * toAnim.weight;
     toAction.play();
@@ -218,12 +207,12 @@ function setupAnimation(id, mixer, animPlayback) {
 
 // Apply a single patch to the Three.js scene
 export function applyPatch(scene, patch) {
-  if (patch instanceof AddNode) {
+  if (patch instanceof SCENE_GLEAM.AddNode) {
     const { id, node, parent_id } = patch;
 
     let threeObj;
 
-    if (node instanceof Mesh) {
+    if (node instanceof SCENE_GLEAM.Mesh) {
       const geometry = createGeometry(node.geometry);
       const material = createMaterial(node.material);
       threeObj = new THREE.Mesh(geometry, material);
@@ -231,9 +220,9 @@ export function applyPatch(scene, patch) {
 
       // Create physics body if specified
       if (node.physics && node.physics[0]) {
-        createRigidBody(id, node.physics[0], node.transform);
+        PHYSICS.createRigidBody(id, node.physics[0], node.transform);
       }
-    } else if (node instanceof InstancedMesh) {
+    } else if (node instanceof SCENE_GLEAM.InstancedMesh) {
       const geometry = createGeometry(node.geometry);
       const material = createMaterial(node.material);
 
@@ -245,13 +234,13 @@ export function applyPatch(scene, patch) {
 
       // Set transform matrix for each instance
       updateInstancedMeshTransforms(threeObj, node.instances);
-    } else if (node instanceof Light) {
+    } else if (node instanceof SCENE_GLEAM.Light) {
       threeObj = createLight(node.light_type);
       applyTransform(threeObj, node.transform);
-    } else if (node instanceof Group) {
+    } else if (node instanceof SCENE_GLEAM.Group) {
       threeObj = new THREE.Group();
       applyTransform(threeObj, node.transform);
-    } else if (node instanceof LOD) {
+    } else if (node instanceof SCENE_GLEAM.LOD) {
       threeObj = new THREE.LOD();
       applyTransform(threeObj, node.transform);
 
@@ -264,16 +253,16 @@ export function applyPatch(scene, patch) {
         // We need to recursively create the node (but we don't add it to scene)
         let levelObj;
 
-        if (levelNode instanceof Mesh) {
+        if (levelNode instanceof SCENE_GLEAM.Mesh) {
           const geometry = createGeometry(levelNode.geometry);
           const material = createMaterial(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
-        } else if (levelNode instanceof Group) {
+        } else if (levelNode instanceof SCENE_GLEAM.Group) {
           levelObj = new THREE.Group();
           applyTransform(levelObj, levelNode.transform);
           // TODO: Handle children of Group in LOD levels if needed
-        } else if (levelNode instanceof Model3D) {
+        } else if (levelNode instanceof SCENE_GLEAM.Model3D) {
           levelObj = levelNode.object.clone();
           applyTransform(levelObj, levelNode.transform);
         }
@@ -283,7 +272,7 @@ export function applyPatch(scene, patch) {
           threeObj.addLevel(levelObj, distance);
         }
       }
-    } else if (node instanceof Model3D) {
+    } else if (node instanceof SCENE_GLEAM.Model3D) {
       // Use the object directly - it will be cached
       // The immutability is maintained at the Gleam level via the scene graph diff
       threeObj = node.object;
@@ -300,24 +289,24 @@ export function applyPatch(scene, patch) {
 
       // Create physics body if specified
       if (node.physics && node.physics[0]) {
-        createRigidBody(id, node.physics[0], node.transform);
+        PHYSICS.createRigidBody(id, node.physics[0], node.transform);
       }
-    } else if (node instanceof Audio) {
+    } else if (node instanceof SCENE_GLEAM.Audio) {
       // Audio nodes don't need a visual Three.js object
       // Just play the audio using the audio system
-      playAudio(id, node.buffer, node.config, node.audio_type);
+      AUDIO.playAudio(id, node.buffer, node.config, node.audio_type);
       // Store a placeholder to track the audio node in cache
       threeObj = new THREE.Group(); // Empty group as placeholder
-    } else if (node instanceof Camera) {
+    } else if (node instanceof SCENE_GLEAM.Camera) {
       // Create Three.js camera from Gleam camera config
-      threeObj = createThreeCamera(node.camera_type.projection);
+      threeObj = CAMERA.createThreeCamera(node.camera.projection);
 
       // Apply camera position from Gleam config
-      const pos = node.camera_type.position;
+      const pos = node.camera.position;
       threeObj.position.set(pos.x, pos.y, pos.z);
 
       // Apply look_at from Gleam config
-      const lookAt = node.camera_type.look_at_target;
+      const lookAt = node.camera.look_at_target;
       threeObj.lookAt(lookAt.x, lookAt.y, lookAt.z);
 
       // Update projection matrix
@@ -333,21 +322,21 @@ export function applyPatch(scene, patch) {
 
       // If this camera is active, set it as the active camera for rendering
       if (node.active) {
-        setCamera(threeObj);
+        CAMERA.setCamera(threeObj);
         console.log('[Renderer] Set active camera:', id);
       }
-    } else if (node instanceof DebugBox) {
-      threeObj = createDebugBox(node.min, node.max, node.color);
-    } else if (node instanceof DebugSphere) {
-      threeObj = createDebugSphere(node.center, node.radius, node.color);
-    } else if (node instanceof DebugLine) {
-      threeObj = createDebugLine(node.from, node.to, node.color);
-    } else if (node instanceof DebugAxes) {
-      threeObj = createDebugAxes(node.origin, node.size);
-    } else if (node instanceof DebugGrid) {
-      threeObj = createDebugGrid(node.size, node.divisions, node.color);
-    } else if (node instanceof DebugPoint) {
-      threeObj = createDebugPoint(node.position, node.size, node.color);
+    } else if (node instanceof SCENE_GLEAM.DebugBox) {
+      threeObj = DEBUG.createDebugBox(node.min, node.max, node.color);
+    } else if (node instanceof SCENE_GLEAM.DebugSphere) {
+      threeObj = DEBUG.createDebugSphere(node.center, node.radius, node.color);
+    } else if (node instanceof SCENE_GLEAM.DebugLine) {
+      threeObj = DEBUG.createDebugLine(node.from, node.to, node.color);
+    } else if (node instanceof SCENE_GLEAM.DebugAxes) {
+      threeObj = DEBUG.createDebugAxes(node.origin, node.size);
+    } else if (node instanceof SCENE_GLEAM.DebugGrid) {
+      threeObj = DEBUG.createDebugGrid(node.size, node.divisions, node.color);
+    } else if (node instanceof SCENE_GLEAM.DebugPoint) {
+      threeObj = DEBUG.createDebugPoint(node.position, node.size, node.color);
     }
 
     if (threeObj) {
@@ -367,7 +356,7 @@ export function applyPatch(scene, patch) {
         scene.add(threeObj);
       }
     }
-  } else if (patch instanceof RemoveNode) {
+  } else if (patch instanceof SCENE_GLEAM.RemoveNode) {
     const id = patch.id;
     const obj = objectCache.get(id);
     if (obj) {
@@ -384,32 +373,32 @@ export function applyPatch(scene, patch) {
       }
 
       // Stop audio if exists
-      stopAudio(id);
+      AUDIO.stopAudio(id);
 
       // Remove physics body if exists
-      removeRigidBody(id);
+      PHYSICS.removeRigidBody(id);
     }
-  } else if (patch instanceof UpdateTransform) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateTransform) {
     const { id, transform } = patch;
     const obj = objectCache.get(id);
     if (obj) {
       applyTransform(obj, transform);
     }
-  } else if (patch instanceof UpdateMaterial) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateMaterial) {
     const { id, material } = patch;
     const obj = objectCache.get(id);
     if (obj && obj.material) {
       obj.material.dispose();
       obj.material = createMaterial(material);
     }
-  } else if (patch instanceof UpdateGeometry) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateGeometry) {
     const { id, geometry } = patch;
     const obj = objectCache.get(id);
     if (obj && obj.geometry) {
       obj.geometry.dispose();
       obj.geometry = createGeometry(geometry);
     }
-  } else if (patch instanceof UpdateLight) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateLight) {
     const { id, light_type } = patch;
     const oldLight = objectCache.get(id);
     if (oldLight) {
@@ -422,7 +411,7 @@ export function applyPatch(scene, patch) {
       scene.add(newLight);
       objectCache.set(id, newLight);
     }
-  } else if (patch instanceof UpdateAnimation) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateAnimation) {
     const { id, animation } = patch;
     const mixer = mixerCache.get(id);
 
@@ -448,11 +437,11 @@ export function applyPatch(scene, patch) {
       }
       console.log('[Renderer] Stopped animation for Model3D:', id);
     }
-  } else if (patch instanceof UpdatePhysics) {
+  } else if (patch instanceof SCENE_GLEAM.UpdatePhysics) {
     const { id, physics } = patch;
 
     // Remove old physics body if it exists
-    removeRigidBody(id);
+    PHYSICS.removeRigidBody(id);
 
     // Create new physics body if provided
     if (physics && physics[0]) {
@@ -464,18 +453,18 @@ export function applyPatch(scene, patch) {
           rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
           scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
         };
-        createRigidBody(id, physics[0], transform);
+        PHYSICS.createRigidBody(id, physics[0], transform);
         console.log('[Renderer] Updated physics for node:', id);
       }
     } else {
       console.log('[Renderer] Removed physics from node:', id);
     }
-  } else if (patch instanceof UpdateAudio) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateAudio) {
     const { id, config } = patch;
     // Update audio configuration
-    updateAudioConfig(id, config);
+    AUDIO.updateAudioConfig(id, config);
     console.log('[Renderer] Updated audio config for node:', id);
-  } else if (patch instanceof UpdateInstances) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateInstances) {
     const { id, instances } = patch;
     const obj = objectCache.get(id);
     if (obj && obj instanceof THREE.InstancedMesh) {
@@ -483,7 +472,7 @@ export function applyPatch(scene, patch) {
     } else {
       console.warn('[Renderer] Object not found or not an InstancedMesh:', id);
     }
-  } else if (patch instanceof UpdateLODLevels) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateLODLevels) {
     const { id, levels } = patch;
     const obj = objectCache.get(id);
     if (obj && obj instanceof THREE.LOD) {
@@ -500,15 +489,15 @@ export function applyPatch(scene, patch) {
         // Create Three.js object for this LOD level
         let levelObj;
 
-        if (levelNode instanceof Mesh) {
+        if (levelNode instanceof SCENE_GLEAM.Mesh) {
           const geometry = createGeometry(levelNode.geometry);
           const material = createMaterial(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
-        } else if (levelNode instanceof Group) {
+        } else if (levelNode instanceof SCENE_GLEAM.Group) {
           levelObj = new THREE.Group();
           applyTransform(levelObj, levelNode.transform);
-        } else if (levelNode instanceof Model3D) {
+        } else if (levelNode instanceof SCENE_GLEAM.Model3D) {
           levelObj = levelNode.object.clone();
           applyTransform(levelObj, levelNode.transform);
         }
@@ -521,7 +510,7 @@ export function applyPatch(scene, patch) {
     } else {
       console.warn('[Renderer] Object not found or not an LOD:', id);
     }
-  } else if (patch instanceof UpdateCamera) {
+  } else if (patch instanceof SCENE_GLEAM.UpdateCamera) {
     const { id, camera_type } = patch;
     const cameraObj = objectCache.get(id);
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
@@ -556,11 +545,11 @@ export function applyPatch(scene, patch) {
     } else {
       console.warn('[Renderer] Camera not found:', id);
     }
-  } else if (patch instanceof SetActiveCamera) {
+  } else if (patch instanceof SCENE_GLEAM.SetActiveCamera) {
     const id = patch.id;
     const cameraObj = objectCache.get(id);
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
-      setCamera(cameraObj);
+      CAMERA.setCamera(cameraObj);
       console.log('[Renderer] Switched to active camera:', id);
     } else {
       console.warn('[Renderer] Camera not found or not a camera:', id);
@@ -634,7 +623,7 @@ export function updateMixers(deltaTime) {
 // Sync physics body transforms to Three.js objects
 export function syncPhysicsTransforms() {
   objectCache.forEach((obj, id) => {
-    const transform = getBodyTransform(id);
+    const transform = PHYSICS.getBodyTransform(id);
     if (transform && transform[0]) {
       // transform is Some(Transform)
       const t = transform[0];

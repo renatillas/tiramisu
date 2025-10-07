@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PerformanceStats } from '../debug.mjs';
+import * as DEBUG_GLEAM from '../debug.mjs';
 
 // --- Debug Rendering Helpers ---
 
@@ -147,11 +147,11 @@ export function updatePerformanceStats(deltaTime) {
 }
 
 export function getPerformanceStats() {
-  return new PerformanceStats(
-    performanceStats.fps, 
-    performanceStats.frameTime, 
-    performanceStats.drawCalls, 
-    performanceStats.triangles, 
+  return new DEBUG_GLEAM.PerformanceStats(
+    performanceStats.fps,
+    performanceStats.frameTime,
+    performanceStats.drawCalls,
+    performanceStats.triangles,
     performanceStats.memoryMB
   );
 }

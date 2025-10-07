@@ -178,10 +178,10 @@ pub fn step(world: PhysicsWorld, delta_time: Float) -> PhysicsWorld {
 
 /// Get the current transform of a physics body
 /// Use this to sync physics transforms back to your scene graph
-pub fn get_transform(world: PhysicsWorld, id: String) -> Option(Transform) {
+pub fn get_transform(world: PhysicsWorld, id: String) -> Result(Transform, Nil) {
   case dict.get(world.bodies, id) {
-    Ok(state) -> option.Some(state.current_transform)
-    Error(_) -> option.None
+    Ok(state) -> Ok(state.current_transform)
+    Error(_) -> Error(Nil)
   }
 }
 
@@ -228,14 +228,12 @@ pub fn remove_body(world: PhysicsWorld, id: String) -> PhysicsWorld {
   PhysicsWorld(bodies: dict.delete(world.bodies, id))
 }
 
-/// Update a body's properties (internal use)
+@internal
 pub fn update_body(
   world: PhysicsWorld,
   id: String,
   body: RigidBody,
 ) -> PhysicsWorld {
-  // For now, remove and recreate
-  // TODO: More efficient updates for specific properties
   case dict.get(world.bodies, id) {
     Ok(state) -> {
       let world = remove_body(world, id)

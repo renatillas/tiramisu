@@ -94,29 +94,6 @@ pub type LightType {
   HemisphereLight(sky_color: Int, ground_color: Int, intensity: Float)
 }
 
-/// Transform data for a single instance in an InstancedMesh
-pub type InstanceTransform {
-  InstanceTransform(position: vec3.Vec3, rotation: vec3.Vec3, scale: vec3.Vec3)
-}
-
-/// Create an instance transform at a position with default rotation and scale
-pub fn instance_at(position: vec3.Vec3) -> InstanceTransform {
-  InstanceTransform(
-    position: position,
-    rotation: vec3.zero(),
-    scale: vec3.one(),
-  )
-}
-
-/// Create an instance transform with custom position, rotation, and scale
-pub fn instance(
-  position position: vec3.Vec3,
-  rotation rotation: vec3.Vec3,
-  scale scale: vec3.Vec3,
-) -> InstanceTransform {
-  InstanceTransform(position: position, rotation: rotation, scale: scale)
-}
-
 /// Level of Detail configuration - a mesh to show at a specific distance from camera
 pub type LODLevel {
   LODLevel(distance: Float, node: SceneNode)
@@ -142,7 +119,7 @@ pub type SceneNode {
     id: String,
     geometry: GeometryType,
     material: MaterialType,
-    instances: List(InstanceTransform),
+    instances: List(transform.Transform),
   )
   Group(id: String, transform: transform.Transform, children: List(SceneNode))
   Light(id: String, light_type: LightType, transform: transform.Transform)
@@ -152,7 +129,7 @@ pub type SceneNode {
   /// Set viewport to render in a specific area (for picture-in-picture effects)
   Camera(
     id: String,
-    camera_type: camera.Camera,
+    camera: camera.Camera,
     transform: transform.Transform,
     active: Bool,
     /// Optional viewport: (x, y, width, height) in pixels
@@ -349,7 +326,7 @@ pub type Patch {
   UpdateAnimation(id: String, animation: option.Option(AnimationPlayback))
   UpdatePhysics(id: String, physics: option.Option(RigidBody))
   UpdateAudio(id: String, config: AudioConfig)
-  UpdateInstances(id: String, instances: List(InstanceTransform))
+  UpdateInstances(id: String, instances: List(transform.Transform))
   UpdateLODLevels(id: String, levels: List(LODLevel))
   UpdateCamera(id: String, camera_type: camera.Camera)
   SetActiveCamera(id: String)
@@ -707,10 +684,10 @@ fn compare_instanced_mesh_fields(
   id: String,
   prev_geom: GeometryType,
   prev_mat: MaterialType,
-  prev_instances: List(InstanceTransform),
+  prev_instances: List(transform.Transform),
   curr_geom: GeometryType,
   curr_mat: MaterialType,
-  curr_instances: List(InstanceTransform),
+  curr_instances: List(transform.Transform),
 ) -> List(Patch) {
   let patches = []
 

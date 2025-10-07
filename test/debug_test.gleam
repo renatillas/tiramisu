@@ -7,7 +7,7 @@ pub fn bounding_box_creates_debug_box_test() {
   let min = vec3.Vec3(0.0, 0.0, 0.0)
   let max = vec3.Vec3(1.0, 1.0, 1.0)
 
-  let node = debug.bounding_box("test_box", min, max, debug.red)
+  let node = debug.bounding_box("test_box", min, max, debug.color_red)
 
   let assert scene.DebugBox(id, node_min, node_max, color) = node
   let assert "test_box" = id
@@ -20,7 +20,7 @@ pub fn sphere_creates_debug_sphere_test() {
   let center = vec3.Vec3(5.0, 5.0, 5.0)
   let radius = 2.5
 
-  let node = debug.sphere("test_sphere", center, radius, debug.green)
+  let node = debug.sphere("test_sphere", center, radius, debug.color_green)
 
   let assert scene.DebugSphere(id, node_center, node_radius, color) = node
   let assert "test_sphere" = id
@@ -33,7 +33,7 @@ pub fn line_creates_debug_line_test() {
   let from = vec3.Vec3(0.0, 0.0, 0.0)
   let to = vec3.Vec3(10.0, 10.0, 10.0)
 
-  let node = debug.line("test_line", from, to, debug.blue)
+  let node = debug.line("test_line", from, to, debug.color_blue)
 
   let assert scene.DebugLine(id, node_from, node_to, color) = node
   let assert "test_line" = id
@@ -58,7 +58,7 @@ pub fn grid_creates_debug_grid_test() {
   let size = 20.0
   let divisions = 10
 
-  let node = debug.grid("test_grid", size, divisions, debug.white)
+  let node = debug.grid("test_grid", size, divisions, debug.color_white)
 
   let assert scene.DebugGrid(id, node_size, node_divisions, color) = node
   let assert "test_grid" = id
@@ -71,7 +71,7 @@ pub fn point_creates_debug_point_test() {
   let position = vec3.Vec3(3.0, 4.0, 5.0)
   let size = 0.5
 
-  let node = debug.point("test_point", position, size, debug.yellow)
+  let node = debug.point("test_point", position, size, debug.color_yellow)
 
   let assert scene.DebugPoint(id, node_position, node_size, color) = node
   let assert "test_point" = id
@@ -88,7 +88,7 @@ pub fn box_from_transform_test() {
       scale: vec3.Vec3(2.0, 4.0, 6.0),
     )
 
-  let node = debug.box_from_transform("test_transform_box", t, debug.cyan)
+  let node = debug.box_from_transform("test_transform_box", t, debug.color_cyan)
 
   let assert scene.DebugBox(_, min, max, _) = node
 
@@ -106,7 +106,7 @@ pub fn path_creates_multiple_lines_test() {
     vec3.Vec3(3.0, 3.0, 3.0),
   ]
 
-  let nodes = debug.path("path", points, debug.magenta)
+  let nodes = debug.path("path", points, debug.color_magenta)
 
   // Should create 3 lines (N-1 lines for N points)
   let assert [_, _, _] = nodes
@@ -115,7 +115,7 @@ pub fn path_creates_multiple_lines_test() {
 pub fn path_with_two_points_creates_one_line_test() {
   let points = [vec3.Vec3(0.0, 0.0, 0.0), vec3.Vec3(1.0, 1.0, 1.0)]
 
-  let nodes = debug.path("path", points, debug.orange)
+  let nodes = debug.path("path", points, debug.color_orange)
 
   let assert [line] = nodes
   let assert scene.DebugLine(_, from, to, _) = line
@@ -126,7 +126,7 @@ pub fn path_with_two_points_creates_one_line_test() {
 pub fn path_with_one_point_creates_no_lines_test() {
   let points = [vec3.Vec3(0.0, 0.0, 0.0)]
 
-  let nodes = debug.path("path", points, debug.purple)
+  let nodes = debug.path("path", points, debug.color_purple)
 
   let assert [] = nodes
 }
@@ -135,7 +135,7 @@ pub fn cross_creates_three_lines_test() {
   let position = vec3.Vec3(1.0, 2.0, 3.0)
   let size = 2.0
 
-  let nodes = debug.cross("cross", position, size, debug.white)
+  let nodes = debug.cross("cross", position, size, debug.color_white)
 
   // Should create 3 lines (X, Y, Z axes)
   let assert [x_line, y_line, z_line] = nodes
@@ -161,7 +161,7 @@ pub fn ray_creates_line_from_origin_and_direction_test() {
   let direction = vec3.Vec3(1.0, 0.0, 0.0)
   let length = 5.0
 
-  let node = debug.ray("test_ray", origin, direction, length, debug.red)
+  let node = debug.ray("test_ray", origin, direction, length, debug.color_red)
 
   let assert scene.DebugLine(_, from, to, _) = node
   let assert vec3.Vec3(0.0, 0.0, 0.0) = from
@@ -170,14 +170,14 @@ pub fn ray_creates_line_from_origin_and_direction_test() {
 
 pub fn color_constants_test() {
   // Test that color constants are correct hex values
-  let assert 0xff0000 = debug.red
-  let assert 0x00ff00 = debug.green
-  let assert 0x0000ff = debug.blue
-  let assert 0xffff00 = debug.yellow
-  let assert 0x00ffff = debug.cyan
-  let assert 0xff00ff = debug.magenta
-  let assert 0xffffff = debug.white
-  let assert 0x000000 = debug.black
-  let assert 0xffa500 = debug.orange
-  let assert 0x800080 = debug.purple
+  let assert 0xff0000 = debug.color_red
+  let assert 0x00ff00 = debug.color_green
+  let assert 0x0000ff = debug.color_blue
+  let assert 0xffff00 = debug.color_yellow
+  let assert 0x00ffff = debug.color_cyan
+  let assert 0xff00ff = debug.color_magenta
+  let assert 0xffffff = debug.color_white
+  let assert 0x000000 = debug.color_black
+  let assert 0xffa500 = debug.color_orange
+  let assert 0x800080 = debug.color_purple
 }

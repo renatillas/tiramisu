@@ -2,7 +2,6 @@ import gleam/bool
 import gleam/int
 import tiramisu/vec3
 
-/// Opaque immutable camera configuration
 pub opaque type Camera {
   Camera(
     position: vec3.Vec3,
@@ -75,15 +74,7 @@ pub fn orthographic(
   )
 }
 
-pub fn set_position(camera: Camera, position position: vec3.Vec3) -> Camera {
-  Camera(..camera, position:)
-}
-
-pub fn look(camera: Camera, at look_at_target: vec3.Vec3) -> Camera {
-  Camera(..camera, look_at_target:)
-}
-
-pub fn camera_2d(width: Int, height: Int) -> Camera {
+pub fn camera_2d(width: Int, height: Int, distance: Float) -> Camera {
   let w = int.to_float(width)
   let h = int.to_float(height)
   let half_w = w /. 2.0
@@ -97,11 +88,14 @@ pub fn camera_2d(width: Int, height: Int) -> Camera {
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(vec3.Vec3(0.0, 0.0, 10.0))
+  |> set_position(vec3.Vec3(0.0, 0.0, distance))
 }
 
-/// Create a 2D camera that matches screen pixels (0,0 at top-left)
-pub fn camera_2d_screen_space(width: Int, height: Int) -> Camera {
+pub fn camera_2d_screen_space(
+  width: Int,
+  height: Int,
+  distance: Float,
+) -> Camera {
   let w = int.to_float(width)
   let h = int.to_float(height)
 
@@ -113,7 +107,7 @@ pub fn camera_2d_screen_space(width: Int, height: Int) -> Camera {
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(vec3.Vec3(w /. 2.0, 0.0 -. h /. 2.0, 10.0))
+  |> set_position(vec3.Vec3(w /. 2.0, 0.0 -. h /. 2.0, distance))
 }
 
 pub fn camera_2d_with_bounds(
@@ -121,6 +115,7 @@ pub fn camera_2d_with_bounds(
   right: Float,
   top: Float,
   bottom: Float,
+  distance: Float,
 ) -> Camera {
   orthographic(
     left: left,
@@ -130,5 +125,13 @@ pub fn camera_2d_with_bounds(
     near: 0.1,
     far: 1000.0,
   )
-  |> set_position(vec3.Vec3(0.0, 0.0, 10.0))
+  |> set_position(vec3.Vec3(0.0, 0.0, distance))
+}
+
+pub fn set_position(camera: Camera, position position: vec3.Vec3) -> Camera {
+  Camera(..camera, position:)
+}
+
+pub fn look(camera: Camera, at look_at_target: vec3.Vec3) -> Camera {
+  Camera(..camera, look_at_target:)
 }

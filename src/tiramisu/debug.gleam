@@ -1,18 +1,9 @@
-/// Debug Visualization Tools
-///
-/// Provides declarative, immutable debug visualization nodes that integrate
-/// seamlessly with the scene graph. All debug functions return SceneNodes that
-/// can be conditionally included in your view based on debug mode.
 import gleam/int
 import gleam/list
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/vec3.{type Vec3}
 
-// --- Debug Scene Node Constructors ---
-// All functions return regular SceneNodes for declarative rendering
-
-/// Draw a wireframe bounding box between two points
 pub fn bounding_box(
   id: String,
   min: Vec3,
@@ -22,7 +13,6 @@ pub fn bounding_box(
   scene.DebugBox(id, min, max, color)
 }
 
-/// Draw a wireframe sphere
 pub fn sphere(
   id: String,
   center: Vec3,
@@ -32,12 +22,10 @@ pub fn sphere(
   scene.DebugSphere(id, center, radius, color)
 }
 
-/// Draw a line between two points
 pub fn line(id: String, from: Vec3, to: Vec3, color: Int) -> scene.SceneNode {
   scene.DebugLine(id, from, to, color)
 }
 
-/// Draw a ray (line with direction and length)
 pub fn ray(
   id: String,
   origin: Vec3,
@@ -49,12 +37,10 @@ pub fn ray(
   scene.DebugLine(id, origin, end, color)
 }
 
-/// Draw coordinate axes at origin (X=red, Y=green, Z=blue)
 pub fn axes(id: String, origin: Vec3, size: Float) -> scene.SceneNode {
   scene.DebugAxes(id, origin, size)
 }
 
-/// Draw a grid on the XZ plane
 pub fn grid(
   id: String,
   size: Float,
@@ -64,7 +50,6 @@ pub fn grid(
   scene.DebugGrid(id, size, divisions, color)
 }
 
-/// Draw a point/marker at a position
 pub fn point(
   id: String,
   position: Vec3,
@@ -74,9 +59,6 @@ pub fn point(
   scene.DebugPoint(id, position, size, color)
 }
 
-// --- Helper Functions ---
-
-/// Create a bounding box from a transform's position and scale
 pub fn box_from_transform(
   id: String,
   t: transform.Transform,
@@ -132,7 +114,6 @@ fn create_path_lines(
   }
 }
 
-/// Draw a cross at a position (useful for marking points)
 pub fn cross(
   id: String,
   position: Vec3,
@@ -162,9 +143,6 @@ pub fn cross(
   ]
 }
 
-// --- Performance Monitoring ---
-
-/// Performance statistics
 pub type PerformanceStats {
   PerformanceStats(
     fps: Float,
@@ -175,28 +153,25 @@ pub type PerformanceStats {
   )
 }
 
-/// Get current performance statistics
 @external(javascript, "./ffi/debug.mjs", "getPerformanceStats")
 pub fn get_performance_stats() -> PerformanceStats
 
-// --- Common Colors ---
+pub const color_red = 0xff0000
 
-pub const red = 0xff0000
+pub const color_green = 0x00ff00
 
-pub const green = 0x00ff00
+pub const color_blue = 0x0000ff
 
-pub const blue = 0x0000ff
+pub const color_yellow = 0xffff00
 
-pub const yellow = 0xffff00
+pub const color_cyan = 0x00ffff
 
-pub const cyan = 0x00ffff
+pub const color_magenta = 0xff00ff
 
-pub const magenta = 0xff00ff
+pub const color_white = 0xffffff
 
-pub const white = 0xffffff
+pub const color_black = 0x000000
 
-pub const black = 0x000000
+pub const color_orange = 0xffa500
 
-pub const orange = 0xffa500
-
-pub const purple = 0x800080
+pub const color_purple = 0x800080

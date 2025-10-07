@@ -156,6 +156,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       camera_type: cam,
       transform: transform.identity(),
       active: True,
+      viewport: option.None,
     )
 
   let lights = [

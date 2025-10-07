@@ -9,13 +9,20 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/order
 import tiramisu/audio.{type AudioBuffer}
-import tiramisu/gltf
-import tiramisu/object3d.{type Object3D}
+import tiramisu/object3d.{type AnimationClip, type Object3D}
 import tiramisu/scene.{type BufferGeometry, type Texture}
-import tiramisu/stl
-import tiramisu/texture
 
 // --- Public Types ---
+/// STL loading error
+pub type LoadError {
+  LoadError(String)
+  InvalidUrl(String)
+  ParseError(String)
+}
+
+pub type GLTFData {
+  GLTFData(scene: Object3D, animations: List(AnimationClip))
+}
 
 /// Types of assets that can be loaded
 pub type AssetType {
@@ -31,7 +38,7 @@ pub type AssetType {
 
 /// A loaded asset (opaque to enforce type safety)
 pub opaque type LoadedAsset {
-  LoadedModel(data: gltf.GLTFData)
+  LoadedModel(data: GLTFData)
   LoadedTexture(texture: Texture)
   LoadedAudio(audio: AudioBuffer)
   LoadedSTL(geometry: BufferGeometry)
@@ -39,7 +46,7 @@ pub opaque type LoadedAsset {
 
 // Internal constructors for FFI use
 @internal
-pub fn loaded_model(data: gltf.GLTFData) -> LoadedAsset {
+pub fn loaded_model(data: GLTFData) -> LoadedAsset {
   LoadedModel(data)
 }
 
@@ -124,23 +131,24 @@ pub fn clear_cache(cache: AssetCache) -> AssetCache {
 pub fn load_asset(asset: AssetType) -> Promise(Result(LoadedAsset, AssetError)) {
   case asset {
     ModelAsset(url) -> {
-      promise.map(gltf.load(url), fn(result) {
+      promise.map(load_gltf(url), fn(result) {
         case result {
           Ok(data) -> Ok(LoadedModel(data))
-          Error(gltf.LoadError(msg)) -> Error(AssetLoadError(url, msg))
-          Error(gltf.InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
-          Error(gltf.ParseError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(LoadError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
+          Error(ParseError(msg)) -> Error(AssetLoadError(url, msg))
         }
       })
     }
 
     TextureAsset(url) -> {
-      promise.map(texture.load(url), fn(result) {
+      promise.map(load_texture(url), fn(result) {
         case result {
           Ok(tex) -> Ok(LoadedTexture(tex))
-          Error(texture.LoadError(msg)) -> Error(AssetLoadError(url, msg))
-          Error(texture.InvalidUrl(_)) ->
-            Error(AssetLoadError(url, "Invalid URL"))
+          Error(LoadError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
+          Error(ParseError(_)) ->
+            Error(AssetLoadError(url, "Failed to parse texture"))
         }
       })
     }
@@ -155,12 +163,12 @@ pub fn load_asset(asset: AssetType) -> Promise(Result(LoadedAsset, AssetError)) 
     }
 
     STLAsset(url) -> {
-      promise.map(stl.load(url), fn(result) {
+      promise.map(load_stl(url), fn(result) {
         case result {
           Ok(geom) -> Ok(LoadedSTL(geom))
-          Error(stl.LoadError(msg)) -> Error(AssetLoadError(url, msg))
-          Error(stl.InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
-          Error(stl.ParseError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(LoadError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
+          Error(ParseError(msg)) -> Error(AssetLoadError(url, msg))
         }
       })
     }
@@ -194,10 +202,7 @@ pub fn load_batch_simple(assets: List(AssetType)) -> Promise(BatchLoadResult) {
 // --- Asset Retrieval ---
 
 /// Get a GLTF model from the cache (updates LRU timestamp)
-pub fn get_model(
-  cache: AssetCache,
-  url: String,
-) -> Result(gltf.GLTFData, AssetError) {
+pub fn get_model(cache: AssetCache, url: String) -> Result(GLTFData, AssetError) {
   case dict.get(cache.assets, url) {
     Ok(CacheEntry(LoadedModel(data), _)) -> Ok(data)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
@@ -352,3 +357,15 @@ fn dispose_geometry_ffi(geometry: BufferGeometry) -> Nil
 
 @external(javascript, "./ffi/assets.mjs", "disposeObject3D")
 fn dispose_object3d_ffi(object: Object3D) -> Nil
+
+/// Load an STL file from a URL using Promises
+@external(javascript, "./ffi/stl.mjs", "loadSTLAsync")
+pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError))
+
+/// Load a texture from a URL using Promises
+@external(javascript, "./ffi/texture.mjs", "loadTextureAsync")
+pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError))
+
+/// Load a GLTF/GLB file from a URL using Promises
+@external(javascript, "./ffi/gltf.mjs", "loadGLTFAsync")
+pub fn load_gltf(url: String) -> Promise(Result(GLTFData, LoadError))

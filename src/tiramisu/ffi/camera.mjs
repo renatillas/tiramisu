@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 
+let currentCamera = null;
+
+export function setCamera(camera) {
+  currentCamera = camera;
+}
+
+export function getCamera() {
+  return currentCamera;
+}
+
 /**
  * Create Three.js camera from projection config
  * Used by renderer.mjs when creating Camera scene nodes

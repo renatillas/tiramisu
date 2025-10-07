@@ -1,3 +1,5 @@
+import gleam/float
+import gleam_community/maths
 import tiramisu/vec3
 
 /// Transform represents position, rotation, and scale
@@ -53,47 +55,42 @@ pub fn compose(first: Transform, second: Transform) -> Transform {
 }
 
 /// Create a transform that looks at a target position from a source position
-pub fn look_at(
-  from from: vec3.Vec3,
-  to to: vec3.Vec3,
-  up up: vec3.Vec3,
-) -> Transform {
-  // Calculate forward direction
-  let forward = vec3.normalize(vec3.subtract(to, from))
+/// Uses proper Euler angle conversion with atan2 for stable results
+/// Returns rotation in radians (pitch, yaw, roll) where:
+/// - Pitch (X): rotation around X axis (up/down)
+/// - Yaw (Y): rotation around Y axis (left/right)
+/// - Roll (Z): rotation around Z axis (typically 0 for look-at)
+pub fn look_at(from from: vec3.Vec3, to to: vec3.Vec3) -> Transform {
+  // Calculate direction vector from source to target
+  let direction = vec3.subtract(to, from)
 
-  // Calculate right direction
-  let right = vec3.normalize(vec3.cross(up, forward))
+  // Handle degenerate case where from == to
+  let direction = case vec3.magnitude(direction) <. 0.0001 {
+    True -> vec3.Vec3(0.0, 0.0, 1.0)
+    // Default forward
+    False -> vec3.normalize(direction)
+  }
 
-  // Calculate actual up direction
-  let _actual_up = vec3.cross(forward, right)
-
-  // Convert to Euler angles (simplified - works for most cases)
-  // This is a simplified version; for production you'd want a full matrix-to-euler conversion
-  let yaw = case forward.x == 0.0 && forward.z == 0.0 {
-    True -> 0.0
-    False -> {
-      let assert Ok(result) =
-        vec3.angle(
-          vec3.Vec3(0.0, 0.0, 1.0),
-          vec3.Vec3(forward.x, 0.0, forward.z),
-        )
-      case forward.x <. 0.0 {
-        True -> 0.0 -. result
-        False -> result
+  // Calculate horizontal distance (projection on XZ plane)
+  let horizontal_distance =
+    float.square_root(direction.x *. direction.x +. direction.z *. direction.z)
+    |> fn(result) {
+      case result {
+        Ok(val) -> val
+        Error(_) -> 0.0
       }
     }
-  }
 
-  let pitch = {
-    let assert Ok(result) =
-      vec3.angle(vec3.Vec3(forward.x, 0.0, forward.z), forward)
-    case forward.y <. 0.0 {
-      True -> 0.0 -. result
-      False -> result
-    }
-  }
+  // Calculate pitch (rotation around X axis - looking up/down)
+  // atan2(y, horizontal_distance) gives angle from horizontal plane
+  let pitch = maths.atan2(direction.y, horizontal_distance)
 
-  // Roll is typically 0 for look-at transforms
+  // Calculate yaw (rotation around Y axis - looking left/right)
+  // atan2(x, z) gives angle from forward (Z) axis
+  // Note: In Three.js, positive Z is backward, so we negate
+  let yaw = maths.atan2(direction.x, direction.z)
+
+  // Roll is typically 0 for standard look-at (no barrel roll)
   let roll = 0.0
 
   Transform(

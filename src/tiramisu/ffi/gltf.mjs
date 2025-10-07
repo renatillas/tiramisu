@@ -1,25 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { Ok, Error, toList } from '../../gleam.mjs';
-
-// Define error constructors to match Gleam types
-class LoadError {
-  constructor(message) {
-    this.message = message;
-  }
-}
-
-class InvalidUrl {
-  constructor(url) {
-    this.url = url;
-  }
-}
-
-class ParseError {
-  constructor(message) {
-    this.message = message;
-  }
-}
+import * as GLEAM from '../../gleam.mjs';
+import * as ASSETS_GLEAM from '../assets.mjs';
 
 // Define GLTFData constructor to match Gleam type
 class GLTFData {
@@ -33,7 +15,7 @@ class GLTFData {
 export function loadGLTFAsync(url) {
   return new Promise((resolve) => {
     if (!url || url.trim() === '') {
-      resolve(new Error(new InvalidUrl(url)));
+      resolve(new GLEAM.Error(new ASSETS_GLEAM.InvalidUrl(url)));
       return;
     }
 
@@ -55,9 +37,9 @@ export function loadGLTFAsync(url) {
         }
 
         // Convert animations array to Gleam list
-        const animationsList = toList(gltf.animations);
+        const animationsList = GLEAM.toList(gltf.animations);
         const data = new GLTFData(gltf.scene, animationsList);
-        resolve(new Ok(data));
+        resolve(new GLEAM.Ok(data));
       },
       // Progress callback
       (progress) => {
@@ -71,11 +53,11 @@ export function loadGLTFAsync(url) {
         console.error('[GLTF Loader] ❌ Error:', error);
 
         if (error.message && error.message.includes('404')) {
-          resolve(new Error(new LoadError('File not found: ' + url)));
+          resolve(new GLEAM.Error(new ASSETS_GLEAM.LoadError('File not found: ' + url)));
         } else if (error.message && (error.message.includes('Invalid') || error.message.includes('parse'))) {
-          resolve(new Error(new ParseError(error.message)));
+          resolve(new GLEAM.Error(new ASSETS_GLEAM.ParseError(error.message)));
         } else {
-          resolve(new Error(new LoadError(error.message || 'Failed to load GLTF')));
+          resolve(new GLEAM.Error(new ASSETS_GLEAM.LoadError(error.message || 'Failed to load GLTF')));
         }
       }
     );

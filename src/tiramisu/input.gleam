@@ -249,7 +249,7 @@ fn gamepad_button_to_index(button: GamepadButton) -> Int {
     DPadDown -> 13
     DPadLeft -> 14
     DPadRight -> 15
-    Home -> 16
+    HomeButton -> 16
   }
 }
 
@@ -264,40 +264,256 @@ fn gamepad_axis_to_index(axis: GamepadAxis) -> Int {
 
 /// Common keyboard codes (standard KeyboardEvent.code values)
 pub type Key {
-  KeyW
+  // Letters A-Z
   KeyA
-  KeyS
+  KeyB
+  KeyC
   KeyD
+  KeyE
+  KeyF
+  KeyG
+  KeyH
+  KeyI
+  KeyJ
+  KeyK
+  KeyL
+  KeyM
+  KeyN
+  KeyO
+  KeyP
+  KeyQ
+  KeyR
+  KeyS
+  KeyT
+  KeyU
+  KeyV
+  KeyW
+  KeyX
+  KeyY
+  KeyZ
+  // Numbers 0-9
+  Digit0
+  Digit1
+  Digit2
+  Digit3
+  Digit4
+  Digit5
+  Digit6
+  Digit7
+  Digit8
+  Digit9
+  // Function keys F1-F12
+  F1
+  F2
+  F3
+  F4
+  F5
+  F6
+  F7
+  F8
+  F9
+  F10
+  F11
+  F12
+  // Arrow keys
   ArrowUp
   ArrowDown
   ArrowLeft
   ArrowRight
+  // Modifier keys
+  ShiftLeft
+  ShiftRight
+  ControlLeft
+  ControlRight
+  AltLeft
+  AltRight
+  MetaLeft
+  MetaRight
+  // Special keys
   Space
   Enter
   Escape
-  Shift
-  Control
-  Alt
+  Tab
+  Backspace
+  Delete
+  Insert
+  Home
+  End
+  PageUp
+  PageDown
+  CapsLock
+  // Symbols
+  Minus
+  Equal
+  BracketLeft
+  BracketRight
+  Backslash
+  Semicolon
+  Quote
+  Comma
+  Period
+  Slash
+  Backquote
+  // Numpad
+  Numpad0
+  Numpad1
+  Numpad2
+  Numpad3
+  Numpad4
+  Numpad5
+  Numpad6
+  Numpad7
+  Numpad8
+  Numpad9
+  NumpadAdd
+  NumpadSubtract
+  NumpadMultiply
+  NumpadDivide
+  NumpadDecimal
+  NumpadEnter
+  NumLock
+  // Media keys
+  AudioVolumeUp
+  AudioVolumeDown
+  AudioVolumeMute
+  MediaPlayPause
+  MediaStop
+  MediaTrackNext
+  MediaTrackPrevious
+  // Other
+  PrintScreen
+  ScrollLock
+  Pause
+  ContextMenu
+  // For any key not explicitly defined
   Custom(String)
 }
 
 /// Convert Key to JavaScript KeyboardEvent.code string
 fn key_to_code(key: Key) -> String {
   case key {
-    KeyW -> "KeyW"
+    // Letters
     KeyA -> "KeyA"
-    KeyS -> "KeyS"
+    KeyB -> "KeyB"
+    KeyC -> "KeyC"
     KeyD -> "KeyD"
+    KeyE -> "KeyE"
+    KeyF -> "KeyF"
+    KeyG -> "KeyG"
+    KeyH -> "KeyH"
+    KeyI -> "KeyI"
+    KeyJ -> "KeyJ"
+    KeyK -> "KeyK"
+    KeyL -> "KeyL"
+    KeyM -> "KeyM"
+    KeyN -> "KeyN"
+    KeyO -> "KeyO"
+    KeyP -> "KeyP"
+    KeyQ -> "KeyQ"
+    KeyR -> "KeyR"
+    KeyS -> "KeyS"
+    KeyT -> "KeyT"
+    KeyU -> "KeyU"
+    KeyV -> "KeyV"
+    KeyW -> "KeyW"
+    KeyX -> "KeyX"
+    KeyY -> "KeyY"
+    KeyZ -> "KeyZ"
+    // Numbers
+    Digit0 -> "Digit0"
+    Digit1 -> "Digit1"
+    Digit2 -> "Digit2"
+    Digit3 -> "Digit3"
+    Digit4 -> "Digit4"
+    Digit5 -> "Digit5"
+    Digit6 -> "Digit6"
+    Digit7 -> "Digit7"
+    Digit8 -> "Digit8"
+    Digit9 -> "Digit9"
+    // Function keys
+    F1 -> "F1"
+    F2 -> "F2"
+    F3 -> "F3"
+    F4 -> "F4"
+    F5 -> "F5"
+    F6 -> "F6"
+    F7 -> "F7"
+    F8 -> "F8"
+    F9 -> "F9"
+    F10 -> "F10"
+    F11 -> "F11"
+    F12 -> "F12"
+    // Arrow keys
     ArrowUp -> "ArrowUp"
     ArrowDown -> "ArrowDown"
     ArrowLeft -> "ArrowLeft"
     ArrowRight -> "ArrowRight"
+    // Modifier keys
+    ShiftLeft -> "ShiftLeft"
+    ShiftRight -> "ShiftRight"
+    ControlLeft -> "ControlLeft"
+    ControlRight -> "ControlRight"
+    AltLeft -> "AltLeft"
+    AltRight -> "AltRight"
+    MetaLeft -> "MetaLeft"
+    MetaRight -> "MetaRight"
+    // Special keys
     Space -> "Space"
     Enter -> "Enter"
     Escape -> "Escape"
-    Shift -> "ShiftLeft"
-    Control -> "ControlLeft"
-    Alt -> "AltLeft"
+    Tab -> "Tab"
+    Backspace -> "Backspace"
+    Delete -> "Delete"
+    Insert -> "Insert"
+    Home -> "Home"
+    End -> "End"
+    PageUp -> "PageUp"
+    PageDown -> "PageDown"
+    CapsLock -> "CapsLock"
+    // Symbols
+    Minus -> "Minus"
+    Equal -> "Equal"
+    BracketLeft -> "BracketLeft"
+    BracketRight -> "BracketRight"
+    Backslash -> "Backslash"
+    Semicolon -> "Semicolon"
+    Quote -> "Quote"
+    Comma -> "Comma"
+    Period -> "Period"
+    Slash -> "Slash"
+    Backquote -> "Backquote"
+    // Numpad
+    Numpad0 -> "Numpad0"
+    Numpad1 -> "Numpad1"
+    Numpad2 -> "Numpad2"
+    Numpad3 -> "Numpad3"
+    Numpad4 -> "Numpad4"
+    Numpad5 -> "Numpad5"
+    Numpad6 -> "Numpad6"
+    Numpad7 -> "Numpad7"
+    Numpad8 -> "Numpad8"
+    Numpad9 -> "Numpad9"
+    NumpadAdd -> "NumpadAdd"
+    NumpadSubtract -> "NumpadSubtract"
+    NumpadMultiply -> "NumpadMultiply"
+    NumpadDivide -> "NumpadDivide"
+    NumpadDecimal -> "NumpadDecimal"
+    NumpadEnter -> "NumpadEnter"
+    NumLock -> "NumLock"
+    // Media keys
+    AudioVolumeUp -> "AudioVolumeUp"
+    AudioVolumeDown -> "AudioVolumeDown"
+    AudioVolumeMute -> "AudioVolumeMute"
+    MediaPlayPause -> "MediaPlayPause"
+    MediaStop -> "MediaStop"
+    MediaTrackNext -> "MediaTrackNext"
+    MediaTrackPrevious -> "MediaTrackPrevious"
+    // Other
+    PrintScreen -> "PrintScreen"
+    ScrollLock -> "ScrollLock"
+    Pause -> "Pause"
+    ContextMenu -> "ContextMenu"
+    // Custom
     Custom(code) -> code
   }
 }
@@ -320,7 +536,7 @@ pub type GamepadButton {
   DPadDown
   DPadLeft
   DPadRight
-  Home
+  HomeButton
 }
 
 pub type GamepadAxis {

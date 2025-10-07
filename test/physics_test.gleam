@@ -1,4 +1,3 @@
-import gleam/option
 import tiramisu/physics
 import tiramisu/transform
 import tiramisu/vec3
@@ -14,7 +13,7 @@ pub fn register_and_get_transform_test() {
   let world = physics.register_body(world, "test_body", body, initial_transform)
 
   // Get transform - should return the initial transform we set
-  let assert option.Some(t) = physics.get_transform(world, "test_body")
+  let assert Ok(t) = physics.get_transform(world, "test_body")
   assert t.position.x == 0.0
   assert t.position.y == 5.0
   assert t.position.z == 0.0
@@ -25,8 +24,7 @@ pub fn get_nonexistent_transform_test() {
   let world =
     physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
 
-  let assert option.None = physics.get_transform(world, "nonexistent")
-  Nil
+  let assert Error(Nil) = physics.get_transform(world, "nonexistent")
 }
 
 // Test: Unregister body
@@ -40,19 +38,13 @@ pub fn unregister_body_test() {
   let world = physics.register_body(world, "test_body", body, initial_transform)
 
   // Verify body exists
-  assert case physics.get_transform(world, "test_body") {
-    option.Some(_) -> True
-    option.None -> False
-  }
+  let assert Ok(_) = physics.get_transform(world, "test_body")
 
   // Unregister body
   let world = physics.unregister_body(world, "test_body")
 
   // Verify body no longer exists
-  assert case physics.get_transform(world, "test_body") {
-    option.Some(_) -> False
-    option.None -> True
-  }
+  let assert Error(Nil) = physics.get_transform(world, "test_body")
 }
 
 // Test: Physics world with multiple bodies
@@ -83,11 +75,9 @@ pub fn multiple_bodies_test() {
     )
 
   // Verify all bodies exist
-  let assert option.Some(_) = physics.get_transform(world, "cube")
-
-  let assert option.Some(_) = physics.get_transform(world, "sphere")
-
-  let assert option.Some(_) = physics.get_transform(world, "ground")
+  let assert Ok(_) = physics.get_transform(world, "cube")
+  let assert Ok(_) = physics.get_transform(world, "sphere")
+  let assert Ok(_) = physics.get_transform(world, "ground")
 }
 
 // Test: Update body after registration
@@ -106,8 +96,5 @@ pub fn update_body_after_registration_test() {
 
   let world = physics.update_body(world, "test", updated_body)
 
-  assert case physics.get_transform(world, "test") {
-    option.Some(_) -> True
-    option.None -> False
-  }
+  let assert Ok(_) = physics.get_transform(world, "test")
 }

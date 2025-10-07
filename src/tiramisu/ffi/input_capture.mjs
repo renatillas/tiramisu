@@ -1,13 +1,8 @@
 // Input capture system that creates immutable InputState snapshots
 // Note: Opaque types (InputState, KeyboardState, MouseState) are not exported
 // so we recreate their constructors here to match the generated structure
-import {
-  ButtonState,
-  GamepadState,
-  TouchState,
-  Touch
-} from '../input.mjs';
-import { toList, Empty } from '../../gleam.mjs';
+import * as INPUT_GLEAM from '../input.mjs';
+import * as GLEAM from '../../gleam.mjs';
 
 // Recreate opaque type constructors to match generated input.mjs
 class InputState {
@@ -186,9 +181,9 @@ export function captureInputState() {
   const justReleasedKeys = Array.from(keysJustReleased);
 
   const keyboardState = new KeyboardState(
-    toList(pressedKeys),
-    toList(justPressedKeys),
-    toList(justReleasedKeys)
+    GLEAM.toList(pressedKeys),
+    GLEAM.toList(justPressedKeys),
+    GLEAM.toList(justReleasedKeys)
   );
 
   // Mouse state
@@ -198,9 +193,9 @@ export function captureInputState() {
     deltaX,
     deltaY,
     wheelDelta,
-    new ButtonState(leftButton.pressed, leftButton.justPressed, leftButton.justReleased),
-    new ButtonState(middleButton.pressed, middleButton.justPressed, middleButton.justReleased),
-    new ButtonState(rightButton.pressed, rightButton.justPressed, rightButton.justReleased)
+    new INPUT_GLEAM.ButtonState(leftButton.pressed, leftButton.justPressed, leftButton.justReleased),
+    new INPUT_GLEAM.ButtonState(middleButton.pressed, middleButton.justPressed, middleButton.justReleased),
+    new INPUT_GLEAM.ButtonState(rightButton.pressed, rightButton.justPressed, rightButton.justReleased)
   );
 
   // Gamepad state (support up to 4 gamepads)
@@ -212,17 +207,17 @@ export function captureInputState() {
     if (gamepad && gamepad.connected) {
       const buttons = Array.from(gamepad.buttons).map(b => b.value);
       const axes = Array.from(gamepad.axes);
-      gamepadStates.push(new GamepadState(
+      gamepadStates.push(new INPUT_GLEAM.GamepadState(
         true,
-        toList(buttons),
-        toList(axes)
+        GLEAM.toList(buttons),
+        GLEAM.toList(axes)
       ));
     } else {
       // Disconnected gamepad
-      gamepadStates.push(new GamepadState(
+      gamepadStates.push(new INPUT_GLEAM.GamepadState(
         false,
-        new Empty(),
-        new Empty()
+        new GLEAM.Empty(),
+        new GLEAM.Empty()
       ));
     }
   }
@@ -230,30 +225,30 @@ export function captureInputState() {
   // Touch state
   const touchList = [];
   touches.forEach((data, id) => {
-    touchList.push(new Touch(id, data.x, data.y));
+    touchList.push(new INPUT_GLEAM.Touch(id, data.x, data.y));
   });
 
   const touchJustStartedList = [];
   touchesJustStarted.forEach((data, id) => {
-    touchJustStartedList.push(new Touch(id, data.x, data.y));
+    touchJustStartedList.push(new INPUT_GLEAM.Touch(id, data.x, data.y));
   });
 
   const touchJustEndedList = [];
   touchesJustEnded.forEach((data, id) => {
-    touchJustEndedList.push(new Touch(id, data.x, data.y));
+    touchJustEndedList.push(new INPUT_GLEAM.Touch(id, data.x, data.y));
   });
 
-  const touchState = new TouchState(
-    toList(touchList),
-    toList(touchJustStartedList),
-    toList(touchJustEndedList)
+  const touchState = new INPUT_GLEAM.TouchState(
+    GLEAM.toList(touchList),
+    GLEAM.toList(touchJustStartedList),
+    GLEAM.toList(touchJustEndedList)
   );
 
   // Create immutable InputState
   return new InputState(
     keyboardState,
     mouseState,
-    toList(gamepadStates),
+    GLEAM.toList(gamepadStates),
     touchState
   );
 }
