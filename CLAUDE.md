@@ -204,3 +204,291 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
 ```
 
 For cameras with custom viewports, the aspect ratio uses the viewport dimensions. For main cameras, it uses the window dimensions (which update automatically on resize in fullscreen mode).
+
+## Migration Guide from v1.0.0
+
+This section helps developers migrate from v1.0.0 to the next version.
+
+### Breaking Changes
+
+#### 1. Canvas Dimensions API
+
+**Old:**
+```gleam
+tiramisu.run(
+  width: 800,
+  height: 600,
+  background: 0x111111,
+  // ...
+)
+```
+
+**New:**
+```gleam
+import gleam/option
+
+// Fullscreen mode (recommended)
+tiramisu.run(
+  dimensions: option.None,
+  background: 0x111111,
+  // ...
+)
+
+// Or fixed size
+tiramisu.run(
+  dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
+  background: 0x111111,
+  // ...
+)
+```
+
+#### 2. Camera Perspective API
+
+**Old:**
+```gleam
+let assert Ok(cam) = camera.perspective(
+  field_of_view: 75.0,
+  aspect: 16.0 /. 9.0,
+  near: 0.1,
+  far: 1000.0,
+)
+```
+
+**New:**
+```gleam
+// Aspect ratio is calculated automatically at render time
+let assert Ok(cam) = camera.perspective(
+  field_of_view: 75.0,
+  near: 0.1,
+  far: 1000.0,
+)
+```
+
+#### 3. Camera 2D API
+
+**Old:**
+```gleam
+let cam = camera.camera_2d(width: 800, height: 600, distance: 5.0)
+```
+
+**New:**
+```gleam
+// Distance is now set via scene.Camera node's transform
+let cam = camera.camera_2d(width: 800, height: 600)
+
+scene.Camera(
+  id: "main",
+  camera: cam,
+  transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+  // ...
+)
+```
+
+#### 4. Camera Position and Look At
+
+**Old:**
+```gleam
+let cam = camera.perspective(...)
+  |> camera.set_position(vec3.Vec3(0.0, 5.0, 10.0))
+  |> camera.set_look_at(vec3.Vec3(0.0, 0.0, 0.0))
+```
+
+**New:**
+```gleam
+// Position and look_at are now set on the scene.Camera node
+let assert Ok(cam) = camera.perspective(
+  field_of_view: 75.0,
+  near: 0.1,
+  far: 1000.0,
+)
+
+scene.Camera(
+  id: "main",
+  camera: cam,
+  transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
+  look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+  active: True,
+  viewport: option.None,
+)
+```
+
+#### 5. Context Type
+
+The `Context` type now includes canvas dimensions:
+
+**Old:**
+```gleam
+pub type Context {
+  Context(delta_time: Float, input: input.InputState)
+}
+```
+
+**New:**
+```gleam
+pub type Context {
+  Context(
+    delta_time: Float,
+    input: input.InputState,
+    canvas_width: Float,
+    canvas_height: Float,
+  )
+}
+```
+
+**Impact:** If you pattern match on Context, update your patterns:
+
+```gleam
+// Old
+fn update(model: Model, msg: Msg, Context(delta_time, input)) { ... }
+
+// New
+fn update(model: Model, msg: Msg, Context(delta_time, input, width, height)) { ... }
+
+// Or just use record access
+fn update(model: Model, msg: Msg, ctx: Context) {
+  let x = ctx.canvas_width
+  // ...
+}
+```
+
+#### 6. Geometry and Material Types
+
+Geometry and material types are now opaque and constructors return `Result` types:
+
+**Old:**
+```gleam
+scene.Mesh(
+  id: "cube",
+  geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+  material: scene.StandardMaterial(color: 0xff0000),
+  // ...
+)
+```
+
+**New:**
+```gleam
+let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+let assert Ok(material) = scene.standard_material(
+  color: 0xff0000,
+  metalness: 0.3,
+  roughness: 0.5,
+  map: option.None,
+  normal_map: option.None,
+)
+
+scene.Mesh(
+  id: "cube",
+  geometry: geometry,
+  material: material,
+  // ...
+)
+```
+
+#### 7. Light Constructors
+
+Light constructors now return `Result` types:
+
+**Old:**
+```gleam
+scene.Light(
+  id: "sun",
+  light_type: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
+  transform: transform.identity,
+)
+```
+
+**New:**
+```gleam
+let assert Ok(light) = scene.directional_light(
+  color: 0xffffff,
+  intensity: 1.0,
+)
+
+scene.Light(
+  id: "sun",
+  light: light,  // Note: renamed from light_type to light
+  transform: transform.identity,
+)
+```
+
+#### 8. State Machine Generic Types
+
+State machines are now generic over state type:
+
+**Old:**
+```gleam
+let machine = state_machine.new("idle")
+  |> state_machine.add_state("idle", idle_anim, looping: True)
+  |> state_machine.add_state("running", run_anim, looping: True)
+  |> state_machine.add_transition(
+    from: "idle",
+    to: "running",
+    condition: state_machine.Always,
+    blend_duration: 0.3,
+  )
+```
+
+**New:**
+```gleam
+// Define your state type
+type State {
+  Idle
+  Running
+}
+
+let machine = state_machine.new(Idle)
+  |> state_machine.add_state(Idle, idle_anim, looping: True)
+  |> state_machine.add_state(Running, run_anim, looping: True)
+  |> state_machine.add_transition(
+    from: Idle,
+    to: Running,
+    condition: state_machine.Always,
+    blend_duration: 0.3,
+  )
+```
+
+### New Features
+
+#### Canvas Dimensions in Context
+
+You can now access canvas dimensions for coordinate conversion:
+
+```gleam
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+  case msg {
+    TouchMove(screen_x, screen_y) -> {
+      // Convert screen to world coordinates using actual canvas size
+      let world_x = { screen_x -. ctx.canvas_width /. 2.0 } /. 100.0
+      let world_y = { ctx.canvas_height /. 2.0 -. screen_y } /. 100.0
+      // ...
+    }
+  }
+}
+```
+
+#### Fullscreen Mode
+
+Easily create fullscreen games that automatically resize:
+
+```gleam
+tiramisu.run(
+  dimensions: option.None,  // Fullscreen!
+  background: 0x111111,
+  // ...
+)
+```
+
+#### Camera Look At
+
+Cameras now support look-at targets directly in scene nodes:
+
+```gleam
+scene.Camera(
+  id: "main",
+  camera: cam,
+  transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
+  look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Look at origin
+  active: True,
+  viewport: option.None,
+)
+```

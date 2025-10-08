@@ -29,7 +29,8 @@ Then open your browser to the URL shown (typically http://localhost:1234)
 - Cyan/turquoise snake (3 segments initially)
 - Red food cube
 - Camera positioned above and behind, looking down at the grid
-- Score would normally display via UI overlay (simplified in this version)
+- **Score display** in the top-left corner via Lustre UI overlay
+- **Game Over screen** with restart button when you lose
 
 ## Troubleshooting
 

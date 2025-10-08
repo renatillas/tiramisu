@@ -24,23 +24,25 @@ Tiramisu brings the power of functional programming and static type safety to ga
 ## 🚀 Quick Start
 
 ```gleam
+import gleam/option
 import tiramisu
+import tiramisu/camera
 import tiramisu/effect
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec3
 
 type Model {
   Model(rotation: Float)
 }
 
 type Msg {
-  Frame
+  Tick
 }
 
 pub fn main() {
   tiramisu.run(
-    width: 800,
-    height: 600,
+    dimensions: option.None,  // Fullscreen mode
     background: 0x111111,
     init: init,
     update: update,
@@ -49,26 +51,50 @@ pub fn main() {
 }
 
 fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0), effect.none())
+  #(Model(rotation: 0.0), effect.tick(Tick))
 }
 
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
-    Frame -> {
+    Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.none())
+      #(Model(rotation: new_rotation), effect.tick(Tick))
     }
   }
 }
 
 fn view(model: Model) {
+  let assert Ok(cam) = camera.perspective(
+    field_of_view: 75.0,
+    near: 0.1,
+    far: 1000.0,
+  )
+
+  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material) = scene.standard_material(
+    color: 0x00ff00,
+    metalness: 0.3,
+    roughness: 0.5,
+    map: option.None,
+    normal_map: option.None,
+  )
+
   [
+    scene.Camera(
+      id: "main",
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+      look_at: option.None,
+      active: True,
+      viewport: option.None,
+    ),
     scene.Mesh(
       id: "cube",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(color: 0x00ff00),
+      geometry: geometry,
+      material: material,
       transform: transform.identity
         |> transform.rotate_y(model.rotation),
+      physics: option.None,
     ),
   ]
 }
@@ -84,21 +110,26 @@ Add Tiramisu to your Gleam project:
 gleam add tiramisu@1
 ```
 
-### Add Three.js and Rapier via Lustre to your gleam.toml
+### Configure your gleam.toml
+
+Add Three.js, Rapier, and styling configuration:
 
 ```toml
-
 name = "my_game"
 version = "0.1.0"
-license = "MIT"
 
-...
+# ...
 
 [tools.lustre.html]
 scripts = [
   { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
 ]
+stylesheets = [
+  { content = "body { margin: 0; padding: 0; overflow: hidden; }" }
+]
 ```
+
+**Note**: The `stylesheets` configuration removes default body margins and prevents scrollbars, which is essential for fullscreen games.
 
 ---
 

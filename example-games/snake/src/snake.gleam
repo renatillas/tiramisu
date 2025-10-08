@@ -6,7 +6,6 @@ import lustre/attribute.{class}
 import lustre/effect as lustre_effect
 import lustre/element.{type Element}
 import lustre/element/html
-import lustre/event
 import tiramisu
 import tiramisu/camera
 import tiramisu/debug
@@ -50,6 +49,7 @@ pub type Model {
 
 pub type Msg {
   Tick
+  RestartGame
 }
 
 // UI Messages
@@ -86,9 +86,12 @@ fn ui_init(_flags) {
 
 fn ui_update(model: UIModel, msg: UIMsg) {
   case msg {
-    UpdateScore(score) -> #(UIModel(..model, score: score), lustre_effect.none())
+    UpdateScore(score) -> #(
+      UIModel(..model, score: score),
+      lustre_effect.none(),
+    )
     GameOver -> #(UIModel(..model, game_over: True), lustre_effect.none())
-    Restart -> #(model, ui.dispatch_to_tiramisu(Tick))
+    Restart -> #(UIModel(score: 0, game_over: False), lustre_effect.none())
   }
 }
 
@@ -118,7 +121,7 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
     html.div(
       [
         class(
-          "absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black/80 pointer-events-auto",
+          "text-white absolute top-0 left-0 w-full h-full flex items-center justify-center bg-red/80 pointer-events-auto",
         ),
       ],
       [
@@ -135,15 +138,6 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
             html.p([class("text-3xl my-5")], [
               element.text("Final Score: " <> int.to_string(model.score)),
             ]),
-            html.button(
-              [
-                event.on_click(Restart),
-                class(
-                  "px-8 py-4 text-xl cursor-pointer bg-[#4ecdc4] text-white border-none rounded-lg hover:bg-[#45b8af] transition-colors",
-                ),
-              ],
-              [element.text("Press R to Restart")],
-            ),
           ],
         ),
       ],
@@ -176,12 +170,26 @@ fn update(
   ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg)) {
   case msg {
+    RestartGame -> {
+      // Reset UI and restart game
+      let #(new_model, game_effect) = init(ctx)
+      #(
+        new_model,
+        effect.batch([
+          game_effect,
+          ui.dispatch_to_lustre(RestartGame),
+          ui.dispatch_to_lustre(UpdateScore(0)),
+        ]),
+      )
+    }
     Tick -> {
       case model.game_over {
         True -> {
           // Check for restart (R key)
           case input.is_key_pressed(ctx.input, input.KeyR) {
-            True -> init(ctx)
+            True -> {
+              #(model, effect.from(fn(dispatch) { dispatch(RestartGame) }))
+            }
             False -> #(model, effect.tick(Tick))
           }
         }
@@ -281,7 +289,6 @@ fn get_new_direction(
   input_state: input.InputState,
   current: Direction,
 ) -> Direction {
-  // Can't reverse direction
   case
     input.is_key_pressed(input_state, input.KeyW)
     || input.is_key_pressed(input_state, input.ArrowUp)
