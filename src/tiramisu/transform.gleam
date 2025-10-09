@@ -218,3 +218,182 @@ pub fn look_at(
     scale: vec3f.one,
   )
 }
+
+// --- Convenience Methods for Relative Transforms ---
+
+/// Move a transform by adding to its current position (relative movement).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.at(vec3.Vec3(5.0, 0.0, 0.0))
+///   |> transform.translate_by(vec3.Vec3(2.0, 1.0, 0.0))
+/// // position: (7.0, 1.0, 0.0)
+/// ```
+pub fn translate_by(
+  transform: Transform,
+  offset: vec3.Vec3(Float),
+) -> Transform {
+  Transform(..transform, position: vec3f.add(transform.position, offset))
+}
+
+/// Rotate a transform by adding to its current rotation (relative rotation).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))  // Turn 90° right
+///   |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))  // Turn another 90° right
+/// // rotation: (0.0, 3.14, 0.0) - now facing backward
+/// ```
+pub fn rotate_by(
+  transform: Transform,
+  rotation: vec3.Vec3(Float),
+) -> Transform {
+  Transform(..transform, rotation: vec3f.add(transform.rotation, rotation))
+}
+
+/// Scale a transform by multiplying its current scale (relative scaling).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.scale_by(vec3.Vec3(2.0, 1.0, 2.0))
+///   |> transform.scale_by(vec3.Vec3(2.0, 1.0, 1.0))
+/// // scale: (4.0, 1.0, 2.0)
+/// ```
+pub fn scale_by(transform: Transform, scale_factor: vec3.Vec3(Float)) -> Transform {
+  Transform(
+    ..transform,
+    scale: vec3.Vec3(
+      transform.scale.x *. scale_factor.x,
+      transform.scale.y *. scale_factor.y,
+      transform.scale.z *. scale_factor.z,
+    ),
+  )
+}
+
+/// Set uniform scale on all axes (width = height = depth).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.scale_uniform(2.0)
+/// // scale: (2.0, 2.0, 2.0) - twice as big in all dimensions
+/// ```
+pub fn scale_uniform(transform: Transform, scale: Float) -> Transform {
+  Transform(..transform, scale: vec3.Vec3(scale, scale, scale))
+}
+
+/// Rotate around the Y axis (yaw/turn left-right).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.rotate_y(1.57)  // Turn 90° right
+/// ```
+pub fn rotate_y(transform: Transform, angle: Float) -> Transform {
+  Transform(
+    ..transform,
+    rotation: vec3.Vec3(
+      transform.rotation.x,
+      transform.rotation.y +. angle,
+      transform.rotation.z,
+    ),
+  )
+}
+
+/// Rotate around the X axis (pitch/look up-down).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.rotate_x(0.5)  // Look up slightly
+/// ```
+pub fn rotate_x(transform: Transform, angle: Float) -> Transform {
+  Transform(
+    ..transform,
+    rotation: vec3.Vec3(
+      transform.rotation.x +. angle,
+      transform.rotation.y,
+      transform.rotation.z,
+    ),
+  )
+}
+
+/// Rotate around the Z axis (roll/tilt left-right).
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.rotate_z(0.3)  // Tilt right
+/// ```
+pub fn rotate_z(transform: Transform, angle: Float) -> Transform {
+  Transform(
+    ..transform,
+    rotation: vec3.Vec3(
+      transform.rotation.x,
+      transform.rotation.y,
+      transform.rotation.z +. angle,
+    ),
+  )
+}
+
+/// Move forward along the local Z axis (useful for character movement).
+///
+/// Positive distance moves in the direction the object is facing.
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.rotate_y(1.57)  // Face right
+///   |> transform.move_forward(5.0)  // Move 5 units to the right
+/// ```
+pub fn move_forward(transform: Transform, distance: Float) -> Transform {
+  // Calculate forward vector from Y rotation (yaw)
+  let yaw = transform.rotation.y
+  let forward_x = maths.sin(yaw) *. distance
+  let forward_z = maths.cos(yaw) *. distance
+
+  translate_by(transform, vec3.Vec3(forward_x, 0.0, forward_z))
+}
+
+/// Move right along the local X axis (strafe movement).
+///
+/// Positive distance moves to the right.
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.move_right(3.0)  // Strafe right 3 units
+/// ```
+pub fn move_right(transform: Transform, distance: Float) -> Transform {
+  // Calculate right vector from Y rotation (yaw)
+  let yaw = transform.rotation.y
+  let right_x = maths.cos(yaw) *. distance
+  let right_z = 0.0 -. maths.sin(yaw) *. distance
+
+  translate_by(transform, vec3.Vec3(right_x, 0.0, right_z))
+}
+
+/// Move up along the world Y axis (vertical movement).
+///
+/// Positive distance moves up.
+///
+/// ## Example
+///
+/// ```gleam
+/// let t = transform.identity
+///   |> transform.move_up(2.0)  // Jump up 2 units
+/// ```
+pub fn move_up(transform: Transform, distance: Float) -> Transform {
+  translate_by(transform, vec3.Vec3(0.0, distance, 0.0))
+}

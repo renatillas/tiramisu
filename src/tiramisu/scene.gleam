@@ -762,6 +762,369 @@ pub fn toon_material(
   Ok(ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
 }
 
+// --- Material Presets ---
+
+/// Create a plastic material (non-metallic, medium roughness).
+///
+/// ## Example
+///
+/// ```gleam
+/// let red_plastic = scene.plastic(0xff0000)
+/// let blue_plastic = scene.plastic(0x0000ff)
+/// ```
+pub fn plastic(color color: Int) -> Result(Material, MaterialError) {
+  standard_material(
+    color: color,
+    metalness: 0.0,
+    roughness: 0.5,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+/// Create a metallic material (full metalness, low roughness).
+///
+/// ## Example
+///
+/// ```gleam
+/// let gold = scene.metal(0xffd700)
+/// let silver = scene.metal(0xc0c0c0)
+/// ```
+pub fn metal(color color: Int) -> Result(Material, MaterialError) {
+  standard_material(
+    color: color,
+    metalness: 1.0,
+    roughness: 0.3,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+/// Create a rough metal material (full metalness, high roughness).
+///
+/// ## Example
+///
+/// ```gleam
+/// let rusty_metal = scene.rough_metal(0x8b4513)
+/// ```
+pub fn rough_metal(color color: Int) -> Result(Material, MaterialError) {
+  standard_material(
+    color: color,
+    metalness: 1.0,
+    roughness: 0.8,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+/// Create a glossy material (non-metallic, very low roughness).
+///
+/// ## Example
+///
+/// ```gleam
+/// let glossy_paint = scene.glossy(0xff0000)
+/// ```
+pub fn glossy(color color: Int) -> Result(Material, MaterialError) {
+  standard_material(
+    color: color,
+    metalness: 0.0,
+    roughness: 0.1,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+/// Create a matte material (non-metallic, very high roughness).
+///
+/// ## Example
+///
+/// ```gleam
+/// let fabric = scene.matte(0x4a4a4a)
+/// ```
+pub fn matte(color color: Int) -> Result(Material, MaterialError) {
+  standard_material(
+    color: color,
+    metalness: 0.0,
+    roughness: 1.0,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+// --- Material Builder Pattern ---
+
+/// Builder for standard (PBR) materials with sensible defaults.
+///
+/// Start with `new_standard_material()`, chain setter methods, then call `build()`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let material = scene.new_standard_material()
+///   |> scene.mat_color(0xff0000)
+///   |> scene.mat_metalness(0.8)
+///   |> scene.mat_roughness(0.3)
+///   |> scene.build_material()
+/// ```
+pub opaque type StandardMaterialBuilder {
+  StandardMaterialBuilder(
+    color: Int,
+    metalness: Float,
+    roughness: Float,
+    map: Option(Texture),
+    normal_map: Option(Texture),
+    ambient_oclusion_map: Option(Texture),
+    roughness_map: Option(Texture),
+    metalness_map: Option(Texture),
+  )
+}
+
+/// Create a new standard material builder with default values.
+///
+/// Defaults: gray color (0x808080), metalness 0.5, roughness 0.5, no textures.
+pub fn new_standard_material() -> StandardMaterialBuilder {
+  StandardMaterialBuilder(
+    color: 0x808080,
+    metalness: 0.5,
+    roughness: 0.5,
+    map: option.None,
+    normal_map: option.None,
+    ambient_oclusion_map: option.None,
+    roughness_map: option.None,
+    metalness_map: option.None,
+  )
+}
+
+/// Set the base color of the material.
+pub fn mat_color(
+  builder: StandardMaterialBuilder,
+  color: Int,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, color: color)
+}
+
+/// Set the metalness (0.0 = dielectric, 1.0 = metal).
+pub fn mat_metalness(
+  builder: StandardMaterialBuilder,
+  metalness: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, metalness: metalness)
+}
+
+/// Set the roughness (0.0 = mirror smooth, 1.0 = completely rough).
+pub fn mat_roughness(
+  builder: StandardMaterialBuilder,
+  roughness: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, roughness: roughness)
+}
+
+/// Set the color/diffuse texture map.
+pub fn mat_map(
+  builder: StandardMaterialBuilder,
+  map: Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, map: option.Some(map))
+}
+
+/// Set the normal map for surface detail.
+pub fn mat_normal_map(
+  builder: StandardMaterialBuilder,
+  normal_map: Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, normal_map: option.Some(normal_map))
+}
+
+/// Set the ambient occlusion map.
+pub fn mat_ao_map(
+  builder: StandardMaterialBuilder,
+  ao_map: Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, ambient_oclusion_map: option.Some(ao_map))
+}
+
+/// Set the roughness map.
+pub fn mat_roughness_map(
+  builder: StandardMaterialBuilder,
+  roughness_map: Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, roughness_map: option.Some(roughness_map))
+}
+
+/// Set the metalness map.
+pub fn mat_metalness_map(
+  builder: StandardMaterialBuilder,
+  metalness_map: Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, metalness_map: option.Some(metalness_map))
+}
+
+/// Build the material from the builder (validates parameters).
+pub fn build_material(
+  builder: StandardMaterialBuilder,
+) -> Result(Material, MaterialError) {
+  standard_material(
+    color: builder.color,
+    metalness: builder.metalness,
+    roughness: builder.roughness,
+    map: builder.map,
+    normal_map: builder.normal_map,
+    ambient_oclusion_map: builder.ambient_oclusion_map,
+    roughness_map: builder.roughness_map,
+    metalness_map: builder.metalness_map,
+  )
+}
+
+// --- Geometry Builder Pattern ---
+
+/// Builder for box geometry with sensible defaults.
+pub opaque type BoxBuilder {
+  BoxBuilder(width: Float, height: Float, depth: Float)
+}
+
+/// Create a new box builder (default: 1x1x1 cube).
+pub fn new_box() -> BoxBuilder {
+  BoxBuilder(width: 1.0, height: 1.0, depth: 1.0)
+}
+
+/// Set the width of the box.
+pub fn box_width(builder: BoxBuilder, width: Float) -> BoxBuilder {
+  BoxBuilder(..builder, width: width)
+}
+
+/// Set the height of the box.
+pub fn box_height(builder: BoxBuilder, height: Float) -> BoxBuilder {
+  BoxBuilder(..builder, height: height)
+}
+
+/// Set the depth of the box.
+pub fn box_depth(builder: BoxBuilder, depth: Float) -> BoxBuilder {
+  BoxBuilder(..builder, depth: depth)
+}
+
+/// Set all dimensions at once.
+pub fn box_size(
+  _builder: BoxBuilder,
+  width width: Float,
+  height height: Float,
+  depth depth: Float,
+) -> BoxBuilder {
+  BoxBuilder(width: width, height: height, depth: depth)
+}
+
+/// Set uniform size (width = height = depth) for a cube.
+pub fn box_cube(_builder: BoxBuilder, size: Float) -> BoxBuilder {
+  BoxBuilder(width: size, height: size, depth: size)
+}
+
+/// Build the box geometry (validates parameters).
+pub fn build_box(builder: BoxBuilder) -> Result(Geometry, GeometryError) {
+  box(width: builder.width, height: builder.height, depth: builder.depth)
+}
+
+/// Builder for sphere geometry with sensible defaults.
+pub opaque type SphereBuilder {
+  SphereBuilder(radius: Float, width_segments: Int, height_segments: Int)
+}
+
+/// Create a new sphere builder (default: radius 1.0, 32x16 segments).
+pub fn new_sphere() -> SphereBuilder {
+  SphereBuilder(radius: 1.0, width_segments: 32, height_segments: 16)
+}
+
+/// Set the radius of the sphere.
+pub fn sphere_radius(builder: SphereBuilder, radius: Float) -> SphereBuilder {
+  SphereBuilder(..builder, radius: radius)
+}
+
+/// Set the width segments (horizontal divisions).
+pub fn sphere_width_segments(
+  builder: SphereBuilder,
+  segments: Int,
+) -> SphereBuilder {
+  SphereBuilder(..builder, width_segments: segments)
+}
+
+/// Set the height segments (vertical divisions).
+pub fn sphere_height_segments(
+  builder: SphereBuilder,
+  segments: Int,
+) -> SphereBuilder {
+  SphereBuilder(..builder, height_segments: segments)
+}
+
+/// Set both width and height segments (for uniform detail).
+pub fn sphere_segments(builder: SphereBuilder, segments: Int) -> SphereBuilder {
+  SphereBuilder(
+    ..builder,
+    width_segments: segments,
+    height_segments: segments / 2,
+  )
+}
+
+/// Build the sphere geometry (validates parameters).
+pub fn build_sphere(builder: SphereBuilder) -> Result(Geometry, GeometryError) {
+  sphere(
+    radius: builder.radius,
+    width_segments: builder.width_segments,
+    height_segments: builder.height_segments,
+  )
+}
+
+/// Builder for plane geometry with sensible defaults.
+pub opaque type PlaneBuilder {
+  PlaneBuilder(width: Float, height: Float)
+}
+
+/// Create a new plane builder (default: 1x1).
+pub fn new_plane() -> PlaneBuilder {
+  PlaneBuilder(width: 1.0, height: 1.0)
+}
+
+/// Set the width of the plane.
+pub fn plane_width(builder: PlaneBuilder, width: Float) -> PlaneBuilder {
+  PlaneBuilder(..builder, width: width)
+}
+
+/// Set the height of the plane.
+pub fn plane_height(builder: PlaneBuilder, height: Float) -> PlaneBuilder {
+  PlaneBuilder(..builder, height: height)
+}
+
+/// Set both dimensions at once.
+pub fn plane_size(
+  _builder: PlaneBuilder,
+  width width: Float,
+  height height: Float,
+) -> PlaneBuilder {
+  PlaneBuilder(width: width, height: height)
+}
+
+/// Set uniform size (square plane).
+pub fn plane_square(_builder: PlaneBuilder, size: Float) -> PlaneBuilder {
+  PlaneBuilder(width: size, height: size)
+}
+
+/// Build the plane geometry (validates parameters).
+pub fn build_plane(builder: PlaneBuilder) -> Result(Geometry, GeometryError) {
+  plane(width: builder.width, height: builder.height)
+}
+
 @internal
 pub type Patch {
   AddNode(id: String, node: Node, parent_id: option.Option(String))

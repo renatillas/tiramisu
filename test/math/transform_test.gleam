@@ -272,3 +272,160 @@ pub fn look_at_zero_roll_test() {
     assert t.rotation.z == 0.0
   })
 }
+
+// --- Convenience Method Tests ---
+
+// Test: translate_by adds to position
+pub fn translate_by_test() {
+  let t = transform.at(position: vec3.Vec3(1.0, 2.0, 3.0))
+  let offset = vec3.Vec3(4.0, 5.0, 6.0)
+  let result = transform.translate_by(t, offset)
+
+  assert result.position.x == 5.0
+  assert result.position.y == 7.0
+  assert result.position.z == 9.0
+}
+
+// Test: rotate_by adds to rotation
+pub fn rotate_by_test() {
+  let t = transform.identity
+    |> transform.set_rotation(vec3.Vec3(0.5, 1.0, 1.5))
+  let rotation = vec3.Vec3(0.2, 0.3, 0.4)
+  let result = transform.rotate_by(t, rotation)
+
+  assert float.absolute_value(result.rotation.x -. 0.7) <. 0.0001
+  assert float.absolute_value(result.rotation.y -. 1.3) <. 0.0001
+  assert float.absolute_value(result.rotation.z -. 1.9) <. 0.0001
+}
+
+// Test: scale_by multiplies scale
+pub fn scale_by_test() {
+  let t = transform.identity
+    |> transform.set_scale(vec3.Vec3(2.0, 3.0, 4.0))
+  let scale_factor = vec3.Vec3(2.0, 1.5, 0.5)
+  let result = transform.scale_by(t, scale_factor)
+
+  assert result.scale.x == 4.0
+  assert float.absolute_value(result.scale.y -. 4.5) <. 0.0001
+  assert result.scale.z == 2.0
+}
+
+// Test: scale_uniform sets all axes
+pub fn scale_uniform_test() {
+  let t = transform.identity
+  let result = transform.scale_uniform(t, 2.5)
+
+  assert result.scale.x == 2.5
+  assert result.scale.y == 2.5
+  assert result.scale.z == 2.5
+}
+
+// Test: rotate_y only affects Y rotation
+pub fn rotate_y_test() {
+  let t = transform.identity
+    |> transform.set_rotation(vec3.Vec3(0.1, 0.2, 0.3))
+  let result = transform.rotate_y(t, 1.5)
+
+  assert result.rotation.x == 0.1
+  assert float.absolute_value(result.rotation.y -. 1.7) <. 0.0001
+  assert result.rotation.z == 0.3
+}
+
+// Test: rotate_x only affects X rotation
+pub fn rotate_x_test() {
+  let t = transform.identity
+    |> transform.set_rotation(vec3.Vec3(0.1, 0.2, 0.3))
+  let result = transform.rotate_x(t, 0.5)
+
+  assert float.absolute_value(result.rotation.x -. 0.6) <. 0.0001
+  assert result.rotation.y == 0.2
+  assert result.rotation.z == 0.3
+}
+
+// Test: rotate_z only affects Z rotation
+pub fn rotate_z_test() {
+  let t = transform.identity
+    |> transform.set_rotation(vec3.Vec3(0.1, 0.2, 0.3))
+  let result = transform.rotate_z(t, 0.7)
+
+  assert result.rotation.x == 0.1
+  assert result.rotation.y == 0.2
+  assert result.rotation.z == 1.0
+}
+
+// Test: move_forward when facing forward (yaw = 0)
+pub fn move_forward_facing_forward_test() {
+  let t = transform.identity
+  let result = transform.move_forward(t, 5.0)
+
+  // When yaw is 0, forward is along +Z axis
+  assert float.absolute_value(result.position.x) <. 0.0001
+  assert result.position.y == 0.0
+  assert float.absolute_value(result.position.z -. 5.0) <. 0.0001
+}
+
+// Test: move_forward when facing right (yaw = π/2)
+pub fn move_forward_facing_right_test() {
+  let pi = maths.pi()
+  let t = transform.identity
+    |> transform.rotate_y(pi /. 2.0)
+  let result = transform.move_forward(t, 5.0)
+
+  // When yaw is π/2, forward is along +X axis
+  assert float.absolute_value(result.position.x -. 5.0) <. 0.0001
+  assert result.position.y == 0.0
+  assert float.absolute_value(result.position.z) <. 0.0001
+}
+
+// Test: move_right when facing forward (yaw = 0)
+pub fn move_right_facing_forward_test() {
+  let t = transform.identity
+  let result = transform.move_right(t, 3.0)
+
+  // When yaw is 0, right is along +X axis
+  assert float.absolute_value(result.position.x -. 3.0) <. 0.0001
+  assert result.position.y == 0.0
+  assert float.absolute_value(result.position.z) <. 0.0001
+}
+
+// Test: move_right when facing right (yaw = π/2)
+pub fn move_right_facing_right_test() {
+  let pi = maths.pi()
+  let t = transform.identity
+    |> transform.rotate_y(pi /. 2.0)
+  let result = transform.move_right(t, 3.0)
+
+  // When yaw is π/2 and moving right, should move along -Z axis
+  assert float.absolute_value(result.position.x) <. 0.0001
+  assert result.position.y == 0.0
+  assert float.absolute_value(result.position.z +. 3.0) <. 0.0001
+}
+
+// Test: move_up ignores rotation
+pub fn move_up_test() {
+  let pi = maths.pi()
+  let t = transform.identity
+    |> transform.rotate_y(pi)  // Face backward
+    |> transform.rotate_x(pi /. 4.0)  // Look up
+  let result = transform.move_up(t, 2.5)
+
+  // Move up should always be along world +Y, regardless of rotation
+  assert result.position.x == 0.0
+  assert result.position.y == 2.5
+  assert result.position.z == 0.0
+}
+
+// Test: chaining convenience methods
+pub fn chaining_convenience_methods_test() {
+  let result = transform.identity
+    |> transform.translate_by(vec3.Vec3(1.0, 0.0, 0.0))
+    |> transform.rotate_y(1.57)
+    |> transform.move_forward(2.0)
+    |> transform.scale_uniform(2.0)
+
+  // Should have applied all operations in sequence
+  assert float.absolute_value(result.position.x -. 3.0) <. 0.1  // Approximate due to rotation
+  assert result.scale.x == 2.0
+  assert result.scale.y == 2.0
+  assert result.scale.z == 2.0
+}

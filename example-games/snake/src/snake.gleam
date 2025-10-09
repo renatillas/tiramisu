@@ -450,7 +450,7 @@ fn get_eye_positions(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let fruit_audio = case
     asset.get_audio(model.asset_cache, "fruit-collect.wav"),
     model.ate_food

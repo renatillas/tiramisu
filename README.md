@@ -26,7 +26,6 @@ Tiramisu brings the power of functional programming and static type safety to ga
 ```gleam
 import gleam/option
 import tiramisu
-import tiramisu/camera
 import tiramisu/effect
 import tiramisu/scene
 import tiramisu/transform
@@ -37,12 +36,13 @@ type Model {
 }
 
 type Msg {
-  Tick
+  Frame
 }
 
 pub fn main() {
   tiramisu.run(
-    dimensions: option.None,  // Fullscreen mode
+    width: 800,
+    height: 600,
     background: 0x111111,
     init: init,
     update: update,
@@ -51,49 +51,32 @@ pub fn main() {
 }
 
 fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0), effect.tick(Tick))
+  #(Model(rotation: 0.0), effect.none())
 }
 
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
-    Tick -> {
+    Frame -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick))
+      #(Model(rotation: new_rotation), effect.none())
     }
   }
 }
 
 fn view(model: Model) {
-  let assert Ok(cam) = camera.perspective(
-    field_of_view: 75.0,
-    near: 0.1,
-    far: 1000.0,
-  )
-
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(material) = scene.standard_material(
-    color: 0x00ff00,
-    metalness: 0.3,
-    roughness: 0.5,
-    map: option.None,
-    normal_map: option.None,
-  )
-
   [
-    scene.Camera(
-      id: "main",
-      camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-      look_at: option.None,
-      active: True,
-      viewport: option.None,
-    ),
     scene.Mesh(
       id: "cube",
-      geometry: geometry,
-      material: material,
+      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
+      material: scene.StandardMaterial(
+        color: 0x00ff00,
+        metalness: 1.0,
+        roughness: 1.0,
+        map: option.None,
+        normal_map: option.None,
+      ),
       transform: transform.identity
-        |> transform.rotate_y(model.rotation),
+        |> transform.set_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
   ]
