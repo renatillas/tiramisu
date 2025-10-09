@@ -1,4 +1,5 @@
 import gleam/int
+import gleam/javascript/promise
 import gleam/list
 import gleam/option.{None}
 import lustre
@@ -7,8 +8,9 @@ import lustre/effect as lustre_effect
 import lustre/element.{type Element}
 import lustre/element/html
 import tiramisu
+import tiramisu/asset
+import tiramisu/audio
 import tiramisu/camera
-import tiramisu/debug
 import tiramisu/effect.{type Effect}
 import tiramisu/input
 import tiramisu/scene
@@ -44,12 +46,15 @@ pub type Model {
     game_over: Bool,
     move_timer: Float,
     move_interval: Float,
+    asset_cache: asset.AssetCache,
+    ate_food: Bool,
   )
 }
 
 pub type Msg {
   Tick
   RestartGame
+  AudioAssetsLoaded(asset.BatchLoadResult)
 }
 
 // UI Messages
@@ -70,13 +75,7 @@ pub fn main() -> Nil {
     |> lustre.start("#app", Nil)
 
   // Start Tiramisu game in fullscreen mode
-  tiramisu.run(
-    dimensions: None,
-    background: 0x1a1a2e,
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.run(dimensions: None, background: 0x1a1a2e, init:, update:, view:)
 }
 
 // UI Init/Update/View
@@ -146,6 +145,15 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+  let sound_assets = [
+    asset.AudioAsset("game-over.wav"),
+    asset.AudioAsset("fruit-collect.wav"),
+  ]
+  let fruit_eat_sound =
+    effect.from_promise(promise.map(
+      asset.load_batch_simple(sound_assets),
+      AudioAssetsLoaded,
+    ))
   let initial_snake = [
     Position(10, 10),
     Position(10, 11),
@@ -160,8 +168,10 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       game_over: False,
       move_timer: 0.0,
       move_interval: initial_speed,
+      asset_cache: asset.new_cache(),
+      ate_food: False,
     )
-  #(model, effect.tick(Tick))
+  #(model, effect.batch([effect.tick(Tick), fruit_eat_sound]))
 }
 
 fn update(
@@ -258,12 +268,14 @@ fn update(
 
                   #(
                     Model(
+                      ..model,
                       snake: new_snake,
                       direction: safe_direction,
                       food: new_food,
                       score: new_score,
                       game_over: False,
                       move_timer: 0.0,
+                      ate_food:,
                       move_interval: new_interval,
                     ),
                     effect.batch([
@@ -281,6 +293,10 @@ fn update(
           }
         }
       }
+    }
+    AudioAssetsLoaded(audio_buffer) -> {
+      let asset.BatchLoadResult(asset_cache, _) = audio_buffer
+      #(Model(..model, asset_cache:), effect.none())
     }
   }
 }
@@ -367,8 +383,114 @@ fn position_to_world(pos: Position) -> vec3.Vec3(Float) {
   )
 }
 
+fn get_head_rotation(direction: Direction) -> vec3.Vec3(Float) {
+  case direction {
+    Up -> vec3.Vec3(0.0, 0.0, 0.0)
+    Down -> vec3.Vec3(0.0, 3.14159, 0.0)
+    Left -> vec3.Vec3(0.0, 1.5708, 0.0)
+    Right -> vec3.Vec3(0.0, -1.5708, 0.0)
+  }
+}
+
+fn get_eye_positions(
+  head_pos: vec3.Vec3(Float),
+  direction: Direction,
+) -> #(vec3.Vec3(Float), vec3.Vec3(Float)) {
+  let eye_offset = 0.15
+  let forward_offset = 0.45
+  case direction {
+    Up -> #(
+      vec3.Vec3(
+        head_pos.x -. eye_offset,
+        head_pos.y,
+        head_pos.z -. forward_offset,
+      ),
+      vec3.Vec3(
+        head_pos.x +. eye_offset,
+        head_pos.y,
+        head_pos.z -. forward_offset,
+      ),
+    )
+    Down -> #(
+      vec3.Vec3(
+        head_pos.x -. eye_offset,
+        head_pos.y,
+        head_pos.z +. forward_offset,
+      ),
+      vec3.Vec3(
+        head_pos.x +. eye_offset,
+        head_pos.y,
+        head_pos.z +. forward_offset,
+      ),
+    )
+    Left -> #(
+      vec3.Vec3(
+        head_pos.x -. forward_offset,
+        head_pos.y,
+        head_pos.z -. eye_offset,
+      ),
+      vec3.Vec3(
+        head_pos.x -. forward_offset,
+        head_pos.y,
+        head_pos.z +. eye_offset,
+      ),
+    )
+    Right -> #(
+      vec3.Vec3(
+        head_pos.x +. forward_offset,
+        head_pos.y,
+        head_pos.z -. eye_offset,
+      ),
+      vec3.Vec3(
+        head_pos.x +. forward_offset,
+        head_pos.y,
+        head_pos.z +. eye_offset,
+      ),
+    )
+  }
+}
+
 fn view(model: Model) -> List(scene.SceneNode) {
-  echo debug.get_performance_stats()
+  let fruit_audio = case
+    asset.get_audio(model.asset_cache, "fruit-collect.wav"),
+    model.ate_food
+  {
+    Ok(audio_buffer), True -> [
+      scene.Audio(
+        id: "eating-sound",
+        buffer: audio_buffer,
+        config: audio.AudioConfig(
+          volume: 0.3,
+          loop: False,
+          playback_rate: 1.0,
+          autoplay: True,
+        ),
+        audio_type: audio.GlobalAudio,
+      ),
+    ]
+    _, _ -> []
+  }
+
+  let game_over_audio = case
+    asset.get_audio(model.asset_cache, "game-over.wav"),
+    model.game_over
+  {
+    Ok(audio_buffer), True -> [
+      scene.Audio(
+        id: "eating-sound",
+        buffer: audio_buffer,
+        config: audio.AudioConfig(
+          volume: 0.3,
+          loop: False,
+          playback_rate: 1.0,
+          autoplay: True,
+        ),
+        audio_type: audio.GlobalAudio,
+      ),
+    ]
+    _, _ -> []
+  }
+
   let assert Ok(cam) =
     camera.perspective(field_of_view: 60.0, near: 0.1, far: 1000.0)
 
@@ -411,9 +533,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let snake_segments =
     list.index_map(model.snake, fn(pos, idx) {
       let world_pos = position_to_world(pos)
-      let color = case idx {
-        0 -> 0x4ecdc4
-        _ -> 0x3aafa9
+      let #(color, rotation) = case idx {
+        0 -> #(0x4ecdc4, get_head_rotation(model.direction))
+        _ -> #(0x3aafa9, vec3.Vec3(0.0, 0.0, 0.0))
       }
       scene.Mesh(
         id: "snake_" <> int.to_string(idx),
@@ -434,17 +556,97 @@ fn view(model: Model) -> List(scene.SceneNode) {
               roughness: 0.6,
               map: option.None,
               normal_map: option.None,
+              ambient_oclusion_map: option.None,
+              roughness_map: option.None,
+              metalness_map: option.None,
             )
           material
         },
         transform: transform.Transform(
           position: world_pos,
-          rotation: vec3.Vec3(0.0, 0.0, 0.0),
+          rotation: rotation,
           scale: vec3.Vec3(1.0, 1.0, 1.0),
         ),
         physics: option.None,
       )
     })
+
+  // Create eyes for the snake head
+  let eyes = case model.snake {
+    [head, ..] -> {
+      let head_world = position_to_world(head)
+      let #(left_eye_pos, right_eye_pos) =
+        get_eye_positions(head_world, model.direction)
+
+      [
+        scene.Mesh(
+          id: "left_eye",
+          geometry: {
+            let assert Ok(sphere) =
+              scene.sphere(
+                radius: 0.12,
+                width_segments: 16,
+                height_segments: 12,
+              )
+            sphere
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xffffff,
+                metalness: 0.8,
+                roughness: 0.2,
+                map: option.None,
+                normal_map: option.None,
+                ambient_oclusion_map: option.None,
+                roughness_map: option.None,
+                metalness_map: option.None,
+              )
+            material
+          },
+          transform: transform.Transform(
+            position: left_eye_pos,
+            rotation: vec3.Vec3(0.0, 0.0, 0.0),
+            scale: vec3.Vec3(1.0, 1.0, 1.0),
+          ),
+          physics: option.None,
+        ),
+        scene.Mesh(
+          id: "right_eye",
+          geometry: {
+            let assert Ok(sphere) =
+              scene.sphere(
+                radius: 0.12,
+                width_segments: 16,
+                height_segments: 12,
+              )
+            sphere
+          },
+          material: {
+            let assert Ok(material) =
+              scene.standard_material(
+                color: 0xffffff,
+                metalness: 0.8,
+                roughness: 0.2,
+                map: option.None,
+                normal_map: option.None,
+                ambient_oclusion_map: option.None,
+                roughness_map: option.None,
+                metalness_map: option.None,
+              )
+            material
+          },
+          transform: transform.Transform(
+            position: right_eye_pos,
+            rotation: vec3.Vec3(0.0, 0.0, 0.0),
+            scale: vec3.Vec3(1.0, 1.0, 1.0),
+          ),
+          physics: option.None,
+        ),
+      ]
+    }
+    [] -> []
+  }
 
   // Create food
   let food_world = position_to_world(model.food)
@@ -468,6 +670,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             roughness: 0.3,
             map: option.None,
             normal_map: option.None,
+            ambient_oclusion_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },
@@ -504,6 +709,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             roughness: 0.8,
             map: option.None,
             normal_map: option.None,
+            ambient_oclusion_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },
@@ -516,10 +724,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
 
   list.flatten([
+    fruit_audio,
+    game_over_audio,
     [camera_node],
     lights,
     [ground_updated],
     snake_segments,
+    eyes,
     [food_node],
   ])
 }

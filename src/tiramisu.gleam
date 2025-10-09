@@ -217,7 +217,7 @@ pub fn run(
   background background: Int,
   init init: fn(Context) -> #(state, effect.Effect(msg)),
   update update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
-  view view: fn(state) -> List(scene.SceneNode),
+  view view: fn(state) -> List(scene.Node),
 ) -> Nil {
   // Create Three.js objects
   let renderer_obj =
@@ -286,7 +286,7 @@ fn append_to_dom(element: renderer.DomElement) -> Nil
 fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "applyInitialScene")
-fn apply_initial_scene(scene: Scene, nodes: List(scene.SceneNode)) -> Nil
+fn apply_initial_scene(scene: Scene, nodes: List(scene.Node)) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "getCanvasDimensions")
 fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
@@ -294,13 +294,13 @@ fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
   state: state,
-  prev_nodes: List(scene.SceneNode),
+  prev_nodes: List(scene.Node),
   effect: effect.Effect(msg),
   context: Context,
   scene: Scene,
   renderer: renderer.WebGLRenderer,
   update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
-  view: fn(state) -> List(scene.SceneNode),
+  view: fn(state) -> List(scene.Node),
 ) -> Nil
 
 /// Get the current window aspect ratio (width / height).

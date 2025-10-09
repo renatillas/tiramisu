@@ -245,7 +245,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
           },
           material: {
             let assert Ok(scene) =
-              scene.phong_material(0x4ecdc4, 30.0, option.None, option.None)
+              scene.phong_material(0x4ecdc4, 30.0, option.None, option.None, option.None)
             scene
           },
           transform: transform.Transform(
@@ -276,6 +276,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
                 roughness: 0.5,
                 map: option.None,
                 normal_map: option.None,
+                ao_map: option.None,
+                roughness_map: option.None,
+                metalness_map: option.None,
               )
             material
           },

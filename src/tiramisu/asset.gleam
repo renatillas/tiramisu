@@ -56,6 +56,20 @@ pub type AssetType {
   AudioAsset(url: String)
   /// STL 3D model
   STLAsset(url: String)
+  /// OBJ 3D model with optional MTL material file
+  ///
+  /// Supports loading Wavefront OBJ models with their associated MTL material
+  /// files. The loader automatically:
+  /// - Loads diffuse color maps (map_Kd)
+  /// - Loads normal maps (map_bump) for surface detail
+  /// - Loads ambient occlusion maps (map_Ka) for realistic shadows
+  /// - Centers the model at origin
+  /// - Computes vertex normals if missing
+  ///
+  /// MTL files can include texture paths with options (e.g., "map_bump -bm 1 texture.jpg"),
+  /// which are properly parsed. Textures are assumed to be in the same directory as
+  /// the MTL file.
+  OBJAsset(obj_url: String, mtl_url: option.Option(String))
 }
 
 /// A loaded asset (opaque to enforce type safety)
@@ -64,6 +78,7 @@ pub opaque type LoadedAsset {
   LoadedTexture(texture: Texture)
   LoadedAudio(audio: AudioBuffer)
   LoadedSTL(geometry: BufferGeometry)
+  LoadedOBJ(object: Object3D)
 }
 
 // Internal constructors for FFI use
@@ -85,6 +100,11 @@ pub fn loaded_audio(audio: AudioBuffer) -> LoadedAsset {
 @internal
 pub fn loaded_stl(geometry: BufferGeometry) -> LoadedAsset {
   LoadedSTL(geometry)
+}
+
+@internal
+pub fn loaded_obj(object: Object3D) -> LoadedAsset {
+  LoadedOBJ(object)
 }
 
 /// Asset loading error
@@ -194,6 +214,21 @@ pub fn load_asset(asset: AssetType) -> Promise(Result(LoadedAsset, AssetError)) 
         }
       })
     }
+
+    OBJAsset(obj_url, mtl_url) -> {
+      let mtl_url_str = case mtl_url {
+        option.Some(url) -> url
+        option.None -> ""
+      }
+      promise.map(load_obj(obj_url, mtl_url_str), fn(result) {
+        case result {
+          Ok(object) -> Ok(LoadedOBJ(object))
+          Error(LoadError(msg)) -> Error(AssetLoadError(obj_url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(obj_url, "Invalid URL"))
+          Error(ParseError(msg)) -> Error(AssetLoadError(obj_url, msg))
+        }
+      })
+    }
   }
 }
 
@@ -274,6 +309,34 @@ pub fn get_stl(
 ) -> Result(BufferGeometry, AssetError) {
   case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedSTL(geom), _)) -> Ok(geom)
+    Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
+    Error(_) -> Error(AssetNotFound(url))
+  }
+}
+
+/// Get an OBJ model from the cache
+///
+/// Returns the loaded OBJ model as an Object3D. The model will have:
+/// - Materials with textures applied (if MTL file was loaded)
+/// - Vertex normals computed
+/// - Center position at origin
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(bread_model) = asset.get_obj(cache, "models/bread.obj")
+///
+/// scene.Model3D(
+///   id: "bread",
+///   object: bread_model,
+///   transform: transform.identity,
+///   animation: option.None,
+///   physics: option.None,
+/// )
+/// ```
+pub fn get_obj(cache: AssetCache, url: String) -> Result(Object3D, AssetError) {
+  case dict.get(cache.asset, url) {
+    Ok(CacheEntry(LoadedOBJ(object), _)) -> Ok(object)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
   }
@@ -391,3 +454,62 @@ pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError))
 /// Load a GLTF/GLB file from a URL using Promises
 @external(javascript, "./ffi/gltf.mjs", "loadGLTFAsync")
 pub fn load_gltf(url: String) -> Promise(Result(GLTFData, LoadError))
+
+/// Load an audio file from a URL using Promises
+///
+/// Supports common audio formats including MP3, WAV, and OGG.
+/// Returns an AudioBuffer that can be used with the audio system.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+/// import gleam/javascript/promise
+///
+/// let load_effect = asset.load_audio("sounds/jump.mp3")
+///   |> promise.map(fn(result) {
+///     case result {
+///       Ok(audio_buffer) -> AudioLoaded(audio_buffer)
+///       Error(err) -> LoadFailed(err)
+///     }
+///   })
+/// ```
+pub fn load_audio(url: String) -> Promise(Result(AudioBuffer, LoadError)) {
+  promise.map(load_audio_ffi(url), fn(result) {
+    case result {
+      Ok(audio) -> Ok(audio)
+      Error(msg) -> Error(LoadError(msg))
+    }
+  })
+}
+
+/// Load a Wavefront OBJ file with optional MTL materials
+///
+/// Loads a 3D model in OBJ format with full material and texture support.
+/// The loader handles:
+/// - **Diffuse/Color Maps** (map_Kd): Base color textures
+/// - **Normal Maps** (map_bump): Surface detail and lighting
+/// - **Ambient Occlusion Maps** (map_Ka): Contact shadows and depth
+/// - **Vertex Normals**: Computed automatically if missing
+/// - **Model Centering**: Centers the model at origin
+///
+/// Textures are loaded from the same directory as the MTL file. The loader
+/// properly parses MTL texture paths with options like `map_bump -bm 1 normal.jpg`.
+///
+/// ## Parameters
+///
+/// - `obj_url`: Path to the OBJ file
+/// - `mtl_url`: Path to the MTL file, or empty string `""` for no materials
+///
+/// ## Returns
+///
+/// A Promise that resolves to:
+/// - `Ok(Object3D)`: Loaded model with materials and textures
+/// - `Error(LoadError)`: File not found
+/// - `Error(InvalidUrl)`: Invalid URL provided
+/// - `Error(ParseError)`: Failed to parse OBJ/MTL file
+@external(javascript, "./ffi/obj.mjs", "loadOBJAsync")
+pub fn load_obj(
+  obj_url obj_url: String,
+  mtl_url mtl_url: String,
+) -> Promise(Result(Object3D, LoadError))

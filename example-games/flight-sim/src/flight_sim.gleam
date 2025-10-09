@@ -118,6 +118,9 @@ fn view(_model: Model) -> List(scene.SceneNode) {
             roughness: 0.7,
             map: option.None,
             normal_map: option.None,
+            ambient_oclusion_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },
@@ -149,6 +152,9 @@ fn create_cube(id: String, color: Int) -> scene.SceneNode {
           roughness: 0.8,
           map: option.None,
           normal_map: option.None,
+          ambient_oclusion_map: option.None,
+          roughness_map: option.None,
+          metalness_map: option.None,
         )
       material
     },

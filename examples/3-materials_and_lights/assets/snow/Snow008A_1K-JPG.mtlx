@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<materialx version="1.38" fileprefix="./">
+  <standard_surface xpos="6.159420" type="surfaceshader" name="Snow008A_1K_JPG_StandardSurface" ypos="-1.879310">
+    <input type="float" value="0" name="specular" />
+    <input type="float" value="1" name="coat" />
+    <input type="color3" value="1, 1, 1" name="coat_color" />
+    <input type="float" value="1" name="base" />
+    <input type="color3" name="base_color" nodename="Snow008A_1K_JPG_Color" />
+    <input type="vector3" name="normal" nodename="normalmap" />
+    <input type="vector3" name="coat_normal" nodename="normalmap" />
+    <input type="float" name="specular_roughness" nodename="Snow008A_1K_JPG_Roughness" />
+    <input type="float" name="coat_roughness" nodename="Snow008A_1K_JPG_Roughness" />
+  </standard_surface>
+  <surfacematerial xpos="8.695652" type="material" name="Snow008A_1K_JPG" ypos="0.000000">
+    <input type="surfaceshader" name="surfaceshader" nodename="Snow008A_1K_JPG_StandardSurface" />
+    <input type="displacementshader" name="displacementshader" nodename="displacement" />
+  </surfacematerial>
+  <tiledimage xpos="3.623188" type="color3" name="Snow008A_1K_JPG_Color" ypos="-3.103448">
+    <input colorspace="srgb_texture" type="filename" value="Snow008A_1K-JPG_Color.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <tiledimage xpos="3.623188" type="float" name="Snow008A_1K_JPG_Displacement" ypos="5.163793">
+    <input type="filename" value="Snow008A_1K-JPG_Displacement.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <displacement xpos="6.159420" type="displacementshader" name="displacement" ypos="1.879310">
+    <input type="float" name="displacement" nodename="Snow008A_1K_JPG_Displacement" />
+    <input type="float" value="1.0" name="scale" />
+  </displacement>
+  <tiledimage xpos="1.086957" type="vector3" name="Snow008A_1K_JPG_NormalGL" ypos="0.879310">
+    <input type="filename" value="Snow008A_1K-JPG_NormalGL.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+  <normalmap xpos="3.623188" type="vector3" name="normalmap" ypos="3.586207">
+    <input type="vector3" name="in" nodename="Snow008A_1K_JPG_NormalGL" />
+    <input type="float" value="1.0" name="scale" />
+  </normalmap>
+  <tiledimage xpos="3.623188" type="float" name="Snow008A_1K_JPG_Roughness" ypos="-0.413793">
+    <input type="filename" value="Snow008A_1K-JPG_Roughness.jpg" name="file" />
+    <input type="vector2" value="1.0, 1.0" name="uvtiling" />
+  </tiledimage>
+</materialx>

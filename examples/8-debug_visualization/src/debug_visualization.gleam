@@ -204,6 +204,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             roughness: 0.7,
             map: option.None,
             normal_map: option.None,
+            ao_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },
@@ -229,6 +232,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             roughness: 0.5,
             map: option.None,
             normal_map: option.None,
+            ao_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },

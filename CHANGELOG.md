@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OBJ Model Loading**: Full support for loading Wavefront OBJ models with MTL materials
+  - Loads diffuse color maps (map_Kd), normal maps (map_bump), and ambient occlusion maps (map_Ka)
+  - Automatically centers models at origin
+  - Computes vertex normals when missing
+  - Parses MTL texture paths with options (e.g., `map_bump -bm 1 texture.jpg`)
+  - New `asset.OBJAsset` type for loading OBJ files
+  - New `asset.load_obj()` function for direct loading
+  - New `asset.get_obj()` function for cache retrieval
+  - Example: `examples/20-bread` demonstrates OBJ loading with full textures
+
 ### Types
 
 - The `tiramisu.Dimensions` type has been added with `width: Float` and `height: Float` fields.

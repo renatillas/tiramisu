@@ -76,43 +76,73 @@ export function createBasicMaterial(color, transparent, opacity, map, normalMap)
     color,
     transparent,
     opacity,
-    map: getTexture(map),
-    normalMap: getTexture(normalMap)
+    map: getTexture(map)
+    // Note: BasicMaterial doesn't support normalMap
   });
 }
 
-export function createStandardMaterial(color, metalness, roughness, map, normalMap) {
-  return new THREE.MeshStandardMaterial({
+export function createStandardMaterial(color, metalness, roughness, map, normalMap, aoMap, roughnessMap, metalnessMap) {
+  const extractedNormalMap = getTexture(normalMap);
+
+  const material = new THREE.MeshStandardMaterial({
     color,
     metalness,
     roughness,
     map: getTexture(map),
-    normalMap: getTexture(normalMap)
+    normalMap: extractedNormalMap,
+    aoMap: getTexture(aoMap),
+    roughnessMap: getTexture(roughnessMap),
+    metalnessMap: getTexture(metalnessMap)
   });
+
+  // Set normal map scale to make it more pronounced
+  if (extractedNormalMap) {
+    material.normalScale.set(1.0, 1.0);
+  }
+
+  return material;
 }
 
-export function createPhongMaterial(color, shininess, map, normalMap) {
-  return new THREE.MeshPhongMaterial({
+export function createPhongMaterial(color, shininess, map, normalMap, aoMap) {
+  const extractedNormalMap = getTexture(normalMap);
+  const material = new THREE.MeshPhongMaterial({
     color,
     shininess,
     map: getTexture(map),
-    normalMap: getTexture(normalMap)
+    normalMap: extractedNormalMap,
+    aoMap: getTexture(aoMap)
   });
+
+  if (extractedNormalMap) {
+    material.normalScale.set(1.0, 1.0);
+  }
+
+  return material;
 }
 
-export function createLambertMaterial(color, map, normalMap) {
-  return new THREE.MeshLambertMaterial({
+export function createLambertMaterial(color, map, normalMap, aoMap) {
+  const extractedNormalMap = getTexture(normalMap);
+  const material = new THREE.MeshLambertMaterial({
     color,
     map: getTexture(map),
-    normalMap: getTexture(normalMap)
+    normalMap: extractedNormalMap,
+    aoMap: getTexture(aoMap)
   });
+
+  // Set normal map scale
+  if (extractedNormalMap) {
+    material.normalScale.set(1.0, 1.0);
+  }
+
+  return material;
 }
 
-export function createToonMaterial(color, map, normalMap) {
+export function createToonMaterial(color, map, normalMap, aoMap) {
   return new THREE.MeshToonMaterial({
     color,
     map: getTexture(map),
-    normalMap: getTexture(normalMap)
+    normalMap: getTexture(normalMap),
+    aoMap: getTexture(aoMap)
   });
 }
 
@@ -196,7 +226,6 @@ function setupAnimation(id, mixer, animPlayback) {
     action.play();
 
     actionCache.set(id, action);
-    console.log('[Renderer] Playing single animation for Model3D:', id);
   } else if (animPlayback instanceof OBJECT3D_GLEAM.BlendedAnimations) {
     // Blended animations
     const fromAnim = animPlayback.from;
@@ -216,7 +245,6 @@ function setupAnimation(id, mixer, animPlayback) {
     toAction.play();
 
     actionCache.set(id, [fromAction, toAction]);
-    console.log('[Renderer] Blending animations for Model3D:', id, 'Factor:', blendFactor.toFixed(2));
   }
 }
 
@@ -342,7 +370,6 @@ export function applyPatch(scene, patch) {
       // If this camera is active, set it as the active camera for rendering
       if (node.active) {
         CAMERA.setCamera(threeObj);
-        console.log('[Renderer] Set active camera:', id);
       }
     } else if (node instanceof SCENE_GLEAM.DebugBox) {
       threeObj = DEBUG.createDebugBox(node.min, node.max, node.color);
@@ -457,7 +484,6 @@ export function applyPatch(scene, patch) {
     // If animation is Some, setup new animation
     if (animation && animation[0]) {
       setupAnimation(id, mixer, animation[0]);
-      console.log('[Renderer] Updated animation for Model3D:', id);
     } else {
       // Stop all animations
       const currentActions = actionCache.get(id);
@@ -469,7 +495,6 @@ export function applyPatch(scene, patch) {
         }
         actionCache.delete(id);
       }
-      console.log('[Renderer] Stopped animation for Model3D:', id);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdatePhysics) {
     const { id, physics } = patch;
@@ -488,16 +513,13 @@ export function applyPatch(scene, patch) {
           scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
         };
         PHYSICS.createRigidBody(id, physics[0], transform);
-        console.log('[Renderer] Updated physics for node:', id);
       }
     } else {
-      console.log('[Renderer] Removed physics from node:', id);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateAudio) {
     const { id, config } = patch;
     // Update audio configuration
     AUDIO.updateAudioConfig(id, config);
-    console.log('[Renderer] Updated audio config for node:', id);
   } else if (patch instanceof SCENE_GLEAM.UpdateInstances) {
     const { id, instances } = patch;
     const obj = objectCache.get(id);
@@ -540,7 +562,6 @@ export function applyPatch(scene, patch) {
           obj.addLevel(levelObj, distance);
         }
       }
-      console.log('[Renderer] Updated LOD levels for:', id);
     } else {
       console.warn('[Renderer] Object not found or not an LOD:', id);
     }
@@ -572,7 +593,6 @@ export function applyPatch(scene, patch) {
       // Update projection matrix
       cameraObj.updateProjectionMatrix();
 
-      console.log('[Renderer] Updated camera:', id);
     } else {
       console.warn('[Renderer] Camera not found:', id);
     }
@@ -581,7 +601,6 @@ export function applyPatch(scene, patch) {
     const cameraObj = objectCache.get(id);
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
       CAMERA.setCamera(cameraObj);
-      console.log('[Renderer] Switched to active camera:', id);
     } else {
       console.warn('[Renderer] Camera not found or not a camera:', id);
     }
@@ -732,20 +751,15 @@ function setupContextLossHandling(renderer) {
   canvas.addEventListener('webglcontextlost', (event) => {
     console.warn('[Tiramisu] WebGL context lost!');
     event.preventDefault(); // Prevent default to enable context restoration
-
     // Stop rendering loop temporarily
     // The game loop will handle this gracefully by checking if context exists
   }, false);
 
   canvas.addEventListener('webglcontextrestored', () => {
-    console.log('[Tiramisu] WebGL context restored!');
-
     // Reinitialize renderer settings
     renderer.setPixelRatio(window.devicePixelRatio);
-
     // Clear caches - textures and geometries need to be re-uploaded to GPU
     // The scene will be re-rendered, triggering resource re-creation
-    console.log('[Tiramisu] Caches cleared, resources will be re-uploaded on next render');
   }, false);
 }
 

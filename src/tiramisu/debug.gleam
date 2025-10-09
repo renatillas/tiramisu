@@ -10,7 +10,7 @@ pub fn bounding_box(
   min: Vec3(Float),
   max: Vec3(Float),
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   scene.DebugBox(id, min, max, color)
 }
 
@@ -19,7 +19,7 @@ pub fn sphere(
   center: Vec3(Float),
   radius: Float,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   scene.DebugSphere(id, center, radius, color)
 }
 
@@ -28,7 +28,7 @@ pub fn line(
   from: Vec3(Float),
   to: Vec3(Float),
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   scene.DebugLine(id, from, to, color)
 }
 
@@ -38,21 +38,16 @@ pub fn ray(
   direction: Vec3(Float),
   length: Float,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   let end = vec3f.add(origin, vec3f.scale(direction, length))
   scene.DebugLine(id, origin, end, color)
 }
 
-pub fn axes(id: String, origin: Vec3(Float), size: Float) -> scene.SceneNode {
+pub fn axes(id: String, origin: Vec3(Float), size: Float) -> scene.Node {
   scene.DebugAxes(id, origin, size)
 }
 
-pub fn grid(
-  id: String,
-  size: Float,
-  divisions: Int,
-  color: Int,
-) -> scene.SceneNode {
+pub fn grid(id: String, size: Float, divisions: Int, color: Int) -> scene.Node {
   scene.DebugGrid(id, size, divisions, color)
 }
 
@@ -61,7 +56,7 @@ pub fn point(
   position: Vec3(Float),
   size: Float,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   scene.DebugPoint(id, position, size, color)
 }
 
@@ -69,7 +64,7 @@ pub fn box_from_transform(
   id: String,
   t: transform.Transform,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node {
   let half_x = t.scale.x /. 2.0
   let half_y = t.scale.y /. 2.0
   let half_z = t.scale.z /. 2.0
@@ -96,7 +91,7 @@ pub fn path(
   id_prefix: String,
   points: List(Vec3(Float)),
   color: Int,
-) -> List(scene.SceneNode) {
+) -> List(scene.Node) {
   create_path_lines(id_prefix, points, color, 0, [])
 }
 
@@ -105,8 +100,8 @@ fn create_path_lines(
   points: List(Vec3(Float)),
   color: Int,
   index: Int,
-  acc: List(scene.SceneNode),
-) -> List(scene.SceneNode) {
+  acc: List(scene.Node),
+) -> List(scene.Node) {
   case points {
     [] | [_] -> list.reverse(acc)
     [p1, p2, ..rest] -> {
@@ -125,7 +120,7 @@ pub fn cross(
   position: Vec3(Float),
   size: Float,
   color: Int,
-) -> List(scene.SceneNode) {
+) -> List(scene.Node) {
   let half_size = size /. 2.0
   [
     line(

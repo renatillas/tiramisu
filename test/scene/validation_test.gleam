@@ -95,6 +95,9 @@ pub fn valid_standard_material_test() {
       roughness: 0.8,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      metalness_map: option.None,
+      roughness_map: option.None,
     )
   assert case result {
     Ok(_) -> True
@@ -111,6 +114,9 @@ pub fn invalid_metalness_test() {
       roughness: 0.8,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      metalness_map: option.None,
+      roughness_map: option.None,
     )
 }
 
@@ -123,5 +129,8 @@ pub fn invalid_roughness_test() {
       roughness: -0.1,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      metalness_map: option.None,
+      roughness_map: option.None,
     )
 }

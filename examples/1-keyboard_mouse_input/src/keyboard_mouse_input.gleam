@@ -119,7 +119,7 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   [
@@ -167,6 +167,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             roughness: 0.4,
             map: option.None,
             normal_map: option.None,
+            ambient_oclusion_map: option.None,
+            roughness_map: option.None,
+            metalness_map: option.None,
           )
         material
       },

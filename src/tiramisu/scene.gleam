@@ -45,7 +45,7 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/order
 import gleam/set
-import tiramisu/audio.{type AudioBuffer, type AudioConfig, type AudioType}
+import tiramisu/audio.{type Audio, type AudioBuffer, type AudioConfig}
 import tiramisu/camera
 import tiramisu/object3d.{type AnimationPlayback, type Object3D}
 import tiramisu/physics.{type RigidBody}
@@ -114,6 +114,9 @@ pub opaque type Material {
     color: Int,
     map: Option(Texture),
     normal_map: Option(Texture),
+    ambient_oclusion_map: Option(Texture),
+    roughness_map: Option(Texture),
+    metalness_map: Option(Texture),
     metalness: Float,
     roughness: Float,
   )
@@ -122,12 +125,23 @@ pub opaque type Material {
     color: Int,
     map: Option(Texture),
     normal_map: Option(Texture),
+    ambient_oclusion_map: Option(Texture),
     shininess: Float,
   )
   /// Matte material (like cloth or wood). Non-shiny diffuse lighting.
-  LambertMaterial(color: Int, map: Option(Texture), normal_map: Option(Texture))
+  LambertMaterial(
+    color: Int,
+    map: Option(Texture),
+    normal_map: Option(Texture),
+    ambient_oclusion_map: Option(Texture),
+  )
   /// Cartoon-style material with banded shading.
-  ToonMaterial(color: Int, map: Option(Texture), normal_map: Option(Texture))
+  ToonMaterial(
+    color: Int,
+    map: Option(Texture),
+    normal_map: Option(Texture),
+    ambient_oclusion_map: Option(Texture),
+  )
   /// Material for rendering lines.
   LineMaterial(color: Int, linewidth: Float)
   /// Material for 2D sprites that always face the camera.
@@ -269,7 +283,7 @@ pub fn hemisphere_light(
 /// )
 /// ```
 pub type LODLevel {
-  LODLevel(distance: Float, node: SceneNode)
+  LODLevel(distance: Float, node: Node)
 }
 
 /// Create an LOD level with a distance threshold and scene node.
@@ -282,7 +296,7 @@ pub type LODLevel {
 /// let high_detail = scene.lod_level(distance: 0.0, node: detailed_mesh)
 /// let low_detail = scene.lod_level(distance: 100.0, node: simple_mesh)
 /// ```
-pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
+pub fn lod_level(distance distance: Float, node node: Node) -> LODLevel {
   LODLevel(distance: distance, node: node)
 }
 
@@ -325,7 +339,7 @@ pub fn lod_level(distance distance: Float, node node: SceneNode) -> LODLevel {
 ///   ]
 /// }
 /// ```
-pub type SceneNode {
+pub type Node {
   Mesh(
     id: String,
     geometry: Geometry,
@@ -341,7 +355,7 @@ pub type SceneNode {
     material: Material,
     instances: List(transform.Transform),
   )
-  Group(id: String, transform: transform.Transform, children: List(SceneNode))
+  Group(id: String, transform: transform.Transform, children: List(Node))
   Light(id: String, light: Light, transform: transform.Transform)
   /// Camera - defines a viewpoint in the scene
   /// Only one camera can be active at a time for rendering (when viewport is None)
@@ -370,12 +384,7 @@ pub type SceneNode {
     animation: option.Option(AnimationPlayback),
     physics: option.Option(RigidBody),
   )
-  Audio(
-    id: String,
-    buffer: AudioBuffer,
-    config: AudioConfig,
-    audio_type: AudioType,
-  )
+  Audio(id: String, buffer: AudioBuffer, config: AudioConfig, audio_type: Audio)
   // Debug visualization nodes
   DebugBox(id: String, min: Vec3(Float), max: Vec3(Float), color: Int)
   DebugSphere(id: String, center: Vec3(Float), radius: Float, color: Int)
@@ -620,8 +629,8 @@ pub fn basic_material(
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(gold) = scene.standard_material(color: 0xffd700, metalness: 1.0, roughness: 0.3)
-/// let assert Ok(plastic) = scene.standard_material(color: 0xff0000, metalness: 0.0, roughness: 0.5)
+/// let assert Ok(gold) = scene.standard_material(color: 0xffd700, metalness: 1.0, roughness: 0.3, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
+/// let assert Ok(plastic) = scene.standard_material(color: 0xff0000, metalness: 0.0, roughness: 0.5, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
 /// ```
 pub fn standard_material(
   color color: Int,
@@ -629,6 +638,9 @@ pub fn standard_material(
   roughness roughness: Float,
   map map: option.Option(Texture),
   normal_map normal_map: option.Option(Texture),
+  ambient_oclusion_map ambient_oclusion_map: option.Option(Texture),
+  roughness_map roughness_map: option.Option(Texture),
+  metalness_map metalness_map: option.Option(Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -643,7 +655,16 @@ pub fn standard_material(
     Error(InvalidMaterialRoughness(roughness)),
   )
 
-  Ok(StandardMaterial(color:, metalness:, roughness:, map:, normal_map:))
+  Ok(StandardMaterial(
+    color:,
+    metalness:,
+    roughness:,
+    map:,
+    normal_map:,
+    roughness_map:,
+    metalness_map:,
+    ambient_oclusion_map:,
+  ))
 }
 
 /// Create a validated line material for rendering lines.
@@ -701,12 +722,13 @@ pub fn lambert_material(
   color color: Int,
   map map: Option(Texture),
   normal_map normal_map: Option(Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
     Error(InvalidMaterialColor(color)),
   )
-  Ok(LambertMaterial(color:, map:, normal_map:))
+  Ok(LambertMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
 }
 
 pub fn phong_material(
@@ -714,6 +736,7 @@ pub fn phong_material(
   shininess shininess: Float,
   map map: Option(Texture),
   normal_map normal_map: Option(Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -723,24 +746,25 @@ pub fn phong_material(
     shininess <. 0.0,
     Error(InvalidMaterialShininess(shininess)),
   )
-  Ok(PhongMaterial(color:, shininess:, map:, normal_map:))
+  Ok(PhongMaterial(color:, shininess:, map:, normal_map:, ambient_oclusion_map:))
 }
 
 pub fn toon_material(
   color color: Int,
   map map: Option(Texture),
   normal_map normal_map: Option(Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
     Error(InvalidMaterialColor(color)),
   )
-  Ok(ToonMaterial(color:, map:, normal_map:))
+  Ok(ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
 }
 
 @internal
 pub type Patch {
-  AddNode(id: String, node: SceneNode, parent_id: option.Option(String))
+  AddNode(id: String, node: Node, parent_id: option.Option(String))
   RemoveNode(id: String)
   UpdateTransform(id: String, transform: transform.Transform)
   UpdateMaterial(id: String, material: Material)
@@ -760,15 +784,15 @@ pub type Patch {
 }
 
 type NodeWithParent {
-  NodeWithParent(node: SceneNode, parent_id: option.Option(String))
+  NodeWithParent(node: Node, parent_id: option.Option(String))
 }
 
-fn flatten_scene(nodes: List(SceneNode)) -> dict.Dict(String, NodeWithParent) {
+fn flatten_scene(nodes: List(Node)) -> dict.Dict(String, NodeWithParent) {
   flatten_scene_helper(nodes, option.None, dict.new())
 }
 
 fn flatten_scene_helper(
-  nodes: List(SceneNode),
+  nodes: List(Node),
   parent_id: option.Option(String),
   acc: dict.Dict(String, NodeWithParent),
 ) -> dict.Dict(String, NodeWithParent) {
@@ -783,7 +807,7 @@ fn flatten_scene_helper(
 }
 
 @internal
-pub fn diff(previous: List(SceneNode), current: List(SceneNode)) -> List(Patch) {
+pub fn diff(previous: List(Node), current: List(Node)) -> List(Patch) {
   let prev_dict = flatten_scene(previous)
   let curr_dict = flatten_scene(current)
 
@@ -975,7 +999,7 @@ fn calculate_depth(
 }
 
 /// Compare two nodes and generate update patches
-fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
+fn compare_nodes(id: String, prev: Node, curr: Node) -> List(Patch) {
   // Fast path: if nodes are structurally equal, skip all field comparisons
   case prev == curr {
     True -> []
@@ -985,11 +1009,7 @@ fn compare_nodes(id: String, prev: SceneNode, curr: SceneNode) -> List(Patch) {
 
 /// Detailed comparison of node properties (called only when nodes differ)
 /// Uses accumulator pattern to avoid empty list allocations
-fn compare_nodes_detailed(
-  id: String,
-  prev: SceneNode,
-  curr: SceneNode,
-) -> List(Patch) {
+fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
   case prev, curr {
     Mesh(_, prev_geom, prev_mat, prev_trans, prev_phys),
       Mesh(_, curr_geom, curr_mat, curr_trans, curr_phys)
@@ -1330,14 +1350,38 @@ pub fn create_material(material: Material) -> Nil {
   case material {
     BasicMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
       create_basic_material(color, transparent, opacity, map, normal_map)
-    StandardMaterial(color:, map:, normal_map:, metalness:, roughness:) ->
-      create_standard_material(color, metalness, roughness, map, normal_map)
-    PhongMaterial(color:, map:, normal_map:, shininess:) ->
-      create_phong_material(color, shininess, map, normal_map)
-    LambertMaterial(color:, map:, normal_map:) ->
-      create_lambert_material(color, map, normal_map)
-    ToonMaterial(color:, map:, normal_map:) ->
-      create_toon_material(color, map, normal_map)
+    StandardMaterial(
+      color:,
+      map:,
+      normal_map:,
+      ambient_oclusion_map:,
+      roughness_map:,
+      metalness_map:,
+      metalness:,
+      roughness:,
+    ) ->
+      create_standard_material(
+        color,
+        metalness,
+        roughness,
+        map,
+        normal_map,
+        ambient_oclusion_map,
+        roughness_map,
+        metalness_map,
+      )
+    PhongMaterial(color:, map:, normal_map:, ambient_oclusion_map:, shininess:) ->
+      create_phong_material(
+        color,
+        shininess,
+        map,
+        normal_map,
+        ambient_oclusion_map,
+      )
+    LambertMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
+      create_lambert_material(color, map, normal_map, ambient_oclusion_map)
+    ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
+      create_toon_material(color, map, normal_map, ambient_oclusion_map)
     LineMaterial(color:, linewidth:) -> create_line_material(color, linewidth)
     SpriteMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
       create_sprite_material(color, transparent, opacity, map, normal_map)
@@ -1360,6 +1404,9 @@ fn create_standard_material(
   roughness: Float,
   map: Option(Texture),
   normal_map: Option(Texture),
+  ao_map: Option(Texture),
+  roughness_map: Option(Texture),
+  metalness_map: Option(Texture),
 ) -> Nil
 
 @external(javascript, "./ffi/renderer.mjs", "createPhongMaterial")
@@ -1368,6 +1415,7 @@ fn create_phong_material(
   shininess: Float,
   map: Option(Texture),
   normal_map: Option(Texture),
+  ao_map: Option(Texture),
 ) -> Nil
 
 @external(javascript, "./ffi/renderer.mjs", "createLambertMaterial")
@@ -1375,6 +1423,7 @@ fn create_lambert_material(
   color: Int,
   map: Option(Texture),
   normal_map: Option(Texture),
+  ao_map: Option(Texture),
 ) -> Nil
 
 @external(javascript, "./ffi/renderer.mjs", "createToonMaterial")
@@ -1382,6 +1431,7 @@ fn create_toon_material(
   color: Int,
   map: Option(Texture),
   normal_map: Option(Texture),
+  ao_map: Option(Texture),
 ) -> Nil
 
 @external(javascript, "./ffi/renderer.mjs", "createLineMaterial")

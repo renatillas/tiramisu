@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<materialx version="1.38" fileprefix="./">
+  <standard_surface xpos="6.159420" type="surfaceshader" name="PavingStones142_1K_JPG_StandardSurface" ypos="-1.879310">
+    <input type="float" name="specular" value="0" />
+    <input type="float" name="coat" value="1" />
+    <input type="color3" name="coat_color" value="1, 1, 1" />
+    <input type="float" name="base" value="1" />
+    <input nodename="PavingStones142_1K_JPG_Color" type="color3" name="base_color" />
+    <input nodename="normalmap" type="vector3" name="normal" />
+    <input nodename="normalmap" type="vector3" name="coat_normal" />
+    <input nodename="PavingStones142_1K_JPG_Roughness" type="float" name="specular_roughness" />
+    <input nodename="PavingStones142_1K_JPG_Roughness" type="float" name="coat_roughness" />
+  </standard_surface>
+  <surfacematerial xpos="8.695652" type="material" name="PavingStones142_1K_JPG" ypos="0.000000">
+    <input nodename="PavingStones142_1K_JPG_StandardSurface" type="surfaceshader" name="surfaceshader" />
+    <input nodename="displacement" type="displacementshader" name="displacementshader" />
+  </surfacematerial>
+  <tiledimage xpos="3.623188" type="color3" name="PavingStones142_1K_JPG_Color" ypos="-3.103448">
+    <input type="filename" name="file" value="PavingStones142_1K-JPG_Color.jpg" colorspace="srgb_texture" />
+    <input type="vector2" name="uvtiling" value="1.0, 1.0" />
+  </tiledimage>
+  <tiledimage xpos="3.623188" type="float" name="PavingStones142_1K_JPG_Displacement" ypos="5.163793">
+    <input type="filename" name="file" value="PavingStones142_1K-JPG_Displacement.jpg" />
+    <input type="vector2" name="uvtiling" value="1.0, 1.0" />
+  </tiledimage>
+  <displacement xpos="6.159420" type="displacementshader" name="displacement" ypos="1.879310">
+    <input nodename="PavingStones142_1K_JPG_Displacement" type="float" name="displacement" />
+    <input type="float" name="scale" value="1.0" />
+  </displacement>
+  <tiledimage xpos="1.086957" type="vector3" name="PavingStones142_1K_JPG_NormalGL" ypos="0.879310">
+    <input type="filename" name="file" value="PavingStones142_1K-JPG_NormalGL.jpg" />
+    <input type="vector2" name="uvtiling" value="1.0, 1.0" />
+  </tiledimage>
+  <normalmap xpos="3.623188" type="vector3" name="normalmap" ypos="3.586207">
+    <input nodename="PavingStones142_1K_JPG_NormalGL" type="vector3" name="in" />
+    <input type="float" name="scale" value="1.0" />
+  </normalmap>
+  <tiledimage xpos="3.623188" type="float" name="PavingStones142_1K_JPG_Roughness" ypos="-0.413793">
+    <input type="filename" name="file" value="PavingStones142_1K-JPG_Roughness.jpg" />
+    <input type="vector2" name="uvtiling" value="1.0, 1.0" />
+  </tiledimage>
+</materialx>

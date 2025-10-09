@@ -21,7 +21,7 @@ pub type AudioConfig {
 }
 
 /// Type of audio (global or positional)
-pub type AudioType {
+pub type Audio {
   /// Global audio (2D, same volume everywhere)
   GlobalAudio
   /// Positional audio (3D, volume based on distance)
@@ -66,7 +66,7 @@ pub fn set_autoplay(config: AudioConfig, autoplay: Bool) -> AudioConfig {
 }
 
 /// Create a default positional audio configuration
-pub fn positional() -> AudioType {
+pub fn positional() -> Audio {
   PositionalAudio(
     ref_distance: 1.0,
     rolloff_factor: 1.0,
@@ -75,7 +75,7 @@ pub fn positional() -> AudioType {
 }
 
 /// Set reference distance for positional audio
-pub fn set_ref_distance(audio: AudioType, distance: Float) -> AudioType {
+pub fn set_ref_distance(audio: Audio, distance: Float) -> Audio {
   case audio {
     PositionalAudio(_, rolloff, max) ->
       PositionalAudio(
@@ -88,7 +88,7 @@ pub fn set_ref_distance(audio: AudioType, distance: Float) -> AudioType {
 }
 
 /// Set rolloff factor for positional audio
-pub fn set_rolloff_factor(audio: AudioType, factor: Float) -> AudioType {
+pub fn set_rolloff_factor(audio: Audio, factor: Float) -> Audio {
   case audio {
     PositionalAudio(ref, _, max) ->
       PositionalAudio(
@@ -101,7 +101,7 @@ pub fn set_rolloff_factor(audio: AudioType, factor: Float) -> AudioType {
 }
 
 /// Set maximum distance for positional audio
-pub fn set_max_distance(audio: AudioType, distance: Float) -> AudioType {
+pub fn set_max_distance(audio: Audio, distance: Float) -> Audio {
   case audio {
     PositionalAudio(ref, rolloff, _) ->
       PositionalAudio(
@@ -158,7 +158,7 @@ pub type AudioNode {
   AudioNode(
     id: String,
     config: AudioConfig,
-    audio_type: AudioType,
+    audio_type: Audio,
     position: Option(vec3.Vec3(Float)),
   )
 }
@@ -192,7 +192,7 @@ pub fn positional_audio_custom(
   id: String,
   config: AudioConfig,
   position: vec3.Vec3(Float),
-  audio_type: AudioType,
+  audio_type: Audio,
 ) -> AudioNode {
   AudioNode(
     id: id,

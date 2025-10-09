@@ -393,6 +393,9 @@ fn game_view(model: GameModel) {
             roughness: 0.3,
             map: None,
             normal_map: None,
+            ao_map: None,
+            roughness_map: None,
+            metalness_map: None,
           )
         material
       },

@@ -14,6 +14,9 @@ pub fn update_standard_material_test() {
       roughness: 0.5,
       map: option.None,
       normal_map: option.None,
+      roughness_map: option.None,
+      metalness_map: option.None,
+      ambient_oclusion_map: option.None,
     )
   let assert Ok(material2) =
     scene.standard_material(
@@ -22,6 +25,9 @@ pub fn update_standard_material_test() {
       roughness: 0.2,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      roughness_map: option.None,
+      metalness_map: option.None,
     )
 
   let previous = [
@@ -70,6 +76,9 @@ pub fn change_material_type_test() {
       roughness: 0.5,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      roughness_map: option.None,
+      metalness_map: option.None,
     )
 
   let previous = [
@@ -104,9 +113,9 @@ pub fn change_material_type_test() {
 pub fn phong_material_test() {
   let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.phong_material(0xff0000, 30.0, option.None, option.None)
+    scene.phong_material(0xff0000, 30.0, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.phong_material(0xff0000, 60.0, option.None, option.None)
+    scene.phong_material(0xff0000, 60.0, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -140,9 +149,9 @@ pub fn phong_material_test() {
 pub fn lambert_material_test() {
   let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.lambert_material(0xff0000, option.None, option.None)
+    scene.lambert_material(0xff0000, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.lambert_material(0x00ff00, option.None, option.None)
+    scene.lambert_material(0x00ff00, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -171,9 +180,9 @@ pub fn lambert_material_test() {
 pub fn toon_material_test() {
   let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.toon_material(0xff0000, option.None, option.None)
+    scene.toon_material(0xff0000, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.toon_material(0x00ff00, option.None, option.None)
+    scene.toon_material(0x00ff00, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -538,11 +547,14 @@ pub fn complex_scene_test() {
       roughness: 0.5,
       map: option.None,
       normal_map: option.None,
+      ambient_oclusion_map: option.None,
+      roughness_map: option.None,
+      metalness_map: option.None,
     )
   let assert Ok(material2) =
-    scene.phong_material(0x00ff00, 30.0, option.None, option.None)
+    scene.phong_material(0x00ff00, 30.0, option.None, option.None, option.None)
   let assert Ok(material3) =
-    scene.toon_material(0x0000ff, option.None, option.None)
+    scene.toon_material(0x0000ff, option.None, option.None, option.None)
 
   let previous = []
   let current = [

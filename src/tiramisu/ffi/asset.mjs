@@ -57,7 +57,7 @@ function AssetCache(assetsDict) {
 }
 
 function AssetLoadError(url, reason) {
-  return ASSETS_GLEAM.AssetError$AssetLoadError(url, reason);
+  return new ASSETS_GLEAM.AssetLoadError(url, reason);
 }
 
 // Audio loader singleton

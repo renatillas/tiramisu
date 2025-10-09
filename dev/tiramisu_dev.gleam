@@ -107,12 +107,12 @@ pub fn main() {
 }
 
 pub type ScenePair {
-  ScenePair(previous: List(scene.SceneNode), current: List(scene.SceneNode))
+  ScenePair(previous: List(scene.Node), current: List(scene.Node))
 }
 
 // --- Helper Functions ---
 
-fn create_flat_scene(count: Int) -> List(scene.SceneNode) {
+fn create_flat_scene(count: Int) -> List(scene.Node) {
   let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
     scene.basic_material(
@@ -138,7 +138,7 @@ fn create_flat_scene(count: Int) -> List(scene.SceneNode) {
   })
 }
 
-fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.SceneNode) {
+fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
   let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
     scene.basic_material(
@@ -164,11 +164,11 @@ fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.SceneNode) 
   })
 }
 
-fn create_nested_scene(depth: Int) -> List(scene.SceneNode) {
+fn create_nested_scene(depth: Int) -> List(scene.Node) {
   [create_nested_group(depth, 0)]
 }
 
-fn create_nested_group(depth: Int, current: Int) -> scene.SceneNode {
+fn create_nested_group(depth: Int, current: Int) -> scene.Node {
   let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
     scene.basic_material(
