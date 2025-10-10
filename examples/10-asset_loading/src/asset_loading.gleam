@@ -9,6 +9,9 @@ import tiramisu/asset
 import tiramisu/audio
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -111,7 +114,7 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -119,7 +122,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       |> scene.Camera(
         id: "main-camera",
         camera: _,
-        transform: transform.at(position: vec3.Vec3(5.0, 5.0, 10.0)),
+        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
         look_at: option.None,
         active: True,
         viewport: option.None,
@@ -131,8 +134,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
@@ -141,7 +143,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 1.5)
+          light.directional(color: 0xffffff, intensity: 1.5)
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
@@ -156,21 +158,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
           id: "loading",
           geometry: {
             let assert Ok(geometry) =
-              scene.box(width: 2.0, height: 2.0, depth: 2.0)
+              geometry.box(width: 2.0, height: 2.0, depth: 2.0)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
-                color: 0x4a90e2,
-                metalness: 0.3,
-                roughness: 0.7,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0x4a90e2)
+              |> material.build
             material
           },
           transform: transform.Transform(
@@ -187,7 +182,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
     Loaded(cache) -> {
       let audio_node = case
-        echo asset.get_audio(
+        asset.get_audio(
           cache,
           "https://actions.google.com/sounds/v1/alarms/beep_short.ogg",
         )
@@ -196,14 +191,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
           [
             scene.Audio(
               id: "beep-sound",
-              buffer: audio_buffer,
-              config: audio.AudioConfig(
-                volume: 0.3,
-                loop: True,
-                playback_rate: 1.0,
-                autoplay: True,
+              audio: audio.global(
+                audio_buffer,
+                audio.playing()
+                  |> audio.with_volume(1.0)
+                  |> audio.with_loop(True)
+                  |> audio.with_playback_rate(1.0),
               ),
-              audio_type: audio.GlobalAudio,
             ),
           ]
         }
@@ -223,12 +217,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
               id: "cube1",
               geometry: {
                 let assert Ok(geometry) =
-                  scene.box(width: 2.0, height: 2.0, depth: 2.0)
+                  geometry.box(width: 2.0, height: 2.0, depth: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.standard_material(
+                  material.standard(
                     color: 0x4ecdc4,
                     metalness: 1.0,
                     roughness: 0.5,
@@ -255,21 +249,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
               id: "cube1",
               geometry: {
                 let assert Ok(geometry) =
-                  scene.box(width: 2.0, height: 2.0, depth: 2.0)
+                  geometry.box(width: 2.0, height: 2.0, depth: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.standard_material(
-                    color: 0x4ecdc4,
-                    metalness: 0.5,
-                    roughness: 0.5,
-                    map: option.None,
-                    normal_map: option.None,
-                    ambient_oclusion_map: option.None,
-                    roughness_map: option.None,
-                    metalness_map: option.None,
-                  )
+                  material.new()
+                  |> material.with_color(0x4ecdc4)
+                  |> material.build()
                 material
               },
               transform: transform.Transform(

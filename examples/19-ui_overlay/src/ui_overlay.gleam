@@ -22,7 +22,10 @@ import lustre/event
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect as game_effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui
@@ -236,8 +239,7 @@ pub type GameMsg {
 
 fn start_game() -> Nil {
   tiramisu.run(
-    width: 800,
-    height: 600,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: game_init,
     update: game_update,
@@ -346,12 +348,7 @@ fn game_view(model: GameModel) {
       id: "main-camera",
       camera: {
         let assert Ok(cam) =
-          camera.perspective(
-            field_of_view: 75.0,
-            aspect: 800.0 /. 600.0,
-            near: 0.1,
-            far: 1000.0,
-          )
+          camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
         cam
       },
       transform: transform.at(vec3.Vec3(0.0, 0.0, 20.0)),
@@ -363,8 +360,7 @@ fn game_view(model: GameModel) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
@@ -373,7 +369,7 @@ fn game_view(model: GameModel) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
@@ -382,21 +378,15 @@ fn game_view(model: GameModel) {
     scene.Mesh(
       id: "cube",
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        let assert Ok(geometry) =
+          geometry.box(width: 1.0, height: 1.0, depth: 1.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x4ecdc4,
-            metalness: 0.5,
-            roughness: 0.3,
-            map: None,
-            normal_map: None,
-            ao_map: None,
-            roughness_map: None,
-            metalness_map: None,
-          )
+          material.new()
+          |> material.with_color(0x4ecdc4)
+          |> material.build()
         material
       },
       transform: transform.identity

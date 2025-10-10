@@ -1,6 +1,8 @@
 import gleam/list
 import gleam/option
 import tiramisu/camera
+import tiramisu/geometry
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -277,9 +279,9 @@ pub fn camera_and_mesh_siblings_test() {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let assert Ok(geometry1) = scene.box(width: 2.0, height: 1.0, depth: 3.0)
+  let assert Ok(geometry1) = geometry.box(width: 2.0, height: 1.0, depth: 3.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,

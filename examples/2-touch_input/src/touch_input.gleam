@@ -6,7 +6,10 @@ import gleam/result
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -113,6 +116,7 @@ fn update(
 fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
+
   let camera =
     scene.Camera(
       id: "main",
@@ -122,12 +126,12 @@ fn view(model: Model) -> List(scene.Node) {
       look_at: option.None,
       viewport: option.None,
     )
+
   let lights = [
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
@@ -136,7 +140,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -151,21 +155,14 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Mesh(
       id: "cube",
       geometry: {
-        let assert Ok(box) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
         box
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x4ecdc4,
-            metalness: 0.3,
-            roughness: 0.4,
-            map: option.None,
-            normal_map: option.None,
-            ambient_oclusion_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0x4ecdc4)
+          |> material.build
         material
       },
       transform: transform.Transform(
@@ -187,12 +184,16 @@ fn view(model: Model) -> List(scene.Node) {
         id: "touch-" <> int.to_string(touch.id),
         geometry: {
           let assert Ok(sphere) =
-            scene.sphere(radius: 0.3, width_segments: 16, height_segments: 16)
+            geometry.sphere(
+              radius: 0.3,
+              width_segments: 16,
+              height_segments: 16,
+            )
           sphere
         },
         material: {
           let assert Ok(material) =
-            scene.basic_material(
+            material.basic(
               color: 0xff00ff,
               transparent: True,
               opacity: 0.7,

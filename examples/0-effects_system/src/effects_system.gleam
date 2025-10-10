@@ -9,6 +9,9 @@ import plinth/javascript/global
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -67,7 +70,6 @@ fn update(
           Cube(..cube, position: new_pos)
         })
 
-      // Remove cubes that fall too far
       let filtered_cubes =
         list.filter(updated_cubes, fn(cube) { cube.position.y >. -10.0 })
 
@@ -125,7 +127,8 @@ fn view(model: Model) -> List(scene.Node) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let assert Ok(box_geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geometry) =
+    geometry.box(width: 1.0, height: 1.0, depth: 1.0)
 
   let camera_node =
     scene.Camera(
@@ -136,13 +139,13 @@ fn view(model: Model) -> List(scene.Node) {
       active: True,
       viewport: option.None,
     )
+    |> list.wrap
 
   let lights = [
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(intensity: 0.6, color: 0xffffff)
+        let assert Ok(light) = light.ambient(intensity: 0.6, color: 0xffffff)
         light
       },
       transform: transform.identity,
@@ -151,7 +154,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(intensity: 0.8, color: 0xffffff)
+          light.directional(intensity: 0.8, color: 0xffffff)
         light
       },
       transform: transform.Transform(
@@ -165,16 +168,7 @@ fn view(model: Model) -> List(scene.Node) {
   let cubes =
     list.map(model.cubes, fn(cube) {
       let assert Ok(cube_material) =
-        scene.standard_material(
-          color: cube.color,
-          metalness: 0.3,
-          roughness: 0.5,
-          map: option.None,
-          normal_map: option.None,
-          ambient_oclusion_map: option.None,
-          roughness_map: option.None,
-          metalness_map: option.None,
-        )
+        material.new() |> material.with_color(cube.color) |> material.build
 
       scene.Mesh(
         id: "cube-" <> int.to_string(cube.id),
@@ -193,5 +187,5 @@ fn view(model: Model) -> List(scene.Node) {
       )
     })
 
-  list.flatten([[camera_node], lights, cubes])
+  list.flatten([camera_node, lights, cubes])
 }

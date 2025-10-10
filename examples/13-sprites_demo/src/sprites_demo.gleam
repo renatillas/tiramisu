@@ -11,14 +11,17 @@ import tiramisu
 import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/scene.{type Texture}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
 pub type Model {
   Model(
     rotation: Float,
-    textures: Dict(String, Texture),
+    textures: Dict(String, asset.Texture),
     loading_complete: Bool,
   )
 }
@@ -26,13 +29,12 @@ pub type Model {
 pub type Msg {
   NoOp
   Tick
-  TextureLoaded(String, Texture)
+  TextureLoaded(String, asset.Texture)
 }
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -95,14 +97,9 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
@@ -120,7 +117,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 1.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.5)
         light
       },
       transform: transform.identity,
@@ -141,12 +138,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
             scene.Mesh(
               id: "sprite1",
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
@@ -167,12 +165,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
             scene.Mesh(
               id: "sprite2",
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
@@ -191,12 +190,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
             scene.Mesh(
               id: "sprite3",
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 1.5, height: 1.5)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 1.5, height: 1.5)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
@@ -220,12 +220,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
             scene.Mesh(
               id: "sprite4",
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,

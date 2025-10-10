@@ -61,6 +61,7 @@ import gleam/option.{type Option}
 import tiramisu/effect
 import tiramisu/input
 import tiramisu/internal/renderer
+import tiramisu/physics
 import tiramisu/scene
 
 /// Internal Three.js Scene type (opaque)
@@ -98,7 +99,7 @@ pub type Dimensions {
 
 /// Game context passed to init and update functions.
 ///
-/// Contains timing information, input state, and canvas dimensions for the current frame.
+/// Contains timing information, input state, canvas dimensions, and physics world for the current frame.
 ///
 /// ## Fields
 ///
@@ -106,6 +107,7 @@ pub type Dimensions {
 /// - `input`: Current input state (keyboard, mouse, touch)
 /// - `canvas_width`: Current canvas width in pixels (useful for coordinate conversion)
 /// - `canvas_height`: Current canvas height in pixels (useful for coordinate conversion)
+/// - `physics_world`: Optional physics world (set via init function return value)
 ///
 /// ## Example
 ///
@@ -126,12 +128,13 @@ pub type Dimensions {
 ///   }
 /// }
 /// ```
-pub type Context {
+pub type Context(id) {
   Context(
     delta_time: Float,
     input: input.InputState,
     canvas_width: Float,
     canvas_height: Float,
+    physics_world: Option(physics.PhysicsWorld(id)),
   )
 }
 
@@ -215,9 +218,17 @@ pub type Context {
 pub fn run(
   dimensions dimensions: Option(Dimensions),
   background background: Int,
-  init init: fn(Context) -> #(state, effect.Effect(msg)),
-  update update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
-  view view: fn(state) -> List(scene.Node),
+  init init: fn(Context(id)) -> #(
+    state,
+    effect.Effect(msg),
+    Option(physics.PhysicsWorld(id)),
+  ),
+  update update: fn(state, msg, Context(id)) -> #(
+    state,
+    effect.Effect(msg),
+    Option(physics.PhysicsWorld(id)),
+  ),
+  view view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil {
   // Create Three.js objects
   let renderer_obj =
@@ -238,20 +249,31 @@ pub fn run(
   // Get initial canvas dimensions
   let #(initial_width, initial_height) = get_canvas_dimensions(renderer_obj)
 
-  // Initial context with empty input
+  // Initial context with empty input (no physics_world yet)
   let initial_context =
     Context(
       delta_time: 0.0,
       input: input.new(),
       canvas_width: initial_width,
       canvas_height: initial_height,
+      physics_world: option.None,
     )
 
   // Initialize game state
-  let #(initial_state, initial_effect) = init(initial_context)
+  let #(initial_state, initial_effect, physics_world) = init(initial_context)
+
+  // Create context with physics_world for the game loop
+  let context_with_physics =
+    Context(
+      delta_time: 0.0,
+      input: input.new(),
+      canvas_width: initial_width,
+      canvas_height: initial_height,
+      physics_world: physics_world,
+    )
 
   // Get initial scene nodes
-  let initial_nodes = view(initial_state)
+  let initial_nodes = view(initial_state, context_with_physics)
 
   // Append renderer to DOM and initialize input
   let canvas = renderer.get_dom_element(renderer_obj)
@@ -259,14 +281,14 @@ pub fn run(
   initialize_input_systems(canvas)
 
   // Apply initial scene (this will set up cameras from scene nodes)
-  apply_initial_scene(scene_obj, initial_nodes)
+  apply_initial_scene(scene_obj, initial_nodes, physics_world)
 
   // Start game loop
   start_loop(
     initial_state,
     initial_nodes,
     initial_effect,
-    initial_context,
+    context_with_physics,
     scene_obj,
     renderer_obj,
     update,
@@ -286,7 +308,11 @@ fn append_to_dom(element: renderer.DomElement) -> Nil
 fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "applyInitialScene")
-fn apply_initial_scene(scene: Scene, nodes: List(scene.Node)) -> Nil
+fn apply_initial_scene(
+  scene: Scene,
+  nodes: List(scene.Node(id)),
+  physics_world: Option(physics.PhysicsWorld(id)),
+) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "getCanvasDimensions")
 fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
@@ -294,13 +320,17 @@ fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
   state: state,
-  prev_nodes: List(scene.Node),
+  prev_nodes: List(scene.Node(id)),
   effect: effect.Effect(msg),
-  context: Context,
+  context: Context(id),
   scene: Scene,
   renderer: renderer.WebGLRenderer,
-  update: fn(state, msg, Context) -> #(state, effect.Effect(msg)),
-  view: fn(state) -> List(scene.Node),
+  update: fn(state, msg, Context(id)) -> #(
+    state,
+    effect.Effect(msg),
+    Option(physics.PhysicsWorld(id)),
+  ),
+  view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil
 
 /// Get the current window aspect ratio (width / height).

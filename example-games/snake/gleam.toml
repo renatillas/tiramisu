@@ -1,10 +1,10 @@
-name = "firstgame"
+name = "snake"
 version = "1.0.0"
 target = "javascript"
 
 [dependencies]
 gleam_stdlib = ">= 0.63.0 and < 2.0.0"
-tiramisu = ">= 1.0.0 and < 2.0.0" 
+tiramisu = { path = "../.." }
 vec = ">= 3.0.1 and < 4.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 gleam_javascript = ">= 1.0.0 and < 2.0.0"

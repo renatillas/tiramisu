@@ -162,3 +162,191 @@ export function setRenderStats(info) {
     performanceStats.triangles = info.render?.triangles || 0;
   }
 }
+
+// --- Physics Debugger ---
+
+import { getPhysicsWorld, getBodyMap } from './physics.mjs';
+
+let debugColliderMeshes = new Map(); // Map of body ID to debug mesh
+let debugScene = null; // Will be set by setDebugScene
+let collidersEnabled = false; // Track if visualization is enabled
+
+/**
+ * Set the Three.js scene for debug rendering
+ * @param {THREE.Scene} scene
+ */
+export function setDebugScene(scene) {
+  debugScene = scene;
+}
+
+/**
+ * Enable/disable collision shape visualization for a specific physics world
+ * @param {PhysicsWorld} physicsWorld - The Gleam PhysicsWorld (passed for explicitness)
+ * @param {boolean} enabled
+ *
+ * Note: The physics world parameter makes the API declarative and explicit about
+ * which world is being debugged. Internally, we access the global Rapier world
+ * since Tiramisu currently supports one physics world per game.
+ */
+export function showColliders(enabled) {
+  collidersEnabled = enabled;
+
+  if (enabled) {
+    console.log('[Tiramisu] Collision shape visualization enabled for physics world');
+    updateColliderVisualization();
+  } else {
+    console.log('[Tiramisu] Collision shape visualization disabled');
+    clearColliderVisualization();
+  }
+}
+
+/**
+ * Update collider visualization (call each frame when enabled)
+ */
+export function updateColliderVisualization() {
+  if (!collidersEnabled || !debugScene) return;
+
+  // Access the global Rapier world and body map
+  const physicsWorld = getPhysicsWorld();
+  const bodyMap = getBodyMap();
+
+  if (!physicsWorld || !bodyMap) return;
+
+  // Get current body IDs
+  const currentBodyIds = new Set(bodyMap.keys());
+
+  // Remove debug meshes for bodies that no longer exist
+  for (const [bodyId, debugMesh] of debugColliderMeshes) {
+    if (!currentBodyIds.has(bodyId)) {
+      debugScene.remove(debugMesh);
+      debugMesh.geometry.dispose();
+      debugMesh.material.dispose();
+      debugColliderMeshes.delete(bodyId);
+    }
+  }
+
+  // Create or update debug meshes for each body
+  for (const [bodyId, rigidBody] of bodyMap) {
+    const numColliders = rigidBody.numColliders();
+
+    for (let i = 0; i < numColliders; i++) {
+      const collider = rigidBody.collider(i);
+      const meshKey = `${bodyId}_${i}`;
+
+      // Get collider shape and create/update debug mesh
+      let debugMesh = debugColliderMeshes.get(meshKey);
+
+      if (!debugMesh) {
+        debugMesh = createColliderDebugMesh(collider, physicsWorld);
+        if (debugMesh) {
+          debugScene.add(debugMesh);
+          debugColliderMeshes.set(meshKey, debugMesh);
+        }
+      }
+
+      if (debugMesh) {
+        // Update position and rotation from rigid body
+        const translation = rigidBody.translation();
+        const rotation = rigidBody.rotation();
+
+        debugMesh.position.set(translation.x, translation.y, translation.z);
+        debugMesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+      }
+    }
+  }
+}
+
+/**
+ * Create a debug mesh for a Rapier collider
+ * @param {RAPIER.Collider} collider
+ * @param {RAPIER.World} world - Physics world needed to compute AABB
+ * @returns {THREE.Object3D|null}
+ */
+function createColliderDebugMesh(collider, world) {
+  const shape = collider.shape;
+  const shapeType = shape.type;
+
+  let geometry = null;
+
+  try {
+    // Based on console output:
+    // Type 0 = Ball (has radius property)
+    // Type 1 = Cuboid (has halfExtents property with x, y, z)
+
+    switch (shapeType) {
+      case 0: // Ball (Sphere)
+        if (shape.radius !== undefined) {
+          geometry = new THREE.SphereGeometry(shape.radius, 16, 12);
+        } else {
+          console.error('[Tiramisu Debug] Ball shape missing radius');
+          return null;
+        }
+        break;
+
+      case 1: // Cuboid (Box)
+        const he = shape.halfExtents;
+        if (he && he.x !== undefined) {
+          geometry = new THREE.BoxGeometry(he.x * 2, he.y * 2, he.z * 2);
+        } else {
+          console.error('[Tiramisu Debug] Cuboid shape missing halfExtents');
+          return null;
+        }
+        break;
+
+      case 2: // Capsule
+        if (shape.radius !== undefined && shape.halfHeight !== undefined) {
+          geometry = new THREE.CapsuleGeometry(shape.radius, shape.halfHeight * 2, 8, 16);
+        } else {
+          console.error('[Tiramisu Debug] Capsule shape missing properties');
+          return null;
+        }
+        break;
+
+      case 3: // Cylinder
+        if (shape.radius !== undefined && shape.halfHeight !== undefined) {
+          geometry = new THREE.CylinderGeometry(shape.radius, shape.radius, shape.halfHeight * 2, 16);
+        } else {
+          console.error('[Tiramisu Debug] Cylinder shape missing properties');
+          return null;
+        }
+        break;
+
+      default:
+        console.warn(`[Tiramisu Debug] Unsupported collider shape type ${shapeType}`);
+        return null;
+    }
+  } catch (error) {
+    console.error('[Tiramisu Debug] Error creating collider debug mesh:', error);
+    return null;
+  }
+
+  if (!geometry) return null;
+
+  // Create wireframe
+  const edges = new THREE.EdgesGeometry(geometry);
+  const material = new THREE.LineBasicMaterial({
+    color: 0x00ff00,
+    linewidth: 2,
+    transparent: true,
+    opacity: 0.8
+  });
+  const wireframe = new THREE.LineSegments(edges, material);
+
+  geometry.dispose();
+  return wireframe;
+}
+
+/**
+ * Clear all collider debug visualization
+ */
+function clearColliderVisualization() {
+  if (!debugScene) return;
+
+  for (const [_, debugMesh] of debugColliderMeshes) {
+    debugScene.remove(debugMesh);
+    debugMesh.geometry.dispose();
+    debugMesh.material.dispose();
+  }
+
+  debugColliderMeshes.clear();
+}

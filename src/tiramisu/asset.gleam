@@ -32,7 +32,16 @@ import gleam/option.{type Option}
 import gleam/order
 import tiramisu/audio.{type AudioBuffer}
 import tiramisu/object3d.{type AnimationClip, type Object3D}
-import tiramisu/scene.{type BufferGeometry, type Texture}
+
+/// Opaque type for Three.js textures.
+///
+/// Created via `asset.load_texture()` and used in materials.
+pub type Texture
+
+/// Opaque type for Three.js BufferGeometry.
+///
+/// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
+pub type BufferGeometry
 
 // --- Public Types ---
 /// STL loading error

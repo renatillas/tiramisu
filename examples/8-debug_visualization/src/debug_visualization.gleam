@@ -8,7 +8,10 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -32,8 +35,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
+    dimensions: option.None,
     background: 0x0a0a1a,
     init: init,
     update: update,
@@ -148,14 +150,9 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let camera =
     camera
     |> scene.Camera(
@@ -171,8 +168,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
@@ -181,7 +177,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 1.0)
+          light.directional(color: 0xffffff, intensity: 1.0)
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 5.0)),
@@ -193,18 +189,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "cube1",
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(geometry) =
+          geometry.box(width: 2.0, height: 2.0, depth: 2.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
+          material.standard(
             color: 0x4a90e2,
             metalness: 0.3,
             roughness: 0.7,
             map: option.None,
             normal_map: option.None,
-            ao_map: option.None,
+            ambient_oclusion_map: option.None,
             roughness_map: option.None,
             metalness_map: option.None,
           )
@@ -221,18 +218,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "sphere1",
       geometry: {
         let assert Ok(geometry) =
-          scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+          geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
+          material.standard(
             color: 0xe24a4a,
             metalness: 0.5,
             roughness: 0.5,
             map: option.None,
             normal_map: option.None,
-            ao_map: option.None,
+            ambient_oclusion_map: option.None,
             roughness_map: option.None,
             metalness_map: option.None,
           )

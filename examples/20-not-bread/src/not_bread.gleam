@@ -10,6 +10,9 @@ import tiramisu
 import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/object3d.{type Object3D}
 import tiramisu/scene
 import tiramisu/transform
@@ -89,7 +92,7 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -108,8 +111,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
@@ -118,7 +120,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 1.5)
+          light.directional(color: 0xffffff, intensity: 1.5)
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
@@ -133,18 +135,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
           id: "loading",
           geometry: {
             let assert Ok(geometry) =
-              scene.box(width: 0.5, height: 0.5, depth: 0.5)
+              geometry.box(width: 0.5, height: 0.5, depth: 0.5)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
+              material.standard(
                 color: 0xffa500,
                 metalness: 0.3,
                 roughness: 0.5,
                 map: option.None,
                 normal_map: option.None,
-                ao_map: option.None,
+                ambient_oclusion_map: option.None,
                 roughness_map: option.None,
                 metalness_map: option.None,
               )
@@ -168,18 +170,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
           id: "error",
           geometry: {
             let assert Ok(geometry) =
-              scene.box(width: 0.5, height: 0.5, depth: 0.5)
+              geometry.box(width: 0.5, height: 0.5, depth: 0.5)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
+              material.standard(
                 color: 0xff0000,
                 metalness: 0.5,
                 roughness: 0.5,
                 map: option.None,
                 normal_map: option.None,
-                ao_map: option.None,
+                ambient_oclusion_map: option.None,
                 roughness_map: option.None,
                 metalness_map: option.None,
               )

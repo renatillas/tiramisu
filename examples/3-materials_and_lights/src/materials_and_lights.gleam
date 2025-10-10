@@ -6,6 +6,9 @@ import tiramisu
 import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -106,8 +109,7 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0x404040, intensity: 0.3)
+        let assert Ok(light) = light.ambient(color: 0x404040, intensity: 0.3)
         light
       },
       transform: transform.identity,
@@ -116,7 +118,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 2.0)
+          light.directional(color: 0xffffff, intensity: 2.0)
         light
       },
       transform: transform.Transform(
@@ -133,7 +135,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "point",
       light: {
         let assert Ok(light) =
-          scene.point_light(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
+          light.point(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
         light
       },
       transform: transform.Transform(
@@ -146,7 +148,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "hemisphere",
       light: {
         let assert Ok(light) =
-          scene.hemisphere_light(
+          light.hemisphere(
             sky_color: 0xffffff,
             ground_color: 0xff0000,
             intensity: 1.0,
@@ -162,7 +164,7 @@ fn view(model: Model) -> List(scene.Node) {
   ]
 
   let assert Ok(box_geom) =
-    scene.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
+    geometry.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
 
   // Get textures from cache if loaded
   let wood_color =
@@ -248,7 +250,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   // Create materials with textures
   let assert Ok(basic_mat) =
-    scene.basic_material(
+    material.basic(
       color: 0xff6b6b,
       transparent: False,
       opacity: 1.0,
@@ -256,7 +258,7 @@ fn view(model: Model) -> List(scene.Node) {
       normal_map: option.None,
     )
   let assert Ok(standard_mat) =
-    scene.standard_material(
+    material.standard(
       color: 0xffffff,
       metalness: 0.0,
       roughness: 1.0,
@@ -267,7 +269,7 @@ fn view(model: Model) -> List(scene.Node) {
       metalness_map: option.None,
     )
   let assert Ok(phong_mat) =
-    scene.phong_material(
+    material.phong(
       color: 0xffffff,
       shininess: 100.0,
       map: onyx_color,
@@ -275,14 +277,14 @@ fn view(model: Model) -> List(scene.Node) {
       ambient_oclusion_map: option.None,
     )
   let assert Ok(lambert_mat) =
-    scene.lambert_material(
+    material.lambert(
       color: 0xffffff,
       map: snow_color,
       normal_map: snow_normal,
       ambient_oclusion_map: snow_ao,
     )
   let assert Ok(toon_mat) =
-    scene.toon_material(
+    material.toon(
       color: 0xf38181,
       map: option.None,
       normal_map: option.None,
@@ -347,9 +349,9 @@ fn view(model: Model) -> List(scene.Node) {
     ),
   ]
 
-  let assert Ok(plane_geom) = scene.plane(width: 20.0, height: 20.0)
+  let assert Ok(plane_geom) = geometry.plane(width: 20.0, height: 20.0)
   let assert Ok(ground_mat) =
-    scene.standard_material(
+    material.standard(
       color: 0xffffff,
       metalness: 0.0,
       roughness: 1.0,

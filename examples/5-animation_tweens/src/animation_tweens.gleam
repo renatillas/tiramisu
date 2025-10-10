@@ -3,6 +3,9 @@ import tiramisu
 import tiramisu/animation
 import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -17,8 +20,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -105,16 +107,11 @@ fn easing_name(index: Int) -> String {
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let position = animation.get_tween_value(model.tween)
   let _ = easing_name(model.current_easing)
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 45.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 100.0,
-    )
+    camera.perspective(field_of_view: 45.0, near: 0.1, far: 100.0)
 
   [
     scene.Camera(
@@ -128,7 +125,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
@@ -136,7 +133,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "directional",
       light: {
-        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.8)
+        let assert Ok(light) =
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -148,20 +146,15 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "sphere",
       geometry: {
-        let assert Ok(geom) = scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+        let assert Ok(geom) =
+          geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.standard_material(
-          color: 0x4ecdc4,
-          metalness: 0.5,
-          roughness: 0.3,
-          map: option.None,
-          normal_map: option.None,
-          ao_map: option.None,
-          roughness_map: option.None,
-          metalness_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.new()
+          |> material.with_color(0x4ecdc4)
+          |> material.build()
         mat
       },
       transform: transform.Transform(
@@ -174,17 +167,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "start",
       geometry: {
-        let assert Ok(geom) = scene.box(width: 0.5, height: 0.5, depth: 0.5)
+        let assert Ok(geom) = geometry.box(width: 0.5, height: 0.5, depth: 0.5)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0xff6b6b,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0xff6b6b,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+            normal_map: option.None,
+          )
         mat
       },
       transform: transform.Transform(
@@ -197,17 +191,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "end",
       geometry: {
-        let assert Ok(geom) = scene.box(width: 0.5, height: 0.5, depth: 0.5)
+        let assert Ok(geom) = geometry.box(width: 0.5, height: 0.5, depth: 0.5)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0x95e1d3,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0x95e1d3,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+            normal_map: option.None,
+          )
         mat
       },
       transform: transform.Transform(

@@ -7,6 +7,9 @@ import gleam/result
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -21,8 +24,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
+    dimensions: option.None,
     background: 0x0f0f0f,
     init: init,
     update: update,
@@ -47,14 +49,9 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
@@ -70,19 +67,10 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
-      light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0x404040, intensity: 10.0)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.Light(
       id: "point",
       light: {
         let assert Ok(light) =
-          scene.point_light(color: 0xffffff, intensity: 10.5, distance: 100.0)
+          light.point(color: 0xfffb00, intensity: 100.5, distance: 100.0)
         light
       },
       transform: transform.Transform(
@@ -99,12 +87,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "sun",
       geometry: {
         let assert Ok(geometry) =
-          scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+          geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.basic_material(
+          material.basic(
             color: 0xffff00,
             transparent: False,
             opacity: 1.0,
@@ -138,7 +126,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             id: "planet1",
             geometry: {
               let assert Ok(geometry) =
-                scene.sphere(
+                geometry.sphere(
                   radius: 0.5,
                   width_segments: 32,
                   height_segments: 32,
@@ -147,13 +135,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             },
             material: {
               let assert Ok(material) =
-                scene.standard_material(
-                  color: 0x4ecdc4,
-                  metalness: 0.3,
-                  roughness: 0.7,
-                  map: option.None,
-                  normal_map: option.None,
-                )
+                material.new()
+                |> material.with_color(0x4ecdc4)
+                |> material.build
               material
             },
             transform: transform.Transform(
@@ -176,7 +160,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
                 id: "moon1",
                 geometry: {
                   let assert Ok(geometry) =
-                    scene.sphere(
+                    geometry.sphere(
                       radius: 0.2,
                       width_segments: 16,
                       height_segments: 16,
@@ -185,13 +169,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
                 },
                 material: {
                   let assert Ok(material) =
-                    scene.basic_material(
-                      color: 0xcccccc,
-                      transparent: False,
-                      opacity: 1.0,
-                      map: option.None,
-                      normal_map: option.None,
-                    )
+                    material.new()
+                    |> material.with_color(0xcccccc)
+                    |> material.build()
                   material
                 },
                 transform: transform.Transform(
@@ -218,7 +198,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
             id: "planet2",
             geometry: {
               let assert Ok(geometry) =
-                scene.sphere(
+                geometry.sphere(
                   radius: 0.7,
                   width_segments: 32,
                   height_segments: 32,
@@ -227,13 +207,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
             },
             material: {
               let assert Ok(material) =
-                scene.standard_material(
-                  color: 0xff6b6b,
-                  metalness: 0.5,
-                  roughness: 0.5,
-                  map: option.None,
-                  normal_map: option.None,
-                )
+                material.new()
+                |> material.with_color(0xff6b6b)
+                |> material.build()
               material
             },
             transform: transform.Transform(

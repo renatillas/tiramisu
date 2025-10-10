@@ -37,12 +37,19 @@ export function initializeInputSystems(canvas) {
 /**
  * Apply initial scene nodes to Three.js scene
  */
-export function applyInitialScene(scene, nodes) {
+export function applyInitialScene(scene, nodes, physicsWorldOption) {
   // Use diff with empty previous scene to generate proper patches
   // This ensures hierarchy is respected and parent_id is set correctly
   const emptyList = GLEAM.toList([]);
   const patches = SCENE_GLEAM.diff(emptyList, nodes);
-  RENDERER.applyPatches(scene, patches);
+
+  // Extract physics_world from Option (Some or None)
+  const physicsWorld = physicsWorldOption && physicsWorldOption[0] ? physicsWorldOption[0] : null;
+
+  RENDERER.applyPatches(scene, patches, physicsWorld);
+
+  // Set the Three.js scene for debug visualization
+  DEBUG.setDebugScene(scene);
 }
 
 /**
@@ -105,7 +112,8 @@ export function startLoop(
     const canvasHeight = canvas.clientHeight;
 
     // Update context with new delta, input, and canvas dimensions
-    const newContext = {
+    // Keep the physics_world from the original context
+    let newContext = {
       ...context,
       delta_time: deltaTime,
       input: inputState,
@@ -116,36 +124,56 @@ export function startLoop(
     // Process all messages in queue
     while (messageQueue.length > 0) {
       const msg = messageQueue.shift();
-      const [newState, newEffect] = update(currentState, msg, newContext);
+      const [newState, newEffect, newPhysicsWorld] = update(currentState, msg, newContext);
       currentState = newState;
+
+      // Update context with new physics_world if it changed
+      if (newPhysicsWorld) {
+        newContext = {
+          ...newContext,
+          physics_world: newPhysicsWorld,
+        };
+      }
+
       runEffect(newEffect, dispatch);
     }
 
     // Call update function (for frame-based logic)
     // In Lustre-style, update is typically message-driven, but we keep this for delta time updates
 
-    // Generate new scene nodes
-    const newNodes = view(currentState);
+    // Generate new scene nodes - pass context to view
+    const newNodes = view(currentState, newContext);
 
     // Dirty flagging optimization: skip diff if scene hasn't changed (referential equality)
     // This is extremely fast for static scenes where view() returns the same list reference
     if (currentNodes !== newNodes) {
-      // Diff and patch
+      // Diff and patch - pass physics_world from context
       const patches = SCENE_GLEAM.diff(currentNodes, newNodes);
-      RENDERER.applyPatches(scene, patches);
+      // Extract physics_world from Option in context
+      const physicsWorldOption = newContext.physics_world;
+      const physicsWorld = physicsWorldOption && physicsWorldOption[0] ? physicsWorldOption[0] : null;
+      RENDERER.applyPatches(scene, patches, physicsWorld);
 
       currentNodes = newNodes;
     }
     // else: Scene unchanged, skip diff entirely (massive speedup for static/paused scenes)
 
-    // Step physics simulation
-    PHYSICS.stepWorld(deltaTime);
+    // Note: Physics stepping is handled in the Gleam update function via physics.step()
 
-    // Sync physics transforms to Three.js objects
-    RENDERER.syncPhysicsTransforms();
+    // Sync physics body transforms to Three.js objects (direct mutation for performance)
+    // This keeps visual meshes in sync with Rapier physics bodies
+    const physicsWorldOption = newContext.physics_world;
+    const physicsWorld = physicsWorldOption && physicsWorldOption[0] ? physicsWorldOption[0] : null;
+    RENDERER.syncPhysicsTransforms(physicsWorld);
 
     // Update animation mixers
     RENDERER.updateMixers(deltaTime);
+
+    // Update particle systems
+    RENDERER.updateParticleSystems(deltaTime);
+
+    // Update debug collider visualization
+    DEBUG.updateColliderVisualization();
 
     // Clear the entire canvas first
     renderer.setScissorTest(false);

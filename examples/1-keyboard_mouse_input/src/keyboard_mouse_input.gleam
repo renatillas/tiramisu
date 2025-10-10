@@ -10,7 +10,10 @@ import gleam/option
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -134,8 +137,7 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
@@ -144,7 +146,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -156,21 +158,14 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Mesh(
       id: "cube",
       geometry: {
-        let assert Ok(box) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
         box
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: model.color,
-            metalness: 0.3,
-            roughness: 0.4,
-            map: option.None,
-            normal_map: option.None,
-            ambient_oclusion_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(model.color)
+          |> material.build()
         material
       },
       transform: transform.Transform(

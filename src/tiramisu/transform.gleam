@@ -230,10 +230,7 @@ pub fn look_at(
 ///   |> transform.translate_by(vec3.Vec3(2.0, 1.0, 0.0))
 /// // position: (7.0, 1.0, 0.0)
 /// ```
-pub fn translate_by(
-  transform: Transform,
-  offset: vec3.Vec3(Float),
-) -> Transform {
+pub fn translate(transform: Transform, by offset: vec3.Vec3(Float)) -> Transform {
   Transform(..transform, position: vec3f.add(transform.position, offset))
 }
 
@@ -247,10 +244,7 @@ pub fn translate_by(
 ///   |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))  // Turn another 90° right
 /// // rotation: (0.0, 3.14, 0.0) - now facing backward
 /// ```
-pub fn rotate_by(
-  transform: Transform,
-  rotation: vec3.Vec3(Float),
-) -> Transform {
+pub fn rotate_by(transform: Transform, rotation: vec3.Vec3(Float)) -> Transform {
   Transform(..transform, rotation: vec3f.add(transform.rotation, rotation))
 }
 
@@ -264,7 +258,10 @@ pub fn rotate_by(
 ///   |> transform.scale_by(vec3.Vec3(2.0, 1.0, 1.0))
 /// // scale: (4.0, 1.0, 2.0)
 /// ```
-pub fn scale_by(transform: Transform, scale_factor: vec3.Vec3(Float)) -> Transform {
+pub fn scale_by(
+  transform: Transform,
+  scale_factor: vec3.Vec3(Float),
+) -> Transform {
   Transform(
     ..transform,
     scale: vec3.Vec3(
@@ -343,57 +340,4 @@ pub fn rotate_z(transform: Transform, angle: Float) -> Transform {
       transform.rotation.z +. angle,
     ),
   )
-}
-
-/// Move forward along the local Z axis (useful for character movement).
-///
-/// Positive distance moves in the direction the object is facing.
-///
-/// ## Example
-///
-/// ```gleam
-/// let t = transform.identity
-///   |> transform.rotate_y(1.57)  // Face right
-///   |> transform.move_forward(5.0)  // Move 5 units to the right
-/// ```
-pub fn move_forward(transform: Transform, distance: Float) -> Transform {
-  // Calculate forward vector from Y rotation (yaw)
-  let yaw = transform.rotation.y
-  let forward_x = maths.sin(yaw) *. distance
-  let forward_z = maths.cos(yaw) *. distance
-
-  translate_by(transform, vec3.Vec3(forward_x, 0.0, forward_z))
-}
-
-/// Move right along the local X axis (strafe movement).
-///
-/// Positive distance moves to the right.
-///
-/// ## Example
-///
-/// ```gleam
-/// let t = transform.identity
-///   |> transform.move_right(3.0)  // Strafe right 3 units
-/// ```
-pub fn move_right(transform: Transform, distance: Float) -> Transform {
-  // Calculate right vector from Y rotation (yaw)
-  let yaw = transform.rotation.y
-  let right_x = maths.cos(yaw) *. distance
-  let right_z = 0.0 -. maths.sin(yaw) *. distance
-
-  translate_by(transform, vec3.Vec3(right_x, 0.0, right_z))
-}
-
-/// Move up along the world Y axis (vertical movement).
-///
-/// Positive distance moves up.
-///
-/// ## Example
-///
-/// ```gleam
-/// let t = transform.identity
-///   |> transform.move_up(2.0)  // Jump up 2 units
-/// ```
-pub fn move_up(transform: Transform, distance: Float) -> Transform {
-  translate_by(transform, vec3.Vec3(0.0, distance, 0.0))
 }

@@ -1,14 +1,16 @@
 import gleam/list
 import gleam/option
+import tiramisu/geometry
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 
 // Test: nested group structure tracks parent IDs correctly
 pub fn nested_group_parent_test() {
   let previous = []
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -50,9 +52,9 @@ pub fn nested_group_parent_test() {
 // Test: deeply nested groups
 pub fn deeply_nested_groups_test() {
   let previous = []
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -109,11 +111,12 @@ pub fn deeply_nested_groups_test() {
 // Test: multiple children in same group
 pub fn multiple_children_test() {
   let previous = []
-  let assert Ok(box_geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geometry) =
+    geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(sphere_geometry) =
-    scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+    geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
   let assert Ok(material_red) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -121,7 +124,7 @@ pub fn multiple_children_test() {
       normal_map: option.None,
     )
   let assert Ok(material_green) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -175,9 +178,9 @@ pub fn multiple_children_test() {
 // Test: root level nodes have no parent
 pub fn root_level_no_parent_test() {
   let previous = []
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,

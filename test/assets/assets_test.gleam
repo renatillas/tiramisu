@@ -2,7 +2,6 @@ import gleam/list
 import gleam/option
 import tiramisu/asset
 import tiramisu/audio
-import tiramisu/scene
 
 // --- Cache Management Tests ---
 
@@ -352,10 +351,10 @@ pub fn load_progress_test() {
 // --- Helper Functions (unsafe mocks for testing) ---
 
 @external(javascript, "../tiramisu/ffi/test_helpers.mjs", "mockTexture")
-fn unsafe_mock_texture() -> scene.Texture
+fn unsafe_mock_texture() -> asset.Texture
 
 @external(javascript, "../tiramisu/ffi/test_helpers.mjs", "mockAudio")
 fn unsafe_mock_audio() -> audio.AudioBuffer
 
 @external(javascript, "../tiramisu/ffi/test_helpers.mjs", "mockGeometry")
-fn unsafe_mock_geometry() -> scene.BufferGeometry
+fn unsafe_mock_geometry() -> asset.BufferGeometry

@@ -1,5 +1,8 @@
 import gleam/list
 import gleam/option
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -13,9 +16,9 @@ pub fn empty_to_empty_test() {
 // Test: adding a single mesh
 pub fn add_mesh_test() {
   let previous = []
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -42,9 +45,9 @@ pub fn add_mesh_test() {
 
 // Test: removing a single mesh
 pub fn remove_mesh_test() {
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -72,9 +75,9 @@ pub fn remove_mesh_test() {
 
 // Test: no changes produces no patches
 pub fn no_changes_test() {
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -96,9 +99,9 @@ pub fn no_changes_test() {
 
 // Test: updating transform
 pub fn update_transform_test() {
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -138,9 +141,9 @@ pub fn update_transform_test() {
 
 // Test: updating material
 pub fn update_material_test() {
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -148,7 +151,7 @@ pub fn update_material_test() {
       normal_map: option.None,
     )
   let assert Ok(material2) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -184,11 +187,12 @@ pub fn update_material_test() {
 
 // Test: updating geometry
 pub fn update_geometry_test() {
-  let assert Ok(box_geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geometry) =
+    geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(sphere_geometry) =
-    scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+    geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -229,8 +233,7 @@ pub fn add_light_test() {
     scene.Light(
       id: "light1",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(intensity: 1.0, color: 0xffffff)
+        let assert Ok(light) = light.ambient(intensity: 1.0, color: 0xffffff)
         light
       },
       transform: transform.identity,
@@ -251,8 +254,7 @@ pub fn update_light_test() {
     scene.Light(
       id: "light1",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(intensity: 0.5, color: 0xffffff)
+        let assert Ok(light) = light.ambient(intensity: 0.5, color: 0xffffff)
         light
       },
       transform: transform.identity,
@@ -262,8 +264,7 @@ pub fn update_light_test() {
     scene.Light(
       id: "light1",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(intensity: 1.0, color: 0xffffff)
+        let assert Ok(light) = light.ambient(intensity: 1.0, color: 0xffffff)
         light
       },
       transform: transform.identity,
@@ -272,8 +273,7 @@ pub fn update_light_test() {
   let patches = scene.diff(previous, current)
 
   assert list.length(patches) == 1
-  let assert Ok(ambient_light) =
-    scene.ambient_light(intensity: 1.0, color: 0xffffff)
+  let assert Ok(ambient_light) = light.ambient(intensity: 1.0, color: 0xffffff)
   assert case list.first(patches) {
     Ok(scene.UpdateLight("light1", light)) -> light == ambient_light
     _ -> False
@@ -282,9 +282,9 @@ pub fn update_light_test() {
 
 // Test: multiple changes
 pub fn multiple_changes_test() {
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material_red) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -292,7 +292,7 @@ pub fn multiple_changes_test() {
       normal_map: option.None,
     )
   let assert Ok(material_green) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -300,7 +300,7 @@ pub fn multiple_changes_test() {
       normal_map: option.None,
     )
   let assert Ok(material_blue) =
-    scene.basic_material(
+    material.basic(
       color: 0x0000ff,
       transparent: False,
       opacity: 1.0,
@@ -348,9 +348,9 @@ pub fn multiple_changes_test() {
 // Test: group node
 pub fn group_test() {
   let previous = []
-  let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,

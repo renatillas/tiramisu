@@ -1,15 +1,32 @@
 import gleam/list
 import gleam/option
+import tiramisu/geometry
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
 // Test: Parent group is added before children in patches
 pub fn parent_before_children_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(geometry2) = scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
-  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
-  let assert Ok(material2) = scene.basic_material(color: 0x00ff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry2) =
+    geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+  let assert Ok(material1) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    material.basic(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
 
   let previous = []
   let current = [
@@ -67,8 +84,15 @@ pub fn parent_before_children_test() {
 
 // Test: Deeply nested hierarchy is added in correct order
 pub fn deeply_nested_ordering_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
 
   let previous = []
   let current = [
@@ -133,9 +157,23 @@ pub fn deeply_nested_ordering_test() {
 
 // Test: Multiple groups at same level can be in any order
 pub fn sibling_groups_ordering_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(material1) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
-  let assert Ok(material2) = scene.basic_material(color: 0x00ff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(material1) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    material.basic(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
 
   let previous = []
   let current = [
@@ -204,12 +242,36 @@ pub fn sibling_groups_ordering_test() {
 
 // Test: Complex hierarchy with moon orbiting planet orbiting sun
 pub fn solar_system_ordering_test() {
-  let assert Ok(geometry1) = scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
-  let assert Ok(geometry2) = scene.sphere(radius: 0.5, width_segments: 32, height_segments: 32)
-  let assert Ok(geometry3) = scene.sphere(radius: 0.2, width_segments: 16, height_segments: 16)
-  let assert Ok(material1) = scene.basic_material(color: 0xffff00, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
-  let assert Ok(material2) = scene.basic_material(color: 0x4ecdc4, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
-  let assert Ok(material3) = scene.basic_material(color: 0xcccccc, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None)
+  let assert Ok(geometry1) =
+    geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+  let assert Ok(geometry2) =
+    geometry.sphere(radius: 0.5, width_segments: 32, height_segments: 32)
+  let assert Ok(geometry3) =
+    geometry.sphere(radius: 0.2, width_segments: 16, height_segments: 16)
+  let assert Ok(material1) =
+    material.basic(
+      color: 0xffff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material2) =
+    material.basic(
+      color: 0x4ecdc4,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
+  let assert Ok(material3) =
+    material.basic(
+      color: 0xcccccc,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      normal_map: option.None,
+    )
 
   let previous = []
   let current = [

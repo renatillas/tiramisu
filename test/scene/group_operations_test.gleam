@@ -1,14 +1,17 @@
 import gleam/list
 import gleam/option
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
 // Test: Removing a group removes all its children
 pub fn remove_group_with_children_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -16,7 +19,7 @@ pub fn remove_group_with_children_test() {
       normal_map: option.None,
     )
   let assert Ok(material2) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -79,9 +82,9 @@ pub fn remove_group_with_children_test() {
 
 // Test: Removing nested groups removes all descendants
 pub fn remove_nested_groups_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -111,9 +114,9 @@ pub fn remove_nested_groups_test() {
 
 // Test: Update group transform
 pub fn update_group_transform_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -161,9 +164,9 @@ pub fn update_group_transform_test() {
 
 // Test: Add child to existing group
 pub fn add_child_to_existing_group_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -171,7 +174,7 @@ pub fn add_child_to_existing_group_test() {
       normal_map: option.None,
     )
   let assert Ok(material2) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -221,9 +224,9 @@ pub fn add_child_to_existing_group_test() {
 
 // Test: Remove child from group (group remains)
 pub fn remove_child_from_group_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -231,7 +234,7 @@ pub fn remove_child_from_group_test() {
       normal_map: option.None,
     )
   let assert Ok(material2) =
-    scene.basic_material(
+    material.basic(
       color: 0x00ff00,
       transparent: False,
       opacity: 1.0,
@@ -281,9 +284,9 @@ pub fn remove_child_from_group_test() {
 
 // Test: Moving a node from one group to another
 pub fn move_node_between_groups_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -367,7 +370,7 @@ pub fn group_with_lights_test() {
         id: "light1",
         light: {
           let assert Ok(light) =
-            scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+            light.point(intensity: 1.0, color: 0xffffff, distance: 10.0)
           light
         },
         transform: transform.identity,
@@ -375,8 +378,7 @@ pub fn group_with_lights_test() {
       scene.Light(
         id: "light2",
         light: {
-          let assert Ok(light) =
-            scene.ambient_light(intensity: 0.5, color: 0x404040)
+          let assert Ok(light) = light.ambient(intensity: 0.5, color: 0x404040)
           light
         },
         transform: transform.identity,

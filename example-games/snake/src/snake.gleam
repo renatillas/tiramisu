@@ -1,3 +1,4 @@
+import gleam/bool
 import gleam/int
 import gleam/javascript/promise
 import gleam/list
@@ -9,10 +10,13 @@ import lustre/element.{type Element}
 import lustre/element/html
 import tiramisu
 import tiramisu/asset
-import tiramisu/audio
+import tiramisu/audio.{Playing}
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui
@@ -39,6 +43,7 @@ pub type Position {
 
 pub type Model {
   Model(
+    input_bindings: input.InputBindings(Direction),
     snake: List(Position),
     direction: Direction,
     food: Position,
@@ -145,6 +150,12 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+  let input_bindings =
+    input.new_bindings()
+    |> input.bind_key(input.KeyW, Up)
+    |> input.bind_key(input.KeyD, Right)
+    |> input.bind_key(input.KeyS, Down)
+    |> input.bind_key(input.KeyA, Left)
   let sound_assets = [
     asset.AudioAsset("game-over.wav"),
     asset.AudioAsset("fruit-collect.wav"),
@@ -161,6 +172,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   ]
   let model =
     Model(
+      input_bindings:,
       snake: initial_snake,
       direction: Up,
       food: Position(15, 15),
@@ -180,6 +192,10 @@ fn update(
   ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg)) {
   case msg {
+    AudioAssetsLoaded(audio_buffer) -> {
+      let asset.BatchLoadResult(asset_cache, _) = audio_buffer
+      #(Model(..model, asset_cache:), effect.none())
+    }
     RestartGame -> {
       // Reset UI and restart game
       let #(new_model, game_effect) = init(ctx)
@@ -193,161 +209,127 @@ fn update(
       )
     }
     Tick -> {
-      case model.game_over {
-        True -> {
-          // Check for restart (R key)
-          case input.is_key_pressed(ctx.input, input.KeyR) {
-            True -> {
-              #(model, effect.from(fn(dispatch) { dispatch(RestartGame) }))
-            }
-            False -> #(model, effect.tick(Tick))
+      use <- bool.guard(
+        model.game_over,
+        case input.is_key_pressed(ctx.input, input.KeyR) {
+          True -> {
+            #(model, effect.from(fn(dispatch) { dispatch(RestartGame) }))
+          }
+          False -> #(model, effect.tick(Tick))
+        },
+      )
+      // Handle direction input
+      let new_direction =
+        get_new_direction(ctx.input, model.input_bindings, model.direction)
+
+      // Update move timer
+      let new_timer = model.move_timer +. ctx.delta_time
+
+      // Validate direction change before moving
+      let assert [head, ..tail] = model.snake
+      let safe_direction = case tail {
+        [neck, ..] -> {
+          let potential_head = move_position(head, new_direction)
+          case potential_head == neck {
+            True -> model.direction
+            False -> new_direction
           }
         }
-        False -> {
-          // Handle direction input
-          let new_direction = get_new_direction(ctx.input, model.direction)
-
-          // Update move timer
-          let new_timer = model.move_timer +. ctx.delta_time
-
-          // Validate direction change before moving
-          let assert [head, ..tail] = model.snake
-          let safe_direction = case tail {
-            [neck, ..] -> {
-              let potential_head = move_position(head, new_direction)
-              case potential_head == neck {
-                True -> model.direction
-                // Keep moving in current direction
-                False -> new_direction
-              }
-            }
-            [] -> new_direction
-            // Single segment, any direction is fine
-          }
-
-          case new_timer >=. model.move_interval {
-            True -> {
-              // Move snake
-              let new_head = move_position(head, safe_direction)
-
-              // Check collisions
-              let hit_wall =
-                new_head.x < 0
-                || new_head.x >= grid_size
-                || new_head.y < 0
-                || new_head.y >= grid_size
-              let hit_self = list.contains(tail, new_head)
-
-              case hit_wall || hit_self {
-                True -> #(
-                  Model(..model, game_over: True),
-                  effect.batch([
-                    effect.tick(Tick),
-                    ui.dispatch_to_lustre(GameOver),
-                  ]),
-                )
-                False -> {
-                  // Check if ate food
-                  let ate_food = new_head == model.food
-                  let new_snake = case ate_food {
-                    True -> [new_head, ..model.snake]
-                    False -> [
-                      new_head,
-                      ..list.take(model.snake, list.length(model.snake) - 1)
-                    ]
-                  }
-
-                  let #(new_food, new_score, new_interval) = case ate_food {
-                    True -> #(
-                      generate_food(new_snake),
-                      model.score + 1,
-                      model.move_interval -. speed_increase,
-                    )
-                    False -> #(model.food, model.score, model.move_interval)
-                  }
-
-                  #(
-                    Model(
-                      ..model,
-                      snake: new_snake,
-                      direction: safe_direction,
-                      food: new_food,
-                      score: new_score,
-                      game_over: False,
-                      move_timer: 0.0,
-                      ate_food:,
-                      move_interval: new_interval,
-                    ),
-                    effect.batch([
-                      effect.tick(Tick),
-                      ui.dispatch_to_lustre(UpdateScore(new_score)),
-                    ]),
-                  )
-                }
-              }
-            }
-            False -> #(
-              Model(..model, direction: safe_direction, move_timer: new_timer),
-              effect.tick(Tick),
-            )
-          }
-        }
+        [] -> new_direction
       }
-    }
-    AudioAssetsLoaded(audio_buffer) -> {
-      let asset.BatchLoadResult(asset_cache, _) = audio_buffer
-      #(Model(..model, asset_cache:), effect.none())
+
+      case new_timer >=. model.move_interval {
+        True -> {
+          // Move snake
+          let new_head = move_position(head, safe_direction)
+
+          // Check collisions
+          let hit_wall =
+            new_head.x < 0
+            || new_head.x >= grid_size
+            || new_head.y < 0
+            || new_head.y >= grid_size
+          let hit_self = list.contains(tail, new_head)
+
+          case hit_wall || hit_self {
+            True -> #(
+              Model(..model, game_over: True),
+              effect.batch([
+                effect.tick(Tick),
+                ui.dispatch_to_lustre(GameOver),
+              ]),
+            )
+            False -> {
+              // Check if ate food
+              let ate_food = new_head == model.food
+              let new_snake = case ate_food {
+                True -> [new_head, ..model.snake]
+                False -> [
+                  new_head,
+                  ..list.take(model.snake, list.length(model.snake) - 1)
+                ]
+              }
+
+              let #(new_food, new_score, new_interval) = case ate_food {
+                True -> #(
+                  generate_food(new_snake),
+                  model.score + 1,
+                  model.move_interval -. speed_increase,
+                )
+                False -> #(model.food, model.score, model.move_interval)
+              }
+
+              #(
+                Model(
+                  ..model,
+                  snake: new_snake,
+                  direction: safe_direction,
+                  food: new_food,
+                  score: new_score,
+                  game_over: False,
+                  move_timer: 0.0,
+                  ate_food:,
+                  move_interval: new_interval,
+                ),
+                effect.batch([
+                  effect.tick(Tick),
+                  ui.dispatch_to_lustre(UpdateScore(new_score)),
+                ]),
+              )
+            }
+          }
+        }
+        False -> #(
+          Model(..model, direction: safe_direction, move_timer: new_timer),
+          effect.tick(Tick),
+        )
+      }
     }
   }
 }
 
 fn get_new_direction(
   input_state: input.InputState,
+  input_bidnings: input.InputBindings(Direction),
   current: Direction,
 ) -> Direction {
   case
-    input.is_key_pressed(input_state, input.KeyW)
-    || input.is_key_pressed(input_state, input.ArrowUp)
+    current,
+    input.is_action_just_pressed(input_state, input_bidnings, Up),
+    input.is_action_just_pressed(input_state, input_bidnings, Down),
+    input.is_action_just_pressed(input_state, input_bidnings, Right),
+    input.is_action_just_pressed(input_state, input_bidnings, Left)
   {
-    True ->
-      case current {
-        Down -> current
-        _ -> Up
-      }
-    False ->
-      case
-        input.is_key_pressed(input_state, input.KeyS)
-        || input.is_key_pressed(input_state, input.ArrowDown)
-      {
-        True ->
-          case current {
-            Up -> current
-            _ -> Down
-          }
-        False ->
-          case
-            input.is_key_pressed(input_state, input.KeyA)
-            || input.is_key_pressed(input_state, input.ArrowLeft)
-          {
-            True ->
-              case current {
-                Right -> current
-                _ -> Left
-              }
-            False ->
-              case
-                input.is_key_pressed(input_state, input.KeyD)
-                || input.is_key_pressed(input_state, input.ArrowRight)
-              {
-                True ->
-                  case current {
-                    Left -> current
-                    _ -> Right
-                  }
-                False -> current
-              }
-          }
-      }
+    _, False, False, False, False
+    | Down, True, _, _, _
+    | Up, _, True, _, _
+    | Left, _, _, True, _
+    | Right, _, _, _, True
+    -> current
+    _, True, _, _, _ -> Up
+    _, _, True, _, _ -> Down
+    _, _, _, True, _ -> Right
+    _, _, _, _, True -> Left
   }
 }
 
@@ -455,19 +437,27 @@ fn view(model: Model) -> List(scene.Node) {
     asset.get_audio(model.asset_cache, "fruit-collect.wav"),
     model.ate_food
   {
-    Ok(audio_buffer), True -> [
+    Ok(audio_buffer), True ->
       scene.Audio(
         id: "eating-sound",
-        buffer: audio_buffer,
-        config: audio.AudioConfig(
-          volume: 0.3,
-          loop: False,
-          playback_rate: 1.0,
-          autoplay: True,
+        audio: audio.GlobalAudio(
+          buffer: audio_buffer,
+          config: audio.AudioConfig(
+            state: case model.ate_food {
+              True -> Playing
+              False -> audio.Stopped
+            },
+            fade: audio.NoFade,
+            group: option.Some(audio.SFX),
+            on_end: option.None,
+            volume: 1.0,
+            loop: False,
+            playback_rate: 1.0,
+          ),
         ),
-        audio_type: audio.GlobalAudio,
-      ),
-    ]
+      )
+      |> list.wrap
+
     _, _ -> []
   }
 
@@ -477,15 +467,22 @@ fn view(model: Model) -> List(scene.Node) {
   {
     Ok(audio_buffer), True -> [
       scene.Audio(
-        id: "eating-sound",
-        buffer: audio_buffer,
-        config: audio.AudioConfig(
-          volume: 0.3,
-          loop: False,
-          playback_rate: 1.0,
-          autoplay: True,
+        id: "game-over-sound",
+        audio: audio.GlobalAudio(
+          buffer: audio_buffer,
+          config: audio.AudioConfig(
+            volume: 0.3,
+            loop: False,
+            playback_rate: 1.0,
+            state: case model.game_over {
+              True -> audio.Playing
+              False -> audio.Stopped
+            },
+            fade: audio.NoFade,
+            group: option.Some(audio.SFX),
+            on_end: option.None,
+          ),
         ),
-        audio_type: audio.GlobalAudio,
       ),
     ]
     _, _ -> []
@@ -503,13 +500,13 @@ fn view(model: Model) -> List(scene.Node) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
     )
+    |> list.wrap
 
   let lights = [
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
@@ -518,7 +515,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -541,7 +538,7 @@ fn view(model: Model) -> List(scene.Node) {
         id: "snake_" <> int.to_string(idx),
         geometry: {
           let assert Ok(box) =
-            scene.box(
+            geometry.box(
               width: cell_size *. 0.9,
               height: cell_size *. 0.9,
               depth: cell_size *. 0.9,
@@ -550,16 +547,7 @@ fn view(model: Model) -> List(scene.Node) {
         },
         material: {
           let assert Ok(material) =
-            scene.standard_material(
-              color: color,
-              metalness: 0.4,
-              roughness: 0.6,
-              map: option.None,
-              normal_map: option.None,
-              ambient_oclusion_map: option.None,
-              roughness_map: option.None,
-              metalness_map: option.None,
-            )
+            material.new() |> material.with_color(color) |> material.build()
           material
         },
         transform: transform.Transform(
@@ -583,7 +571,7 @@ fn view(model: Model) -> List(scene.Node) {
           id: "left_eye",
           geometry: {
             let assert Ok(sphere) =
-              scene.sphere(
+              geometry.sphere(
                 radius: 0.12,
                 width_segments: 16,
                 height_segments: 12,
@@ -592,16 +580,9 @@ fn view(model: Model) -> List(scene.Node) {
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
-                color: 0xffffff,
-                metalness: 0.8,
-                roughness: 0.2,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xffffff)
+              |> material.build()
             material
           },
           transform: transform.Transform(
@@ -615,7 +596,7 @@ fn view(model: Model) -> List(scene.Node) {
           id: "right_eye",
           geometry: {
             let assert Ok(sphere) =
-              scene.sphere(
+              geometry.sphere(
                 radius: 0.12,
                 width_segments: 16,
                 height_segments: 12,
@@ -624,16 +605,9 @@ fn view(model: Model) -> List(scene.Node) {
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
-                color: 0xffffff,
-                metalness: 0.8,
-                roughness: 0.2,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xffffff)
+              |> material.build()
             material
           },
           transform: transform.Transform(
@@ -655,7 +629,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "food",
       geometry: {
         let assert Ok(box) =
-          scene.box(
+          geometry.box(
             width: cell_size *. 0.8,
             height: cell_size *. 0.8,
             depth: cell_size *. 0.8,
@@ -664,16 +638,9 @@ fn view(model: Model) -> List(scene.Node) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xff6b6b,
-            metalness: 0.6,
-            roughness: 0.3,
-            map: option.None,
-            normal_map: option.None,
-            ambient_oclusion_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xff6b6b)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -683,6 +650,7 @@ fn view(model: Model) -> List(scene.Node) {
       ),
       physics: option.None,
     )
+    |> list.wrap
 
   // Visual feedback for game over - make ground red
   let ground_color = case model.game_over {
@@ -695,7 +663,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "ground",
       geometry: {
         let assert Ok(plane) =
-          scene.plane(
+          geometry.plane(
             width: int.to_float(grid_size) *. cell_size,
             height: int.to_float(grid_size) *. cell_size,
           )
@@ -703,16 +671,9 @@ fn view(model: Model) -> List(scene.Node) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: ground_color,
-            metalness: 0.1,
-            roughness: 0.8,
-            map: option.None,
-            normal_map: option.None,
-            ambient_oclusion_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(ground_color)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -722,15 +683,16 @@ fn view(model: Model) -> List(scene.Node) {
       ),
       physics: option.None,
     )
+    |> list.wrap
 
   list.flatten([
     fruit_audio,
     game_over_audio,
-    [camera_node],
+    camera_node,
     lights,
-    [ground_updated],
+    ground_updated,
     snake_segments,
     eyes,
-    [food_node],
+    food_node,
   ])
 }

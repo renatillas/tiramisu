@@ -8,7 +8,10 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -30,8 +33,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1280,
-    height: 720,
+    dimensions: option.None,
     background: 0x1a1a2e,
     init: init,
     update: update,
@@ -170,17 +172,12 @@ fn camera_view_to_string(view: CameraView) -> String {
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   // Create multiple cameras with different perspectives
 
   // 1. Top-down camera (bird's eye view)
   let assert Ok(cam_topdown) =
-    camera.perspective(
-      field_of_view: 60.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
 
   let camera_topdown =
     scene.Camera(
@@ -194,12 +191,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   // 2. Side camera (profile view from the side)
   let assert Ok(cam_side) =
-    camera.perspective(
-      field_of_view: 60.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
 
   let camera_side =
     scene.Camera(
@@ -213,12 +205,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   // 3. First-person camera (ground level, looking at rotating cube)
   let assert Ok(cam_firstperson) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
 
   let camera_firstperson =
     scene.Camera(
@@ -236,12 +223,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
   let orbit_z = maths.sin(model.rotation) *. orbit_radius
 
   let assert Ok(cam_orbiting) =
-    camera.perspective(
-      field_of_view: 65.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 65.0, near: 0.1, far: 200.0)
 
   let camera_orbiting =
     scene.Camera(
@@ -254,7 +236,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     )
 
   let assert Ok(cam_overlay) =
-    camera.perspective(field_of_view: 50.0, aspect: 1.0, near: 0.1, far: 200.0)
+    camera.perspective(field_of_view: 50.0, near: 0.1, far: 200.0)
 
   let camera_overlay =
     scene.Camera(
@@ -271,8 +253,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
         light
       },
       transform: transform.identity,
@@ -281,7 +262,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -299,21 +280,15 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "rotating_cube",
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 4.0, height: 4.0, depth: 4.0)
+        let assert Ok(geometry) =
+          geometry.box(width: 4.0, height: 4.0, depth: 4.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xff6b6b,
-            metalness: 0.3,
-            roughness: 0.4,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xff6b6b)
+          |> material.build
         material
       },
       transform: transform.Transform(
@@ -329,21 +304,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "ground",
       geometry: {
-        let assert Ok(geometry) = scene.plane(width: 100.0, height: 100.0)
+        let assert Ok(geometry) = geometry.plane(width: 100.0, height: 100.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x2d3561,
-            metalness: 0.0,
-            roughness: 0.8,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0x2d3561)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -369,21 +337,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
         id: "sphere_" <> int.to_string(i),
         geometry: {
           let assert Ok(geometry) =
-            scene.sphere(radius: 2.0, width_segments: 16, height_segments: 16)
+            geometry.sphere(
+              radius: 2.0,
+              width_segments: 16,
+              height_segments: 16,
+            )
           geometry
         },
         material: {
           let assert Ok(material) =
-            scene.standard_material(
-              color: 0x4ecdc4,
-              metalness: 0.5,
-              roughness: 0.3,
-              map: option.None,
-              normal_map: option.None,
-              ao_map: option.None,
-              roughness_map: option.None,
-              metalness_map: option.None,
-            )
+            material.new() |> material.with_color(0x4ecdc4) |> material.build()
           material
         },
         transform: transform.Transform(
@@ -401,7 +364,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "pillar_1",
       geometry: {
         let assert Ok(geometry) =
-          scene.cylinder(
+          geometry.cylinder(
             radius_top: 1.0,
             radius_bottom: 1.0,
             height: 12.0,
@@ -411,16 +374,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xf9ca24,
-            metalness: 0.2,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xf9ca24)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -434,7 +390,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "pillar_2",
       geometry: {
         let assert Ok(geometry) =
-          scene.cylinder(
+          geometry.cylinder(
             radius_top: 1.0,
             radius_bottom: 1.0,
             height: 12.0,
@@ -444,16 +400,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xf9ca24,
-            metalness: 0.2,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xf9ca24)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -467,7 +416,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "pillar_3",
       geometry: {
         let assert Ok(geometry) =
-          scene.cylinder(
+          geometry.cylinder(
             radius_top: 1.0,
             radius_bottom: 1.0,
             height: 12.0,
@@ -477,16 +426,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xf9ca24,
-            metalness: 0.2,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xf9ca24)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -500,7 +442,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "pillar_4",
       geometry: {
         let assert Ok(geometry) =
-          scene.cylinder(
+          geometry.cylinder(
             radius_top: 1.0,
             radius_bottom: 1.0,
             height: 12.0,
@@ -510,16 +452,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xf9ca24,
-            metalness: 0.2,
-            roughness: 0.6,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xf9ca24)
+          |> material.build()
         material
       },
       transform: transform.Transform(

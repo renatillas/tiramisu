@@ -7,7 +7,10 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -28,9 +31,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1280,
-    height: 720,
     background: 0x0a0a1a,
+    dimensions: option.None,
     init: init,
     update: update,
     view: view,
@@ -174,21 +176,16 @@ fn compute_instances(time: Float) -> List(transform.Transform) {
   })
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   // Camera setup
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera_node =
     scene.Camera(
       id: "main_camera",
       camera:,
-      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 60.0)),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 500.0)),
       look_at: option.None,
       active: True,
       viewport: option.None,
@@ -198,7 +195,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.3)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
         light
       },
       transform: transform.identity,
@@ -206,7 +203,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "directional",
       light: {
-        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) =
+          light.directional(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.Transform(
@@ -225,15 +223,16 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.InstancedMesh(
       id: "cubes_instanced",
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 0.8, height: 0.8, depth: 0.8)
+        let assert Ok(geometry) =
+          geometry.box(width: 0.8, height: 0.8, depth: 0.8)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x4ecdc4,
-            metalness: 0.2,
-            roughness: 0.6,
+          material.basic(
+            color: 0xff00ff,
+            transparent: False,
+            opacity: 1.0,
             map: option.None,
             normal_map: option.None,
           )

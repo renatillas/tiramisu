@@ -1,14 +1,17 @@
 import gleam/list
 import gleam/option
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
 // Test: Update StandardMaterial properties
 pub fn update_standard_material_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.standard_material(
+    material.standard(
       color: 0xff0000,
       metalness: 0.5,
       roughness: 0.5,
@@ -19,7 +22,7 @@ pub fn update_standard_material_test() {
       ambient_oclusion_map: option.None,
     )
   let assert Ok(material2) =
-    scene.standard_material(
+    material.standard(
       color: 0xff0000,
       metalness: 0.8,
       roughness: 0.2,
@@ -60,9 +63,9 @@ pub fn update_standard_material_test() {
 
 // Test: Change material type (BasicMaterial to StandardMaterial)
 pub fn change_material_type_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -70,7 +73,7 @@ pub fn change_material_type_test() {
       normal_map: option.None,
     )
   let assert Ok(material2) =
-    scene.standard_material(
+    material.standard(
       color: 0xff0000,
       metalness: 0.5,
       roughness: 0.5,
@@ -111,11 +114,11 @@ pub fn change_material_type_test() {
 
 // Test: PhongMaterial update
 pub fn phong_material_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.phong_material(0xff0000, 30.0, option.None, option.None, option.None)
+    material.phong(0xff0000, 30.0, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.phong_material(0xff0000, 60.0, option.None, option.None, option.None)
+    material.phong(0xff0000, 60.0, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -147,11 +150,11 @@ pub fn phong_material_test() {
 
 // Test: LambertMaterial
 pub fn lambert_material_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.lambert_material(0xff0000, option.None, option.None, option.None)
+    material.lambert(0xff0000, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.lambert_material(0x00ff00, option.None, option.None, option.None)
+    material.lambert(0x00ff00, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -178,11 +181,11 @@ pub fn lambert_material_test() {
 
 // Test: ToonMaterial
 pub fn toon_material_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material1) =
-    scene.toon_material(0xff0000, option.None, option.None, option.None)
+    material.toon(0xff0000, option.None, option.None, option.None)
   let assert Ok(material2) =
-    scene.toon_material(0x00ff00, option.None, option.None, option.None)
+    material.toon(0x00ff00, option.None, option.None, option.None)
 
   let previous = [
     scene.Mesh(
@@ -209,10 +212,11 @@ pub fn toon_material_test() {
 
 // Test: Different geometry types
 pub fn cone_geometry_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(geometry2) = scene.cone(radius: 1.0, height: 2.0, segments: 32)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry2) =
+    geometry.cone(radius: 1.0, height: 2.0, segments: 32)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -250,9 +254,9 @@ pub fn cone_geometry_test() {
 
 // Test: PlaneGeometry
 pub fn plane_geometry_test() {
-  let assert Ok(geometry1) = scene.plane(width: 10.0, height: 10.0)
+  let assert Ok(geometry1) = geometry.plane(width: 10.0, height: 10.0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0x808080,
       transparent: False,
       opacity: 1.0,
@@ -282,9 +286,9 @@ pub fn plane_geometry_test() {
 
 // Test: CircleGeometry
 pub fn circle_geometry_test() {
-  let assert Ok(geometry1) = scene.circle(radius: 1.5, segments: 64)
+  let assert Ok(geometry1) = geometry.circle(radius: 1.5, segments: 64)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -310,14 +314,14 @@ pub fn circle_geometry_test() {
 // Test: CylinderGeometry
 pub fn cylinder_geometry_test() {
   let assert Ok(geometry1) =
-    scene.cylinder(
+    geometry.cylinder(
       radius_top: 1.0,
       radius_bottom: 1.0,
       height: 2.0,
       radial_segments: 32,
     )
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -343,14 +347,14 @@ pub fn cylinder_geometry_test() {
 // Test: TorusGeometry
 pub fn torus_geometry_test() {
   let assert Ok(geometry1) =
-    scene.torus(
+    geometry.torus(
       radius: 1.0,
       tube: 0.3,
       radial_segments: 16,
       tubular_segments: 100,
     )
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -375,9 +379,9 @@ pub fn torus_geometry_test() {
 
 // Test: TetrahedronGeometry
 pub fn tetrahedron_geometry_test() {
-  let assert Ok(geometry1) = scene.tetrahedron(radius: 1.0, detail: 0)
+  let assert Ok(geometry1) = geometry.tetrahedron(radius: 1.0, detail: 0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -402,9 +406,9 @@ pub fn tetrahedron_geometry_test() {
 
 // Test: IcosahedronGeometry
 pub fn icosahedron_geometry_test() {
-  let assert Ok(geometry1) = scene.icosahedron(radius: 1.0, detail: 0)
+  let assert Ok(geometry1) = geometry.icosahedron(radius: 1.0, detail: 0)
   let assert Ok(material1) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
@@ -435,7 +439,7 @@ pub fn directional_light_test() {
       id: "dir_light",
       light: {
         let assert Ok(light) =
-          scene.directional_light(intensity: 1.0, color: 0xffffff)
+          light.directional(intensity: 1.0, color: 0xffffff)
         light
       },
       transform: transform.identity,
@@ -453,7 +457,7 @@ pub fn point_light_test() {
       id: "light1",
       light: {
         let assert Ok(light) =
-          scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+          light.point(intensity: 1.0, color: 0xffffff, distance: 10.0)
         light
       },
       transform: transform.identity,
@@ -464,7 +468,7 @@ pub fn point_light_test() {
       id: "light1",
       light: {
         let assert Ok(light) =
-          scene.point_light(intensity: 2.0, color: 0xffffff, distance: 20.0)
+          light.point(intensity: 2.0, color: 0xffffff, distance: 20.0)
         light
       },
       transform: transform.identity,
@@ -488,7 +492,7 @@ pub fn spot_light_test() {
       id: "spot",
       light: {
         let assert Ok(light) =
-          scene.spotlight(
+          light.spot(
             intensity: 1.0,
             color: 0xffffff,
             distance: 10.0,
@@ -513,7 +517,7 @@ pub fn hemisphere_light_test() {
       id: "hemi",
       light: {
         let assert Ok(light) =
-          scene.hemisphere_light(
+          light.hemisphere(
             intensity: 1.0,
             sky_color: 0x0000ff,
             ground_color: 0x00ff00,
@@ -530,18 +534,18 @@ pub fn hemisphere_light_test() {
 
 // Test: Complex scene with various material and geometry types
 pub fn complex_scene_test() {
-  let assert Ok(geometry1) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(geometry1) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(geometry2) =
-    scene.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
+    geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
   let assert Ok(geometry3) =
-    scene.torus(
+    geometry.torus(
       radius: 1.0,
       tube: 0.3,
       radial_segments: 16,
       tubular_segments: 100,
     )
   let assert Ok(material1) =
-    scene.standard_material(
+    material.standard(
       color: 0xff0000,
       metalness: 0.5,
       roughness: 0.5,
@@ -552,9 +556,9 @@ pub fn complex_scene_test() {
       metalness_map: option.None,
     )
   let assert Ok(material2) =
-    scene.phong_material(0x00ff00, 30.0, option.None, option.None, option.None)
+    material.phong(0x00ff00, 30.0, option.None, option.None, option.None)
   let assert Ok(material3) =
-    scene.toon_material(0x0000ff, option.None, option.None, option.None)
+    material.toon(0x0000ff, option.None, option.None, option.None)
 
   let previous = []
   let current = [
@@ -582,8 +586,7 @@ pub fn complex_scene_test() {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(intensity: 0.5, color: 0x404040)
+        let assert Ok(light) = light.ambient(intensity: 0.5, color: 0x404040)
         light
       },
       transform: transform.identity,
@@ -592,7 +595,7 @@ pub fn complex_scene_test() {
       id: "point",
       light: {
         let assert Ok(light) =
-          scene.point_light(intensity: 1.0, color: 0xffffff, distance: 10.0)
+          light.point(intensity: 1.0, color: 0xffffff, distance: 10.0)
         light
       },
       transform: transform.at(vec3.Vec3(0.0, 5.0, 0.0)),

@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import * as SCENE_GLEAM from '../scene.mjs';
+import * as GEOMETRY_GLEAM from '../geometry.mjs';
+import * as MATERIAL_GLEAM from '../material.mjs';
+import * as LIGHT_GLEAM from '../light.mjs';
 import * as OBJECT3D_GLEAM from '../object3d.mjs';
 import * as AUDIO_GLEAM from '../audio.mjs';
 import * as AUDIO from './audio.mjs';
+import * as ASSET from './asset.mjs';
 import * as PHYSICS from './physics.mjs';
 import * as DEBUG from './debug.mjs';
 import * as CAMERA from './camera.mjs';
@@ -18,6 +22,202 @@ const actionCache = new Map();
 
 // Cache of camera viewports by camera ID
 const cameraViewports = new Map();
+
+// Cache of particle systems by node ID
+const particleSystemCache = new Map();
+
+/**
+ * Particle System - manages particle spawning, updating, and rendering
+ */
+class ParticleSystem {
+  constructor(emitter, transform) {
+    this.emitter = emitter;
+    this.active = true;
+    this.particles = [];
+    this.timeSinceLastSpawn = 0;
+
+    // Create Three.js Points object for rendering
+    const maxParticles = emitter.max_particles;
+    const geometry = new THREE.BufferGeometry();
+
+    // Pre-allocate buffers for all particles
+    this.positions = new Float32Array(maxParticles * 3);
+    this.colors = new Float32Array(maxParticles * 3);
+    this.sizes = new Float32Array(maxParticles);
+    this.alphas = new Float32Array(maxParticles);
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+    geometry.setAttribute('alpha', new THREE.BufferAttribute(this.alphas, 1));
+
+    // Create material
+    const material = new THREE.PointsMaterial({
+      size: emitter.size,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1.0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending, // Additive blending for glowy particles
+      sizeAttenuation: true
+    });
+
+    // Create Points mesh
+    this.points = new THREE.Points(geometry, material);
+    this.points.position.set(transform.position.x, transform.position.y, transform.position.z);
+    this.points.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+    this.points.scale.set(transform.scale.x, transform.scale.y, transform.scale.z);
+
+    // Extract start and end colors
+    this.startColor = new THREE.Color(emitter.color);
+    this.endColor = emitter.color_end && emitter.color_end[0]
+      ? new THREE.Color(emitter.color_end[0])
+      : this.startColor.clone();
+  }
+
+  spawn() {
+    if (this.particles.length >= this.emitter.max_particles) {
+      // Recycle oldest particle
+      const particle = this.particles.shift();
+      this.initParticle(particle);
+      this.particles.push(particle);
+    } else {
+      // Create new particle
+      const particle = {};
+      this.initParticle(particle);
+      this.particles.push(particle);
+    }
+  }
+
+  initParticle(particle) {
+    const emitter = this.emitter;
+
+    // Randomize velocity with variance
+    const vx = emitter.velocity.x + (Math.random() * 2 - 1) * emitter.velocity_variance.x;
+    const vy = emitter.velocity.y + (Math.random() * 2 - 1) * emitter.velocity_variance.y;
+    const vz = emitter.velocity.z + (Math.random() * 2 - 1) * emitter.velocity_variance.z;
+
+    // Randomize size with variance
+    const size = Math.max(0.01, emitter.size + (Math.random() * 2 - 1) * emitter.size_variance);
+
+    particle.position = { x: 0, y: 0, z: 0 }; // Start at emitter position
+    particle.velocity = { x: vx, y: vy, z: vz };
+    particle.life = 0; // Current age
+    particle.lifetime = emitter.lifetime;
+    particle.size = size;
+  }
+
+  update(deltaTime) {
+    const emitter = this.emitter;
+
+    // Spawn new particles
+    if (this.active) {
+      this.timeSinceLastSpawn += deltaTime;
+      const spawnInterval = 1.0 / emitter.rate;
+
+      while (this.timeSinceLastSpawn >= spawnInterval) {
+        this.spawn();
+        this.timeSinceLastSpawn -= spawnInterval;
+      }
+    }
+
+    // Update existing particles
+    const gravity = { x: 0, y: -9.81 * emitter.gravity_scale, z: 0 };
+
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const particle = this.particles[i];
+
+      // Update lifetime
+      particle.life += deltaTime;
+
+      // Remove dead particles
+      if (particle.life >= particle.lifetime) {
+        this.particles.splice(i, 1);
+        continue;
+      }
+
+      // Apply gravity
+      particle.velocity.x += gravity.x * deltaTime;
+      particle.velocity.y += gravity.y * deltaTime;
+      particle.velocity.z += gravity.z * deltaTime;
+
+      // Update position
+      particle.position.x += particle.velocity.x * deltaTime;
+      particle.position.y += particle.velocity.y * deltaTime;
+      particle.position.z += particle.velocity.z * deltaTime;
+    }
+
+    // Update buffers
+    this.updateBuffers();
+  }
+
+  updateBuffers() {
+    const count = this.particles.length;
+
+    for (let i = 0; i < count; i++) {
+      const particle = this.particles[i];
+      const i3 = i * 3;
+
+      // Position (relative to emitter)
+      this.positions[i3] = particle.position.x;
+      this.positions[i3 + 1] = particle.position.y;
+      this.positions[i3 + 2] = particle.position.z;
+
+      // Color interpolation based on lifetime
+      const t = particle.life / particle.lifetime;
+      const color = this.startColor.clone().lerp(this.endColor, t);
+      this.colors[i3] = color.r;
+      this.colors[i3 + 1] = color.g;
+      this.colors[i3 + 2] = color.b;
+
+      // Size
+      this.sizes[i] = particle.size;
+
+      // Alpha fade out at end of life
+      const fadeStart = 0.7; // Start fading at 70% of lifetime
+      this.alphas[i] = t > fadeStart ? (1.0 - (t - fadeStart) / (1.0 - fadeStart)) : 1.0;
+    }
+
+    // Clear unused particles
+    for (let i = count; i < this.emitter.max_particles; i++) {
+      const i3 = i * 3;
+      this.positions[i3] = 0;
+      this.positions[i3 + 1] = 0;
+      this.positions[i3 + 2] = 0;
+      this.sizes[i] = 0;
+      this.alphas[i] = 0;
+    }
+
+    // Mark buffers for update
+    this.points.geometry.attributes.position.needsUpdate = true;
+    this.points.geometry.attributes.color.needsUpdate = true;
+    this.points.geometry.attributes.size.needsUpdate = true;
+    this.points.geometry.attributes.alpha.needsUpdate = true;
+
+    // Update draw range to only render active particles
+    this.points.geometry.setDrawRange(0, count);
+  }
+
+  updateEmitter(emitter) {
+    this.emitter = emitter;
+    this.startColor = new THREE.Color(emitter.color);
+    this.endColor = emitter.color_end && emitter.color_end[0]
+      ? new THREE.Color(emitter.color_end[0])
+      : this.startColor.clone();
+
+    // Update material size
+    this.points.material.size = emitter.size;
+  }
+
+  setActive(active) {
+    this.active = active;
+  }
+
+  dispose() {
+    this.points.geometry.dispose();
+    this.points.material.dispose();
+  }
+}
 
 export function createBoxGeometry(width, height, depth) {
   return new THREE.BoxGeometry(width, height, depth);
@@ -249,25 +449,25 @@ function setupAnimation(id, mixer, animPlayback) {
 }
 
 // Apply a single patch to the Three.js scene
-export function applyPatch(scene, patch) {
+export function applyPatch(scene, patch, physicsWorld) {
   if (patch instanceof SCENE_GLEAM.AddNode) {
     const { id, node, parent_id } = patch;
 
     let threeObj;
 
     if (node instanceof SCENE_GLEAM.Mesh) {
-      const geometry = SCENE_GLEAM.create_geometry(node.geometry);
-      const material = SCENE_GLEAM.create_material(node.material);
+      const geometry = GEOMETRY_GLEAM.create_geometry(node.geometry);
+      const material = MATERIAL_GLEAM.create_material(node.material);
       threeObj = new THREE.Mesh(geometry, material);
       applyTransform(threeObj, node.transform);
 
       // Create physics body if specified
-      if (node.physics && node.physics[0]) {
-        PHYSICS.createRigidBody(id, node.physics[0], node.transform);
+      if (node.physics && node.physics[0] && physicsWorld) {
+        PHYSICS.createRigidBody(physicsWorld, id, node.physics[0], node.transform);
       }
     } else if (node instanceof SCENE_GLEAM.InstancedMesh) {
-      const geometry = SCENE_GLEAM.create_geometry(node.geometry);
-      const material = SCENE_GLEAM.create_material(node.material);
+      const geometry = GEOMETRY_GLEAM.create_geometry(node.geometry);
+      const material = MATERIAL_GLEAM.create_material(node.material);
 
       // Convert Gleam list to array to get count
       const instancesArray = Array.from(node.instances);
@@ -278,7 +478,7 @@ export function applyPatch(scene, patch) {
       // Set transform matrix for each instance
       updateInstancedMeshTransforms(threeObj, node.instances);
     } else if (node instanceof SCENE_GLEAM.Light) {
-      threeObj = SCENE_GLEAM.create_light(node.light);
+      threeObj = LIGHT_GLEAM.create_light(node.light);
       applyTransform(threeObj, node.transform);
     } else if (node instanceof SCENE_GLEAM.Group) {
       threeObj = new THREE.Group();
@@ -297,8 +497,8 @@ export function applyPatch(scene, patch) {
         let levelObj;
 
         if (levelNode instanceof SCENE_GLEAM.Mesh) {
-          const geometry = SCENE_GLEAM.create_geometry(levelNode.geometry);
-          const material = SCENE_GLEAM.create_material(levelNode.material);
+          const geometry = GEOMETRY_GLEAM.create_geometry(levelNode.geometry);
+          const material = MATERIAL_GLEAM.create_material(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
         } else if (levelNode instanceof SCENE_GLEAM.Group) {
@@ -331,13 +531,27 @@ export function applyPatch(scene, patch) {
       }
 
       // Create physics body if specified
-      if (node.physics && node.physics[0]) {
-        PHYSICS.createRigidBody(id, node.physics[0], node.transform);
+      if (node.physics && node.physics[0] && physicsWorld) {
+        PHYSICS.createRigidBody(physicsWorld, id, node.physics[0], node.transform);
       }
     } else if (node instanceof SCENE_GLEAM.Audio) {
       // Audio nodes don't need a visual Three.js object
       // Just play the audio using the audio system
-      AUDIO.playAudio(id, node.buffer, node.config, node.audio_type);
+      // Extract buffer and config from Audio type
+      const audioData = node.audio;
+      let buffer, config, audioType;
+
+      if (audioData instanceof AUDIO_GLEAM.GlobalAudio) {
+        buffer = audioData.buffer;
+        config = audioData.config;
+        audioType = audioData; // Pass the whole Audio type
+      } else if (audioData instanceof AUDIO_GLEAM.PositionalAudio) {
+        buffer = audioData.buffer;
+        config = audioData.config;
+        audioType = audioData; // Pass the whole Audio type
+      }
+
+      AUDIO.playAudio(id, buffer, config, audioType);
       // Store a placeholder to track the audio node in cache
       threeObj = new THREE.Group(); // Empty group as placeholder
     } else if (node instanceof SCENE_GLEAM.Camera) {
@@ -345,6 +559,14 @@ export function applyPatch(scene, patch) {
       // Pass viewport if specified to calculate correct aspect ratio
       const viewport = node.viewport && node.viewport[0] ? node.viewport[0] : null;
       threeObj = CAMERA.createThreeCamera(node.camera.projection, viewport);
+
+      // Add AudioListener to the camera (required for Three.js audio to work)
+      // The listener must be a child of the camera in the scene graph
+      const listener = ASSET.getAudioListener();
+      if (!threeObj.children.includes(listener)) {
+        threeObj.add(listener);
+        console.log(`[Tiramisu] Added AudioListener to camera: ${id} (active: ${node.active})`);
+      }
 
       // Apply node transform (position and rotation)
       applyTransform(threeObj, node.transform);
@@ -383,6 +605,12 @@ export function applyPatch(scene, patch) {
       threeObj = DEBUG.createDebugGrid(node.size, node.divisions, node.color);
     } else if (node instanceof SCENE_GLEAM.DebugPoint) {
       threeObj = DEBUG.createDebugPoint(node.position, node.size, node.color);
+    } else if (node instanceof SCENE_GLEAM.Particles) {
+      // Create particle system
+      const particleSystem = new ParticleSystem(node.emitter, node.transform);
+      particleSystem.setActive(node.active);
+      particleSystemCache.set(id, particleSystem);
+      threeObj = particleSystem.points;
     }
 
     if (threeObj) {
@@ -428,7 +656,16 @@ export function applyPatch(scene, patch) {
       AUDIO.stopAudio(id);
 
       // Remove physics body if exists
-      PHYSICS.removeRigidBody(id);
+      if (physicsWorld) {
+        PHYSICS.removeRigidBody(physicsWorld, id);
+      }
+
+      // Clean up particle system if exists
+      if (particleSystemCache.has(id)) {
+        const particleSystem = particleSystemCache.get(id);
+        particleSystem.dispose();
+        particleSystemCache.delete(id);
+      }
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateTransform) {
     const { id, transform } = patch;
@@ -450,20 +687,20 @@ export function applyPatch(scene, patch) {
     const obj = objectCache.get(id);
     if (obj && obj.material) {
       obj.material.dispose();
-      obj.material = SCENE_GLEAM.create_material(material);
+      obj.material = MATERIAL_GLEAM.create_material(material);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateGeometry) {
     const { id, geometry } = patch;
     const obj = objectCache.get(id);
     if (obj && obj.geometry) {
       obj.geometry.dispose();
-      obj.geometry = SCENE_GLEAM.create_geometry(geometry);
+      obj.geometry = GEOMETRY_GLEAM.create_geometry(geometry);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateLight) {
     const { id, light } = patch;
     const oldLight = objectCache.get(id);
     if (oldLight) {
-      const newLight = SCENE_GLEAM.create_light(light);
+      const newLight = LIGHT_GLEAM.create_light(light);
       newLight.position.copy(oldLight.position);
       newLight.rotation.copy(oldLight.rotation);
       newLight.scale.copy(oldLight.scale);
@@ -499,27 +736,35 @@ export function applyPatch(scene, patch) {
   } else if (patch instanceof SCENE_GLEAM.UpdatePhysics) {
     const { id, physics } = patch;
 
-    // Remove old physics body if it exists
-    PHYSICS.removeRigidBody(id);
+    if (physicsWorld) {
+      // Remove old physics body if it exists
+      PHYSICS.removeRigidBody(physicsWorld, id);
 
-    // Create new physics body if provided
-    if (physics && physics[0]) {
-      // Get current transform from Three.js object
-      const obj = objectCache.get(id);
-      if (obj) {
-        const transform = {
-          position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
-          rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
-          scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
-        };
-        PHYSICS.createRigidBody(id, physics[0], transform);
+      // Create new physics body if provided
+      if (physics && physics[0]) {
+        // Get current transform from Three.js object
+        const obj = objectCache.get(id);
+        if (obj) {
+          const transform = {
+            position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+            rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+            scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
+          };
+          PHYSICS.createRigidBody(physicsWorld, id, physics[0], transform);
+        }
       }
-    } else {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateAudio) {
-    const { id, config } = patch;
-    // Update audio configuration
-    AUDIO.updateAudioConfig(id, config);
+    const { id, audio } = patch;
+    // Extract config from Audio type
+    const config = audio instanceof AUDIO_GLEAM.GlobalAudio || audio instanceof AUDIO_GLEAM.PositionalAudio
+      ? audio.config
+      : null;
+
+    if (config) {
+      // Update audio configuration
+      AUDIO.updateAudioConfig(id, config);
+    }
   } else if (patch instanceof SCENE_GLEAM.UpdateInstances) {
     const { id, instances } = patch;
     const obj = objectCache.get(id);
@@ -546,8 +791,8 @@ export function applyPatch(scene, patch) {
         let levelObj;
 
         if (levelNode instanceof SCENE_GLEAM.Mesh) {
-          const geometry = SCENE_GLEAM.create_geometry(levelNode.geometry);
-          const material = SCENE_GLEAM.create_material(levelNode.material);
+          const geometry = GEOMETRY_GLEAM.create_geometry(levelNode.geometry);
+          const material = MATERIAL_GLEAM.create_material(levelNode.material);
           levelObj = new THREE.Mesh(geometry, material);
           applyTransform(levelObj, levelNode.transform);
         } else if (levelNode instanceof SCENE_GLEAM.Group) {
@@ -604,6 +849,22 @@ export function applyPatch(scene, patch) {
     } else {
       console.warn('[Renderer] Camera not found or not a camera:', id);
     }
+  } else if (patch instanceof SCENE_GLEAM.UpdateParticleEmitter) {
+    const { id, emitter } = patch;
+    const particleSystem = particleSystemCache.get(id);
+    if (particleSystem) {
+      particleSystem.updateEmitter(emitter);
+    } else {
+      console.warn('[Renderer] Particle system not found:', id);
+    }
+  } else if (patch instanceof SCENE_GLEAM.UpdateParticleActive) {
+    const { id, active } = patch;
+    const particleSystem = particleSystemCache.get(id);
+    if (particleSystem) {
+      particleSystem.setActive(active);
+    } else {
+      console.warn('[Renderer] Particle system not found:', id);
+    }
   } else {
     console.warn('Unknown patch type:', patch);
   }
@@ -654,10 +915,10 @@ function updateInstancedMeshTransforms(instancedMesh, instances) {
 }
 
 // Apply multiple patches
-export function applyPatches(scene, patches) {
+export function applyPatches(scene, patches, physicsWorld) {
   // Convert Gleam list to array for iteration
   for (const patch of patches) {
-    applyPatch(scene, patch);
+    applyPatch(scene, patch, physicsWorld);
   }
 }
 
@@ -670,15 +931,34 @@ export function updateMixers(deltaTime) {
   }
 }
 
+// Update all particle systems
+export function updateParticleSystems(deltaTime) {
+  if (particleSystemCache.size > 0) {
+    particleSystemCache.forEach(particleSystem => {
+      particleSystem.update(deltaTime);
+    });
+  }
+}
+
 // Sync physics body transforms to Three.js objects
-export function syncPhysicsTransforms() {
+export function syncPhysicsTransforms(physicsWorld) {
+  if (!physicsWorld) return; // No physics world, skip syncing
+
   objectCache.forEach((obj, id) => {
-    const transform = PHYSICS.getBodyTransform(id);
-    if (transform && transform[0]) {
-      // transform is Some(Transform)
-      const t = transform[0];
-      obj.position.set(t.position.x, t.position.y, t.position.z);
-      obj.rotation.set(t.rotation.x, t.rotation.y, t.rotation.z);
+    // Get the rigid body by typed ID using PhysicsWorld's BiMap
+    const body = PHYSICS.getBodyByTypedId(physicsWorld, id);
+
+    if (body) {
+      // Get position and rotation directly from physics body
+      const translation = body.translation();
+      const quaternion = body.rotation();
+
+      // Update position
+      obj.position.set(translation.x, translation.y, translation.z);
+
+      // Update rotation using quaternion directly (avoids Euler conversion issues)
+      obj.quaternion.set(quaternion.x, quaternion.y, quaternion.z, quaternion.w);
+
       // Don't update scale - physics doesn't affect scale
     }
   });
@@ -693,6 +973,12 @@ export function clearCache() {
   objectCache.clear();
   mixerCache.clear();
   actionCache.clear();
+
+  // Clean up particle systems
+  particleSystemCache.forEach(particleSystem => {
+    particleSystem.dispose();
+  });
+  particleSystemCache.clear();
 }
 
 export function createRenderer(options) {

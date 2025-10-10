@@ -7,10 +7,15 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+// TODO: This runs very badly at 30fps
 
 pub type Model {
   Model(camera_position: vec3.Vec3(Float), show_performance: Bool)
@@ -22,8 +27,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1280,
-    height: 720,
+    dimensions: option.None,
     background: 0x0a0a1a,
     init: init,
     update: update,
@@ -125,15 +129,10 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   // Camera setup
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 500.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 500.0)
 
   let camera_node =
     scene.Camera(
@@ -149,7 +148,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
@@ -157,7 +156,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "directional",
       light: {
-        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.7)
+        let assert Ok(light) =
+          light.directional(color: 0xffffff, intensity: 0.7)
         light
       },
       transform: transform.Transform(
@@ -180,19 +180,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
         scene.Mesh(
           id: "high_" <> int.to_string(i),
           geometry: {
-            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 3)
+            let assert Ok(geometry) =
+              geometry.icosahedron(radius: 5.0, detail: 3)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
+              material.standard(
                 color: 0x00ff00,
                 // Green for high detail
                 metalness: 0.3,
                 roughness: 0.6,
                 map: option.None,
                 normal_map: option.None,
-                ao_map: option.None,
+                ambient_oclusion_map: option.None,
                 roughness_map: option.None,
                 metalness_map: option.None,
               )
@@ -206,19 +207,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
         scene.Mesh(
           id: "medium_" <> int.to_string(i),
           geometry: {
-            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 2)
+            let assert Ok(geometry) =
+              geometry.icosahedron(radius: 5.0, detail: 2)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
+              material.standard(
                 color: 0xffff00,
                 // Yellow for medium detail
                 metalness: 0.3,
                 roughness: 0.6,
                 map: option.None,
                 normal_map: option.None,
-                ao_map: option.None,
+                ambient_oclusion_map: option.None,
                 roughness_map: option.None,
                 metalness_map: option.None,
               )
@@ -232,19 +234,20 @@ fn view(model: Model) -> List(scene.SceneNode) {
         scene.Mesh(
           id: "low_" <> int.to_string(i),
           geometry: {
-            let assert Ok(geometry) = scene.icosahedron(radius: 5.0, detail: 1)
+            let assert Ok(geometry) =
+              geometry.icosahedron(radius: 5.0, detail: 1)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.standard_material(
+              material.standard(
                 color: 0xff8800,
                 // Orange for low detail
                 metalness: 0.3,
                 roughness: 0.6,
                 map: option.None,
                 normal_map: option.None,
-                ao_map: option.None,
+                ambient_oclusion_map: option.None,
                 roughness_map: option.None,
                 metalness_map: option.None,
               )
@@ -258,12 +261,12 @@ fn view(model: Model) -> List(scene.SceneNode) {
         scene.Mesh(
           id: "billboard_" <> int.to_string(i),
           geometry: {
-            let assert Ok(geometry) = scene.plane(width: 8.0, height: 8.0)
+            let assert Ok(geometry) = geometry.plane(width: 8.0, height: 8.0)
             geometry
           },
           material: {
             let assert Ok(material) =
-              scene.basic_material(
+              material.basic(
                 color: 0xff0000,
                 // Red for billboard
                 transparent: False,

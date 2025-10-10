@@ -9,7 +9,10 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -24,8 +27,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1280,
-    height: 720,
+    dimensions: option.None,
     background: 0x000510,
     init: init,
     update: update,
@@ -101,14 +103,9 @@ fn update(
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1280.0 /. 720.0,
-      near: 0.1,
-      far: 200.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
     |> result.map(fn(cam) {
       cam
       |> scene.Camera(
@@ -125,7 +122,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
         light
       },
       transform: transform.identity,
@@ -133,7 +130,8 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "directional",
       light: {
-        let assert Ok(light) = scene.directional_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) =
+          light.directional(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.Transform(
@@ -172,18 +170,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
       scene.Mesh(
         id: "cube_" <> int.to_string(i),
         geometry: {
-          let assert Ok(geometry) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+          let assert Ok(geometry) =
+            geometry.box(width: 2.0, height: 2.0, depth: 2.0)
           geometry
         },
         material: {
           let assert Ok(material) =
-            scene.standard_material(
+            material.standard(
               color: 0x4a9eff,
               metalness: 0.3,
               roughness: 0.7,
               map: option.None,
               normal_map: option.None,
-              ao_map: option.None,
+              ambient_oclusion_map: option.None,
               roughness_map: option.None,
               metalness_map: option.None,
             )
@@ -203,18 +202,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "ground",
       geometry: {
-        let assert Ok(geometry) = scene.plane(width: 200.0, height: 200.0)
+        let assert Ok(geometry) = geometry.plane(width: 200.0, height: 200.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
+          material.standard(
             color: 0x1a1a2e,
             metalness: 0.0,
             roughness: 1.0,
             map: option.None,
             normal_map: option.None,
-            ao_map: option.None,
+            ambient_oclusion_map: option.None,
             roughness_map: option.None,
             metalness_map: option.None,
           )
