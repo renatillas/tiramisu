@@ -491,36 +491,19 @@ fn apply_command(
     ApplyForce(id, force) -> {
       case bimap.get(bimap, id) {
         Ok(string_id) -> {
-          io.println(
-            "[Physics] Applying force to " <> string_id <> ": " <> string.inspect(
-              force,
-            ),
-          )
           apply_force_ffi(string_id, force)
           Ok(Nil)
         }
-        Error(_) -> {
-          io.println("[Physics] ERROR: Failed to find string ID for force")
-          Error(Nil)
-        }
+        Error(_) -> Error(Nil)
       }
     }
     ApplyImpulse(id, impulse) -> {
       case bimap.get(bimap, id) {
         Ok(string_id) -> {
-          io.println(
-            "[Physics] Applying impulse to "
-            <> string_id
-            <> ": "
-            <> string.inspect(impulse),
-          )
           apply_impulse_ffi(string_id, impulse)
           Ok(Nil)
         }
-        Error(_) -> {
-          io.println("[Physics] ERROR: Failed to find string ID for impulse")
-          Error(Nil)
-        }
+        Error(_) -> Error(Nil)
       }
     }
     SetVelocity(id, velocity) -> {
@@ -544,18 +527,10 @@ fn apply_command(
     ApplyTorque(id, torque) -> {
       case bimap.get(bimap, id) {
         Ok(string_id) -> {
-          io.println(
-            "[Physics] Applying torque to " <> string_id <> ": " <> string.inspect(
-              torque,
-            ),
-          )
           apply_torque_ffi(string_id, torque)
           Ok(Nil)
         }
-        Error(_) -> {
-          io.println("[Physics] ERROR: Failed to find string ID for torque")
-          Error(Nil)
-        }
+        Error(_) -> Error(Nil)
       }
     }
     ApplyTorqueImpulse(id, impulse) -> {
@@ -574,17 +549,6 @@ fn apply_command(
 /// This should be called in your update function each frame
 /// Returns updated world with new transforms for all bodies
 pub fn step(world: PhysicsWorld(body), delta_time: Float) -> PhysicsWorld(body) {
-  // Debug: Log number of pending commands
-  let command_count = list.length(world.pending_commands)
-  case command_count > 0 {
-    True -> {
-      io.println(
-        "[Physics] Applying " <> int.to_string(command_count) <> " commands",
-      )
-    }
-    False -> Nil
-  }
-
   // Apply all pending commands before stepping (reverse to apply in FIFO order)
   list.each(list.reverse(world.pending_commands), fn(command) {
     let _ = apply_command(command, world.bimap)

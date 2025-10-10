@@ -152,30 +152,22 @@ fn update(
         input.is_key_pressed(ctx.input, input.ArrowLeft),
         input.is_key_pressed(ctx.input, input.ArrowRight)
       {
-        True, _, _, _ -> {
-          io.println("Arrow UP pressed - applying impulse")
+        True, _, _, _ ->
           physics.apply_impulse(
             physics_world,
             Player,
             vec3.Vec3(0.0, 0.0, -1.0),
           )
-        }
-        _, True, _, _ -> {
-          io.println("Arrow DOWN pressed - applying impulse")
+        _, True, _, _ ->
           physics.apply_impulse(physics_world, Player, vec3.Vec3(0.0, 0.0, 1.0))
-        }
-        _, _, True, _ -> {
-          io.println("Arrow LEFT pressed - applying impulse")
+        _, _, True, _ ->
           physics.apply_impulse(
             physics_world,
             Player,
             vec3.Vec3(-1.0, 0.0, 0.0),
           )
-        }
-        _, _, _, True -> {
-          io.println("Arrow RIGHT pressed - applying impulse")
+        _, _, _, True ->
           physics.apply_impulse(physics_world, Player, vec3.Vec3(1.0, 0.0, 0.0))
-        }
         _, _, _, _ -> physics_world
       }
 
