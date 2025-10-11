@@ -1,0 +1,1 @@
+-record(loaded_audio, {audio :: tiramisu@audio:audio_buffer()}).

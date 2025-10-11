@@ -88,12 +88,7 @@ pub fn perspective(
   // Aspect ratio will be calculated at render time based on viewport/renderer dimensions
   // Use 1.0 as placeholder - the FFI layer will calculate the correct aspect
   Ok(
-    Camera(projection: Perspective(
-      fov: fov,
-      aspect: 1.0,
-      near: near,
-      far: far,
-    )),
+    Camera(projection: Perspective(fov: fov, aspect: 1.0, near: near, far: far)),
   )
 }
 
@@ -226,4 +221,12 @@ pub fn camera_2d_with_bounds(
     near: 0.1,
     far: 1000.0,
   )
+}
+
+/// Internal function to get the camera projection
+///
+/// Used by the internal renderer to create Three.js cameras
+@internal
+pub fn get_projection(camera: Camera) -> CameraProjection {
+  camera.projection
 }

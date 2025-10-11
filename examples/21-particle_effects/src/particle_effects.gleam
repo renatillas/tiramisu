@@ -140,7 +140,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           |> particle_emitter.lifetime(1.5)
           |> particle_emitter.velocity(vec3.Vec3(0.0, 3.0, 0.0))
           |> particle_emitter.velocity_variance(vec3.Vec3(0.5, 0.5, 0.5))
-          |> particle_emitter.size(0.2)
+          |> particle_emitter.size(0.1)
           |> particle_emitter.size_variance(0.1)
           |> particle_emitter.color(0xff4500)
           |> particle_emitter.fade_to(0xffaa00)
@@ -165,7 +165,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           |> particle_emitter.size(0.15)
           |> particle_emitter.size_variance(0.05)
           |> particle_emitter.color(0xffd700)
-          |> particle_emitter.gravity(0.0)
+          |> particle_emitter.gravity(-0.2)
           |> particle_emitter.max_particles(100)
           |> particle_emitter.build()
         emitter
@@ -226,20 +226,15 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       material: {
         let assert Ok(mat) =
-          material.standard(
-            color: 0x2a2a3a,
-            metalness: 0.2,
-            roughness: 0.8,
-            map: option.None,
-            normal_map: option.None,
-            ambient_oclusion_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0x2a2a3a)
+          |> material.with_metalness(0.2)
+          |> material.with_roughness(0.8)
+          |> material.build()
         mat
       },
       transform: transform.at(position: vec3.Vec3(0.0, -0.1, 0.0))
-        |> transform.set_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
+        |> transform.with_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
       physics: option.None,
     ),
   ]

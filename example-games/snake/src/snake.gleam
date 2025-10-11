@@ -11,6 +11,7 @@ import lustre/element/html
 import tiramisu
 import tiramisu/asset
 import tiramisu/audio.{Playing}
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -95,7 +96,13 @@ pub fn main() -> Nil {
     |> lustre.start("#app", Nil)
 
   // Start Tiramisu game in fullscreen mode
-  tiramisu.run(dimensions: None, background: 0x1a1a2e, init:, update:, view:)
+  tiramisu.run(
+    dimensions: None,
+    background: background.Color(0x1a1a2e),
+    init:,
+    update:,
+    view:,
+  )
 }
 
 // UI Init/Update/View

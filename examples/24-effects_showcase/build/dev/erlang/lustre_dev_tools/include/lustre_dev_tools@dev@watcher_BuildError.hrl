@@ -1,0 +1,1 @@
+-record(build_error, {reason :: lustre_dev_tools@error:error()}).

@@ -1,0 +1,1 @@
+-record(effect_emit_event, {name :: binary(), data :: gleam@json:json()}).

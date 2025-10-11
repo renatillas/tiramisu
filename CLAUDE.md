@@ -630,37 +630,21 @@ export function createWorld(gravityX, gravityY, gravityZ) {
 }
 ```
 
-### Business Logic FFI Files
+#### `src/tiramisu.ffi.mjs`
+**Purpose**: Main consolidated FFI file containing all game engine business logic
+**Contents**: Game loop, scene rendering, physics integration, audio system, input capture, asset loading, debug tools, UI integration, and effect system
+**Why FFI**: Performance-critical code paths, DOM API integration, mutable state management, complex callback handling, async coordination
 
-Some FFI files contain business logic that can't easily be moved to Gleam due to performance, DOM API requirements, or complex callback handling. These remain in `src/tiramisu/ffi/`:
-
-#### `src/tiramisu/ffi/renderer.mjs`
-**Contains**: Scene graph management, patch application, object caching, instance rendering
-**Why FFI**: Performance-critical rendering loop, manages mutable Three.js state
-
-#### `src/tiramisu/ffi/asset.mjs`
-**Contains**: Asset batch loading, progress tracking, model loaders
-**Why FFI**: Async loader coordination, progress callbacks, Three.js loader integration
-
-#### `src/tiramisu/ffi/audio.mjs`
-**Contains**: Audio playback, group management, spatial audio
-**Why FFI**: Web Audio API state management, Three.js Audio integration
-
-#### `src/tiramisu/ffi/debug.mjs`
-**Contains**: Performance monitoring, debug visualization, stats collection
-**Why FFI**: Browser performance APIs, mutable stat tracking
-
-#### `src/tiramisu/ffi/input_capture.mjs`
-**Contains**: Keyboard, mouse, touch, gamepad input capture
-**Why FFI**: DOM event listeners, mutable input state for performance
-
-#### `src/tiramisu/ffi/ui.mjs`
-**Contains**: Lustre integration, bidirectional messaging
-**Why FFI**: Framework integration, callback management
-
-#### `src/tiramisu/ffi/effects.mjs`
-**Contains**: Effect system for scene manipulation
-**Why FFI**: Scene reference management, effect callbacks
+**Major subsystems**:
+- **Game Loop**: Animation frame loop, delta time calculation, state updates
+- **Scene Rendering**: Scene graph management, patch application, object caching, instance rendering
+- **Physics Integration**: Rapier world management, collision detection, rigid body lifecycle
+- **Audio System**: Web Audio API state management, group volume control, spatial audio
+- **Input Capture**: Keyboard, mouse, touch, gamepad event listeners
+- **Asset Loading**: Batch loading coordination, progress tracking, model/texture loaders
+- **Debug Tools**: Performance monitoring, debug visualization, stats collection
+- **UI Integration**: Lustre framework integration, bidirectional messaging
+- **Effect System**: Scene manipulation effects, callback management
 
 ### Design Benefits
 
@@ -702,30 +686,30 @@ pub fn some_geometry(
 ### Migration Status
 
 **Completed**:
-- ✅ Created `src/threejs.ffi.mjs` with comprehensive Three.js bindings
-- ✅ Created `src/rapier.ffi.mjs` with comprehensive Rapier bindings
+- ✅ Created `src/threejs.ffi.mjs` with comprehensive Three.js bindings (pure 1:1 functions)
+- ✅ Created `src/rapier.ffi.mjs` with comprehensive Rapier bindings (pure 1:1 functions)
+- ✅ Consolidated all business logic FFI into `src/tiramisu.ffi.mjs` (game loop, rendering, physics, audio, input, assets, debug, UI, effects)
+- ✅ Deleted `src/tiramisu/ffi/` directory and all individual FFI files
 - ✅ Updated `geometry.gleam`, `material.gleam`, `light.gleam`, `camera.gleam` to use new structure
 - ✅ Updated `physics.gleam` to use `rapier.ffi.mjs`
-- ✅ Updated `internal/renderer.gleam` to use new structure
+- ✅ Updated `internal/renderer.gleam` to use `tiramisu.ffi.mjs`
+- ✅ Updated `audio.gleam` to use `tiramisu.ffi.mjs`
+- ✅ Fixed all `@external` declarations to point to consolidated FFI files
 - ✅ Library builds successfully
-- ✅ Example projects compile
+- ✅ Example projects compile and run
 
-**Preserved**:
-- `src/tiramisu/ffi/renderer.mjs` - Scene rendering logic
-- `src/tiramisu/ffi/asset.mjs` - Asset loading logic
-- `src/tiramisu/ffi/audio.mjs` - Audio system logic
-- `src/tiramisu/ffi/debug.mjs` - Debug/performance logic
-- `src/tiramisu/ffi/input_capture.mjs` - Input system logic
-- `src/tiramisu/ffi/ui.mjs` - UI integration logic
-- `src/tiramisu/ffi/effects.mjs` - Effect system logic
+**Final Architecture**:
+- `src/threejs.ffi.mjs` - Pure Three.js bindings (no logic)
+- `src/rapier.ffi.mjs` - Pure Rapier bindings (no logic)
+- `src/tiramisu.ffi.mjs` - All game engine business logic (consolidated)
 
 ### Future Improvements
 
-1. **Renderer Refactor**: The `ffi/renderer.mjs` could be further split:
-   - Keep pure scene graph operations in Gleam
-   - Use `threejs.ffi.mjs` for object creation
-   - Only keep critical rendering loop in FFI
+1. **Further Gleam Migration**: Move more business logic from `tiramisu.ffi.mjs` to Gleam modules:
+   - Scene graph operations could be pure Gleam using `threejs.ffi.mjs`
+   - Asset batch coordination once Gleam gets better async support
+   - Debug stats aggregation, keeping only browser API calls in FFI
 
-2. **Asset Loading**: Move batch coordination logic to Gleam once Gleam gets better async support
+2. **Particle System Integration**: Complete the particle system integration in renderer (currently marked as TODO)
 
-3. **Debug System**: Move stats aggregation to Gleam, keep only browser API calls in FFI
+3. **Performance Optimization**: Profile and optimize hot paths in the consolidated FFI file

@@ -1,0 +1,1 @@
+-record(non_positive_height, {height :: float()}).

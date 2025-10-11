@@ -1,0 +1,14 @@
+name = "marceau"
+version = "1.3.0"
+description = "A MIME types library for Gleam"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "lpil", repo = "marceau" }
+links = [
+  { title = "Sponsor", href = "https://github.com/sponsors/lpil" },
+]
+
+[dependencies]
+
+[dev-dependencies]
+gleeunit = "~> 1.0"
+gleam_stdlib = "~> 0.31"

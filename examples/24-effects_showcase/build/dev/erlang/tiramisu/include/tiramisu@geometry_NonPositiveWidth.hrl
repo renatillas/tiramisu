@@ -1,0 +1,1 @@
+-record(non_positive_width, {width :: float()}).

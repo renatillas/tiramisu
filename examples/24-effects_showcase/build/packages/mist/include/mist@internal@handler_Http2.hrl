@@ -1,0 +1,1 @@
+-record(http2, {state :: mist@internal@http2@handler:state()}).

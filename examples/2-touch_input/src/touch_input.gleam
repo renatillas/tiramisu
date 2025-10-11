@@ -266,7 +266,6 @@ fn create_touch_indicator(
       transparent: True,
       opacity: 0.7,
       map: option.None,
-      normal_map: option.None,
     )
 
   let #(x, y) =

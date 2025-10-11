@@ -1,0 +1,1 @@
+-record(chunk, {data :: bitstring(), buffer :: mist@internal@buffer:buffer()}).

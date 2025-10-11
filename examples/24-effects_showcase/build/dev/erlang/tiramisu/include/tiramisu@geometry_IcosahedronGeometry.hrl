@@ -1,0 +1,1 @@
+-record(icosahedron_geometry, {radius :: float(), detail :: integer()}).

@@ -1,0 +1,1 @@
+-record(abnormal_stop, {reason :: binary()}).

@@ -201,17 +201,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           },
           material: {
             let assert Ok(material) =
-              material.standard(
-                color: 0x00ff00,
-                // Green for high detail
-                metalness: 0.3,
-                roughness: 0.6,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0x00ff00)
+              |> material.with_metalness(0.3)
+              |> material.with_roughness(0.6)
+              |> material.build()
             material
           },
           transform: transform.identity,
@@ -228,17 +222,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           },
           material: {
             let assert Ok(material) =
-              material.standard(
-                color: 0xffff00,
-                // Yellow for medium detail
-                metalness: 0.3,
-                roughness: 0.6,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xffff00)
+              |> material.with_metalness(0.3)
+              |> material.with_roughness(0.6)
+              |> material.build()
             material
           },
           transform: transform.identity,
@@ -255,17 +243,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           },
           material: {
             let assert Ok(material) =
-              material.standard(
-                color: 0xff8800,
-                // Orange for low detail
-                metalness: 0.3,
-                roughness: 0.6,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xff8800)
+              |> material.with_metalness(0.3)
+              |> material.with_roughness(0.6)
+              |> material.build()
             material
           },
           transform: transform.identity,
@@ -283,11 +265,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             let assert Ok(material) =
               material.basic(
                 color: 0xff0000,
-                // Red for billboard
                 transparent: False,
                 opacity: 1.0,
                 map: option.None,
-                normal_map: option.None,
               )
             material
           },

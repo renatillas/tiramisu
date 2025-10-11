@@ -407,8 +407,8 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
         material
       },
       transform: transform.identity
-        |> transform.set_position(model.position)
-        |> transform.set_rotation(vec3.Vec3(
+        |> transform.with_position(model.position)
+        |> transform.with_rotation(vec3.Vec3(
           model.rotation,
           model.rotation *. 0.7,
           0.0,

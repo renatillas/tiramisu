@@ -1,0 +1,1 @@
+-record(near_far_conflict, {near :: float(), far :: float()}).

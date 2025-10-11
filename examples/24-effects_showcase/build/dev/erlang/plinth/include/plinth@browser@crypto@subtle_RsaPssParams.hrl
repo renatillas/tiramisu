@@ -1,0 +1,1 @@
+-record(rsa_pss_params, {salt_length :: integer()}).

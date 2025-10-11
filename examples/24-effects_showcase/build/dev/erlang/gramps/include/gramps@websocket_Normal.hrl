@@ -1,0 +1,1 @@
+-record(normal, {body :: bitstring()}).

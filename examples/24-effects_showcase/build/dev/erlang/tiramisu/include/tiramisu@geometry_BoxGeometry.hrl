@@ -1,0 +1,1 @@
+-record(box_geometry, {width :: float(), height :: float(), depth :: float()}).

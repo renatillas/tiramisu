@@ -1,0 +1,1 @@
+-record(state, {idle_timer :: gleam@option:option(gleam@erlang@process:timer())}).

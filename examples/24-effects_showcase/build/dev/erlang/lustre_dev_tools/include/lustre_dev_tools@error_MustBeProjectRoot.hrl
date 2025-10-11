@@ -1,0 +1,1 @@
+-record(must_be_project_root, {path :: binary()}).

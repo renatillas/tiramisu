@@ -1,0 +1,1 @@
+-record(protocol_error, {body :: bitstring()}).

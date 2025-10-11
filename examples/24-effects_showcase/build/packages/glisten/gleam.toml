@@ -1,0 +1,19 @@
+name = "glisten"
+version = "8.0.1"
+description = "a shiny Gleam TCP/TLS server"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "rawhat", repo = "glisten" }
+gleam = ">= 1.11.0"
+
+[erlang]
+extra_applications = ["ssl"]
+
+[dependencies]
+gleam_stdlib = ">= 0.59.0 and < 1.0.0"
+gleam_otp = ">= 1.0.0 and < 2.0.0"
+gleam_erlang = ">= 1.0.0 and < 2.0.0"
+telemetry = ">= 1.2.1 and < 2.0.0"
+logging = ">= 1.3.0 and < 2.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

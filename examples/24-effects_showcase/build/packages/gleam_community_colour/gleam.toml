@@ -1,0 +1,13 @@
+name = "gleam_community_colour"
+version = "2.0.2"
+licences = ["Apache-2.0"]
+description = "Colour types, conversions, and other utilities"
+repository = { type = "github", user = "gleam-community", repo = "colour" }
+gleam = ">= 1.4.0"
+
+[dependencies]
+gleam_stdlib = ">= 0.50.0 and < 2.0.0"
+gleam_json = ">= 2.2.0 and < 4.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.3.0 and < 2.0.0"

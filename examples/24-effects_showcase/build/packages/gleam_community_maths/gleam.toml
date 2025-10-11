@@ -1,0 +1,14 @@
+name = "gleam_community_maths"
+version = "2.0.0"
+
+licences = ["Apache-2.0"]
+description = "A basic maths library"
+repository = { type = "github", user = "gleam-community", repo = "maths" }
+gleam = ">= 0.32.0"
+
+[dependencies]
+gleam_stdlib = "~> 0.38"
+gleam_yielder = ">= 1.1.0 and < 2.0.0"
+
+[dev-dependencies]
+gleeunit = "~> 1.0"

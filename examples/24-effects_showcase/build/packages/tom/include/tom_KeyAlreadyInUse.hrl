@@ -1,0 +1,1 @@
+-record(key_already_in_use, {key :: list(binary())}).

@@ -294,16 +294,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           },
           material: {
             let assert Ok(material) =
-              material.standard(
-                color: 0xff0000,
-                metalness: 0.5,
-                roughness: 0.5,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xff0000)
+              |> material.with_metalness(0.5)
+              |> material.with_roughness(0.5)
+              |> material.build()
             material
           },
           transform: transform.Transform(

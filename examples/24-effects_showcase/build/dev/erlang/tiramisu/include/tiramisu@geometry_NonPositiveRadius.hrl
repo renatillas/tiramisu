@@ -1,0 +1,1 @@
+-record(non_positive_radius, {radius :: float()}).

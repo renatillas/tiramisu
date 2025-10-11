@@ -60,6 +60,7 @@ import gleam/option.{type Option}
 import tiramisu/background.{type Background}
 import tiramisu/effect
 import tiramisu/input
+import tiramisu/internal/managers
 import tiramisu/internal/renderer
 import tiramisu/physics
 import tiramisu/scene
@@ -108,6 +109,7 @@ pub type Dimensions {
 /// - `canvas_width`: Current canvas width in pixels (useful for coordinate conversion)
 /// - `canvas_height`: Current canvas height in pixels (useful for coordinate conversion)
 /// - `physics_world`: Optional physics world (set via init function return value)
+/// - `input_manager`: Internal input manager (managed by the engine, do not access directly)
 ///
 /// ## Example
 ///
@@ -135,6 +137,8 @@ pub type Context(id) {
     canvas_width: Float,
     canvas_height: Float,
     physics_world: Option(physics.PhysicsWorld(id)),
+    input_manager: managers.InputManager,
+    audio_manager: managers.AudioManager,
   )
 }
 
@@ -218,36 +222,45 @@ pub type Context(id) {
 pub fn run(
   dimensions dimensions: Option(Dimensions),
   background background: Background,
-  init init: fn(Context(id)) -> #(
-    state,
-    effect.Effect(msg),
-    Option(physics.PhysicsWorld(id)),
-  ),
-  update update: fn(state, msg, Context(id)) -> #(
-    state,
-    effect.Effect(msg),
-    Option(physics.PhysicsWorld(id)),
-  ),
+  init init: fn(Context(id)) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
+  update update: fn(state, msg, Context(id)) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   view view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil {
-  // Create Three.js objects
-  let renderer_obj =
-    renderer.create(renderer.RendererOptions(
-      antialias: True,
-      alpha: False,
-      dimensions: dimensions
-        |> option.map(fn(dimensions) {
-          renderer.Dimensions(
-            height: dimensions.height,
-            width: dimensions.width,
-          )
-        }),
-    ))
+  // Create audio manager first (needed by renderer)
+  let audio_manager = managers.new_audio_manager()
 
-  let scene_obj = create_scene(background)
+  // Create renderer state
+  let renderer_state =
+    renderer.create(
+      renderer.RendererOptions(
+        antialias: True,
+        alpha: False,
+        dimensions: dimensions
+          |> option.map(fn(dimensions) {
+            renderer.Dimensions(
+              height: dimensions.height,
+              width: dimensions.width,
+            )
+          }),
+      ),
+      to_dynamic(audio_manager),
+    )
+
+  // Set background on the Three.js scene
+  let scene_obj = renderer.get_scene(renderer_state)
+  set_background(scene_obj, background)
 
   // Get initial canvas dimensions
-  let #(initial_width, initial_height) = get_canvas_dimensions(renderer_obj)
+  let webgl_renderer = renderer.get_renderer(renderer_state)
+  let #(initial_width, initial_height) = get_canvas_dimensions(webgl_renderer)
+
+  // Get canvas for input manager
+  let canvas = renderer.get_dom_element(webgl_renderer)
+
+  // Create input manager
+  let input_manager = managers.new_input_manager(canvas)
 
   // Initial context with empty input (no physics_world yet)
   let initial_context =
@@ -257,6 +270,8 @@ pub fn run(
       canvas_width: initial_width,
       canvas_height: initial_height,
       physics_world: option.None,
+      input_manager: input_manager,
+      audio_manager: audio_manager,
     )
 
   // Initialize game state
@@ -270,55 +285,76 @@ pub fn run(
       canvas_width: initial_width,
       canvas_height: initial_height,
       physics_world: physics_world,
+      input_manager: input_manager,
+      audio_manager: audio_manager,
     )
+
+  // Set physics world in renderer state if provided
+  let renderer_state_with_physics = case physics_world {
+    option.Some(world) -> {
+      renderer.set_physics_world(renderer_state, option.Some(world))
+    }
+    option.None -> renderer.set_physics_world(renderer_state, option.None)
+  }
 
   // Get initial scene nodes
   let initial_nodes = view(initial_state, context_with_physics)
 
-  // Append renderer to DOM and initialize input
-  let canvas = renderer.get_dom_element(renderer_obj)
+  // Append renderer to DOM (input already initialized via InputManager)
   append_to_dom(canvas)
-  initialize_input_systems(canvas)
 
-  // Set canvas reference for camera aspect ratio calculation (BEFORE applying initial scene)
-  renderer.set_canvas(canvas)
+  // Apply initial scene using renderer.gleam
+  let renderer_state_after_init =
+    apply_initial_scene_gleam(renderer_state_with_physics, initial_nodes)
 
-  // Apply initial scene (this will set up cameras from scene nodes and use the canvas reference)
-  apply_initial_scene(scene_obj, initial_nodes, physics_world)
+  // Extract updated physics world from renderer (it now has bodies created during patching)
+  let updated_context = case
+    renderer.get_physics_world(renderer_state_after_init)
+  {
+    option.Some(updated_world) -> {
+      // Convert opaque physics world back to typed physics world
+      Context(
+        ..context_with_physics,
+        physics_world: option.Some(updated_world),
+      )
+    }
+    option.None -> context_with_physics
+  }
 
-  // Start game loop
+  // Start game loop with updated context containing bodies
   start_loop(
     initial_state,
     initial_nodes,
     initial_effect,
-    context_with_physics,
-    scene_obj,
-    renderer_obj,
+    updated_context,
+    renderer_state_after_init,
     update,
     view,
   )
 }
 
-// --- FFI Declarations ---
+// --- Helper Functions ---
 
-@external(javascript, "./tiramisu.ffi.mjs", "createScene")
-fn create_scene(background: Background) -> Scene
+/// Apply initial scene using renderer.gleam's patch system
+fn apply_initial_scene_gleam(
+  renderer_state: renderer.RendererState(id),
+  nodes: List(scene.Node(id)),
+) -> renderer.RendererState(id) {
+  // Use diff with empty previous scene to generate proper patches
+  let patches = scene.diff([], nodes)
+  renderer.apply_patches(renderer_state, patches)
+}
+
+// --- FFI Declarations ---
 
 @external(javascript, "./tiramisu.ffi.mjs", "appendToDom")
 fn append_to_dom(element: renderer.DomElement) -> Nil
 
-@external(javascript, "./tiramisu.ffi.mjs", "initializeInputSystems")
-fn initialize_input_systems(canvas: renderer.DomElement) -> Nil
-
-@external(javascript, "./tiramisu.ffi.mjs", "applyInitialScene")
-fn apply_initial_scene(
-  scene: Scene,
-  nodes: List(scene.Node(id)),
-  physics_world: Option(physics.PhysicsWorld(id)),
-) -> Nil
-
 @external(javascript, "./tiramisu.ffi.mjs", "getCanvasDimensions")
 fn get_canvas_dimensions(renderer: renderer.WebGLRenderer) -> #(Float, Float)
+
+@external(javascript, "./tiramisu.ffi.mjs", "setBackground")
+fn set_background(scene: renderer.Scene, background: Background) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
@@ -326,15 +362,15 @@ fn start_loop(
   prev_nodes: List(scene.Node(id)),
   effect: effect.Effect(msg),
   context: Context(id),
-  scene: Scene,
-  renderer: renderer.WebGLRenderer,
-  update: fn(state, msg, Context(id)) -> #(
-    state,
-    effect.Effect(msg),
-    Option(physics.PhysicsWorld(id)),
-  ),
+  renderer_state: renderer.RendererState(id),
+  update: fn(state, msg, Context(id)) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil
+
+/// Helper to cast AudioManager to Dynamic (identity function)
+@external(javascript, "./tiramisu.ffi.mjs", "identity")
+fn to_dynamic(value: a) -> b
 
 /// Get the current window aspect ratio (width / height).
 ///

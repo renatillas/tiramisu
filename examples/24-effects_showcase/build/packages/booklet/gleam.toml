@@ -1,0 +1,10 @@
+name = "booklet"
+version = "1.0.2"
+
+licenses = ["BSD-3-Clause"]
+description = "A simple in-memory cache using ETS tables or mutable references."
+repository = { type = "gitlab", user = "arkandos", repo = "booklet" }
+dev-dependencies = {}
+
+[erlang]
+application_start_module = "booklet_ffi"

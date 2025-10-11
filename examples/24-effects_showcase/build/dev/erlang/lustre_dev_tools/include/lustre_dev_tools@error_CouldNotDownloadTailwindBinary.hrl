@@ -1,0 +1,1 @@
+-record(could_not_download_tailwind_binary, {reason :: gleam@httpc:http_error()}).

@@ -1,0 +1,1 @@
+-record(message_too_big, {body :: bitstring()}).

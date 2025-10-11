@@ -1,0 +1,14 @@
+name = "envoy"
+version = "1.0.2"
+description = "A zero dependency cross platform Gleam package for reading environment variables"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "lpil", repo = "envoy" }
+links = [
+  { title = "Website", href = "https://gleam.run" },
+  { title = "Sponsor", href = "https://github.com/sponsors/lpil" },
+]
+
+[dependencies]
+gleam_stdlib = "~> 0.34"
+
+[dev-dependencies]

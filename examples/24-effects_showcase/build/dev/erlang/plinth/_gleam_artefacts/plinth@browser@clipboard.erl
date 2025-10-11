@@ -1,0 +1,1 @@
+-module(plinth@browser@clipboard).

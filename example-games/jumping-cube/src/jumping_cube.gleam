@@ -1,6 +1,7 @@
 import gleam/option
 import gleam/result
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -27,7 +28,7 @@ pub type Id {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
@@ -64,11 +65,11 @@ fn update(
             physics.apply_impulse(
               physics_world,
               Sphere,
-              vec3.Vec3(0.0, 100.0, 0.0),
+              vec3.Vec3(0.0, 10.0, 0.0),
             )
           False -> physics_world
         }
-        |> physics.step(ctx.delta_time)
+        |> physics.step
 
       #(Nil, effect.tick(Tick), option.Some(physics_world))
     }
@@ -134,8 +135,10 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
-        physics.rigid_body(physics.Fixed, physics.Box(20.0, 0.2, 20.0))
-        |> physics.set_restitution(0.0),
+        physics.new_rigid_body(physics.Fixed)
+        |> physics.with_collider(physics.Box(20.0, 0.2, 20.0))
+        |> physics.with_restitution(0.0)
+        |> physics.build(),
       ),
     )
 
@@ -163,10 +166,12 @@ fn create_sphere(id: Id, color: Int) -> scene.Node(Id) {
     },
     transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
     physics: option.Some(
-      physics.rigid_body(physics.Dynamic, physics.Sphere(1.0))
-      |> physics.set_mass(1.0)
-      |> physics.set_restitution(0.5)
-      |> physics.set_friction(0.5),
+      physics.new_rigid_body(physics.Dynamic)
+      |> physics.with_collider(physics.Sphere(1.0))
+      |> physics.with_mass(1.0)
+      |> physics.with_restitution(0.5)
+      |> physics.with_friction(0.5)
+      |> physics.build(),
     ),
   )
 }

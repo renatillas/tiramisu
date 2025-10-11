@@ -1,0 +1,1 @@
+-record(has_class, {name :: binary()}).

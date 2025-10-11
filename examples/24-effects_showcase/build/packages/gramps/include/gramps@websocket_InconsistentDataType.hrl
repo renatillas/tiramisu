@@ -1,0 +1,1 @@
+-record(inconsistent_data_type, {body :: bitstring()}).

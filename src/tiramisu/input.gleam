@@ -691,10 +691,10 @@ pub fn bind_key(
   key: Key,
   action: action,
 ) -> InputBindings(action) {
-  InputBindings(
-    ..bindings,
-    key_to_action: [#(key, action), ..bindings.key_to_action],
-  )
+  InputBindings(..bindings, key_to_action: [
+    #(key, action),
+    ..bindings.key_to_action
+  ])
 }
 
 /// Bind a mouse button to an action
@@ -703,10 +703,10 @@ pub fn bind_mouse_button(
   button: MouseButton,
   action: action,
 ) -> InputBindings(action) {
-  InputBindings(
-    ..bindings,
-    mouse_to_action: [#(button, action), ..bindings.mouse_to_action],
-  )
+  InputBindings(..bindings, mouse_to_action: [
+    #(button, action),
+    ..bindings.mouse_to_action
+  ])
 }
 
 /// Bind a gamepad button to an action
@@ -715,10 +715,10 @@ pub fn bind_gamepad_button(
   button: GamepadButton,
   action: action,
 ) -> InputBindings(action) {
-  InputBindings(
-    ..bindings,
-    gamepad_to_action: [#(button, action), ..bindings.gamepad_to_action],
-  )
+  InputBindings(..bindings, gamepad_to_action: [
+    #(button, action),
+    ..bindings.gamepad_to_action
+  ])
 }
 
 /// Check if an action is currently pressed
@@ -1069,15 +1069,14 @@ pub fn consume_buffered_action(
   action: action,
 ) -> BufferedInput(action) {
   // Remove first occurrence of this action from buffer
-  let updated_buffer =
-    case
-      list.split_while(buffered.buffer, fn(buffered_action) {
-        buffered_action.action != action
-      })
-    {
-      #(before, []) -> before
-      #(before, [_consumed, ..after]) -> list.append(before, after)
-    }
+  let updated_buffer = case
+    list.split_while(buffered.buffer, fn(buffered_action) {
+      buffered_action.action != action
+    })
+  {
+    #(before, []) -> before
+    #(before, [_consumed, ..after]) -> list.append(before, after)
+  }
 
   BufferedInput(..buffered, buffer: updated_buffer)
 }

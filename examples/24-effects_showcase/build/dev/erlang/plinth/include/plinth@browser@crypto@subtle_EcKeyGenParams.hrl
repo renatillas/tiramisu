@@ -1,0 +1,1 @@
+-record(ec_key_gen_params, {name :: binary(), named_curve :: binary()}).

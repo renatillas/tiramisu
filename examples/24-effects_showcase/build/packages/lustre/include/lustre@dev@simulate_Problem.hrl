@@ -1,0 +1,1 @@
+-record(problem, {name :: binary(), message :: binary()}).

@@ -160,7 +160,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -187,7 +186,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -212,7 +210,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -242,7 +239,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },

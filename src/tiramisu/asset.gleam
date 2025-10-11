@@ -434,35 +434,86 @@ pub fn dispose_object3d(object: Object3D) -> Nil {
 
 // --- FFI Functions ---
 
-@external(javascript, "./ffi/asset.mjs", "loadAudio")
+@external(javascript, "../tiramisu.ffi.mjs", "loadAudio")
 fn load_audio_ffi(url: String) -> Promise(Result(AudioBuffer, String))
 
-@external(javascript, "./ffi/asset.mjs", "loadBatch")
+@external(javascript, "../tiramisu.ffi.mjs", "loadTextureSafe")
+fn load_texture_ffi(url: String) -> Promise(Result(Texture, String))
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadBatch")
 fn load_batch_ffi(
   asset: array.Array(AssetType),
   on_progress: fn(LoadProgress) -> Nil,
 ) -> Promise(BatchLoadResult)
 
-@external(javascript, "./ffi/asset.mjs", "disposeTexture")
+@external(javascript, "../tiramisu.ffi.mjs", "disposeTexture")
 fn dispose_texture_ffi(texture: Texture) -> Nil
 
-@external(javascript, "./ffi/asset.mjs", "disposeGeometry")
+@external(javascript, "../tiramisu.ffi.mjs", "disposeGeometry")
 fn dispose_geometry_ffi(geometry: BufferGeometry) -> Nil
 
-@external(javascript, "./ffi/asset.mjs", "disposeObject3D")
+@external(javascript, "../tiramisu.ffi.mjs", "disposeObject3D")
 fn dispose_object3d_ffi(object: Object3D) -> Nil
 
 /// Load an STL file from a URL using Promises
-@external(javascript, "./ffi/asset.mjs", "loadSTLAsync")
-pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError))
+pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError)) {
+  // Validate URL
+  case url == "" {
+    True -> promise.resolve(Error(InvalidUrl(url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_stl_ffi(url)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(geometry) -> Ok(geometry)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadSTLSafe")
+fn load_stl_ffi(url: String) -> Promise(Result(BufferGeometry, String))
 
 /// Load a texture from a URL using Promises
-@external(javascript, "./ffi/asset.mjs", "loadTextureAsync")
-pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError))
+pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError)) {
+  // Validate URL
+  case url == "" {
+    True -> promise.resolve(Error(InvalidUrl(url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_texture_ffi(url)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(texture) -> Ok(texture)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
 
 /// Load a GLTF/GLB file from a URL using Promises
-@external(javascript, "./ffi/asset.mjs", "loadGLTFAsync")
-pub fn load_gltf(url: String) -> Promise(Result(GLTFData, LoadError))
+pub fn load_gltf(url: String) -> Promise(Result(GLTFData, LoadError)) {
+  // Validate URL
+  case url == "" {
+    True -> promise.resolve(Error(InvalidUrl(url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_gltf_ffi(url)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(data) -> Ok(data)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadGLTFSafe")
+fn load_gltf_ffi(url: String) -> Promise(Result(GLTFData, String))
 
 /// Load an audio file from a URL using Promises
 ///
@@ -517,8 +568,28 @@ pub fn load_audio(url: String) -> Promise(Result(AudioBuffer, LoadError)) {
 /// - `Error(LoadError)`: File not found
 /// - `Error(InvalidUrl)`: Invalid URL provided
 /// - `Error(ParseError)`: Failed to parse OBJ/MTL file
-@external(javascript, "./ffi/asset.mjs", "loadOBJAsync")
 pub fn load_obj(
   obj_url obj_url: String,
   mtl_url mtl_url: String,
-) -> Promise(Result(Object3D, LoadError))
+) -> Promise(Result(Object3D, LoadError)) {
+  // Validate URL
+  case obj_url == "" {
+    True -> promise.resolve(Error(InvalidUrl(obj_url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_obj_ffi(obj_url, mtl_url)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(object) -> Ok(object)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadOBJSafe")
+fn load_obj_ffi(
+  obj_url: String,
+  mtl_url: String,
+) -> Promise(Result(Object3D, String))

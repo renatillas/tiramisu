@@ -1,0 +1,1 @@
+-module(plinth@javascript@compression_stream).

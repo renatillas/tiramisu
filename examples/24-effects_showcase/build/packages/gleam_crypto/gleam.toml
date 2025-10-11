@@ -1,0 +1,18 @@
+name = "gleam_crypto"
+version = "1.5.1"
+gleam = ">= 1.9.0"
+
+licences = ["Apache-2.0"]
+description = "A Gleam cryptography library supporting Erlang and JavaScript"
+
+repository = { type = "github", user = "gleam-lang", repo = "crypto" }
+links = [
+  { title = "Website", href = "https://gleam.run" },
+  { title = "Sponsor", href = "https://github.com/sponsors/lpil" },
+]
+
+[dependencies]
+gleam_stdlib = "~> 0.32"
+
+[dev-dependencies]
+gleeunit = "~> 1.0"

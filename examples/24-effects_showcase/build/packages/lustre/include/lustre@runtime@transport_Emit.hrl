@@ -1,0 +1,1 @@
+-record(emit, {kind :: integer(), name :: binary(), data :: gleam@json:json()}).

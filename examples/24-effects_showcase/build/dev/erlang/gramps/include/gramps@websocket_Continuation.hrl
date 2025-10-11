@@ -1,0 +1,1 @@
+-record(continuation, {length :: integer(), payload :: bitstring()}).

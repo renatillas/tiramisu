@@ -1,0 +1,1 @@
+-record(cert_key_files, {certfile :: binary(), keyfile :: binary()}).

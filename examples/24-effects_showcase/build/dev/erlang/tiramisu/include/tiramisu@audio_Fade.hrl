@@ -1,0 +1,1 @@
+-record(fade, {duration_ms :: integer()}).

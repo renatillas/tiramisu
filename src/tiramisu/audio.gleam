@@ -290,14 +290,14 @@ fn audio_group_to_string(group: AudioGroup) -> String {
 // --- FFI Functions ---
 
 /// FFI functions for audio groups (global settings)
-@external(javascript, "./ffi/audio.mjs", "setGroupVolume")
+@external(javascript, "../tiramisu.ffi.mjs", "setGroupVolume")
 fn set_group_volume_ffi(group: String, volume: Float) -> Nil
 
-@external(javascript, "./ffi/audio.mjs", "getGroupVolume")
+@external(javascript, "../tiramisu.ffi.mjs", "getGroupVolume")
 fn get_group_volume_ffi(group: String) -> Float
 
-@external(javascript, "./ffi/audio.mjs", "muteGroup")
+@external(javascript, "../tiramisu.ffi.mjs", "muteGroup")
 fn mute_group_ffi(group: String) -> Nil
 
-@external(javascript, "./ffi/audio.mjs", "unmuteGroup")
+@external(javascript, "../tiramisu.ffi.mjs", "unmuteGroup")
 fn unmute_group_ffi(group: String) -> Nil

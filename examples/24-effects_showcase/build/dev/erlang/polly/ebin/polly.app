@@ -1,0 +1,9 @@
+{application, polly, [
+    {vsn, "2.1.0"},
+    {applications, [filepath,
+                    gleam_stdlib,
+                    simplifile]},
+    {description, "A polling file-system watcher"},
+    {modules, []},
+    {registered, []}
+]}.

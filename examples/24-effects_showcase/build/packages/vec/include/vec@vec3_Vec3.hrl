@@ -1,0 +1,1 @@
+-record(vec3, {x :: any(), y :: any(), z :: any()}).

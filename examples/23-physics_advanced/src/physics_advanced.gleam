@@ -224,7 +224,7 @@ fn update(
           physics.apply_impulse(
             physics_world,
             Player,
-            vec3.Vec3(0.0, 10.0, 0.0),
+            vec3.Vec3(0.0, 20.0, 0.0),
           )
         }
         True, False -> {
@@ -262,26 +262,28 @@ fn update(
       }
 
       // Toggle debug collider visualization
-      let show_debug_colliders = case
+      let #(show_debug_colliders, effect) = case
         input.is_key_just_pressed(ctx.input, input.KeyD)
       {
         True -> {
-          let new_state = !model.show_debug_colliders
-          debug.show_colliders(new_state)
-          case new_state {
-            True -> io.println("Debug colliders enabled")
-            False -> io.println("Debug colliders disabled")
-          }
-          new_state
+          #(
+            !model.show_debug_colliders,
+            effect.from(fn(_) {
+              debug.show_collider_wireframes(
+                physics_world,
+                model.show_debug_colliders,
+              )
+            }),
+          )
         }
-        False -> model.show_debug_colliders
+        False -> #(model.show_debug_colliders, effect.none())
       }
 
       // NOW step the physics simulation AFTER all commands have been queued
-      let physics_world = physics.step(physics_world, ctx.delta_time)
+      let physics_world = physics.step(physics_world)
 
-      // Get collision events AFTER stepping
-      let collision_events = physics.get_collision_events()
+      // Get collision events from the updated world
+      let collision_events = physics.get_collision_events(physics_world)
       let last_collision_message = case collision_events {
         [] -> model.last_collision_message
         [event, ..] -> collision_event_to_string(event)
@@ -299,7 +301,7 @@ fn update(
           is_grounded: is_grounded,
           show_debug_colliders: show_debug_colliders,
         ),
-        effect.tick(Tick),
+        effect.batch([effect.tick(Tick), effect]),
         option.Some(physics_world),
       )
     }
@@ -367,13 +369,14 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       material: ground_mat,
       transform: transform.at(position: vec3.Vec3(0.0, -0.25, 0.0)),
       physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Fixed)
-          |> physics.body_collider(physics.Box(20.0, 0.5, 20.0))
-          |> physics.body_friction(1.0)
-          |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build()
-        body
+        physics.new_rigid_body(physics.Fixed)
+        |> physics.with_collider(physics.Box(20.0, 0.5, 20.0))
+        |> physics.with_friction(1.0)
+        |> physics.with_collision_groups(membership: [0], can_collide_with: [
+          1,
+          2,
+        ])
+        |> physics.build()
       }),
     )
 
@@ -388,41 +391,44 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
         Ok(t) -> t
         Error(_) -> transform.at(position: vec3.Vec3(0.0, 5.0, 0.0))
       },
-      physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Dynamic)
-          |> physics.body_collider(physics.Box(0.5, 0.5, 0.5))
-          |> physics.body_mass(2.0)
-          |> physics.body_friction(0.5)
-          |> physics.body_linear_damping(0.5)
-          |> physics.lock_rotation_x()
-          |> physics.lock_rotation_z()
-          |> physics.body_collision_groups(membership: [1], filter: [0, 2])
-          |> physics.build()
-        body
-      }),
+      physics: option.Some(
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(2.0)
+        |> physics.with_friction(0.5)
+        |> physics.with_linear_damping(0.5)
+        |> physics.with_lock_rotation_x()
+        |> physics.with_lock_rotation_z()
+        |> physics.with_collision_groups(membership: [1], can_collide_with: [
+          0,
+          2,
+        ])
+        |> physics.build(),
+      ),
     )
 
   // Cube1 - Falls and bounces (Dynamic, collision layer 2)
   let cube1 =
     scene.Mesh(
-      id: SpinningCube,
+      id: Cube,
       geometry: box_geo,
       material: cube1_mat,
-      transform: case physics.get_transform(physics_world, SpinningCube) {
+      transform: case physics.get_transform(physics_world, Cube) {
         Ok(t) -> t
         Error(_) -> transform.at(position: vec3.Vec3(-3.0, 8.0, 0.0))
       },
       physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Dynamic)
-          |> physics.body_collider(physics.Box(0.5, 0.5, 0.5))
-          |> physics.body_mass(1.0)
-          |> physics.body_restitution(0.7)
-          |> physics.body_friction(0.3)
-          |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build()
-        body
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(1.0)
+        |> physics.with_restitution(0.7)
+        |> physics.with_friction(0.3)
+        |> physics.with_collision_groups(membership: [2], can_collide_with: [
+          0,
+          1,
+          2,
+        ])
+        |> physics.build()
       }),
     )
 
@@ -445,18 +451,20 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           transform.at(position: vec3.Vec3(3.0, 3.0, 0.0))
           |> transform.rotate_y(model.rotation)
       },
-      physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Dynamic)
-          |> physics.body_collider(physics.Box(0.5, 0.5, 0.5))
-          |> physics.body_mass(1.5)
-          |> physics.body_restitution(0.3)
-          |> physics.body_friction(0.5)
-          |> physics.body_angular_damping(0.1)
-          |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build()
-        body
-      }),
+      physics: option.Some(
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(1.5)
+        |> physics.with_restitution(0.3)
+        |> physics.with_friction(0.5)
+        |> physics.with_angular_damping(0.1)
+        |> physics.with_collision_groups(membership: [2], can_collide_with: [
+          0,
+          1,
+          2,
+        ])
+        |> physics.build(),
+      ),
     )
 
   // Sphere - Different collider shape
@@ -469,17 +477,19 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
         Ok(t) -> t
         Error(_) -> transform.at(position: vec3.Vec3(0.0, 10.0, -3.0))
       },
-      physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Dynamic)
-          |> physics.body_collider(physics.Sphere(radius: 0.5))
-          |> physics.body_mass(0.8)
-          |> physics.body_restitution(0.9)
-          |> physics.body_friction(0.1)
-          |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build()
-        body
-      }),
+      physics: option.Some(
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Sphere(radius: 0.5))
+        |> physics.with_mass(0.8)
+        |> physics.with_restitution(0.9)
+        |> physics.with_friction(0.1)
+        |> physics.with_collision_groups(membership: [2], can_collide_with: [
+          0,
+          1,
+          2,
+        ])
+        |> physics.build(),
+      ),
     )
 
   // Walls (Fixed bodies)
@@ -489,15 +499,15 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       geometry: wall_geo,
       material: wall_mat,
       transform: transform.at(position: vec3.Vec3(-5.0, 2.5, 0.0)),
-      physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Fixed)
-          |> physics.body_collider(physics.Box(0.25, 2.5, 10.0))
-          |> physics.body_friction(0.5)
-          |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build()
-        body
-      }),
+      physics: option.Some(
+        physics.new_rigid_body(physics.Fixed)
+        |> physics.with_collider(physics.Box(0.5, 5.0, 20.0))
+        |> physics.with_friction(0.5)
+        |> physics.with_collision_groups(membership: [0], can_collide_with: [
+          1,
+        ])
+        |> physics.build(),
+      ),
     )
 
   let wall_right =
@@ -506,15 +516,15 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       geometry: wall_geo,
       material: wall_mat,
       transform: transform.at(position: vec3.Vec3(5.0, 2.5, 0.0)),
-      physics: option.Some({
-        let assert Ok(body) =
-          physics.new_rigid_body(physics.Fixed)
-          |> physics.body_collider(physics.Box(0.25, 2.5, 10.0))
-          |> physics.body_friction(0.5)
-          |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build()
-        body
-      }),
+      physics: option.Some(
+        physics.new_rigid_body(physics.Fixed)
+        |> physics.with_collider(physics.Box(0.5, 5.0, 20.0))
+        |> physics.with_friction(0.5)
+        |> physics.with_collision_groups(membership: [0], can_collide_with: [
+          1,
+        ])
+        |> physics.build(),
+      ),
     )
 
   [

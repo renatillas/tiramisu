@@ -185,7 +185,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       asset.get_texture(cache, "wood-floor/WoodFloor041_1K-JPG_NormalGL.jpg")
       |> option.from_result
     })
-  let wood_ao =
+  let wood_ambient_oclusion =
     option.then(model.assets, fn(cache) {
       asset.get_texture(
         cache,
@@ -263,19 +263,39 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
-  let assert Ok(standard_mat) =
-    material.standard(
-      color: 0xffffff,
-      metalness: 0.0,
-      roughness: 1.0,
-      map: wood_color,
-      normal_map: wood_normal,
-      ambient_oclusion_map: wood_ao,
-      roughness_map: wood_roughness,
-      metalness_map: option.None,
-    )
+
+  let standard_material = case
+    wood_color,
+    wood_normal,
+    wood_ambient_oclusion,
+    wood_roughness
+  {
+    option.Some(color),
+      option.Some(normal),
+      option.Some(ambient_oclusion),
+      option.Some(roughness)
+    -> {
+      let assert Ok(standard_mat) =
+        material.new()
+        |> material.with_color(0xffffff)
+        |> material.with_metalness(0.0)
+        |> material.with_roughness(1.0)
+        |> material.with_color_map(color)
+        |> material.with_normal_map(normal)
+        |> material.with_ambient_oclusion_map(ambient_oclusion)
+        |> material.with_roughness_map(roughness)
+        |> material.build()
+      standard_mat
+    }
+    _, _, _, _ -> {
+      let assert Ok(standard_mat) =
+        material.new()
+        |> material.build()
+      standard_mat
+    }
+  }
+
   let assert Ok(phong_mat) =
     material.phong(
       color: 0xffffff,
@@ -314,7 +334,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     scene.Mesh(
       id: "standard",
       geometry: box_geom,
-      material: standard_mat,
+      material: standard_material,
       transform: transform.Transform(
         position: vec3.Vec3(-3.0, 2.0, 0.0),
         rotation: vec3.Vec3(0.0, model.rotation, 0.0),
@@ -358,23 +378,42 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
   ]
 
   let assert Ok(plane_geom) = geometry.plane(width: 20.0, height: 20.0)
-  let assert Ok(ground_mat) =
-    material.standard(
-      color: 0xffffff,
-      metalness: 0.0,
-      roughness: 1.0,
-      map: paving_color,
-      normal_map: paving_normal,
-      ambient_oclusion_map: paving_ao,
-      roughness_map: paving_roughness,
-      metalness_map: option.None,
-    )
+  let ground_material = case
+    paving_color,
+    paving_normal,
+    paving_ao,
+    paving_roughness
+  {
+    option.Some(color),
+      option.Some(normal),
+      option.Some(ao),
+      option.Some(roughness)
+    -> {
+      let assert Ok(ground_mat) =
+        material.new()
+        |> material.with_color(0xffffff)
+        |> material.with_metalness(0.0)
+        |> material.with_roughness(1.0)
+        |> material.with_color_map(color)
+        |> material.with_normal_map(normal)
+        |> material.with_ambient_oclusion_map(ao)
+        |> material.with_roughness_map(roughness)
+        |> material.build()
+      ground_mat
+    }
+    _, _, _, _ -> {
+      let assert Ok(ground_mat) =
+        material.new()
+        |> material.build()
+      ground_mat
+    }
+  }
 
   let ground = [
     scene.Mesh(
       id: "ground",
       geometry: plane_geom,
-      material: ground_mat,
+      material: ground_material,
       transform: transform.Transform(
         position: vec3.Vec3(0.0, -2.0, 0.0),
         rotation: vec3.Vec3(-1.5708, 0.0, 0.0),

@@ -1,0 +1,1 @@
+-record(close_frame, {reason :: gramps@websocket:close_reason()}).

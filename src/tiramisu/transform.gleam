@@ -67,7 +67,7 @@ pub fn at(position position: vec3.Vec3(Float)) -> Transform {
 /// let moved = transform.identity
 ///   |> transform.set_position(vec3.Vec3(1.0, 2.0, 3.0))
 /// ```
-pub fn set_position(
+pub fn with_position(
   transform: Transform,
   position: vec3.Vec3(Float),
 ) -> Transform {
@@ -82,7 +82,7 @@ pub fn set_position(
 /// let rotated = transform.identity
 ///   |> transform.set_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90° turn around Y axis
 /// ```
-pub fn set_rotation(
+pub fn with_rotation(
   transform: Transform,
   rotation: vec3.Vec3(Float),
 ) -> Transform {
@@ -97,7 +97,7 @@ pub fn set_rotation(
 /// let scaled = transform.identity
 ///   |> transform.set_scale(vec3.Vec3(2.0, 1.0, 2.0))  // Wide and deep, normal height
 /// ```
-pub fn set_scale(transform: Transform, scale: vec3.Vec3(Float)) -> Transform {
+pub fn with_scale(transform: Transform, scale: vec3.Vec3(Float)) -> Transform {
   Transform(..transform, scale:)
 }
 

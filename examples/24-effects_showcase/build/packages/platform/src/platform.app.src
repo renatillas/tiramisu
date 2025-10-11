@@ -1,0 +1,7 @@
+{application, platform, [
+    {vsn, "1.0.0"},
+    {applications, [gleeunit]},
+    {description, "Zero dependency platform detection library for gleam"},
+    {modules, [platform]},
+    {registered, []}
+]}.

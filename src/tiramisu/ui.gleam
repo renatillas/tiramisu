@@ -86,11 +86,11 @@ pub fn dispatch_to_tiramisu(msg: game_msg) -> effect.Effect(ui_msg) {
   effect.from(fn(_dispatch) { do_dispatch_to_game(msg) })
 }
 
-@external(javascript, "./ffi/ui.mjs", "registerUI")
+@external(javascript, "../tiramisu.ffi.mjs", "registerUI")
 fn do_register_lustre(dispatch: fn(msg) -> Nil) -> Nil
 
-@external(javascript, "./ffi/ui.mjs", "dispatchToUI")
+@external(javascript, "../tiramisu.ffi.mjs", "dispatchToUI")
 fn do_dispatch_to_lustre(msg: ui_msg) -> Nil
 
-@external(javascript, "./ffi/ui.mjs", "dispatchToGame")
+@external(javascript, "../tiramisu.ffi.mjs", "dispatchToGame")
 fn do_dispatch_to_game(msg: game_msg) -> Nil

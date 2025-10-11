@@ -1,0 +1,1 @@
+-record(external_command_failed, {command :: binary(), reason :: binary()}).

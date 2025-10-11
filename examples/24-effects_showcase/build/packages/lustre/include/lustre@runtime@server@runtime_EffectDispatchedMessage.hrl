@@ -1,0 +1,1 @@
+-record(effect_dispatched_message, {message :: any()}).

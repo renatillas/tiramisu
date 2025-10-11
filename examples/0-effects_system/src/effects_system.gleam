@@ -4,7 +4,6 @@
 import gleam/float
 import gleam/list
 import gleam/option
-import plinth/javascript/global
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -56,7 +55,7 @@ fn init(
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   #(
     Model(cubes: [], next_id: 0),
-    effect.batch([effect.tick(Tick), schedule_add_cube()]),
+    effect.batch([effect.tick(Tick), effect.delay(500, AddCube)]),
     option.None,
   )
 }
@@ -101,7 +100,7 @@ fn update(
 
       #(
         Model(cubes: [new_cube, ..model.cubes], next_id: model.next_id + 1),
-        schedule_add_cube(),
+        effect.delay(500, AddCube),
         option.None,
       )
     }
@@ -109,12 +108,6 @@ fn update(
 }
 
 // Schedule adding a cube after 500ms
-fn schedule_add_cube() -> effect.Effect(Msg) {
-  effect.from(fn(dispatch) {
-    global.set_timeout(500, fn() { dispatch(AddCube) })
-    Nil
-  })
-}
 
 fn random_color() -> Int {
   let colors = [

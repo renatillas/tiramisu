@@ -122,7 +122,6 @@ fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   list.range(0, count - 1)
@@ -151,7 +150,6 @@ fn create_flat_scene_offset(
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   list.range(0, count - 1)
@@ -181,7 +179,6 @@ fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   case current >= depth {

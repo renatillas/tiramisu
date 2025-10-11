@@ -13,6 +13,7 @@ packages = [
   { name = "gleeunit", version = "1.6.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "FDC68A8C492B1E9B429249062CD9BAC9B5538C6FBF584817205D0998C42E1DAC" },
   { name = "houdini", version = "1.2.0", build_tools = ["gleam"], requirements = [], otp_app = "houdini", source = "hex", outer_checksum = "5DB1053F1AF828049C2B206D4403C18970ABEF5C18671CA3C2D2ED0DD64F6385" },
   { name = "lustre", version = "5.3.5", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_json", "gleam_otp", "gleam_stdlib", "houdini"], otp_app = "lustre", source = "hex", outer_checksum = "5CBB5DD2849D8316A2101792FC35AEB58CE4B151451044A9C2A2A70A2F7FCEB8" },
+  { name = "plinth", version = "0.7.2", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_json", "gleam_stdlib"], otp_app = "plinth", source = "hex", outer_checksum = "3D70AF096A6F46DC71023C28B16BCCC6D7FAB9A467711426DAEB05902022B08F" },
   { name = "structures", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "structures", source = "hex", outer_checksum = "25002A9EBBB373C4AA4333F4CDC3745F2CCE227E79730AAAB36064F6A351C967" },
   { name = "vec", version = "3.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "7658595B4792E29B150FF8854D15DEAC6D3F4EAFB31EEECE473845794ABA7198" },
 ]
@@ -24,5 +25,6 @@ gleam_stdlib = { version = ">= 0.64.0 and < 2.0.0" }
 gleamy_bench = { version = ">= 0.6.0 and < 1.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }
+plinth = { version = ">= 0.7.2 and < 1.0.0" }
 structures = { version = ">= 1.0.0 and < 2.0.0" }
 vec = { version = ">= 3.0.1 and < 4.0.0" }

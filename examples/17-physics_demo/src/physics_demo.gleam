@@ -2,8 +2,10 @@ import gleam/option
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
+import tiramisu/debug
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
+import tiramisu/input
 import tiramisu/light
 import tiramisu/material
 import tiramisu/physics
@@ -21,12 +23,12 @@ pub type Id {
   Cube3
 }
 
-pub type Model {
-  Model(rotation: Float, physics_world: physics.PhysicsWorld(Id))
-}
-
 pub type Msg {
   Tick
+}
+
+pub type Model {
+  Model(debug: Bool)
 }
 
 pub fn main() -> Nil {
@@ -51,9 +53,7 @@ fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
       ]),
     )
 
-  let model = Model(rotation: 0.0, physics_world: physics_world)
-
-  #(model, effect.tick(Tick), option.None)
+  #(Model(False), effect.tick(Tick), option.Some(physics_world))
 }
 
 fn update(
@@ -61,23 +61,24 @@ fn update(
   msg: Msg,
   ctx: tiramisu.Context(Id),
 ) -> #(Model, Effect(Msg), option.Option(_)) {
+  echo debug.get_performance_stats()
+  let assert option.Some(physics_world) = ctx.physics_world
   case msg {
     Tick -> {
-      // Step physics simulation
-      let new_physics_world = physics.step(model.physics_world, ctx.delta_time)
-
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
-
-      #(
-        Model(rotation: new_rotation, physics_world: new_physics_world),
-        effect.tick(Tick),
-        option.None,
-      )
+      let new_physics_world = physics.step(physics_world)
+      case input.is_key_just_pressed(ctx.input, input.KeyD) {
+        True -> #(
+          Model(!model.debug),
+          effect.tick(Tick),
+          option.Some(new_physics_world),
+        )
+        False -> #(model, effect.tick(Tick), option.Some(new_physics_world))
+      }
     }
   }
 }
 
-fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let assert option.Some(physics_world) = ctx.physics_world
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -130,8 +131,10 @@ fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
-        physics.rigid_body(physics.Fixed, physics.Box(20.0, 0.2, 20.0))
-        |> physics.set_restitution(0.0),
+        physics.new_rigid_body(physics.Fixed)
+        |> physics.with_collider(physics.Box(20.0, 0.2, 20.0))
+        |> physics.with_restitution(0.0)
+        |> physics.build(),
       ),
     )
 
@@ -156,10 +159,12 @@ fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         Error(Nil) -> transform.at(position: vec3.Vec3(-2.0, 5.0, 0.0))
       },
       physics: option.Some(
-        physics.rigid_body(physics.Dynamic, physics.Box(1.0, 1.0, 1.0))
-        |> physics.set_mass(1.0)
-        |> physics.set_restitution(0.5)
-        |> physics.set_friction(0.5),
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(1.0)
+        |> physics.with_restitution(0.5)
+        |> physics.with_friction(0.5)
+        |> physics.build(),
       ),
     )
 
@@ -181,10 +186,12 @@ fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         Error(Nil) -> transform.at(position: vec3.Vec3(0.0, 7.0, 0.0))
       },
       physics: option.Some(
-        physics.rigid_body(physics.Dynamic, physics.Box(1.0, 1.0, 1.0))
-        |> physics.set_mass(1.0)
-        |> physics.set_restitution(0.6)
-        |> physics.set_friction(0.3),
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(1.0)
+        |> physics.with_restitution(0.6)
+        |> physics.with_friction(0.3)
+        |> physics.build(),
       ),
     )
 
@@ -206,12 +213,21 @@ fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         Error(Nil) -> transform.at(position: vec3.Vec3(2.0, 9.0, 0.0))
       },
       physics: option.Some(
-        physics.rigid_body(physics.Dynamic, physics.Box(1.0, 1.0, 1.0))
-        |> physics.set_mass(1.0)
-        |> physics.set_restitution(0.4)
-        |> physics.set_friction(0.6),
+        physics.new_rigid_body(physics.Dynamic)
+        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_mass(1.0)
+        |> physics.with_restitution(0.4)
+        |> physics.with_friction(0.6)
+        |> physics.build(),
       ),
     )
 
+  // Enable/disable debug collider visualization
+  case model.debug {
+    True -> debug.show_collider_wireframes(physics_world, True)
+    False -> debug.show_collider_wireframes(physics_world, False)
+  }
+
+  // Return scene
   [camera, ground, cube1, cube2, cube3, ..lights]
 }

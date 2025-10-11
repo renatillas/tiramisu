@@ -1,0 +1,1 @@
+-record(deleted, {path :: binary()}).

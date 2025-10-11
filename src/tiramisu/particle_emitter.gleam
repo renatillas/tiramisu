@@ -1,4 +1,5 @@
 import gleam/bool
+import gleam/float
 import gleam/option.{type Option}
 import vec/vec3.{type Vec3}
 
@@ -259,4 +260,64 @@ pub fn build(
     gravity_scale: builder.gravity_scale,
     max_particles: builder.max_particles,
   )
+}
+
+// --- Internal Accessors (for particle_manager) ---
+
+@internal
+pub fn get_emit_rate(emitter: ParticleEmitter) -> Int {
+  emitter.rate |> float.round
+}
+
+@internal
+pub fn get_max_particles(emitter: ParticleEmitter) -> Int {
+  emitter.max_particles
+}
+
+@internal
+pub fn get_velocity(emitter: ParticleEmitter) -> Vec3(Float) {
+  emitter.velocity
+}
+
+@internal
+pub fn get_velocity_variance(emitter: ParticleEmitter) -> Vec3(Float) {
+  emitter.velocity_variance
+}
+
+@internal
+pub fn get_size(emitter: ParticleEmitter) -> Float {
+  emitter.size
+}
+
+@internal
+pub fn get_size_variance(emitter: ParticleEmitter) -> Float {
+  emitter.size_variance
+}
+
+@internal
+pub fn get_lifetime(emitter: ParticleEmitter) -> Float {
+  emitter.lifetime
+}
+
+@internal
+pub fn get_lifetime_variance(emitter: ParticleEmitter) -> Float {
+  emitter.lifetime *. 0.2
+}
+
+@internal
+pub fn get_start_color(emitter: ParticleEmitter) -> Int {
+  emitter.color
+}
+
+@internal
+pub fn get_end_color(emitter: ParticleEmitter) -> Int {
+  case emitter.color_end {
+    option.Some(c) -> c
+    option.None -> emitter.color
+  }
+}
+
+@internal
+pub fn get_gravity_scale(emitter: ParticleEmitter) -> Float {
+  emitter.gravity_scale
 }

@@ -1,0 +1,1 @@
+-record(texture_asset, {url :: binary()}).

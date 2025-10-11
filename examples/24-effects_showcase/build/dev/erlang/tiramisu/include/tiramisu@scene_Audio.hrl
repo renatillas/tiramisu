@@ -1,0 +1,1 @@
+-record(audio, {id :: any(), audio :: tiramisu@audio:audio()}).

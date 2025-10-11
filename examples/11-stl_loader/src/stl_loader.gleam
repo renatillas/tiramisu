@@ -178,16 +178,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           },
           material: {
             let assert Ok(material) =
-              material.standard(
-                color: 0xff0000,
-                metalness: 0.5,
-                roughness: 0.5,
-                map: option.None,
-                normal_map: option.None,
-                ambient_oclusion_map: option.None,
-                roughness_map: option.None,
-                metalness_map: option.None,
-              )
+              material.new()
+              |> material.with_color(0xff0000)
+              |> material.with_metalness(0.5)
+              |> material.with_roughness(0.5)
+              |> material.build()
             material
           },
           transform: transform.Transform(
@@ -214,16 +209,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             },
             material: {
               let assert Ok(material) =
-                material.standard(
-                  color: 0x4ecdc4,
-                  metalness: 0.8,
-                  roughness: 0.2,
-                  map: option.None,
-                  normal_map: option.None,
-                  ambient_oclusion_map: option.None,
-                  roughness_map: option.None,
-                  metalness_map: option.None,
-                )
+                material.new()
+                |> material.with_color(0x4ecdc4)
+                |> material.with_metalness(0.8)
+                |> material.with_roughness(0.2)
+                |> material.build()
               material
             },
             transform: transform.Transform(
@@ -238,16 +228,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             geometry: geometry.custom_geometry(geom),
             material: {
               let assert Ok(material) =
-                material.standard(
-                  color: 0x4ecdc4,
-                  metalness: 0.8,
-                  roughness: 0.2,
-                  map: option.None,
-                  normal_map: option.None,
-                  ambient_oclusion_map: option.None,
-                  roughness_map: option.None,
-                  metalness_map: option.None,
-                )
+                material.new()
+                |> material.with_color(0x4ecdc4)
+                |> material.with_metalness(0.8)
+                |> material.with_roughness(0.2)
+                |> material.build()
               material
             },
             transform: transform.Transform(

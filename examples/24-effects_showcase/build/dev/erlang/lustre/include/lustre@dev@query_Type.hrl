@@ -1,0 +1,1 @@
+-record(type, {namespace :: binary(), tag :: binary()}).

@@ -82,7 +82,6 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         mat
       },
@@ -107,7 +106,6 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         mat
       },
@@ -131,7 +129,6 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         mat
       },
@@ -155,7 +152,6 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         mat
       },
@@ -179,7 +175,6 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         mat
       },

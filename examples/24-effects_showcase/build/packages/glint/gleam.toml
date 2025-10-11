@@ -1,0 +1,29 @@
+name = "glint"
+version = "1.2.1"
+
+# Fill out these fields if you intend to generate HTML documentation or publishname = "glint"
+# your project to the Hex package manager.
+#
+licences = ["Apache-2.0"]
+
+description = "Gleam command-line argument parsing with flags and automated help text generation."
+
+repository = { type = "github", user = "TanklesXL", repo = "glint" }
+
+links = [
+    { title = "Hex", href = "https://hex.pm/packages/glint" },
+    { title = "Docs", href = "https://hexdocs.pm/glint/" },
+]
+
+gleam = ">= 1.4.0 and < 2.0.0"
+
+[dependencies]
+gleam_stdlib = ">= 0.43.0 and < 2.0.0"
+snag = ">= 1.0.0 and < 2.0.0"
+gleam_community_ansi = "~> 1.0"
+gleam_community_colour = "~> 1.0 or ~> 2.0"
+
+[dev-dependencies]
+gleeunit = "~> 1.0"
+argv = ">= 1.0.2 and < 2.0.0"
+birdie = ">= 1.1.8 and < 2.0.0"

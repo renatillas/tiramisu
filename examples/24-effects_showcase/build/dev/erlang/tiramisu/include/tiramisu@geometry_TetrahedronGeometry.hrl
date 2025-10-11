@@ -1,0 +1,1 @@
+-record(tetrahedron_geometry, {radius :: float(), detail :: integer()}).

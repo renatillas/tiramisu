@@ -1,0 +1,13 @@
+{application, gleam_httpc, [
+    {vsn, "5.0.0"},
+    {applications, [gleam_erlang,
+                    gleam_http,
+                    gleam_stdlib,
+                    inets,
+                    ssl]},
+    {description, "Gleam bindings to Erlang's built in HTTP client, httpc"},
+    {modules, [gleam@httpc,
+               gleam_httpc@@main,
+               gleam_httpc_ffi]},
+    {registered, []}
+]}.

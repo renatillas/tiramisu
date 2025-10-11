@@ -18,7 +18,6 @@ pub opaque type Material {
   BasicMaterial(
     color: Int,
     map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
     transparent: Bool,
     opacity: Float,
   )
@@ -32,6 +31,8 @@ pub opaque type Material {
     metalness_map: Option(asset.Texture),
     metalness: Float,
     roughness: Float,
+    transparent: Bool,
+    opacity: Float,
   )
   /// Shiny material with specular highlights (like plastic or ceramic).
   PhongMaterial(
@@ -61,7 +62,6 @@ pub opaque type Material {
   SpriteMaterial(
     color: Int,
     map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
     transparent: Bool,
     opacity: Float,
   )
@@ -84,15 +84,14 @@ pub type MaterialError {
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(red) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0)
-/// let assert Ok(glass) = scene.basic_material(color: 0x88ccff, transparent: True, opacity: 0.5)
+/// let assert Ok(red) = material.basic(color: 0xff0000, transparent: False, opacity: 1.0, map: option.None)
+/// let assert Ok(glass) = material.basic(color: 0x88ccff, transparent: True, opacity: 0.5, map: option.None)
 /// ```
 pub fn basic(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
   map map: option.Option(asset.Texture),
-  normal_map normal_map: option.Option(asset.Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -103,7 +102,7 @@ pub fn basic(
     Error(OutOfBoundsOpacity(opacity)),
   )
 
-  Ok(BasicMaterial(color:, transparent:, opacity:, map:, normal_map:))
+  Ok(BasicMaterial(color:, transparent:, opacity:, map:))
 }
 
 /// Create a validated physically-based (PBR) standard material.
@@ -115,13 +114,15 @@ pub fn basic(
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(gold) = scene.standard_material(color: 0xffd700, metalness: 1.0, roughness: 0.3, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
-/// let assert Ok(plastic) = scene.standard_material(color: 0xff0000, metalness: 0.0, roughness: 0.5, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
+/// let assert Ok(gold) = scene.standard_material(color: 0xffd700, metalness: 1.0, roughness: 0.3, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
+/// let assert Ok(plastic) = scene.standard_material(color: 0xff0000, metalness: 0.0, roughness: 0.5, transparent: False, opacity: 1.0, map: option.None, normal_map: option.None, ao_map: option.None, roughness_map: option.None, metalness_map: option.None)
 /// ```
 pub fn standard(
   color color: Int,
   metalness metalness: Float,
   roughness roughness: Float,
+  transparent transparent: Bool,
+  opacity opacity: Float,
   map map: option.Option(asset.Texture),
   normal_map normal_map: option.Option(asset.Texture),
   ambient_oclusion_map ambient_oclusion_map: option.Option(asset.Texture),
@@ -140,11 +141,17 @@ pub fn standard(
     roughness <. 0.0 || roughness >. 1.0,
     Error(OutOfBoundsRoughness(roughness)),
   )
+  use <- bool.guard(
+    opacity <. 0.0 || opacity >. 1.0,
+    Error(OutOfBoundsOpacity(opacity)),
+  )
 
   Ok(StandardMaterial(
     color:,
     metalness:,
     roughness:,
+    transparent:,
+    opacity:,
     map:,
     normal_map:,
     roughness_map:,
@@ -180,14 +187,13 @@ pub fn line(
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(sprite_mat) = scene.sprite_material(color: 0xffffff, transparent: True, opacity: 0.8)
+/// let assert Ok(sprite_mat) = material.sprite(color: 0xffffff, transparent: True, opacity: 0.8, map: option.None)
 /// ```
 pub fn sprite(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
   map map: option.Option(asset.Texture),
-  normal_map normal_map: option.Option(asset.Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -198,7 +204,7 @@ pub fn sprite(
     Error(OutOfBoundsOpacity(opacity)),
   )
 
-  Ok(SpriteMaterial(color:, transparent:, opacity:, map:, normal_map:))
+  Ok(SpriteMaterial(color:, transparent:, opacity:, map:))
 }
 
 pub fn lambert(
@@ -262,6 +268,8 @@ pub opaque type StandardMaterialBuilder {
     color: Int,
     metalness: Float,
     roughness: Float,
+    transparent: Bool,
+    opacity: Float,
     map: Option(asset.Texture),
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
@@ -275,6 +283,8 @@ pub fn new() -> StandardMaterialBuilder {
     color: 0x808080,
     metalness: 0.5,
     roughness: 0.5,
+    transparent: False,
+    opacity: 1.0,
     map: option.None,
     normal_map: option.None,
     ambient_oclusion_map: option.None,
@@ -342,6 +352,20 @@ pub fn with_metalness_map(
   StandardMaterialBuilder(..builder, metalness_map: option.Some(metalness_map))
 }
 
+pub fn with_transparent(
+  builder: StandardMaterialBuilder,
+  transparent: Bool,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, transparent: transparent)
+}
+
+pub fn with_opacity(
+  builder: StandardMaterialBuilder,
+  opacity: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, opacity: opacity)
+}
+
 pub fn build(
   builder: StandardMaterialBuilder,
 ) -> Result(Material, MaterialError) {
@@ -349,6 +373,8 @@ pub fn build(
     color: builder.color,
     metalness: builder.metalness,
     roughness: builder.roughness,
+    transparent: builder.transparent,
+    opacity: builder.opacity,
     map: builder.map,
     normal_map: builder.normal_map,
     ambient_oclusion_map: builder.ambient_oclusion_map,
@@ -358,10 +384,13 @@ pub fn build(
 }
 
 @internal
-pub fn create_material(material: Material) -> Nil {
+pub type ThreeMaterial
+
+@internal
+pub fn create_material(material: Material) -> ThreeMaterial {
   case material {
-    BasicMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
-      create_basic_material(color, transparent, opacity, map, normal_map)
+    BasicMaterial(color:, map:, transparent:, opacity:) ->
+      create_basic_material(color, transparent, opacity, map)
     StandardMaterial(
       color:,
       map:,
@@ -371,11 +400,15 @@ pub fn create_material(material: Material) -> Nil {
       metalness_map:,
       metalness:,
       roughness:,
+      transparent:,
+      opacity:,
     ) ->
       create_standard_material(
         color,
         metalness,
         roughness,
+        transparent,
+        opacity,
         map,
         normal_map,
         ambient_oclusion_map,
@@ -395,8 +428,8 @@ pub fn create_material(material: Material) -> Nil {
     ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
       create_toon_material(color, map, normal_map, ambient_oclusion_map)
     LineMaterial(color:, linewidth:) -> create_line_material(color, linewidth)
-    SpriteMaterial(color:, map:, normal_map:, transparent:, opacity:) ->
-      create_sprite_material(color, transparent, opacity, map, normal_map)
+    SpriteMaterial(color:, map:, transparent:, opacity:) ->
+      create_sprite_material(color, transparent, opacity, map)
   }
 }
 
@@ -406,20 +439,21 @@ fn create_basic_material(
   transparent: Bool,
   opacity: Float,
   map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createStandardMaterial")
 fn create_standard_material(
   color: Int,
   metalness: Float,
   roughness: Float,
+  transparent: Bool,
+  opacity: Float,
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
   roughness_map: Option(asset.Texture),
   metalness_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createPhongMaterial")
 fn create_phong_material(
@@ -428,7 +462,7 @@ fn create_phong_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createLambertMaterial")
 fn create_lambert_material(
@@ -436,7 +470,7 @@ fn create_lambert_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createToonMaterial")
 fn create_toon_material(
@@ -444,10 +478,10 @@ fn create_toon_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createLineMaterial")
-fn create_line_material(color: Int, linewidth: Float) -> Nil
+fn create_line_material(color: Int, linewidth: Float) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createSpriteMaterial")
 fn create_sprite_material(
@@ -455,5 +489,4 @@ fn create_sprite_material(
   transparent: Bool,
   opacity: Float,
   map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-) -> Nil
+) -> ThreeMaterial

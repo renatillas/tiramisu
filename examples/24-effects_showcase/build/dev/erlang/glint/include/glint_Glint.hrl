@@ -1,0 +1,1 @@
+-record(glint, {config :: glint:config(), cmd :: glint:command_node(any())}).

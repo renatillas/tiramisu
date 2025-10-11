@@ -1,0 +1,17 @@
+{application, vec, [
+    {vsn, "3.0.1"},
+    {applications, [gleam_stdlib]},
+    {description, "A vectors library for the Gleam programming language"},
+    {modules, [vec@@main,
+               vec@internal,
+               vec@vec2,
+               vec@vec2f,
+               vec@vec2i,
+               vec@vec3,
+               vec@vec3f,
+               vec@vec3i,
+               vec@vec4,
+               vec@vec4f,
+               vec@vec4i]},
+    {registered, []}
+]}.

@@ -1,0 +1,1 @@
+-record(non_positive_depth, {depth :: float()}).

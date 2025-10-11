@@ -1,0 +1,1 @@
+-record(capsule, {half_height :: float(), radius :: float()}).

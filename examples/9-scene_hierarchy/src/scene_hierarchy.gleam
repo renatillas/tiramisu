@@ -114,7 +114,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             transparent: False,
             opacity: 1.0,
             map: option.None,
-            normal_map: option.None,
           )
         material
       },

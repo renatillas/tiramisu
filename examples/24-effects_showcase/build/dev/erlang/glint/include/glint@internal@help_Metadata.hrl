@@ -1,0 +1,1 @@
+-record(metadata, {name :: binary(), description :: binary()}).

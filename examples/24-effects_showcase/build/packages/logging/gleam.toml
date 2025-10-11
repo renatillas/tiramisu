@@ -1,0 +1,15 @@
+name = "logging"
+version = "1.3.0"
+description = "Configuration for the Erlang logger"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "lpil", repo = "logging" }
+links = [
+  { title = "Website", href = "https://gleam.run" },
+  { title = "Sponsor", href = "https://github.com/sponsors/lpil" },
+]
+
+[dependencies]
+gleam_stdlib = "~> 0.34 or ~> 1.0"
+
+[dev-dependencies]
+gleeunit = "~> 1.0"

@@ -1,0 +1,1 @@
+-record(remove, {kind :: integer(), index :: integer()}).

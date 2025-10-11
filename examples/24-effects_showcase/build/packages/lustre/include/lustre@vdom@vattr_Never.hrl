@@ -1,0 +1,1 @@
+-record(never, {kind :: integer()}).

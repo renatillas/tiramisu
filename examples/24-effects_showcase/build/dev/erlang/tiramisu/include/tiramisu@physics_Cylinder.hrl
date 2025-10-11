@@ -1,0 +1,1 @@
+-record(cylinder, {half_height :: float(), radius :: float()}).

@@ -15,24 +15,34 @@ import structures/bimap
 import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
 
-// --- Opaque Types ---
+pub type RapierWorld
+
+pub type RapierEventQueue
+
+pub type RapierRigidBody
+
+pub type Quaternion {
+  Quaternion(x: Float, y: Float, z: Float, w: Float)
+}
 
 /// Opaque handle to the Rapier physics world
 /// This is part of your Model and gets updated each frame
-pub opaque type PhysicsWorld(body) {
+pub opaque type PhysicsWorld(id) {
   PhysicsWorld(
-    bodies: Dict(body, PhysicsBodyState),
+    world: RapierWorld,
+    queue: RapierEventQueue,
+    /// Declared rigid body configurations (from scene)
+    bodies: Dict(id, RigidBody),
+    /// Actual Rapier rigid body handles
+    rapier_bodies: Dict(String, RapierRigidBody),
     /// Commands to be applied during the next physics step
-    pending_commands: List(PhysicsCommand(body)),
-    bimap: bimap.BiMap(body, String),
+    pending_commands: List(PhysicsCommand(id)),
+    /// Mapping from collider handles to body string IDs
+    collider_to_body: Dict(Int, String),
+    /// Collision events from the last physics step
+    collision_events: List(CollisionEvent),
+    bimap: bimap.BiMap(id, String),
   )
-}
-
-/// Internal state tracking for a physics body
-/// Stores only the body configuration metadata
-/// Transforms are always queried directly from Rapier
-type PhysicsBodyState {
-  PhysicsBodyState(body: RigidBody)
 }
 
 /// Physics commands that can be queued and applied during step
@@ -48,7 +58,7 @@ type PhysicsCommand(body) {
 // --- Public Types ---
 
 /// Physics body type
-pub type BodyType {
+pub type Body {
   /// Dynamic bodies are affected by forces and gravity
   Dynamic
   /// Kinematic bodies can be moved programmatically but don't respond to forces
@@ -127,11 +137,11 @@ pub type CollisionGroups {
   )
 }
 
-/// Physics body configuration (immutable, declarative)
+/// Physics body configuration
 pub type RigidBody {
   RigidBody(
     /// Type of rigid body
-    body_type: BodyType,
+    kind: Body,
     /// Mass (only for Dynamic bodies)
     mass: option.Option(Float),
     /// Restitution (bounciness) 0.0 = no bounce, 1.0 = perfect bounce
@@ -154,11 +164,11 @@ pub type RigidBody {
 }
 
 /// Physics world configuration
-pub type WorldConfig(body) {
+pub type WorldConfig(id) {
   WorldConfig(
     /// Gravity vector (typically Vec3(0.0, -9.81, 0.0))
     gravity: Vec3(Float),
-    correspondances: List(#(body, String)),
+    correspondances: List(#(id, String)),
   )
 }
 
@@ -188,10 +198,21 @@ pub type CollisionEvent {
 
 /// Create a new physics world (call this in your init function)
 pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
-  // Initialize the Rapier world via FFI
-  init_world_ffi(config)
+  // Initialize the Rapier world via physics_manager
+  // Convert config to Dynamic for physics_manager
+  let #(world, queue) = create_world(config)
   let bimap = create_bimap(config.correspondances)
-  PhysicsWorld(bodies: dict.new(), pending_commands: [], bimap:)
+
+  PhysicsWorld(
+    world,
+    queue,
+    bodies: dict.new(),
+    rapier_bodies: dict.new(),
+    pending_commands: [],
+    collider_to_body: dict.new(),
+    collision_events: [],
+    bimap:,
+  )
 }
 
 fn create_bimap(correspondances: List(#(body, String))) {
@@ -201,65 +222,10 @@ fn create_bimap(correspondances: List(#(body, String))) {
   })
 }
 
-/// Create a new rigid body with default settings
-pub fn rigid_body(body_type: BodyType, collider: ColliderShape) -> RigidBody {
-  RigidBody(
-    body_type: body_type,
-    mass: option.None,
-    restitution: 0.3,
-    friction: 0.5,
-    linear_damping: 0.0,
-    angular_damping: 0.0,
-    collider: collider,
-    ccd_enabled: False,
-    axis_locks: AxisLock(
-      lock_translation_x: False,
-      lock_translation_y: False,
-      lock_translation_z: False,
-      lock_rotation_x: False,
-      lock_rotation_y: False,
-      lock_rotation_z: False,
-    ),
-    collision_groups: option.None,
-  )
-}
-
-/// Set mass for a rigid body
-pub fn set_mass(body: RigidBody, mass: Float) -> RigidBody {
-  RigidBody(..body, mass: option.Some(mass))
-}
-
-/// Set restitution (bounciness)
-pub fn set_restitution(body: RigidBody, restitution: Float) -> RigidBody {
-  RigidBody(..body, restitution: restitution)
-}
-
-/// Set friction
-pub fn set_friction(body: RigidBody, friction: Float) -> RigidBody {
-  RigidBody(..body, friction: friction)
-}
-
-/// Set linear damping
-pub fn set_linear_damping(body: RigidBody, damping: Float) -> RigidBody {
-  RigidBody(..body, linear_damping: damping)
-}
-
-/// Set angular damping
-pub fn set_angular_damping(body: RigidBody, damping: Float) -> RigidBody {
-  RigidBody(..body, angular_damping: damping)
-}
-
-/// Enable continuous collision detection
-pub fn enable_ccd(body: RigidBody) -> RigidBody {
-  RigidBody(..body, ccd_enabled: True)
-}
-
-// --- Builder Pattern for Rigid Bodies ---
-
 /// Builder for creating rigid bodies with a fluent API
-pub opaque type RigidBodyBuilder {
+pub opaque type RigidBodyBuilder(a) {
   RigidBodyBuilder(
-    body_type: BodyType,
+    kind: Body,
     collider: option.Option(ColliderShape),
     mass: option.Option(Float),
     restitution: Float,
@@ -282,9 +248,9 @@ pub opaque type RigidBodyBuilder {
 ///   |> physics.body_mass(5.0)
 ///   |> physics.build_body()
 /// ```
-pub fn new_rigid_body(body_type: BodyType) -> RigidBodyBuilder {
+pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
   RigidBodyBuilder(
-    body_type: body_type,
+    kind: body_type,
     collider: option.None,
     mass: option.None,
     restitution: 0.3,
@@ -305,57 +271,64 @@ pub fn new_rigid_body(body_type: BodyType) -> RigidBodyBuilder {
 }
 
 /// Set the collider shape for the rigid body
-pub fn body_collider(
-  builder: RigidBodyBuilder,
+pub fn with_collider(
+  builder: RigidBodyBuilder(_),
   collider: ColliderShape,
-) -> RigidBodyBuilder {
+) -> RigidBodyBuilder(WithCollider) {
   RigidBodyBuilder(..builder, collider: option.Some(collider))
 }
 
 /// Set the mass for the rigid body
-pub fn body_mass(builder: RigidBodyBuilder, mass: Float) -> RigidBodyBuilder {
+pub fn with_mass(
+  builder: RigidBodyBuilder(_),
+  mass: Float,
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, mass: option.Some(mass))
 }
 
 /// Set the restitution (bounciness) for the rigid body
-pub fn body_restitution(
-  builder: RigidBodyBuilder,
+pub fn with_restitution(
+  builder: RigidBodyBuilder(_),
   restitution: Float,
-) -> RigidBodyBuilder {
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, restitution: restitution)
 }
 
 /// Set the friction for the rigid body
-pub fn body_friction(
-  builder: RigidBodyBuilder,
+pub fn with_friction(
+  builder: RigidBodyBuilder(_),
   friction: Float,
-) -> RigidBodyBuilder {
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, friction: friction)
 }
 
 /// Set the linear damping for the rigid body
-pub fn body_linear_damping(
-  builder: RigidBodyBuilder,
+pub fn with_linear_damping(
+  builder: RigidBodyBuilder(_),
   damping: Float,
-) -> RigidBodyBuilder {
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, linear_damping: damping)
 }
 
 /// Set the angular damping for the rigid body
-pub fn body_angular_damping(
-  builder: RigidBodyBuilder,
+pub fn with_angular_damping(
+  builder: RigidBodyBuilder(_),
   damping: Float,
-) -> RigidBodyBuilder {
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, angular_damping: damping)
 }
 
 /// Enable continuous collision detection for the rigid body
-pub fn enable_body_ccd(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_body_ccd_enabled(
+  builder: RigidBodyBuilder(_),
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(..builder, ccd_enabled: True)
 }
 
 /// Lock translation on the X axis
-pub fn lock_translation_x(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_translation_x(
+  builder: RigidBodyBuilder(_),
+) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -364,7 +337,9 @@ pub fn lock_translation_x(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 }
 
 /// Lock translation on the Y axis
-pub fn lock_translation_y(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_translation_y(
+  builder: RigidBodyBuilder(_),
+) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -373,7 +348,9 @@ pub fn lock_translation_y(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 }
 
 /// Lock translation on the Z axis
-pub fn lock_translation_z(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_translation_z(
+  builder: RigidBodyBuilder(_),
+) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -382,7 +359,7 @@ pub fn lock_translation_z(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 }
 
 /// Lock rotation on the X axis (pitch)
-pub fn lock_rotation_x(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_rotation_x(builder: RigidBodyBuilder(_)) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -391,7 +368,7 @@ pub fn lock_rotation_x(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 }
 
 /// Lock rotation on the Y axis (yaw)
-pub fn lock_rotation_y(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_rotation_y(builder: RigidBodyBuilder(_)) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -400,7 +377,7 @@ pub fn lock_rotation_y(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 }
 
 /// Lock rotation on the Z axis (roll)
-pub fn lock_rotation_z(builder: RigidBodyBuilder) -> RigidBodyBuilder {
+pub fn with_lock_rotation_z(builder: RigidBodyBuilder(_)) -> RigidBodyBuilder(_) {
   let locks = builder.axis_locks
   RigidBodyBuilder(
     ..builder,
@@ -422,11 +399,11 @@ pub fn lock_rotation_z(builder: RigidBodyBuilder) -> RigidBodyBuilder {
 ///   )
 ///   |> physics.build_body()
 /// ```
-pub fn body_collision_groups(
-  builder: RigidBodyBuilder,
+pub fn with_collision_groups(
+  builder: RigidBodyBuilder(_),
   membership membership: List(Int),
-  filter filter: List(Int),
-) -> RigidBodyBuilder {
+  can_collide_with filter: List(Int),
+) -> RigidBodyBuilder(_) {
   RigidBodyBuilder(
     ..builder,
     collision_groups: option.Some(CollisionGroups(
@@ -436,109 +413,78 @@ pub fn body_collision_groups(
   )
 }
 
+pub type WithCollider
+
+pub type WithoutCollider
+
 /// Build the final rigid body from the builder
 ///
 /// Returns an error if no collider was set.
-pub fn build(builder: RigidBodyBuilder) -> Result(RigidBody, String) {
-  case builder.collider {
-    option.Some(collider) ->
-      Ok(RigidBody(
-        body_type: builder.body_type,
-        mass: builder.mass,
-        restitution: builder.restitution,
-        friction: builder.friction,
-        linear_damping: builder.linear_damping,
-        angular_damping: builder.angular_damping,
-        collider: collider,
-        ccd_enabled: builder.ccd_enabled,
-        axis_locks: builder.axis_locks,
-        collision_groups: builder.collision_groups,
-      ))
-    option.None -> Error("Collider shape is required for rigid body")
-  }
-}
-
-// --- Physics Simulation (called each frame in update) ---
-
-/// Sync a single body ID with the body registry
-/// Returns updated dict with body added if needed
-fn sync_body_id(
-  bodies_dict: Dict(body, PhysicsBodyState),
-  id: body,
-) -> Dict(body, PhysicsBodyState) {
-  case dict.has_key(bodies_dict, id) {
-    True -> bodies_dict
-    False -> {
-      // Body exists in Rapier but not tracked yet
-      // This happens on first frame after patch creates it
-      // Use a placeholder config - the actual config is in Rapier
-      let placeholder_body = rigid_body(Dynamic, Box(1.0, 1.0, 1.0))
-      let state = PhysicsBodyState(body: placeholder_body)
-      dict.insert(bodies_dict, id, state)
-    }
-  }
+pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
+  let assert option.Some(collider) = builder.collider
+  RigidBody(
+    kind: builder.kind,
+    mass: builder.mass,
+    restitution: builder.restitution,
+    friction: builder.friction,
+    linear_damping: builder.linear_damping,
+    angular_damping: builder.angular_damping,
+    collider: collider,
+    ccd_enabled: builder.ccd_enabled,
+    axis_locks: builder.axis_locks,
+    collision_groups: builder.collision_groups,
+  )
 }
 
 /// Apply a single physics command via FFI
 fn apply_command(
   command: PhysicsCommand(body),
   bimap: bimap.BiMap(body, String),
+  rapier_bodies: Dict(String, RapierRigidBody),
 ) -> Result(Nil, Nil) {
-  // Extract the ID and convert to string using BiMap
+  // Extract the ID and convert to string using BiMap, then get Rapier body
   case command {
     ApplyForce(id, force) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          apply_force_ffi(string_id, force)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      add_body_force_ffi(rapier_body, force.x, force.y, force.z, True)
+      Ok(Nil)
     }
     ApplyImpulse(id, impulse) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          apply_impulse_ffi(string_id, impulse)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      apply_body_impulse_ffi(rapier_body, impulse.x, impulse.y, impulse.z, True)
+      Ok(Nil)
     }
     SetVelocity(id, velocity) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          set_velocity_ffi(string_id, velocity)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      set_body_linvel_ffi(rapier_body, velocity.x, velocity.y, velocity.z, True)
+      Ok(Nil)
     }
     SetAngularVelocity(id, velocity) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          set_angular_velocity_ffi(string_id, velocity)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      set_body_angvel_ffi(rapier_body, velocity.x, velocity.y, velocity.z, True)
+      Ok(Nil)
     }
     ApplyTorque(id, torque) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          apply_torque_ffi(string_id, torque)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      add_body_torque_ffi(rapier_body, torque.x, torque.y, torque.z, True)
+      Ok(Nil)
     }
     ApplyTorqueImpulse(id, impulse) -> {
-      case bimap.get(bimap, id) {
-        Ok(string_id) -> {
-          apply_torque_impulse_ffi(string_id, impulse)
-          Ok(Nil)
-        }
-        Error(_) -> Error(Nil)
-      }
+      use string_id <- result.try(bimap.get(bimap, id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      apply_body_torque_impulse_ffi(
+        rapier_body,
+        impulse.x,
+        impulse.y,
+        impulse.z,
+        True,
+      )
+      Ok(Nil)
     }
   }
 }
@@ -546,28 +492,54 @@ fn apply_command(
 /// Step the physics simulation forward
 /// This should be called in your update function each frame
 /// Returns updated world with new transforms for all bodies
-pub fn step(world: PhysicsWorld(body), delta_time: Float) -> PhysicsWorld(body) {
-  // Apply all pending commands before stepping (reverse to apply in FIFO order)
-  list.each(list.reverse(world.pending_commands), fn(command) {
-    let _ = apply_command(command, world.bimap)
+pub fn step(world: PhysicsWorld(body)) -> PhysicsWorld(body) {
+  // Apply all pending commands
+  list.each(world.pending_commands, fn(command) {
+    let _ = apply_command(command, world.bimap, world.rapier_bodies)
     Nil
   })
 
-  // Step the physics simulation via FFI
-  step_world_ffi(delta_time)
+  // Step the Rapier world
+  step_world_ffi(world.world, world.queue)
 
-  // Get all body IDs that exist in Rapier
-  let all_body_ids =
-    list.map(get_all_body_ids_ffi(), fn(item) {
-      bimap.get_val(world.bimap, item)
-    })
-    |> result.values
-  // Sync body registry - add any bodies that exist in Rapier but not in our dict
-  // This handles bodies created via scene patches
-  let updated_bodies = list.fold(all_body_ids, world.bodies, sync_body_id)
+  // Drain collision events from the queue
+  let collision_events =
+    drain_collision_events(world.queue, world.collider_to_body)
 
-  // Return world with cleared commands
-  PhysicsWorld(..world, bodies: updated_bodies, pending_commands: [])
+  // Return world with cleared commands and updated events
+  PhysicsWorld(
+    ..world,
+    pending_commands: [],
+    collision_events: collision_events,
+  )
+}
+
+/// Drain collision events from the Rapier event queue
+/// Converts collider handles to body IDs using the collider_to_body mapping
+fn drain_collision_events(
+  queue: RapierEventQueue,
+  collider_to_body: Dict(Int, String),
+) -> List(CollisionEvent) {
+  // Call FFI to drain events and return them as a list
+  let raw_events = drain_collision_events_ffi(queue)
+
+  // Convert raw events (with collider handles) to CollisionEvents (with body IDs)
+  list.filter_map(raw_events, fn(raw_event) {
+    let #(handle1, handle2, started) = raw_event
+
+    // Look up body IDs for both collider handles
+    case
+      dict.get(collider_to_body, handle1),
+      dict.get(collider_to_body, handle2)
+    {
+      Ok(body_id1), Ok(body_id2) ->
+        case started {
+          True -> Ok(CollisionStarted(body_id1, body_id2))
+          False -> Ok(CollisionEnded(body_id1, body_id2))
+        }
+      _, _ -> Error(Nil)
+    }
+  })
 }
 
 /// Get the current transform of a rigid body.
@@ -578,7 +550,7 @@ pub fn step(world: PhysicsWorld(body), delta_time: Float) -> PhysicsWorld(body) 
 /// ## Example
 ///
 /// ```gleam
-/// let cube_transform = case physics.get_transform("cube1") {
+/// let cube_transform = case physics.get_transform(physics_world, Cube1) {
 ///   Ok(t) -> t
 ///   Error(_) -> transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
 /// }
@@ -587,8 +559,62 @@ pub fn get_transform(
   physics_world: PhysicsWorld(id),
   id: id,
 ) -> Result(Transform, Nil) {
-  bimap.get(physics_world.bimap, id)
-  |> result.try(get_body_transform_ffi)
+  use string_id <- result.try(bimap.get(physics_world.bimap, id))
+  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, string_id))
+  // Get translation and rotation from Rapier body
+  let translation = get_body_translation_ffi(rapier_body)
+  let rotation_quat = get_body_rotation_ffi(rapier_body)
+
+  // Convert quaternion to Euler angles (done in FFI)
+  let euler =
+    quat_to_euler_ffi(
+      rotation_quat.x,
+      rotation_quat.y,
+      rotation_quat.z,
+      rotation_quat.w,
+    )
+
+  Ok(
+    transform.identity
+    |> transform.with_position(vec3.Vec3(
+      translation.x,
+      translation.y,
+      translation.z,
+    ))
+    |> transform.with_rotation(euler),
+  )
+}
+
+/// Get the raw position and quaternion rotation from a rigid body.
+///
+/// This returns the rotation as a quaternion directly from Rapier,
+/// avoiding conversion to Euler angles which can cause rotation errors.
+///
+/// This is used internally by the renderer for physics synchronization.
+///
+/// ## Example
+///
+/// ```gleam
+/// case physics.get_body_transform_raw(physics_world, Cube1) {
+///   Ok(#(position, quaternion)) -> {
+///     // Use position and quaternion directly
+///   }
+///   Error(_) -> // Handle missing body
+/// }
+/// ```
+@internal
+pub fn get_body_transform_raw(
+  physics_world: PhysicsWorld(id),
+  id: id,
+) -> Result(#(Vec3(Float), Quaternion), Nil) {
+  use string_id <- result.try(bimap.get(physics_world.bimap, id))
+  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, string_id))
+
+  // Get translation and rotation directly from Rapier body
+  let translation = get_body_translation_ffi(rapier_body)
+  let quaternion = get_body_rotation_ffi(rapier_body)
+
+  Ok(#(translation, quaternion))
 }
 
 // --- Forces and Impulses (Functional API) ---
@@ -649,9 +675,15 @@ pub fn set_velocity(
   ])
 }
 
-/// Get the current velocity of a rigid body (queries immediately)
-pub fn get_velocity(id: String) -> Result(Vec3(Float), Nil) {
-  get_velocity_ffi(id)
+/// Get the current velocity of a rigid body
+pub fn get_velocity(
+  world: PhysicsWorld(body),
+  id: body,
+) -> Result(Vec3(Float), Nil) {
+  use string_id <- result.try(bimap.get(world.bimap, id))
+  use rapier_body <- result.try(dict.get(world.rapier_bodies, string_id))
+  let vel = get_body_linvel_ffi(rapier_body)
+  Ok(vec3.Vec3(vel.x, vel.y, vel.z))
 }
 
 /// Queue an angular velocity change for a rigid body during the next physics step.
@@ -668,13 +700,15 @@ pub fn set_angular_velocity(
   ])
 }
 
-/// Get the current angular velocity of a rigid body (queries immediately)
+/// Get the current angular velocity of a rigid body
 pub fn get_angular_velocity(
   world: PhysicsWorld(body),
   id: body,
 ) -> Result(Vec3(Float), Nil) {
-  bimap.get(world.bimap, id)
-  |> result.try(get_angular_velocity_ffi)
+  use string_id <- result.try(bimap.get(world.bimap, id))
+  use rapier_body <- result.try(dict.get(world.rapier_bodies, string_id))
+  let vel = get_body_angvel_ffi(rapier_body)
+  Ok(vec3.Vec3(vel.x, vel.y, vel.z))
 }
 
 /// Queue a torque to be applied to a rigid body during the next physics step.
@@ -734,18 +768,44 @@ pub fn raycast(
   direction direction: Vec3(Float),
   max_distance max_distance: Float,
 ) -> Result(RaycastHit(id), Nil) {
-  // Call the FFI which returns RaycastHit with string ID
-  case raycast_ffi(origin, direction, max_distance) {
-    Ok(hit) -> {
-      // Convert string ID back to typed ID using BiMap
-      case bimap.get_val(world.bimap, hit.id) {
-        Ok(typed_id) ->
-          Ok(RaycastHit(
-            id: typed_id,
-            point: hit.point,
-            normal: hit.normal,
-            distance: hit.distance,
-          ))
+  // Create a ray using Rapier FFI
+  let ray =
+    create_ray_ffi(
+      origin.x,
+      origin.y,
+      origin.z,
+      direction.x,
+      direction.y,
+      direction.z,
+    )
+
+  // Cast the ray and get hit info with normal
+  case cast_ray_and_get_normal_ffi(world.world, ray, max_distance, True) {
+    Ok(hit_info) -> {
+      // Extract collider handle from hit info
+      let collider_handle = get_hit_collider_handle_ffi(hit_info)
+
+      // Look up the body ID from collider handle
+      case dict.get(world.collider_to_body, collider_handle) {
+        Ok(string_id) -> {
+          // Convert string ID to typed ID
+          case bimap.get_val(world.bimap, string_id) {
+            Ok(typed_id) -> {
+              // Extract hit point and normal from hit info
+              let toi = get_hit_toi_ffi(hit_info)
+              let point = ray_point_at_ffi(ray, toi)
+              let normal = get_hit_normal_ffi(hit_info)
+
+              Ok(RaycastHit(
+                id: typed_id,
+                point: vec3.Vec3(point.x, point.y, point.z),
+                normal: vec3.Vec3(normal.x, normal.y, normal.z),
+                distance: toi,
+              ))
+            }
+            Error(_) -> Error(Nil)
+          }
+        }
         Error(_) -> Error(Nil)
       }
     }
@@ -761,7 +821,7 @@ pub fn raycast(
 ///
 /// ```gleam
 /// // Check what's in front of the player
-/// let hits = physics.raycast_all(origin, direction, max_distance: 100.0)
+/// let hits = physics.raycast_all(world, origin, direction, max_distance: 100.0)
 ///
 /// // Find first enemy hit
 /// let enemy_hit = list.find(hits, fn(hit) {
@@ -769,54 +829,36 @@ pub fn raycast(
 /// })
 /// ```
 pub fn raycast_all(
-  origin origin: Vec3(Float),
-  direction direction: Vec3(Float),
-  max_distance max_distance: Float,
+  _world: PhysicsWorld(id),
+  origin _origin: Vec3(Float),
+  direction _direction: Vec3(Float),
+  max_distance _max_distance: Float,
 ) -> List(RaycastHit(id)) {
-  raycast_all_ffi(origin, direction, max_distance)
+  // TODO: Implement using Rapier's intersectionsWithRay
+  []
 }
 
-// --- Collision Events ---
-
-/// Get collision events that occurred during the last physics step
+/// Get all collision events that occurred during the last physics step.
 ///
-/// Call this after `physics.step()` to get all collisions that occurred.
+/// Events are automatically collected when `step()` is called and stored in the world.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// // In your update function
-/// let world = physics.step(world, ctx.delta_time)
-/// let events = physics.get_collision_events()
+/// let physics_world = physics.step(physics_world)
+/// let collision_events = physics.get_collision_events(physics_world)
 ///
-/// // Process collision events
-/// list.each(events, fn(event) {
+/// list.each(collision_events, fn(event) {
 ///   case event {
-///     physics.CollisionStarted("player", enemy_id) -> {
-///       // Player hit an enemy, apply damage
-///     }
-///     physics.CollisionStarted("bullet", enemy_id) -> {
-///       // Bullet hit an enemy
-///     }
-///     _ -> Nil
+///     physics.CollisionStarted(a, b) ->
+///       io.println(a <> " started colliding with " <> b)
+///     physics.CollisionEnded(a, b) ->
+///       io.println(a <> " ended colliding with " <> b)
 ///   }
 /// })
 /// ```
-pub fn get_collision_events() -> List(CollisionEvent) {
-  get_collision_events_ffi()
-}
-
-/// Check if two specific bodies are currently colliding
-///
-/// ## Example
-///
-/// ```gleam
-/// if physics.are_colliding("player", "ground") {
-///   // Player is on the ground, allow jumping
-/// }
-/// ```
-pub fn are_colliding(body_a: String, body_b: String) -> Bool {
-  are_colliding_ffi(body_a, body_b)
+pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent) {
+  world.collision_events
 }
 
 // --- Helper Functions for FFI ---
@@ -826,6 +868,67 @@ pub fn are_colliding(body_a: String, body_b: String) -> Bool {
 @internal
 pub fn id_to_string(world: PhysicsWorld(id), id: id) -> Result(String, Nil) {
   bimap.get(world.bimap, id)
+}
+
+/// Iterate over all physics bodies and call a function for each
+/// This keeps all internal field access within the physics module
+@internal
+pub fn for_each_body(
+  world: PhysicsWorld(id),
+  callback: fn(id, Transform) -> Nil,
+) -> Nil {
+  // Access rapier_bodies directly - this ensures we're within the module where the opaque type is defined
+  for_each_body_internal(world.rapier_bodies, world.bimap, world, callback)
+}
+
+// Internal helper that does the actual iteration
+fn for_each_body_internal(
+  rapier_bodies: dict.Dict(String, RapierRigidBody),
+  bimap: bimap.BiMap(id, String),
+  world: PhysicsWorld(id),
+  callback: fn(id, Transform) -> Nil,
+) -> Nil {
+  // Get all string IDs from rapier_bodies
+  let string_ids = dict.keys(rapier_bodies)
+
+  // For each string ID, convert to typed ID and get transform
+  list.each(string_ids, fn(string_id) {
+    case bimap.get_val(bimap, string_id) {
+      Ok(typed_id) -> {
+        // Get the transform for this body
+        case get_transform(world, typed_id) {
+          Ok(transform) -> callback(typed_id, transform)
+          Error(_) -> Nil
+        }
+      }
+      Error(_) -> Nil
+    }
+  })
+}
+
+/// Iterate over all physics bodies with raw quaternion data.
+///
+/// This is used by the renderer for physics synchronization, avoiding
+/// quaternion-to-Euler conversion which can cause rotation errors.
+@internal
+pub fn for_each_body_raw(
+  world: PhysicsWorld(id),
+  callback: fn(id, Vec3(Float), Quaternion) -> Nil,
+) -> Nil {
+  let string_ids = dict.keys(world.rapier_bodies)
+
+  list.each(string_ids, fn(string_id) {
+    case bimap.get_val(world.bimap, string_id) {
+      Ok(typed_id) -> {
+        case get_body_transform_raw(world, typed_id) {
+          Ok(#(position, quaternion)) ->
+            callback(typed_id, position, quaternion)
+          Error(_) -> Nil
+        }
+      }
+      Error(_) -> Nil
+    }
+  })
 }
 
 // --- Internal Helper Functions ---
@@ -865,59 +968,468 @@ pub fn collision_groups_to_bitmask(groups: CollisionGroups) -> Int {
 }
 
 // --- FFI Functions ---
+// These go directly to Rapier FFI
 
-@external(javascript, "../rapier.ffi.mjs", "initWorld")
-fn init_world_ffi(config: WorldConfig(body)) -> Nil
+// Rigid body operations
+@external(javascript, "../rapier.ffi.mjs", "addBodyForce")
+fn add_body_force_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "applyBodyImpulse")
+fn apply_body_impulse_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyLinvel")
+fn set_body_linvel_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyLinvel")
+fn get_body_linvel_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyAngvel")
+fn set_body_angvel_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyAngvel")
+fn get_body_angvel_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
+
+@external(javascript, "../rapier.ffi.mjs", "addBodyTorque")
+fn add_body_torque_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "applyBodyTorqueImpulse")
+fn apply_body_torque_impulse_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyTranslation")
+fn get_body_translation_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyRotation")
+fn get_body_rotation_ffi(body: RapierRigidBody) -> Quaternion
+
+@external(javascript, "../rapier.ffi.mjs", "quaternionToEuler")
+fn quat_to_euler_ffi(x: Float, y: Float, z: Float, w: Float) -> vec3.Vec3(Float)
+
+@external(javascript, "../rapier.ffi.mjs", "eulerToQuaternion")
+fn euler_to_quat_ffi(x: Float, y: Float, z: Float) -> Quaternion
+
+// Raycasting FFI using Rapier
+type RapierRay
+
+type RapierRayHit
+
+@external(javascript, "../rapier.ffi.mjs", "createRay")
+fn create_ray_ffi(
+  origin_x: Float,
+  origin_y: Float,
+  origin_z: Float,
+  dir_x: Float,
+  dir_y: Float,
+  dir_z: Float,
+) -> RapierRay
+
+@external(javascript, "../rapier.ffi.mjs", "castRayAndGetNormal")
+fn cast_ray_and_get_normal_ffi(
+  world: RapierWorld,
+  ray: RapierRay,
+  max_distance: Float,
+  solid: Bool,
+) -> Result(RapierRayHit, Nil)
+
+@external(javascript, "../rapier.ffi.mjs", "rayPointAt")
+fn ray_point_at_ffi(ray: RapierRay, toi: Float) -> vec3.Vec3(Float)
+
+// Extract info from RapierRayHit
+@external(javascript, "../rapier.ffi.mjs", "getHitColliderHandle")
+fn get_hit_collider_handle_ffi(hit: RapierRayHit) -> Int
+
+@external(javascript, "../rapier.ffi.mjs", "getHitToi")
+fn get_hit_toi_ffi(hit: RapierRayHit) -> Float
+
+@external(javascript, "../rapier.ffi.mjs", "getHitNormal")
+fn get_hit_normal_ffi(hit: RapierRayHit) -> vec3.Vec3(Float)
+
+// ============================================================================
+// WORLD INITIALIZATION
+// ============================================================================
+
+/// Initialize the global physics world
+/// Takes a WorldConfig as Dynamic and extracts gravity
+pub fn create_world(config: WorldConfig(id)) {
+  // Create Rapier world
+  let world =
+    create_world_ffi(config.gravity.x, config.gravity.y, config.gravity.z)
+  let queue = create_event_queue_ffi(True)
+
+  #(world, queue)
+}
+
+// ============================================================================
+// WORLD STEPPING
+// ============================================================================
+
+/// Step the physics world forward by delta_time
+pub fn step_world(physics_world: PhysicsWorld(id)) -> Nil {
+  // Note: Rapier's step() doesn't take a delta_time parameter
+  // It uses a fixed timestep internally
+
+  // Step the simulation
+  step_world_ffi(physics_world.world, physics_world.queue)
+
+  Nil
+}
+
+// ============================================================================
+// FFI FUNCTIONS - WORLD MANAGEMENT
+// ============================================================================
+
+@external(javascript, "../rapier.ffi.mjs", "createWorld")
+fn create_world_ffi(
+  gravity_x: Float,
+  gravity_y: Float,
+  gravity_z: Float,
+) -> RapierWorld
+
+@external(javascript, "../rapier.ffi.mjs", "createEventQueue")
+fn create_event_queue_ffi(auto_drain: Bool) -> RapierEventQueue
 
 @external(javascript, "../rapier.ffi.mjs", "stepWorld")
-fn step_world_ffi(delta_time: Float) -> Nil
+fn step_world_ffi(world: RapierWorld, queue: RapierEventQueue) -> Nil
 
-@external(javascript, "../rapier.ffi.mjs", "getBodyTransform")
-fn get_body_transform_ffi(id: String) -> Result(Transform, Nil)
+// ============================================================================
+// BODY CREATION/REMOVAL (Called by renderer)
+// ============================================================================
 
-@external(javascript, "../rapier.ffi.mjs", "applyForce")
-fn apply_force_ffi(id: String, force: Vec3(Float)) -> Nil
+/// Create a rigid body in the physics world
+/// This is called by the renderer when a scene node with physics is added
+@internal
+pub fn create_body(
+  world: PhysicsWorld(id),
+  id: id,
+  config: RigidBody,
+  transform: Transform,
+) -> PhysicsWorld(id) {
+  // Convert ID to string
+  case bimap.get(world.bimap, id) {
+    Ok(string_id) -> {
+      // Create rigid body descriptor
+      let body_desc = case config.kind {
+        Dynamic -> create_dynamic_body_desc_ffi()
+        Kinematic -> create_kinematic_body_desc_ffi()
+        Fixed -> create_fixed_body_desc_ffi()
+      }
 
-@external(javascript, "../rapier.ffi.mjs", "applyImpulse")
-fn apply_impulse_ffi(id: String, impulse: Vec3(Float)) -> Nil
+      // Set transform
+      let pos = transform.position
+      set_body_translation_ffi(body_desc, pos.x, pos.y, pos.z)
 
-@external(javascript, "../rapier.ffi.mjs", "setVelocity")
-fn set_velocity_ffi(id: String, velocity: Vec3(Float)) -> Nil
+      // Convert Euler angles to quaternion
+      let quat =
+        euler_to_quat_ffi(
+          transform.rotation.x,
+          transform.rotation.y,
+          transform.rotation.z,
+        )
+      set_body_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
 
-@external(javascript, "../rapier.ffi.mjs", "getVelocity")
-fn get_velocity_ffi(id: String) -> Result(Vec3(Float), Nil)
+      // Set damping
+      set_linear_damping_ffi(body_desc, config.linear_damping)
+      set_angular_damping_ffi(body_desc, config.angular_damping)
 
-@external(javascript, "../rapier.ffi.mjs", "setAngularVelocity")
-fn set_angular_velocity_ffi(id: String, velocity: Vec3(Float)) -> Nil
+      // Set CCD
+      case config.ccd_enabled {
+        True -> set_ccd_enabled_ffi(body_desc, True)
+        False -> Nil
+      }
 
-@external(javascript, "../rapier.ffi.mjs", "getAngularVelocity")
-fn get_angular_velocity_ffi(id: String) -> Result(Vec3(Float), Nil)
+      // Set axis locks
+      set_enabled_translations_ffi(
+        body_desc,
+        !config.axis_locks.lock_translation_x,
+        !config.axis_locks.lock_translation_y,
+        !config.axis_locks.lock_translation_z,
+        True,
+      )
+      set_enabled_rotations_ffi(
+        body_desc,
+        !config.axis_locks.lock_rotation_x,
+        !config.axis_locks.lock_rotation_y,
+        !config.axis_locks.lock_rotation_z,
+        True,
+      )
 
-@external(javascript, "../rapier.ffi.mjs", "applyTorque")
-fn apply_torque_ffi(id: String, torque: Vec3(Float)) -> Nil
+      // Create rigid body
+      let rapier_body = create_rigid_body_ffi(world.world, body_desc)
 
-@external(javascript, "../rapier.ffi.mjs", "applyTorqueImpulse")
-fn apply_torque_impulse_ffi(id: String, impulse: Vec3(Float)) -> Nil
+      // Create collider descriptor
+      let collider_desc = case config.collider {
+        Box(width, height, depth) ->
+          create_cuboid_collider_desc_ffi(
+            width /. 2.0,
+            height /. 2.0,
+            depth /. 2.0,
+          )
+        Sphere(radius) -> create_ball_collider_desc_ffi(radius)
+        Capsule(half_height, radius) ->
+          create_capsule_collider_desc_ffi(half_height, radius)
+        Cylinder(half_height, radius) ->
+          create_cylinder_collider_desc_ffi(half_height, radius)
+      }
 
-@external(javascript, "../rapier.ffi.mjs", "raycast")
-fn raycast_ffi(
-  origin: Vec3(Float),
-  direction: Vec3(Float),
-  max_distance: Float,
-) -> Result(RaycastHit(id), Nil)
+      // Set collider properties
+      set_collider_restitution_ffi(collider_desc, config.restitution)
+      set_collider_friction_ffi(collider_desc, config.friction)
 
-@external(javascript, "../rapier.ffi.mjs", "raycastAll")
-fn raycast_all_ffi(
-  origin: Vec3(Float),
-  direction: Vec3(Float),
-  max_distance: Float,
-) -> List(RaycastHit(id))
+      // Set mass if provided
+      case config.mass {
+        option.Some(mass) -> set_collider_mass_ffi(collider_desc, mass)
+        option.None -> Nil
+      }
 
-@external(javascript, "../rapier.ffi.mjs", "getCollisionEvents")
-fn get_collision_events_ffi() -> List(CollisionEvent)
+      // Set collision groups if provided
+      case config.collision_groups {
+        option.Some(groups) -> {
+          let bitmask = collision_groups_to_bitmask(groups)
+          set_collider_collision_groups_ffi(collider_desc, bitmask)
+        }
+        option.None -> Nil
+      }
 
-@external(javascript, "../rapier.ffi.mjs", "areColliding")
-fn are_colliding_ffi(body_a: String, body_b: String) -> Bool
+      // Create collider attached to body
+      let collider =
+        create_collider_ffi(world.world, collider_desc, rapier_body)
 
-@external(javascript, "../rapier.ffi.mjs", "getAllBodyIds")
-fn get_all_body_ids_ffi() -> List(String)
+      // Register collider handle for collision event tracking
+      let collider_handle = get_collider_handle_ffi(collider)
+
+      // Store body and collider mapping in world
+      PhysicsWorld(
+        ..world,
+        bodies: dict.insert(world.bodies, id, config),
+        rapier_bodies: dict.insert(world.rapier_bodies, string_id, rapier_body),
+        collider_to_body: dict.insert(
+          world.collider_to_body,
+          collider_handle,
+          string_id,
+        ),
+      )
+    }
+    Error(_) -> world
+  }
+}
+
+/// Remove a rigid body from the physics world
+/// This is called by the renderer when a scene node with physics is removed
+@internal
+pub fn remove_body(world: PhysicsWorld(id), id: id) -> PhysicsWorld(id) {
+  case bimap.get(world.bimap, id) {
+    Ok(string_id) -> {
+      case dict.get(world.rapier_bodies, string_id) {
+        Ok(rapier_body) -> {
+          // Get all collider handles for this body and remove them from mapping
+          let num_colliders = get_body_num_colliders_ffi(rapier_body)
+          let collider_handles =
+            get_body_collider_handles(rapier_body, num_colliders)
+
+          let updated_collider_map =
+            list.fold(collider_handles, world.collider_to_body, fn(map, handle) {
+              dict.delete(map, handle)
+            })
+
+          // Remove the rigid body
+          remove_rigid_body_ffi(world.world, rapier_body)
+          PhysicsWorld(
+            ..world,
+            bodies: dict.delete(world.bodies, id),
+            rapier_bodies: dict.delete(world.rapier_bodies, string_id),
+            collider_to_body: updated_collider_map,
+          )
+        }
+        Error(_) -> world
+      }
+    }
+    Error(_) -> world
+  }
+}
+
+/// Get all collider handles for a rigid body
+fn get_body_collider_handles(
+  body: RapierRigidBody,
+  num_colliders: Int,
+) -> List(Int) {
+  list.range(0, num_colliders - 1)
+  |> list.filter_map(fn(i) {
+    case get_body_collider_ffi(body, i) {
+      Ok(collider) -> Ok(get_collider_handle_ffi(collider))
+      Error(_) -> Error(Nil)
+    }
+  })
+}
+
+// ============================================================================
+// FFI DECLARATIONS - BODY/COLLIDER CREATION
+// ============================================================================
+
+@external(javascript, "../rapier.ffi.mjs", "createDynamicBodyDesc")
+fn create_dynamic_body_desc_ffi() -> RapierBodyDesc
+
+@external(javascript, "../rapier.ffi.mjs", "createKinematicBodyDesc")
+fn create_kinematic_body_desc_ffi() -> RapierBodyDesc
+
+@external(javascript, "../rapier.ffi.mjs", "createFixedBodyDesc")
+fn create_fixed_body_desc_ffi() -> RapierBodyDesc
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyTranslation")
+fn set_body_translation_ffi(
+  desc: RapierBodyDesc,
+  x: Float,
+  y: Float,
+  z: Float,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyRotation")
+fn set_body_rotation_ffi(
+  desc: RapierBodyDesc,
+  x: Float,
+  y: Float,
+  z: Float,
+  w: Float,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setLinearDamping")
+fn set_linear_damping_ffi(desc: RapierBodyDesc, damping: Float) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setAngularDamping")
+fn set_angular_damping_ffi(desc: RapierBodyDesc, damping: Float) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setCCDEnabled")
+fn set_ccd_enabled_ffi(desc: RapierBodyDesc, enabled: Bool) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setEnabledTranslations")
+fn set_enabled_translations_ffi(
+  desc: RapierBodyDesc,
+  enable_x: Bool,
+  enable_y: Bool,
+  enable_z: Bool,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setEnabledRotations")
+fn set_enabled_rotations_ffi(
+  desc: RapierBodyDesc,
+  enable_x: Bool,
+  enable_y: Bool,
+  enable_z: Bool,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "createRigidBody")
+fn create_rigid_body_ffi(
+  world: RapierWorld,
+  desc: RapierBodyDesc,
+) -> RapierRigidBody
+
+@external(javascript, "../rapier.ffi.mjs", "removeRigidBody")
+fn remove_rigid_body_ffi(world: RapierWorld, body: RapierRigidBody) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "createCuboidColliderDesc")
+fn create_cuboid_collider_desc_ffi(
+  hx: Float,
+  hy: Float,
+  hz: Float,
+) -> RapierColliderDesc
+
+@external(javascript, "../rapier.ffi.mjs", "createBallColliderDesc")
+fn create_ball_collider_desc_ffi(radius: Float) -> RapierColliderDesc
+
+@external(javascript, "../rapier.ffi.mjs", "createCapsuleColliderDesc")
+fn create_capsule_collider_desc_ffi(
+  half_height: Float,
+  radius: Float,
+) -> RapierColliderDesc
+
+@external(javascript, "../rapier.ffi.mjs", "createCylinderColliderDesc")
+fn create_cylinder_collider_desc_ffi(
+  half_height: Float,
+  radius: Float,
+) -> RapierColliderDesc
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderRestitution")
+fn set_collider_restitution_ffi(
+  desc: RapierColliderDesc,
+  restitution: Float,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderFriction")
+fn set_collider_friction_ffi(desc: RapierColliderDesc, friction: Float) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderMass")
+fn set_collider_mass_ffi(desc: RapierColliderDesc, mass: Float) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderCollisionGroups")
+fn set_collider_collision_groups_ffi(
+  desc: RapierColliderDesc,
+  groups: Int,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "createCollider")
+fn create_collider_ffi(
+  world: RapierWorld,
+  desc: RapierColliderDesc,
+  body: RapierRigidBody,
+) -> RapierCollider
+
+@external(javascript, "../rapier.ffi.mjs", "getColliderHandle")
+fn get_collider_handle_ffi(collider: RapierCollider) -> Int
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyNumColliders")
+fn get_body_num_colliders_ffi(body: RapierRigidBody) -> Int
+
+@external(javascript, "../rapier.ffi.mjs", "getBodyCollider")
+fn get_body_collider_ffi(
+  body: RapierRigidBody,
+  index: Int,
+) -> Result(RapierCollider, Nil)
+
+// Collision event draining FFI
+// Returns list of tuples: (collider_handle1, collider_handle2, started)
+@external(javascript, "../rapier.ffi.mjs", "drainCollisionEventsToList")
+fn drain_collision_events_ffi(
+  queue: RapierEventQueue,
+) -> List(#(Int, Int, Bool))
+
+pub type RapierBodyDesc
+
+pub type RapierColliderDesc
+
+pub type RapierCollider

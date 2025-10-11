@@ -1,0 +1,17 @@
+name = "exception"
+version = "2.1.0"
+gleam = ">= 1.11.0"
+description = "A tiny package for dealing with exceptions"
+licences = ["Apache-2.0"]
+
+repository = { type = "github", user = "lpil", repo = "exception" }
+links = [
+  { title = "Sponsor", href = "https://github.com/sponsors/lpil" },
+]
+
+[dependencies]
+gleam_stdlib = "~> 0.30 or ~> 1.0"
+
+[dev-dependencies]
+gleeunit = "~> 1.0"
+simplifile = "~> 2.0"

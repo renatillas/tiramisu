@@ -1,0 +1,1 @@
+-record(snag, {issue :: binary(), cause :: list(binary())}).

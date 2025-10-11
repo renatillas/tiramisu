@@ -1,0 +1,1 @@
+-record(camera, {projection :: tiramisu@camera:camera_projection()}).

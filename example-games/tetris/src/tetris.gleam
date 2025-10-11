@@ -15,6 +15,7 @@ import tetris/ui
 import tiramisu
 import tiramisu/asset
 import tiramisu/audio
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -409,7 +410,7 @@ pub fn main() {
   // Start the game
   tiramisu.run(
     dimensions: None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,

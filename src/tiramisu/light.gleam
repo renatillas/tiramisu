@@ -1,4 +1,5 @@
 import gleam/bool
+import tiramisu/object3d
 
 /// Light types for illuminating the scene.
 ///
@@ -157,7 +158,13 @@ pub fn hemisphere(
 pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
   case light {
     Directional(intensity:, color:, shadow_resolution:, shadow_bias:, ..) ->
-      Directional(intensity:, color:, cast_shadow:, shadow_resolution:, shadow_bias:)
+      Directional(
+        intensity:,
+        color:,
+        cast_shadow:,
+        shadow_resolution:,
+        shadow_bias:,
+      )
     Point(intensity:, color:, distance:, shadow_resolution:, shadow_bias:, ..) ->
       Point(
         intensity:,
@@ -268,10 +275,7 @@ pub fn with_shadow_resolution(
 ///   |> light.with_shadows(True)
 ///   |> light.with_shadow_bias(0.0005)
 /// ```
-pub fn with_shadow_bias(
-  light: Light,
-  bias: Float,
-) -> Result(Light, LightError) {
+pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) {
   use <- bool.guard(bias <. 0.0, Error(InvalidShadowBias(bias)))
 
   case light {
@@ -317,9 +321,9 @@ pub fn with_shadow_bias(
 }
 
 @internal
-pub fn create_light(light: Light) -> Nil {
+pub fn create_light(light: Light) -> object3d.Object3D {
   case light {
-    Ambient(intensity:, color:) -> create_ambient_light(intensity, color)
+    Ambient(intensity:, color:) -> create_ambient_light(color, intensity)
     Directional(
       intensity:,
       color:,
@@ -328,8 +332,8 @@ pub fn create_light(light: Light) -> Nil {
       shadow_bias:,
     ) ->
       create_directional_light(
-        intensity,
         color,
+        intensity,
         cast_shadow,
         shadow_resolution,
         shadow_bias,
@@ -343,8 +347,8 @@ pub fn create_light(light: Light) -> Nil {
       shadow_bias:,
     ) ->
       create_point_light(
-        intensity,
         color,
+        intensity,
         distance,
         cast_shadow,
         shadow_resolution,
@@ -361,8 +365,8 @@ pub fn create_light(light: Light) -> Nil {
       shadow_bias:,
     ) ->
       create_spot_light(
-        intensity,
         color,
+        intensity,
         distance,
         angle,
         penumbra,
@@ -371,47 +375,47 @@ pub fn create_light(light: Light) -> Nil {
         shadow_bias,
       )
     Hemisphere(intensity:, sky_color:, ground_color:) ->
-      create_hemisphere_light(intensity, sky_color, ground_color)
+      create_hemisphere_light(sky_color, ground_color, intensity)
   }
 }
 
 @external(javascript, "../threejs.ffi.mjs", "createAmbientLight")
-fn create_ambient_light(intensity: Float, color: Int) -> Nil
+fn create_ambient_light(color: Int, intensity: Float) -> object3d.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "createDirectionalLight")
 fn create_directional_light(
-  intensity: Float,
   color: Int,
+  intensity: Float,
   cast_shadow: Bool,
   shadow_resolution: Int,
   shadow_bias: Float,
-) -> Nil
+) -> object3d.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "createPointLight")
 fn create_point_light(
-  intensity: Float,
   color: Int,
+  intensity: Float,
   distance: Float,
   cast_shadow: Bool,
   shadow_resolution: Int,
   shadow_bias: Float,
-) -> Nil
+) -> object3d.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "createSpotLight")
 fn create_spot_light(
-  intensity: Float,
   color: Int,
+  intensity: Float,
   distance: Float,
   angle: Float,
   penumbra: Float,
   cast_shadow: Bool,
   shadow_resolution: Int,
   shadow_bias: Float,
-) -> Nil
+) -> object3d.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "createHemisphereLight")
 fn create_hemisphere_light(
-  intensity: Float,
   sky_color: Int,
   ground_color: Int,
-) -> Nil
+  intensity: Float,
+) -> object3d.Object3D

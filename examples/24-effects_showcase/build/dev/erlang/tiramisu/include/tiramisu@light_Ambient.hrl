@@ -1,0 +1,1 @@
+-record(ambient, {intensity :: float(), color :: integer()}).

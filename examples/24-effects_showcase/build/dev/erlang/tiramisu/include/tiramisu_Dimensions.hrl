@@ -1,0 +1,1 @@
+-record(dimensions, {width :: float(), height :: float()}).

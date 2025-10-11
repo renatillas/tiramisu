@@ -29,15 +29,18 @@ pub opaque type Geometry {
 }
 
 pub type GeometryError {
-  NegativeWidth(width: Float)
-  NegativeHeight(height: Float)
-  InvalidGeometryDepth(depth: Float)
-  NegativeRadius(radius: Float)
+  NonPositiveWidth(width: Float)
+  NonPositiveHeight(height: Float)
+  NonPositiveDepth(depth: Float)
+  NonPositiveRadius(radius: Float)
   InvalidGeometryTube(tube: Float)
   LessThanThreeSegmentCountWidth(count: Int)
   LessThanTwoSegmentCountHeight(count: Int)
   NegativeSegmentCount(count: Int)
 }
+
+@internal
+pub type ThreeGeometry
 
 // --- Validated Geometry Constructors ---
 
@@ -56,9 +59,9 @@ pub fn box(
   height height: Float,
   depth depth: Float,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(width <=. 0.0, Error(NegativeWidth(width)))
-  use <- bool.guard(height <=. 0.0, Error(NegativeHeight(height)))
-  use <- bool.guard(depth <=. 0.0, Error(InvalidGeometryDepth(depth)))
+  use <- bool.guard(width <=. 0.0, Error(NonPositiveWidth(width)))
+  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
+  use <- bool.guard(depth <=. 0.0, Error(NonPositiveDepth(depth)))
 
   Ok(BoxGeometry(width, height, depth))
 }
@@ -79,7 +82,7 @@ pub fn sphere(
   width_segments width_segments: Int,
   height_segments height_segments: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(
     width_segments < 3,
     Error(LessThanThreeSegmentCountWidth(width_segments)),
@@ -97,8 +100,8 @@ pub fn cone(
   height height: Float,
   segments segments: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
-  use <- bool.guard(height <=. 0.0, Error(NegativeHeight(height)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
+  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
   use <- bool.guard(segments < 3, Error(NegativeSegmentCount(segments)))
 
   Ok(ConeGeometry(radius, height, segments))
@@ -108,8 +111,8 @@ pub fn plane(
   width width: Float,
   height height: Float,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(width <=. 0.0, Error(NegativeWidth(width)))
-  use <- bool.guard(height <=. 0.0, Error(NegativeHeight(height)))
+  use <- bool.guard(width <=. 0.0, Error(NonPositiveWidth(width)))
+  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
 
   Ok(PlaneGeometry(width, height))
 }
@@ -118,7 +121,7 @@ pub fn circle(
   radius radius: Float,
   segments segments: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(segments < 3, Error(NegativeSegmentCount(segments)))
 
   Ok(CircleGeometry(radius, segments))
@@ -145,9 +148,12 @@ pub fn cylinder(
   height height: Float,
   radial_segments radial_segments: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius_top <. 0.0, Error(NegativeRadius(radius_top)))
-  use <- bool.guard(radius_bottom <. 0.0, Error(NegativeRadius(radius_bottom)))
-  use <- bool.guard(height <=. 0.0, Error(NegativeHeight(height)))
+  use <- bool.guard(radius_top <. 0.0, Error(NonPositiveRadius(radius_top)))
+  use <- bool.guard(
+    radius_bottom <. 0.0,
+    Error(NonPositiveRadius(radius_bottom)),
+  )
+  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
   use <- bool.guard(
     radial_segments < 3,
     Error(NegativeSegmentCount(radial_segments)),
@@ -169,7 +175,7 @@ pub fn torus(
   radial_segments radial_segments: Int,
   tubular_segments tubular_segments: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(tube <=. 0.0, Error(InvalidGeometryTube(tube)))
   use <- bool.guard(
     radial_segments < 3,
@@ -196,7 +202,7 @@ pub fn tetrahedron(
   radius radius: Float,
   detail detail: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(detail < 0, Error(NegativeSegmentCount(detail)))
 
   Ok(TetrahedronGeometry(radius, detail))
@@ -215,14 +221,14 @@ pub fn icosahedron(
   radius radius: Float,
   detail detail: Int,
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(radius <=. 0.0, Error(NegativeRadius(radius)))
+  use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(detail < 0, Error(NegativeSegmentCount(detail)))
 
   Ok(IcosahedronGeometry(radius, detail))
 }
 
 @internal
-pub fn create_geometry(geometry: Geometry) -> Nil {
+pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
   case geometry {
     BoxGeometry(width:, height:, depth:) ->
       create_box_geometry(width, height, depth)
@@ -251,18 +257,26 @@ pub fn create_geometry(geometry: Geometry) -> Nil {
 }
 
 // Note: Custom geometry is just a passthrough since the buffer is already created
-fn create_custom_geometry(_buffer: asset.BufferGeometry) -> Nil {
-  Nil
-}
+// Use identity function to return the buffer as-is
+@external(javascript, "../threejs.ffi.mjs", "identity")
+fn create_custom_geometry(buffer: asset.BufferGeometry) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createConeGeometry")
-fn create_cone_geometry(radius: Float, height: Float, segments: Int) -> Nil
+fn create_cone_geometry(
+  radius: Float,
+  height: Float,
+  segments: Int,
+) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createCircleGeometry")
-fn create_circle_geometry(radius: Float, segments: Int) -> Nil
+fn create_circle_geometry(radius: Float, segments: Int) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createBoxGeometry")
-fn create_box_geometry(width: Float, height: Float, depth: Float) -> Nil
+fn create_box_geometry(
+  width: Float,
+  height: Float,
+  depth: Float,
+) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createCylinderGeometry")
 fn create_cylinder_geometry(
@@ -270,23 +284,23 @@ fn create_cylinder_geometry(
   radius_bottom: Float,
   height: Float,
   radial_segments: Int,
-) -> Nil
+) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createIcosahedronGeometry")
-fn create_icosahedron_geometry(radius: Float, detail: Int) -> Nil
+fn create_icosahedron_geometry(radius: Float, detail: Int) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createPlaneGeometry")
-fn create_plane_geometry(width: Float, height: Float) -> Nil
+fn create_plane_geometry(width: Float, height: Float) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createSphereGeometry")
 fn create_sphere_geometry(
   radius: Float,
   width_segments: Int,
   height_segments: Int,
-) -> Nil
+) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createTetrahedronGeometry")
-fn create_tetrahedron_geometry(radius: Float, detail: Int) -> Nil
+fn create_tetrahedron_geometry(radius: Float, detail: Int) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createTorusGeometry")
 fn create_torus_geometry(
@@ -294,4 +308,4 @@ fn create_torus_geometry(
   tube: Float,
   radial_segments: Int,
   tubular_segments: Int,
-) -> Nil
+) -> ThreeGeometry

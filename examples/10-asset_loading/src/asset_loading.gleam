@@ -235,16 +235,13 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
               },
               material: {
                 let assert Ok(material) =
-                  material.standard(
-                    color: 0x4ecdc4,
-                    metalness: 1.0,
-                    roughness: 0.5,
-                    map: option.Some(metal_color),
-                    normal_map: option.Some(metal_normal),
-                    ambient_oclusion_map: option.None,
-                    roughness_map: option.None,
-                    metalness_map: option.None,
-                  )
+                  material.new()
+                  |> material.with_color(0x4ecdc4)
+                  |> material.with_metalness(1.0)
+                  |> material.with_roughness(0.5)
+                  |> material.with_color_map(metal_color)
+                  |> material.with_normal_map(metal_normal)
+                  |> material.build()
                 material
               },
               transform: transform.Transform(
@@ -285,7 +282,6 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
       list.flatten([camera, audio_node, cube_nodes, lights])
     }
-
     Failed(_errors) -> {
       list.flatten([camera, lights])
     }

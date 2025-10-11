@@ -1,0 +1,1 @@
+-record(attribute, {kind :: integer(), name :: binary(), value :: binary()}).

@@ -1,0 +1,1 @@
+-record(line_material, {color :: integer(), linewidth :: float()}).

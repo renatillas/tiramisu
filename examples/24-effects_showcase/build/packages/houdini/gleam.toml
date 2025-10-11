@@ -1,0 +1,12 @@
+name = "houdini"
+version = "1.2.0"
+description = "🪄 Fast HTML escaping"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "giacomocavalieri", repo = "houdini" }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
+gleamy_bench = ">= 0.6.0 and < 1.0.0"
+simplifile = ">= 2.2.1 and < 3.0.0"
+qcheck = ">= 1.0.0 and < 2.0.0"
+gleam_stdlib = ">= 0.62.0 and < 1.0.0"

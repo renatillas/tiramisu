@@ -1,0 +1,1 @@
+-record(vec2, {x :: any(), y :: any()}).
