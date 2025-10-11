@@ -375,10 +375,10 @@ pub fn create_light(light: Light) -> Nil {
   }
 }
 
-@external(javascript, "./ffi/renderer.mjs", "createAmbientLight")
+@external(javascript, "../threejs.ffi.mjs", "createAmbientLight")
 fn create_ambient_light(intensity: Float, color: Int) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createDirectionalLight")
+@external(javascript, "../threejs.ffi.mjs", "createDirectionalLight")
 fn create_directional_light(
   intensity: Float,
   color: Int,
@@ -387,7 +387,7 @@ fn create_directional_light(
   shadow_bias: Float,
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createPointLight")
+@external(javascript, "../threejs.ffi.mjs", "createPointLight")
 fn create_point_light(
   intensity: Float,
   color: Int,
@@ -397,7 +397,7 @@ fn create_point_light(
   shadow_bias: Float,
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createSpotLight")
+@external(javascript, "../threejs.ffi.mjs", "createSpotLight")
 fn create_spot_light(
   intensity: Float,
   color: Int,
@@ -409,7 +409,7 @@ fn create_spot_light(
   shadow_bias: Float,
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createHemisphereLight")
+@external(javascript, "../threejs.ffi.mjs", "createHemisphereLight")
 fn create_hemisphere_light(
   intensity: Float,
   sky_color: Int,

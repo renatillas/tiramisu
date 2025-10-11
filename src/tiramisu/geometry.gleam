@@ -250,19 +250,21 @@ pub fn create_geometry(geometry: Geometry) -> Nil {
   }
 }
 
-@external(javascript, "./ffi/renderer.mjs", "createCustomGeometry")
-fn create_custom_geometry(buffer: asset.BufferGeometry) -> Nil
+// Note: Custom geometry is just a passthrough since the buffer is already created
+fn create_custom_geometry(_buffer: asset.BufferGeometry) -> Nil {
+  Nil
+}
 
-@external(javascript, "./ffi/renderer.mjs", "createConeGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createConeGeometry")
 fn create_cone_geometry(radius: Float, height: Float, segments: Int) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createCircleGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createCircleGeometry")
 fn create_circle_geometry(radius: Float, segments: Int) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createBoxGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createBoxGeometry")
 fn create_box_geometry(width: Float, height: Float, depth: Float) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createCylinderGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createCylinderGeometry")
 fn create_cylinder_geometry(
   radius_top: Float,
   radius_bottom: Float,
@@ -270,23 +272,23 @@ fn create_cylinder_geometry(
   radial_segments: Int,
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createIcosahedronGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createIcosahedronGeometry")
 fn create_icosahedron_geometry(radius: Float, detail: Int) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createPlaneGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createPlaneGeometry")
 fn create_plane_geometry(width: Float, height: Float) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createSphereGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createSphereGeometry")
 fn create_sphere_geometry(
   radius: Float,
   width_segments: Int,
   height_segments: Int,
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createTetrahedronGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createTetrahedronGeometry")
 fn create_tetrahedron_geometry(radius: Float, detail: Int) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createTorusGeometry")
+@external(javascript, "../threejs.ffi.mjs", "createTorusGeometry")
 fn create_torus_geometry(
   radius: Float,
   tube: Float,

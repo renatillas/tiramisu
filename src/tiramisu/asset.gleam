@@ -453,15 +453,15 @@ fn dispose_geometry_ffi(geometry: BufferGeometry) -> Nil
 fn dispose_object3d_ffi(object: Object3D) -> Nil
 
 /// Load an STL file from a URL using Promises
-@external(javascript, "./ffi/stl.mjs", "loadSTLAsync")
+@external(javascript, "./ffi/asset.mjs", "loadSTLAsync")
 pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError))
 
 /// Load a texture from a URL using Promises
-@external(javascript, "./ffi/texture.mjs", "loadTextureAsync")
+@external(javascript, "./ffi/asset.mjs", "loadTextureAsync")
 pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError))
 
 /// Load a GLTF/GLB file from a URL using Promises
-@external(javascript, "./ffi/gltf.mjs", "loadGLTFAsync")
+@external(javascript, "./ffi/asset.mjs", "loadGLTFAsync")
 pub fn load_gltf(url: String) -> Promise(Result(GLTFData, LoadError))
 
 /// Load an audio file from a URL using Promises
@@ -517,7 +517,7 @@ pub fn load_audio(url: String) -> Promise(Result(AudioBuffer, LoadError)) {
 /// - `Error(LoadError)`: File not found
 /// - `Error(InvalidUrl)`: Invalid URL provided
 /// - `Error(ParseError)`: Failed to parse OBJ/MTL file
-@external(javascript, "./ffi/obj.mjs", "loadOBJAsync")
+@external(javascript, "./ffi/asset.mjs", "loadOBJAsync")
 pub fn load_obj(
   obj_url obj_url: String,
   mtl_url mtl_url: String,

@@ -566,3 +566,166 @@ scene.Camera(
 )
 ```
 - You cannot run the examples. Usually the user will run them in tandem to your conversation
+
+## FFI Architecture (Post-Refactor)
+
+### Overview
+
+The library now uses a **layered FFI architecture** that separates pure bindings from business logic, making the codebase more testable, maintainable, and allowing more code to be written in Gleam.
+
+### Architecture Layers
+
+```
+┌─────────────────────────────────────┐
+│   Gleam Game Logic & API            │  ← User code
+├─────────────────────────────────────┤
+│   Tiramisu Gleam Modules            │  ← geometry.gleam, material.gleam, etc.
+│   (Declarative, type-safe)          │     physics.gleam, scene.gleam
+├─────────────────────────────────────┤
+│   Pure FFI Bindings (1:1)           │  ← threejs.ffi.mjs, rapier.ffi.mjs
+│   (No logic, just thin wrappers)    │     Direct library API calls
+├─────────────────────────────────────┤
+│   External Libraries                │  ← Three.js, Rapier3D
+└─────────────────────────────────────┘
+```
+
+### Core FFI Files
+
+#### `src/threejs.ffi.mjs`
+**Purpose**: Pure 1:1 bindings to Three.js API
+**Contents**: Direct wrappers around Three.js functions with no business logic
+**Used by**:
+- `tiramisu/geometry.gleam` - Geometry creation
+- `tiramisu/material.gleam` - Material creation
+- `tiramisu/light.gleam` - Light creation
+- `tiramisu/camera.gleam` - Camera creation
+- `tiramisu/object3d.gleam` - Animation utilities
+- `tiramisu/internal/renderer.gleam` - Core rendering
+
+**Example binding**:
+```javascript
+// Pure 1:1 binding - no logic
+export function createBoxGeometry(width, height, depth) {
+  return new THREE.BoxGeometry(width, height, depth);
+}
+```
+
+**Gleam usage**:
+```gleam
+@external(javascript, "../threejs.ffi.mjs", "createBoxGeometry")
+fn create_box_geometry(width: Float, height: Float, depth: Float) -> Nil
+```
+
+#### `src/rapier.ffi.mjs`
+**Purpose**: Pure 1:1 bindings to Rapier3D physics API
+**Contents**: Direct wrappers around Rapier functions with no business logic
+**Used by**: `tiramisu/physics.gleam`
+
+**Example binding**:
+```javascript
+// Pure 1:1 binding - no logic
+export function createWorld(gravityX, gravityY, gravityZ) {
+  const gravity = { x: gravityX, y: gravityY, z: gravityZ };
+  return new RAPIER.World(gravity);
+}
+```
+
+### Business Logic FFI Files
+
+Some FFI files contain business logic that can't easily be moved to Gleam due to performance, DOM API requirements, or complex callback handling. These remain in `src/tiramisu/ffi/`:
+
+#### `src/tiramisu/ffi/renderer.mjs`
+**Contains**: Scene graph management, patch application, object caching, instance rendering
+**Why FFI**: Performance-critical rendering loop, manages mutable Three.js state
+
+#### `src/tiramisu/ffi/asset.mjs`
+**Contains**: Asset batch loading, progress tracking, model loaders
+**Why FFI**: Async loader coordination, progress callbacks, Three.js loader integration
+
+#### `src/tiramisu/ffi/audio.mjs`
+**Contains**: Audio playback, group management, spatial audio
+**Why FFI**: Web Audio API state management, Three.js Audio integration
+
+#### `src/tiramisu/ffi/debug.mjs`
+**Contains**: Performance monitoring, debug visualization, stats collection
+**Why FFI**: Browser performance APIs, mutable stat tracking
+
+#### `src/tiramisu/ffi/input_capture.mjs`
+**Contains**: Keyboard, mouse, touch, gamepad input capture
+**Why FFI**: DOM event listeners, mutable input state for performance
+
+#### `src/tiramisu/ffi/ui.mjs`
+**Contains**: Lustre integration, bidirectional messaging
+**Why FFI**: Framework integration, callback management
+
+#### `src/tiramisu/ffi/effects.mjs`
+**Contains**: Effect system for scene manipulation
+**Why FFI**: Scene reference management, effect callbacks
+
+### Design Benefits
+
+1. **Testability**: Pure FFI bindings are easier to mock and test
+2. **Maintainability**: Clear separation between bindings and logic
+3. **Expandability**: Easy to add new Three.js/Rapier functions
+4. **Type Safety**: More logic in Gleam = more compile-time guarantees
+5. **Documentation**: 1:1 bindings are self-documenting
+6. **Performance**: Critical rendering logic stays in optimized JS
+
+### Adding New Bindings
+
+To add a new Three.js binding:
+
+1. Add the 1:1 function to `src/threejs.ffi.mjs`:
+```javascript
+export function createSomeGeometry(param1, param2) {
+  return new THREE.SomeGeometry(param1, param2);
+}
+```
+
+2. Add the Gleam external declaration:
+```gleam
+@external(javascript, "../threejs.ffi.mjs", "createSomeGeometry")
+fn create_some_geometry(param1: Float, param2: Float) -> Nil
+```
+
+3. Add Gleam validation/builder logic around it:
+```gleam
+pub fn some_geometry(
+  param1 param1: Float,
+  param2 param2: Float,
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(param1 <=. 0.0, Error(InvalidParam))
+  Ok(SomeGeometry(param1, param2))
+}
+```
+
+### Migration Status
+
+**Completed**:
+- ✅ Created `src/threejs.ffi.mjs` with comprehensive Three.js bindings
+- ✅ Created `src/rapier.ffi.mjs` with comprehensive Rapier bindings
+- ✅ Updated `geometry.gleam`, `material.gleam`, `light.gleam`, `camera.gleam` to use new structure
+- ✅ Updated `physics.gleam` to use `rapier.ffi.mjs`
+- ✅ Updated `internal/renderer.gleam` to use new structure
+- ✅ Library builds successfully
+- ✅ Example projects compile
+
+**Preserved**:
+- `src/tiramisu/ffi/renderer.mjs` - Scene rendering logic
+- `src/tiramisu/ffi/asset.mjs` - Asset loading logic
+- `src/tiramisu/ffi/audio.mjs` - Audio system logic
+- `src/tiramisu/ffi/debug.mjs` - Debug/performance logic
+- `src/tiramisu/ffi/input_capture.mjs` - Input system logic
+- `src/tiramisu/ffi/ui.mjs` - UI integration logic
+- `src/tiramisu/ffi/effects.mjs` - Effect system logic
+
+### Future Improvements
+
+1. **Renderer Refactor**: The `ffi/renderer.mjs` could be further split:
+   - Keep pure scene graph operations in Gleam
+   - Use `threejs.ffi.mjs` for object creation
+   - Only keep critical rendering loop in FFI
+
+2. **Asset Loading**: Move batch coordination logic to Gleam once Gleam gets better async support
+
+3. **Debug System**: Move stats aggregation to Gleam, keep only browser API calls in FFI

@@ -44,9 +44,9 @@ pub fn set_weight(anim: Animation, weight: Float) -> Animation {
 }
 
 /// Get the name of an animation clip
-@external(javascript, "./ffi/object3d.mjs", "getClipName")
+@external(javascript, "../threejs.ffi.mjs", "getClipName")
 pub fn clip_name(clip: AnimationClip) -> String
 
 /// Get the duration of an animation clip (in seconds)
-@external(javascript, "./ffi/object3d.mjs", "getClipDuration")
+@external(javascript, "../threejs.ffi.mjs", "getClipDuration")
 pub fn clip_duration(clip: AnimationClip) -> Float

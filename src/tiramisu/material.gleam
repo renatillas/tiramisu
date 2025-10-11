@@ -400,7 +400,7 @@ pub fn create_material(material: Material) -> Nil {
   }
 }
 
-@external(javascript, "./ffi/renderer.mjs", "createBasicMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createBasicMaterial")
 fn create_basic_material(
   color: Int,
   transparent: Bool,
@@ -409,7 +409,7 @@ fn create_basic_material(
   normal_map: Option(asset.Texture),
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createStandardMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createStandardMaterial")
 fn create_standard_material(
   color: Int,
   metalness: Float,
@@ -421,7 +421,7 @@ fn create_standard_material(
   metalness_map: Option(asset.Texture),
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createPhongMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createPhongMaterial")
 fn create_phong_material(
   color: Int,
   shininess: Float,
@@ -430,7 +430,7 @@ fn create_phong_material(
   ao_map: Option(asset.Texture),
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createLambertMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createLambertMaterial")
 fn create_lambert_material(
   color: Int,
   map: Option(asset.Texture),
@@ -438,7 +438,7 @@ fn create_lambert_material(
   ao_map: Option(asset.Texture),
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createToonMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createToonMaterial")
 fn create_toon_material(
   color: Int,
   map: Option(asset.Texture),
@@ -446,10 +446,10 @@ fn create_toon_material(
   ao_map: Option(asset.Texture),
 ) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createLineMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createLineMaterial")
 fn create_line_material(color: Int, linewidth: Float) -> Nil
 
-@external(javascript, "./ffi/renderer.mjs", "createSpriteMaterial")
+@external(javascript, "../threejs.ffi.mjs", "createSpriteMaterial")
 fn create_sprite_material(
   color: Int,
   transparent: Bool,

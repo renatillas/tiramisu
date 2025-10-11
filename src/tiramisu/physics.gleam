@@ -866,58 +866,58 @@ pub fn collision_groups_to_bitmask(groups: CollisionGroups) -> Int {
 
 // --- FFI Functions ---
 
-@external(javascript, "./ffi/physics.mjs", "initWorld")
+@external(javascript, "../rapier.ffi.mjs", "initWorld")
 fn init_world_ffi(config: WorldConfig(body)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "stepWorld")
+@external(javascript, "../rapier.ffi.mjs", "stepWorld")
 fn step_world_ffi(delta_time: Float) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "getBodyTransform")
+@external(javascript, "../rapier.ffi.mjs", "getBodyTransform")
 fn get_body_transform_ffi(id: String) -> Result(Transform, Nil)
 
-@external(javascript, "./ffi/physics.mjs", "applyForce")
+@external(javascript, "../rapier.ffi.mjs", "applyForce")
 fn apply_force_ffi(id: String, force: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "applyImpulse")
+@external(javascript, "../rapier.ffi.mjs", "applyImpulse")
 fn apply_impulse_ffi(id: String, impulse: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "setVelocity")
+@external(javascript, "../rapier.ffi.mjs", "setVelocity")
 fn set_velocity_ffi(id: String, velocity: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "getVelocity")
+@external(javascript, "../rapier.ffi.mjs", "getVelocity")
 fn get_velocity_ffi(id: String) -> Result(Vec3(Float), Nil)
 
-@external(javascript, "./ffi/physics.mjs", "setAngularVelocity")
+@external(javascript, "../rapier.ffi.mjs", "setAngularVelocity")
 fn set_angular_velocity_ffi(id: String, velocity: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "getAngularVelocity")
+@external(javascript, "../rapier.ffi.mjs", "getAngularVelocity")
 fn get_angular_velocity_ffi(id: String) -> Result(Vec3(Float), Nil)
 
-@external(javascript, "./ffi/physics.mjs", "applyTorque")
+@external(javascript, "../rapier.ffi.mjs", "applyTorque")
 fn apply_torque_ffi(id: String, torque: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "applyTorqueImpulse")
+@external(javascript, "../rapier.ffi.mjs", "applyTorqueImpulse")
 fn apply_torque_impulse_ffi(id: String, impulse: Vec3(Float)) -> Nil
 
-@external(javascript, "./ffi/physics.mjs", "raycast")
+@external(javascript, "../rapier.ffi.mjs", "raycast")
 fn raycast_ffi(
   origin: Vec3(Float),
   direction: Vec3(Float),
   max_distance: Float,
 ) -> Result(RaycastHit(id), Nil)
 
-@external(javascript, "./ffi/physics.mjs", "raycastAll")
+@external(javascript, "../rapier.ffi.mjs", "raycastAll")
 fn raycast_all_ffi(
   origin: Vec3(Float),
   direction: Vec3(Float),
   max_distance: Float,
 ) -> List(RaycastHit(id))
 
-@external(javascript, "./ffi/physics.mjs", "getCollisionEvents")
+@external(javascript, "../rapier.ffi.mjs", "getCollisionEvents")
 fn get_collision_events_ffi() -> List(CollisionEvent)
 
-@external(javascript, "./ffi/physics.mjs", "areColliding")
+@external(javascript, "../rapier.ffi.mjs", "areColliding")
 fn are_colliding_ffi(body_a: String, body_b: String) -> Bool
 
-@external(javascript, "./ffi/physics.mjs", "getAllBodyIds")
+@external(javascript, "../rapier.ffi.mjs", "getAllBodyIds")
 fn get_all_body_ids_ffi() -> List(String)

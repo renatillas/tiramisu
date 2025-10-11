@@ -21,16 +21,16 @@ pub type RendererOptions {
 }
 
 /// Create a new WebGL renderer
-@external(javascript, "../ffi/renderer.mjs", "createRenderer")
+@external(javascript, "../../threejs.ffi.mjs", "createRenderer")
 pub fn create(options: RendererOptions) -> WebGLRenderer
 
 /// Render a scene with a camera (internal use only)
-@external(javascript, "../ffi/renderer.mjs", "render")
+@external(javascript, "../../threejs.ffi.mjs", "render")
 pub fn render(renderer: WebGLRenderer, scene: Scene, camera: ThreeCamera) -> Nil
 
-@external(javascript, "../ffi/renderer.mjs", "getDomElement")
+@external(javascript, "../../threejs.ffi.mjs", "getDomElement")
 pub fn get_dom_element(renderer: WebGLRenderer) -> DomElement
 
 /// Set the canvas reference for camera aspect ratio calculation (internal use only)
-@external(javascript, "../ffi/renderer.mjs", "setCanvas")
+@external(javascript, "../../threejs.ffi.mjs", "setCanvas")
 pub fn set_canvas(canvas: DomElement) -> Nil
