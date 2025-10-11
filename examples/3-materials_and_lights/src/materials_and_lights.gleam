@@ -4,6 +4,7 @@ import gleam/option
 import gleam_community/maths
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -28,7 +29,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    background: 0x0a0a0a,
+    background: background.Color(0x0a0a0a),
     init: init,
     update: update,
     view: view,
@@ -36,7 +37,9 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   // Define all textures to load
   let textures = [
     // Wood floor textures
@@ -70,28 +73,33 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   #(
     Model(rotation: 0.0, light_intensity: 1.0, assets: option.None),
     effect.batch([effect.tick(Tick), load_effect]),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick))
+      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     AssetsLoaded(result) -> {
       // Store the loaded assets in the model
-      #(Model(..model, assets: option.Some(result.cache)), effect.tick(Tick))
+      #(
+        Model(..model, assets: option.Some(result.cache)),
+        effect.tick(Tick),
+        option.None,
+      )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 

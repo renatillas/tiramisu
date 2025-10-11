@@ -132,13 +132,13 @@ scripts = [
   { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
 ]
 stylesheets = [
-  { content = "body { margin: 0; padding: 0; overflow: hidden; }" }
+  { content = "body { margin: 0; padding: 0; overflow: hidden; } canvas { display: block; }" }
 ]
 ```
 
 **Key components:**
 - `scripts` with importmap: Provides CDN imports for Three.js and Rapier physics
-- `stylesheets`: Removes default body margin/padding and prevents scrollbars for fullscreen games
+- `stylesheets`: Removes default body margin/padding, prevents scrollbars, and ensures canvas has block display (fixes touch coordinate alignment)
 
 ### Canvas Dimensions
 
@@ -211,7 +211,62 @@ This section helps developers migrate from v1.0.0 to the next version.
 
 ### Breaking Changes
 
-#### 1. Canvas Dimensions API
+#### 1. Background API
+
+The `background` parameter now uses a `Background` type instead of a simple hex color integer, allowing for color, texture, or cube texture (skybox) backgrounds.
+
+**Old:**
+```gleam
+tiramisu.run(
+  dimensions: None,
+  background: 0x111111,  // Just a hex color
+  // ...
+)
+```
+
+**New:**
+```gleam
+import tiramisu
+
+// Solid color background (most common)
+tiramisu.run(
+  dimensions: None,
+  background: tiramisu.Color(0x111111),
+  // ...
+)
+
+// Texture background
+tiramisu.run(
+  dimensions: None,
+  background: tiramisu.Texture("assets/sky.jpg"),
+  // ...
+)
+
+// Skybox with cube texture (6 faces)
+tiramisu.run(
+  dimensions: None,
+  background: tiramisu.CubeTexture([
+    "assets/skybox/px.jpg",  // positive x
+    "assets/skybox/nx.jpg",  // negative x
+    "assets/skybox/py.jpg",  // positive y
+    "assets/skybox/ny.jpg",  // negative y
+    "assets/skybox/pz.jpg",  // positive z
+    "assets/skybox/nz.jpg",  // negative z
+  ]),
+  // ...
+)
+```
+
+**Migration:** Wrap all existing hex color backgrounds with `tiramisu.Color()`:
+```gleam
+// Change this:
+background: 0x1a1a2e
+
+// To this:
+background: tiramisu.Color(0x1a1a2e)
+```
+
+#### 2. Canvas Dimensions API
 
 **Old:**
 ```gleam
@@ -230,19 +285,19 @@ import gleam/option
 // Fullscreen mode (recommended)
 tiramisu.run(
   dimensions: option.None,
-  background: 0x111111,
+  background: tiramisu.Color(0x111111),
   // ...
 )
 
 // Or fixed size
 tiramisu.run(
   dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-  background: 0x111111,
+  background: tiramisu.Color(0x111111),
   // ...
 )
 ```
 
-#### 2. Camera Perspective API
+#### 3. Camera Perspective API
 
 **Old:**
 ```gleam
@@ -264,7 +319,7 @@ let assert Ok(cam) = camera.perspective(
 )
 ```
 
-#### 3. Camera 2D API
+#### 4. Camera 2D API
 
 **Old:**
 ```gleam
@@ -284,7 +339,7 @@ scene.Camera(
 )
 ```
 
-#### 4. Camera Position and Look At
+#### 5. Camera Position and Look At
 
 **Old:**
 ```gleam
@@ -312,7 +367,7 @@ scene.Camera(
 )
 ```
 
-#### 5. Context Type
+#### 6. Context Type
 
 The `Context` type now includes canvas dimensions:
 
@@ -351,9 +406,9 @@ fn update(model: Model, msg: Msg, ctx: Context) {
 }
 ```
 
-#### 6. Geometry and Material Types
+#### 7. Geometry and Material Types
 
-Geometry and material types are now opaque and constructors return `Result` types:
+Geometry and material types are now in separate modules with validated constructors and builder patterns:
 
 **Old:**
 ```gleam
@@ -367,13 +422,29 @@ scene.Mesh(
 
 **New:**
 ```gleam
-let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-let assert Ok(material) = scene.standard_material(
+import tiramisu/geometry
+import tiramisu/material
+
+let assert Ok(geometry) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+
+// Option 1: Builder pattern (recommended)
+let assert Ok(material) =
+  material.new()
+  |> material.with_color(0xff0000)
+  |> material.with_metalness(0.8)
+  |> material.with_roughness(0.3)
+  |> material.build()
+
+// Option 2: Direct constructor with all parameters
+let assert Ok(material2) = material.standard(
   color: 0xff0000,
-  metalness: 0.3,
-  roughness: 0.5,
+  metalness: 0.8,
+  roughness: 0.3,
   map: option.None,
   normal_map: option.None,
+  ambient_oclusion_map: option.None,
+  roughness_map: option.None,
+  metalness_map: option.None,
 )
 
 scene.Mesh(
@@ -384,9 +455,9 @@ scene.Mesh(
 )
 ```
 
-#### 7. Light Constructors
+#### 8. Light Constructors
 
-Light constructors now return `Result` types:
+Lights are now in a separate module with validated constructors:
 
 **Old:**
 ```gleam
@@ -399,19 +470,21 @@ scene.Light(
 
 **New:**
 ```gleam
-let assert Ok(light) = scene.directional_light(
-  color: 0xffffff,
+import tiramisu/light
+
+let assert Ok(sun) = light.directional(
   intensity: 1.0,
+  color: 0xffffff,
 )
 
 scene.Light(
   id: "sun",
-  light: light,  // Note: renamed from light_type to light
+  light: sun,  // Note: renamed from light_type to light
   transform: transform.identity,
 )
 ```
 
-#### 8. State Machine Generic Types
+#### 9. State Machine Generic Types
 
 State machines are now generic over state type:
 
@@ -492,3 +565,4 @@ scene.Camera(
   viewport: option.None,
 )
 ```
+- You cannot run the examples. Usually the user will run them in tandem to your conversation

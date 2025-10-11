@@ -5,6 +5,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -13,6 +14,18 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Point
+  Sun
+  Planet1Orbit
+  Planet1
+  Moon1Orbit
+  Moon1
+  Planet2Orbit
+  Planet2
+}
 
 pub type Model {
   Model(rotation: Float, show_planets: Bool)
@@ -25,37 +38,41 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x0f0f0f,
+    background: background.Color(0x0f0f0f),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
-  #(Model(rotation: 0.0, show_planets: True), effect.tick(Tick))
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
+  #(Model(rotation: 0.0, show_planets: True), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation, show_planets: True), effect.tick(Tick))
+      #(
+        Model(rotation: new_rotation, show_planets: True),
+        effect.tick(Tick),
+        option.None,
+      )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
-        id: "main-camera",
+        id: MainCamera,
         camera: _,
         active: True,
         transform: transform.at(position: vec3.Vec3(0.0, 5.0, 15.0)),
@@ -67,7 +84,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "point",
+      id: Point,
       light: {
         let assert Ok(light) =
           light.point(color: 0xfffb00, intensity: 100.5, distance: 100.0)
@@ -84,7 +101,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Solar system: sun with orbiting planets in groups
   let sun = [
     scene.Mesh(
-      id: "sun",
+      id: Sun,
       geometry: {
         let assert Ok(geometry) =
           geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
@@ -115,7 +132,7 @@ fn view(model: Model) -> List(scene.Node) {
     True -> [
       // Planet 1 group (rotates around sun)
       scene.Group(
-        id: "planet1-orbit",
+        id: Planet1Orbit,
         transform: transform.Transform(
           position: vec3.Vec3(0.0, 0.0, 0.0),
           rotation: vec3.Vec3(0.0, model.rotation *. 0.5, 0.0),
@@ -123,7 +140,7 @@ fn view(model: Model) -> List(scene.Node) {
         ),
         children: [
           scene.Mesh(
-            id: "planet1",
+            id: Planet1,
             geometry: {
               let assert Ok(geometry) =
                 geometry.sphere(
@@ -149,7 +166,7 @@ fn view(model: Model) -> List(scene.Node) {
           ),
           // Moon orbiting planet1
           scene.Group(
-            id: "moon1-orbit",
+            id: Moon1Orbit,
             transform: transform.Transform(
               position: vec3.Vec3(4.0, 0.0, 0.0),
               rotation: vec3.Vec3(0.0, model.rotation *. 2.0, 0.0),
@@ -157,7 +174,7 @@ fn view(model: Model) -> List(scene.Node) {
             ),
             children: [
               scene.Mesh(
-                id: "moon1",
+                id: Moon1,
                 geometry: {
                   let assert Ok(geometry) =
                     geometry.sphere(
@@ -187,7 +204,7 @@ fn view(model: Model) -> List(scene.Node) {
       ),
       // Planet 2 group (rotates around sun)
       scene.Group(
-        id: "planet2-orbit",
+        id: Planet2Orbit,
         transform: transform.Transform(
           position: vec3.Vec3(0.0, 0.0, 0.0),
           rotation: vec3.Vec3(0.0, model.rotation *. 0.3, 0.0),
@@ -195,7 +212,7 @@ fn view(model: Model) -> List(scene.Node) {
         ),
         children: [
           scene.Mesh(
-            id: "planet2",
+            id: Planet2,
             geometry: {
               let assert Ok(geometry) =
                 geometry.sphere(

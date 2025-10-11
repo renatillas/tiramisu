@@ -9,6 +9,7 @@ import gleam/option
 import gleam/result
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -21,6 +22,15 @@ import tiramisu/state_machine
 import tiramisu/transform
 import vec/vec3
 
+pub type Id {
+  Main
+  Ambient
+  Directional
+  LoadingCube
+  ErrorCube
+  Character
+}
+
 pub type State {
   Idle
   Walking
@@ -29,7 +39,10 @@ pub type State {
 
 pub type LoadState {
   Loading
-  Loaded(asset.GLTFData, state_machine.StateMachine(State, tiramisu.Context))
+  Loaded(
+    asset.GLTFData,
+    state_machine.StateMachine(State, tiramisu.Context(Id)),
+  )
   Failed(String)
 }
 
@@ -46,14 +59,14 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
   // Load a GLTF file with animations
@@ -69,14 +82,14 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       }),
     )
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]))
+  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.3
@@ -94,6 +107,7 @@ fn update(
       #(
         Model(rotation: new_rotation, load_state: new_load_state),
         effect.tick(Tick),
+        option.None,
       )
     }
 
@@ -115,7 +129,11 @@ fn update(
       // Create state machine with animations
       let machine = create_state_machine(data)
 
-      #(Model(..model, load_state: Loaded(data, machine)), effect.none())
+      #(
+        Model(..model, load_state: Loaded(data, machine)),
+        effect.none(),
+        option.None,
+      )
     }
 
     LoadingFailed(error) -> {
@@ -125,7 +143,11 @@ fn update(
         asset.ParseError(msg) -> "Parse error: " <> msg
       }
       io.println("Failed to load model: " <> error_msg)
-      #(Model(..model, load_state: Failed(error_msg)), effect.none())
+      #(
+        Model(..model, load_state: Failed(error_msg)),
+        effect.none(),
+        option.None,
+      )
     }
   }
 }
@@ -133,7 +155,7 @@ fn update(
 /// Create an animation state machine for the character
 fn create_state_machine(
   data: asset.GLTFData,
-) -> state_machine.StateMachine(State, tiramisu.Context) {
+) -> state_machine.StateMachine(State, tiramisu.Context(Id)) {
   // Get animation clips (assume model has at least 2 animations)
   case data.animations {
     [idle_clip, walk_clip, crouching_clip, ..] -> {
@@ -157,7 +179,7 @@ fn create_state_machine(
       |> state_machine.add_transition(
         from: Idle,
         to: Walking,
-        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context(Id)) {
           input.is_key_pressed(ctx.input, input.KeyW)
         }),
         blend_duration: 0.3,
@@ -165,7 +187,7 @@ fn create_state_machine(
       |> state_machine.add_transition(
         from: Walking,
         to: Idle,
-        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context(Id)) {
           !input.is_key_pressed(ctx.input, input.KeyW)
         }),
         blend_duration: 0.3,
@@ -173,7 +195,7 @@ fn create_state_machine(
       |> state_machine.add_transition(
         from: Walking,
         to: Crouching,
-        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context(Id)) {
           input.is_key_pressed(ctx.input, input.ShiftLeft)
         }),
         blend_duration: 0.2,
@@ -181,7 +203,7 @@ fn create_state_machine(
       |> state_machine.add_transition(
         from: Crouching,
         to: Walking,
-        condition: state_machine.Custom(fn(ctx: tiramisu.Context) {
+        condition: state_machine.Custom(fn(ctx: tiramisu.Context(Id)) {
           !input.is_key_pressed(ctx.input, input.ShiftLeft)
         }),
         blend_duration: 0.2,
@@ -193,13 +215,13 @@ fn create_state_machine(
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
-        id: "main",
+        id: Main,
         camera: _,
         look_at: option.None,
         active: True,
@@ -210,7 +232,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -218,7 +240,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 2.0)
@@ -233,7 +255,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a spinning cube while loading
       let loading_cube =
         scene.Mesh(
-          id: "loading",
+          id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -264,7 +286,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a red cube to indicate error
       let error_cube =
         scene.Mesh(
-          id: "error",
+          id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -307,7 +329,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show the character model with animation
       let character =
         scene.Model3D(
-          id: "character",
+          id: Character,
           object: data.scene,
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),

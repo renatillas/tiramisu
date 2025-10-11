@@ -7,6 +7,7 @@ import gleam/option
 import gleam/result
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -16,6 +17,17 @@ import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 import vec/vec3f
+
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  LoadingCube
+  ErrorCube
+  StlGroup
+  Standard
+  StlModel
+}
 
 pub type LoadState {
   Loading
@@ -36,14 +48,14 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
   // Load an STL file from the asset directory
@@ -61,37 +73,37 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       }),
     )
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]))
+  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick))
+      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     ModelLoaded(geom) -> {
-      #(Model(..model, load_state: Loaded(geom)), effect.none())
+      #(Model(..model, load_state: Loaded(geom)), effect.none(), option.None)
     }
 
     LoadingFailed -> {
-      #(Model(..model, load_state: Failed), effect.none())
+      #(Model(..model, load_state: Failed), effect.none(), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
-        id: "main-camera",
+        id: MainCamera,
         camera: _,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
         look_at: option.None,
@@ -103,7 +115,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
         light
@@ -111,7 +123,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 10.5)
@@ -126,7 +138,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a spinning cube while loading
       let loading_cube =
         scene.Mesh(
-          id: "loading",
+          id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -158,7 +170,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a red cube to indicate error
       let error_cube =
         scene.Mesh(
-          id: "error",
+          id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -192,9 +204,9 @@ fn view(model: Model) -> List(scene.Node) {
     Loaded(geom) -> {
       // Show the loaded STL model
       let model_node =
-        scene.Group(id: "stl_group", transform: transform.identity, children: [
+        scene.Group(id: StlGroup, transform: transform.identity, children: [
           scene.Mesh(
-            id: "standard",
+            id: Standard,
             geometry: {
               let assert Ok(geometry) =
                 geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -222,7 +234,7 @@ fn view(model: Model) -> List(scene.Node) {
             physics: option.None,
           ),
           scene.Mesh(
-            id: "stl_model",
+            id: StlModel,
             geometry: geometry.custom_geometry(geom),
             material: {
               let assert Ok(material) =

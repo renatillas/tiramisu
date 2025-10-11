@@ -18,6 +18,7 @@ import gleam/option
 import tiramisu
 import tiramisu/asset
 import tiramisu/audio
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -28,10 +29,22 @@ import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
+pub type Id {
+  Main
+  MusicCube
+  MusicBg
+  SfxCube
+  MusicGroup
+  SfxGroup
+  Ambient
+  Sun
+  SfxBeep(Int)
+}
+
 pub fn main() {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
@@ -68,7 +81,9 @@ pub type Msg {
 
 // --- Init ---
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   io.println("🎵 Declarative Audio Demo")
   io.println("========================")
   io.println("")
@@ -113,6 +128,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
         }),
       ),
     ]),
+    option.None,
   )
 }
 
@@ -121,8 +137,8 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
@@ -277,6 +293,7 @@ fn update(
           music_volume: music_volume,
         ),
         effect.tick(Tick),
+        option.None,
       )
     }
 
@@ -286,6 +303,7 @@ fn update(
       #(
         Model(..model, music_buffer: option.Some(buffer), loading: False),
         effect.none(),
+        option.None,
       )
     }
 
@@ -295,12 +313,13 @@ fn update(
       #(
         Model(..model, sfx_buffer: option.Some(buffer), loading: False),
         effect.none(),
+        option.None,
       )
     }
 
     LoadError(msg) -> {
       io.println("❌ Failed to load audio: " <> msg)
-      #(Model(..model, loading: False), effect.none())
+      #(Model(..model, loading: False), effect.none(), option.None)
     }
   }
 }
@@ -333,7 +352,7 @@ fn float_to_percentage(value: Float) -> String {
 
 // --- View ---
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -364,18 +383,18 @@ fn view(model: Model) -> List(scene.Node) {
   let music_nodes = case model.music_buffer {
     option.Some(buffer) -> [
       scene.Mesh(
-        id: "music_cube",
+        id: MusicCube,
         geometry: cube_geo,
         material: music_mat,
         transform: transform.identity,
         physics: option.None,
       ),
       // Audio node - state is declarative!
-      scene.Audio(id: "music_bg", audio: audio.global(buffer, music_config)),
+      scene.Audio(id: MusicBg, audio: audio.global(buffer, music_config)),
     ]
     option.None -> [
       scene.Mesh(
-        id: "music_cube",
+        id: MusicCube,
         geometry: cube_geo,
         material: music_mat,
         transform: transform.identity,
@@ -399,10 +418,7 @@ fn view(model: Model) -> List(scene.Node) {
           |> audio.with_state(state)
           |> audio.with_no_fade()
 
-        scene.Audio(
-          id: "sfx_beep_" <> int.to_string(id),
-          audio: audio.global(buffer, sfx_config),
-        )
+        scene.Audio(id: SfxBeep(id), audio: audio.global(buffer, sfx_config))
       })
     }
     option.None -> []
@@ -411,7 +427,7 @@ fn view(model: Model) -> List(scene.Node) {
   let sfx_nodes =
     [
       scene.Mesh(
-        id: "sfx_cube",
+        id: SfxCube,
         geometry: cube_geo,
         material: sfx_mat,
         transform: transform.identity,
@@ -422,7 +438,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   [
     scene.Camera(
-      id: "main",
+      id: Main,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -431,7 +447,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Music cube (left) - state determines if it plays
     scene.Group(
-      id: "music_group",
+      id: MusicGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(-3.0, 0.0, 0.0))
         |> transform.rotate_y(model.rotation),
@@ -439,7 +455,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // SFX cube (right) - one-shot sounds
     scene.Group(
-      id: "sfx_group",
+      id: SfxGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(3.0, 0.0, 0.0))
         |> transform.rotate_y(model.rotation *. -1.5),
@@ -447,12 +463,12 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Lights
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: ambient_light,
       transform: transform.identity,
     ),
     scene.Light(
-      id: "sun",
+      id: Sun,
       light: directional_light,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),

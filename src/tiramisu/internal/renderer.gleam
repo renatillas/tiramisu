@@ -30,3 +30,7 @@ pub fn render(renderer: WebGLRenderer, scene: Scene, camera: ThreeCamera) -> Nil
 
 @external(javascript, "../ffi/renderer.mjs", "getDomElement")
 pub fn get_dom_element(renderer: WebGLRenderer) -> DomElement
+
+/// Set the canvas reference for camera aspect ratio calculation (internal use only)
+@external(javascript, "../ffi/renderer.mjs", "setCanvas")
+pub fn set_canvas(canvas: DomElement) -> Nil

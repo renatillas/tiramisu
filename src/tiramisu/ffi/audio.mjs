@@ -5,7 +5,19 @@
 import * as THREE from 'three';
 import { getAudioListener } from './asset.mjs';
 
-// Global registry of audio sources by ID
+// Convert Gleam ID to string for use as Map key
+// This ensures IDs can be properly compared across frames
+// We include the constructor name to differentiate between types with no fields
+function idToString(id) {
+  // Get constructor name (Gleam custom types compile to JavaScript classes)
+  const typeName = id.constructor.name;
+  // Serialize the object's properties
+  const props = JSON.stringify(id);
+  // Combine both for a unique key
+  return `${typeName}:${props}`;
+}
+
+// Global registry of audio sources by ID (using string keys)
 const audioSources = new Map();
 
 // Audio group volumes (sfx, music, voice, ambient, custom)
@@ -55,8 +67,20 @@ function resumeAudioContext() {
   }
 }
 
-// Add event listeners for user interaction
-if (typeof document !== 'undefined') {
+// Runtime guards namespace - prevents duplicate event listeners across hot reloads
+// Stored on window object to persist across module reloads
+if (typeof window !== 'undefined' && !window.__tiramisu) {
+  window.__tiramisu = {
+    initialized: {
+      audioContextListeners: false,
+      resizeListener: false,
+    }
+  };
+}
+
+// Add event listeners for user interaction (only once, survives hot reload)
+if (typeof document !== 'undefined' && !window.__tiramisu.initialized.audioContextListeners) {
+  window.__tiramisu.initialized.audioContextListeners = true;
   ['click', 'touchstart', 'keydown'].forEach(eventType => {
     document.addEventListener(eventType, resumeAudioContext, { once: true });
   });
@@ -68,7 +92,7 @@ if (typeof document !== 'undefined') {
  * @param {THREE.Audio | THREE.PositionalAudio} source - Audio source
  */
 export function registerAudioSource(id, source) {
-  audioSources.set(id, source);
+  audioSources.set(idToString(id), source);
 }
 
 /**
@@ -76,18 +100,32 @@ export function registerAudioSource(id, source) {
  * @param {string} id - Unique identifier
  */
 export function unregisterAudioSource(id) {
-  const source = audioSources.get(id);
+  const idStr = idToString(id);
+  const source = audioSources.get(idStr);
   if (source && source.isPlaying) {
-    source.stop();
+    // Only stop looping sounds or music
+    // One-shot sounds (loop=false) should play to completion
+    if (source.loop) {
+      source.stop();
+    }
   }
-  audioSources.delete(id);
+  audioSources.delete(idStr);
 }
 
 /**
  * Get an audio source by ID
  */
 function getAudioSource(id) {
-  return audioSources.get(id);
+  return audioSources.get(idToString(id));
+}
+
+/**
+ * Get an audio source for cleanup purposes (exported for renderer)
+ * @param {string} id - Audio source ID
+ * @returns {THREE.Audio | null}
+ */
+export function getAudioSourceForCleanup(id) {
+  return getAudioSource(id);
 }
 
 /**
@@ -99,7 +137,8 @@ function getAudioSource(id) {
  */
 export function playAudio(id, buffer, config, audioType) {
   // Remove existing source if it exists
-  if (audioSources.has(id)) {
+  const idStr = idToString(id);
+  if (audioSources.has(idStr)) {
     stopAudio(id);
     unregisterAudioSource(id);
   }
@@ -313,7 +352,9 @@ export function stopAudio(sourceId) {
  */
 export function updateAudioConfig(id, config) {
   const source = getAudioSource(id);
-  if (!source) return;
+  if (!source) {
+    return;
+  }
 
   // Update base volume and other properties
   source.userData.baseVolume = config.volume;

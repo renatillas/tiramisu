@@ -6,6 +6,7 @@ import gleam/option
 import gleam/result
 import gleam_community/maths
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
@@ -16,6 +17,14 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  Cube(Int)
+  Ground
+}
 
 pub type Model {
   Model(show_performance: Bool, time: Float)
@@ -28,14 +37,14 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x000510,
+    background: background.Color(0x000510),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   io.println("=== Frustum Culling Demo ===")
   io.println("")
   io.println("This demo shows automatic frustum culling:")
@@ -47,14 +56,14 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   io.println("  P - Toggle performance stats")
   io.println("")
 
-  #(Model(show_performance: True, time: 0.0), effect.tick(Tick))
+  #(Model(show_performance: True, time: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Toggle performance stats
@@ -98,18 +107,19 @@ fn update(
           time: model.time +. ctx.delta_time,
         ),
         effect.tick(Tick),
+        option.None,
       )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
     |> result.map(fn(cam) {
       cam
       |> scene.Camera(
-        id: "main-camera",
+        id: MainCamera,
         camera: _,
         transform: transform.at(position: vec3.Vec3(0.0, 20.0, 80.0)),
         look_at: option.None,
@@ -120,7 +130,7 @@ fn view(model: Model) -> List(scene.Node) {
     })
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
         light
@@ -128,7 +138,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.6)
@@ -168,7 +178,7 @@ fn view(model: Model) -> List(scene.Node) {
       let rotation = model.time *. 0.5
 
       scene.Mesh(
-        id: "cube_" <> int.to_string(i),
+        id: Cube(i),
         geometry: {
           let assert Ok(geometry) =
             geometry.box(width: 2.0, height: 2.0, depth: 2.0)
@@ -200,7 +210,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Add a ground plane for reference
   let ground =
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(geometry) = geometry.plane(width: 200.0, height: 200.0)
         geometry

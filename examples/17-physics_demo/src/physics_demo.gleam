@@ -1,5 +1,6 @@
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -10,8 +11,18 @@ import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  Ground
+  Cube1
+  Cube2
+  Cube3
+}
+
 pub type Model {
-  Model(rotation: Float, physics_world: physics.PhysicsWorld)
+  Model(rotation: Float, physics_world: physics.PhysicsWorld(Id))
 }
 
 pub type Msg {
@@ -21,28 +32,35 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   // Initialize physics world with gravity
   let physics_world =
-    physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
+    physics.new_world(
+      physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0), correspondances: [
+        #(Cube1, "cube-1"),
+        #(Cube2, "cube-2"),
+        #(Cube3, "cube-3"),
+        #(Ground, "ground"),
+      ]),
+    )
 
   let model = Model(rotation: 0.0, physics_world: physics_world)
 
-  #(model, effect.tick(Tick))
+  #(model, effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Step physics simulation
@@ -53,18 +71,20 @@ fn update(
       #(
         Model(rotation: new_rotation, physics_world: new_physics_world),
         effect.tick(Tick),
+        option.None,
       )
     }
   }
 }
 
-fn view(_model: Model) -> List(scene.Node) {
+fn view(_model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+  let assert option.Some(physics_world) = ctx.physics_world
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera =
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera:,
       transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -74,7 +94,7 @@ fn view(_model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -82,7 +102,7 @@ fn view(_model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 2.0)
@@ -95,7 +115,7 @@ fn view(_model: Model) -> List(scene.Node) {
   // Ground plane (static physics body)
   let ground =
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 20.0, height: 0.2, depth: 20.0)
@@ -118,7 +138,7 @@ fn view(_model: Model) -> List(scene.Node) {
   // Falling cubes (dynamic physics bodies)
   let cube1 =
     scene.Mesh(
-      id: "cube1",
+      id: Cube1,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -131,7 +151,7 @@ fn view(_model: Model) -> List(scene.Node) {
           |> material.build()
         material
       },
-      transform: case physics.get_transform("cube1") {
+      transform: case physics.get_transform(physics_world, Cube1) {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(-2.0, 5.0, 0.0))
       },
@@ -145,7 +165,7 @@ fn view(_model: Model) -> List(scene.Node) {
 
   let cube2 =
     scene.Mesh(
-      id: "cube2",
+      id: Cube2,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -156,7 +176,7 @@ fn view(_model: Model) -> List(scene.Node) {
           material.new() |> material.with_color(0x44ff44) |> material.build()
         material
       },
-      transform: case physics.get_transform("cube2") {
+      transform: case physics.get_transform(physics_world, Cube2) {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(0.0, 7.0, 0.0))
       },
@@ -170,7 +190,7 @@ fn view(_model: Model) -> List(scene.Node) {
 
   let cube3 =
     scene.Mesh(
-      id: "cube3",
+      id: Cube3,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -181,7 +201,7 @@ fn view(_model: Model) -> List(scene.Node) {
           material.new() |> material.with_color(0x4444ff) |> material.build()
         material
       },
-      transform: case physics.get_transform("cube3") {
+      transform: case physics.get_transform(physics_world, Cube3) {
         Ok(t) -> t
         Error(Nil) -> transform.at(position: vec3.Vec3(2.0, 9.0, 0.0))
       },

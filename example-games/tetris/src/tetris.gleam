@@ -47,6 +47,16 @@ pub type Model {
   )
 }
 
+pub type Id {
+  MoveSfx
+  AmbientLight
+  DirectionalLight
+  MainCamera
+  LockedBlock(Int)
+  CurrentBlock(Int)
+  GridOutLine
+}
+
 // Messages
 pub type Msg {
   Tick
@@ -55,7 +65,9 @@ pub type Msg {
 }
 
 // Initialize
-pub fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+pub fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let assets = [
     asset.AudioAsset("wav/Select-1-(Saw).wav"),
     asset.AudioAsset("wav/Cursor-1-(Saw).wav"),
@@ -88,33 +100,41 @@ pub fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
       assets_cache: option.None,
     )
 
-  #(model, effects)
+  #(model, effects, option.None)
 }
 
 // Update
 pub fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     LoadedAssets(batch_result) -> {
       #(
         Model(..model, assets_cache: option.Some(batch_result.cache)),
         effect.none(),
+        option.None,
       )
     }
     Restart -> {
-      let #(new_model, init_effect) = init(ctx)
+      let #(new_model, init_effect, _) = init(ctx)
       #(
         new_model,
         effect.batch([
           init_effect,
           tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(new_model.game_state)),
         ]),
+        option.None,
       )
     }
     Tick -> {
+      // Reset player_moved from previous frame (for audio one-shot behavior)
+      let model = case model.player_moved {
+        True -> Model(..model, player_moved: False)
+        False -> model
+      }
+
       let move_cooldown = 0.15
       let rotate_cooldown = 0.2
 
@@ -219,40 +239,38 @@ pub fn update(
             updated_model.game_state,
           )),
         ]),
+        option.None,
       )
     }
   }
 }
 
 // View
-pub fn view(model: Model) -> List(scene.Node) {
-  let move_sfx =
-    model.assets_cache
-    |> option.map(fn(cache) {
-      asset.get_audio(cache, "wav/Select-1-(Saw).wav")
-      |> option.from_result()
-    })
-    |> option.flatten
-  let move_audio_node = case move_sfx {
-    option.Some(buffer) -> [
-      scene.Audio(
-        id: "move-sfx",
-        audio: audio.GlobalAudio(
-          buffer:,
-          config: audio.config()
-            |> audio.with_state(case model.player_moved {
-              True -> audio.Playing
-              False -> audio.Stopped
-            }),
-        ),
-      ),
-    ]
-    option.None -> []
+pub fn view(
+  model: Model,
+  _context: tiramisu.Context(Id),
+) -> List(scene.Node(Id)) {
+  // Only add audio node when player actually moved (for one-shot sound effect)
+  let move_audio_node = case model.assets_cache, model.player_moved {
+    option.Some(cache), True ->
+      case asset.get_audio(cache, "wav/Select-1-(Saw).wav") {
+        Ok(buffer) -> [
+          scene.Audio(
+            id: MoveSfx,
+            audio: audio.GlobalAudio(
+              buffer:,
+              config: audio.config() |> audio.with_state(audio.Playing),
+            ),
+          ),
+        ]
+        Error(_) -> []
+      }
+    _, _ -> []
   }
   // Camera
   let camera_node =
     scene.Camera(
-      id: "main",
+      id: MainCamera,
       camera: model.camera,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
       look_at: Some(vec3.Vec3(5.0, 10.0, 0.0)),
@@ -263,7 +281,7 @@ pub fn view(model: Model) -> List(scene.Node) {
   // Lights
   let ambient_light =
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -273,7 +291,7 @@ pub fn view(model: Model) -> List(scene.Node) {
 
   let directional_light =
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.8)
         light
@@ -308,7 +326,11 @@ pub fn view(model: Model) -> List(scene.Node) {
 }
 
 // Helper: Create a block for the current piece
-fn create_block(pos: position.Position, index: Int, color: Int) -> scene.Node {
+fn create_block(
+  pos: position.Position,
+  index: Int,
+  color: Int,
+) -> scene.Node(Id) {
   let assert Ok(geometry) =
     geometry.box(width: block_size, height: block_size, depth: block_size)
   let assert Ok(material) =
@@ -322,7 +344,7 @@ fn create_block(pos: position.Position, index: Int, color: Int) -> scene.Node {
   let y = int.to_float(pos.y) *. block_size
 
   scene.Mesh(
-    id: "current_block_" <> int.to_string(index),
+    id: CurrentBlock(index),
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
@@ -331,7 +353,7 @@ fn create_block(pos: position.Position, index: Int, color: Int) -> scene.Node {
 }
 
 // Helper: Create a locked block
-fn create_locked_block(pos: position.Position, index: Int) -> scene.Node {
+fn create_locked_block(pos: position.Position, index: Int) -> scene.Node(Id) {
   let assert Ok(geometry) =
     geometry.box(width: block_size, height: block_size, depth: block_size)
   let assert Ok(material) =
@@ -343,7 +365,7 @@ fn create_locked_block(pos: position.Position, index: Int) -> scene.Node {
   let y = int.to_float(pos.y) *. block_size
 
   scene.Mesh(
-    id: "locked_block_" <> int.to_string(index),
+    id: LockedBlock(index),
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
@@ -352,7 +374,7 @@ fn create_locked_block(pos: position.Position, index: Int) -> scene.Node {
 }
 
 // Helper: Create grid outline
-fn create_grid_outline() -> scene.Node {
+fn create_grid_outline() -> scene.Node(Id) {
   let assert Ok(geometry) =
     geometry.box(
       width: int.to_float(grid_width) *. block_size +. 0.2,
@@ -365,7 +387,7 @@ fn create_grid_outline() -> scene.Node {
     |> material.build()
 
   scene.Mesh(
-    id: "grid_outline",
+    id: GridOutLine,
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(

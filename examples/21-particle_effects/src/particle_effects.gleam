@@ -1,5 +1,6 @@
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
@@ -10,6 +11,17 @@ import tiramisu/particle_emitter
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  Fire
+  Sparkles
+  Explosion
+  Smoke
+  Ground
+}
 
 pub type Model {
   Model(
@@ -31,14 +43,16 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x0a0a1a,
+    background: background.Color(0x0a0a1a),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   #(
     Model(
       fire_active: True,
@@ -47,47 +61,52 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
       smoke_active: True,
     ),
     effect.tick(Tick),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  _ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
-    Tick -> #(model, effect.tick(Tick))
+    Tick -> #(model, effect.tick(Tick), option.None)
 
     ToggleFire -> #(
       Model(..model, fire_active: !model.fire_active),
       effect.tick(Tick),
+      option.None,
     )
 
     ToggleSparkles -> #(
       Model(..model, sparkles_active: !model.sparkles_active),
       effect.tick(Tick),
+      option.None,
     )
 
     ToggleExplosion -> #(
       Model(..model, explosion_active: !model.explosion_active),
       effect.tick(Tick),
+      option.None,
     )
 
     ToggleSmoke -> #(
       Model(..model, smoke_active: !model.smoke_active),
       effect.tick(Tick),
+      option.None,
     )
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   echo debug.get_performance_stats()
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   [
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera: camera,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -95,7 +114,7 @@ fn view(model: Model) -> List(scene.Node) {
       viewport: option.None,
     ),
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
         light
@@ -103,7 +122,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.6)
@@ -113,7 +132,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Fire particles (red-orange with upward velocity)
     scene.Particles(
-      id: "fire",
+      id: Fire,
       emitter: {
         let assert Ok(emitter) =
           particle_emitter.new()
@@ -135,7 +154,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Sparkles (golden with slow upward drift)
     scene.Particles(
-      id: "sparkles",
+      id: Sparkles,
       emitter: {
         let assert Ok(emitter) =
           particle_emitter.new()
@@ -156,7 +175,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Explosion (fast radial burst)
     scene.Particles(
-      id: "explosion",
+      id: Explosion,
       emitter: {
         let assert Ok(emitter) =
           particle_emitter.new()
@@ -178,7 +197,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Smoke (gray with slow upward drift and spread)
     scene.Particles(
-      id: "smoke",
+      id: Smoke,
       emitter: {
         let assert Ok(emitter) =
           particle_emitter.new()
@@ -200,7 +219,7 @@ fn view(model: Model) -> List(scene.Node) {
     ),
     // Ground plane for reference
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
         geom

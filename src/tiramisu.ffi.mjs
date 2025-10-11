@@ -8,13 +8,79 @@ import * as PHYSICS from './tiramisu/ffi/physics.mjs';
 import * as DEBUG from './tiramisu/ffi/debug.mjs';
 import * as CAMERA from './tiramisu/ffi/camera.mjs';
 import * as UI from './tiramisu/ffi/ui.mjs';
+import * as EFFECTS from './tiramisu/ffi/effects.mjs';
 
 /**
- * Create a Three.js scene with background color
+ * Create a Three.js scene with background (color, texture, or cube texture)
+ * @param {Object} background - Gleam Background type variant
  */
 export function createScene(background) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(background);
+
+  // Handle Gleam ADT variants
+  // Gleam ADTs compile to arrays where [0] is the variant name
+  const variantName = background[0];
+
+  switch (variantName) {
+    case 'Color': {
+      // Color variant: background = ['Color', hexColorInt]
+      const colorValue = background[1];
+      scene.background = new THREE.Color(colorValue);
+      break;
+    }
+
+    case 'Texture': {
+      // Texture variant: background = ['Texture', url]
+      const url = background[1];
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load(
+        url,
+        (texture) => {
+          scene.background = texture;
+        },
+        undefined,
+        (error) => {
+          console.error(`[Tiramisu] Failed to load background texture: ${url}`, error);
+          // Fallback to black background
+          scene.background = new THREE.Color(0x000000);
+        }
+      );
+      break;
+    }
+
+    case 'CubeTexture': {
+      // CubeTexture variant: background = ['CubeTexture', [px, nx, py, ny, pz, nz]]
+      const urls = background[1].toArray();
+      if (urls.length !== 6) {
+        console.error('[Tiramisu] CubeTexture requires exactly 6 URLs [px, nx, py, ny, pz, nz]');
+        scene.background = new THREE.Color(0x000000);
+        break;
+      }
+
+      const cubeTextureLoader = new THREE.CubeTextureLoader();
+      cubeTextureLoader.load(
+        urls,
+        (cubeTexture) => {
+          scene.background = cubeTexture;
+        },
+        undefined,
+        (error) => {
+          console.error('[Tiramisu] Failed to load cube texture background', error);
+          // Fallback to black background
+          scene.background = new THREE.Color(0x000000);
+        }
+      );
+      break;
+    }
+
+    default:
+      console.error(`[Tiramisu] Unknown background variant: ${variantName}`);
+      scene.background = new THREE.Color(0x000000);
+  }
+
+  // Store scene reference for effects to use
+  EFFECTS.setGameScene(scene);
+
   return scene;
 }
 
@@ -106,7 +172,8 @@ export function startLoop(
     // Capture input state snapshot
     const inputState = INPUT_CAPTURE.captureInputState();
 
-    // Get canvas dimensions
+    // Get canvas dimensions (use CSS display size for coordinate conversion)
+    // Touch/mouse coordinates are in CSS pixels, so we need CSS dimensions
     const canvas = renderer.domElement;
     const canvasWidth = canvas.clientWidth;
     const canvasHeight = canvas.clientHeight;

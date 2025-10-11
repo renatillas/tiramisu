@@ -21,9 +21,8 @@
 ////
 //// pub fn main() {
 ////   tiramisu.run(
-////     width: 800,
-////     height: 600,
-////     background: 0x111111,
+////     dimensions: None,
+////     background: background.Color(0x111111),
 ////     init: init,
 ////     update: update,
 ////     view: view,
@@ -58,6 +57,7 @@
 //// ```
 
 import gleam/option.{type Option}
+import tiramisu/background.{type Background}
 import tiramisu/effect
 import tiramisu/input
 import tiramisu/internal/renderer
@@ -146,7 +146,7 @@ pub type Context(id) {
 /// ## Parameters
 ///
 /// - `dimensions`: Canvas dimensions (width and height). Use `None` for fullscreen mode.
-/// - `background`: Background color as hex integer (e.g., 0x111111 for dark gray)
+/// - `background`: Background as Color, Texture, or CubeTexture (see `Background` type)
 /// - `init`: Function to create initial game state and effect
 /// - `update`: Function to update state based on messages
 /// - `view`: Function to render your game state as scene nodes
@@ -176,10 +176,10 @@ pub type Context(id) {
 /// }
 ///
 /// pub fn main() {
-///   // Fullscreen mode
+///   // Fullscreen mode with color background
 ///   tiramisu.run(
 ///     dimensions: None,
-///     background: 0x111111,
+///     background: background.Color(0x111111),
 ///     init: fn(_ctx) {
 ///       #(Model(rotation: 0.0), effect.batch([
 ///         effect.on_animation_frame(Tick),
@@ -217,7 +217,7 @@ pub type Context(id) {
 /// ```
 pub fn run(
   dimensions dimensions: Option(Dimensions),
-  background background: Int,
+  background background: Background,
   init init: fn(Context(id)) -> #(
     state,
     effect.Effect(msg),
@@ -280,7 +280,10 @@ pub fn run(
   append_to_dom(canvas)
   initialize_input_systems(canvas)
 
-  // Apply initial scene (this will set up cameras from scene nodes)
+  // Set canvas reference for camera aspect ratio calculation (BEFORE applying initial scene)
+  renderer.set_canvas(canvas)
+
+  // Apply initial scene (this will set up cameras from scene nodes and use the canvas reference)
   apply_initial_scene(scene_obj, initial_nodes, physics_world)
 
   // Start game loop
@@ -299,7 +302,7 @@ pub fn run(
 // --- FFI Declarations ---
 
 @external(javascript, "./tiramisu.ffi.mjs", "createScene")
-fn create_scene(background: Int) -> Scene
+fn create_scene(background: Background) -> Scene
 
 @external(javascript, "./tiramisu.ffi.mjs", "appendToDom")
 fn append_to_dom(element: renderer.DomElement) -> Nil

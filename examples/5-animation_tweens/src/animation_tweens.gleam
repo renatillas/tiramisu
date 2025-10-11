@@ -1,6 +1,7 @@
 import gleam/option
 import tiramisu
 import tiramisu/animation
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -21,14 +22,16 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let tween =
     animation.tween_vec3(
       vec3.Vec3(-5.0, 0.0, 0.0),
@@ -37,14 +40,14 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
       animation.Linear,
     )
 
-  #(Model(tween: tween, current_easing: 0), effect.tick(Tick))
+  #(Model(tween: tween, current_easing: 0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let updated_tween = animation.update_tween(model.tween, ctx.delta_time)
@@ -72,6 +75,7 @@ fn update(
       #(
         Model(tween: final_tween, current_easing: easing_index),
         effect.tick(Tick),
+        option.None,
       )
     }
   }
@@ -107,7 +111,7 @@ fn easing_name(index: Int) -> String {
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let position = animation.get_tween_value(model.tween)
   let _ = easing_name(model.current_easing)
   let assert Ok(camera) =

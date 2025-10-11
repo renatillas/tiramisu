@@ -3,6 +3,7 @@
 /// Demonstrates 2D camera modes and orthographic projection
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -23,31 +24,33 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
-  #(Model(time: 0.0), effect.tick(Tick))
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
+  #(Model(time: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_time = model.time +. ctx.delta_time
-      #(Model(time: new_time), effect.tick(Tick))
+      #(Model(time: new_time), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   [
     scene.Camera(
       id: "camera",

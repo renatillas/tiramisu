@@ -11,8 +11,20 @@ import * as PHYSICS from './physics.mjs';
 import * as DEBUG from './debug.mjs';
 import * as CAMERA from './camera.mjs';
 
-// Cache of Three.js objects by ID
+// Cache of Three.js objects by ID (using string keys for stable comparison)
 const objectCache = new Map();
+
+// Convert Gleam ID to string for use as Map key
+// This ensures IDs like Snake(0) can be properly compared across frames
+// We include the constructor name to differentiate between types with no fields
+function idToString(id) {
+  // Get constructor name (Gleam custom types compile to JavaScript classes)
+  const typeName = id.constructor.name;
+  // Serialize the object's properties
+  const props = JSON.stringify(id);
+  // Combine both for a unique key
+  return `${typeName}:${props}`;
+}
 
 // Cache of Animation Mixers by node ID
 const mixerCache = new Map();
@@ -25,6 +37,13 @@ const cameraViewports = new Map();
 
 // Cache of particle systems by node ID
 const particleSystemCache = new Map();
+
+// Canvas reference for camera aspect ratio calculation
+let canvasElement = null;
+
+export function setCanvas(canvas) {
+  canvasElement = canvas;
+}
 
 /**
  * Particle System - manages particle spawning, updating, and rendering
@@ -367,16 +386,41 @@ export function createAmbientLight(intensity, color) {
   return new THREE.AmbientLight(color, intensity);
 }
 
-export function createDirectionalLight(intensity, color) {
-  return new THREE.DirectionalLight(color, intensity);
+export function createDirectionalLight(intensity, color, castShadow, shadowResolution, shadowBias) {
+  const light = new THREE.DirectionalLight(color, intensity);
+  light.castShadow = castShadow;
+  if (castShadow) {
+    light.shadow.mapSize.width = shadowResolution;
+    light.shadow.mapSize.height = shadowResolution;
+    light.shadow.bias = shadowBias;
+    // Enable shadow rendering for the renderer
+    light.shadow.camera.updateProjectionMatrix();
+  }
+  return light;
 }
 
-export function createPointLight(intensity, color, distance) {
-  return new THREE.PointLight(color, intensity, distance);
+export function createPointLight(intensity, color, distance, castShadow, shadowResolution, shadowBias) {
+  const light = new THREE.PointLight(color, intensity, distance);
+  light.castShadow = castShadow;
+  if (castShadow) {
+    light.shadow.mapSize.width = shadowResolution;
+    light.shadow.mapSize.height = shadowResolution;
+    light.shadow.bias = shadowBias;
+    light.shadow.camera.updateProjectionMatrix();
+  }
+  return light;
 }
 
-export function createSpotLight(intensity, color, distance, angle, penumbra) {
-  return new THREE.SpotLight(color, intensity, distance, angle, penumbra);
+export function createSpotLight(intensity, color, distance, angle, penumbra, castShadow, shadowResolution, shadowBias) {
+  const light = new THREE.SpotLight(color, intensity, distance, angle, penumbra);
+  light.castShadow = castShadow;
+  if (castShadow) {
+    light.shadow.mapSize.width = shadowResolution;
+    light.shadow.mapSize.height = shadowResolution;
+    light.shadow.bias = shadowBias;
+    light.shadow.camera.updateProjectionMatrix();
+  }
+  return light;
 }
 
 export function createHemisphereLight(intensity, skyColor, groundColor) {
@@ -406,8 +450,9 @@ function applyCameraLookAt(camera, lookAtTarget) {
 
 // Setup animation (single or blended) for a Model3D
 function setupAnimation(id, mixer, animPlayback) {
+  const idStr = idToString(id);
   // Stop any existing animations
-  const existingActions = actionCache.get(id);
+  const existingActions = actionCache.get(idStr);
   if (existingActions) {
     if (Array.isArray(existingActions)) {
       existingActions.forEach(action => action.stop());
@@ -425,7 +470,7 @@ function setupAnimation(id, mixer, animPlayback) {
     action.weight = animConfig.weight;
     action.play();
 
-    actionCache.set(id, action);
+    actionCache.set(idStr, action);
   } else if (animPlayback instanceof OBJECT3D_GLEAM.BlendedAnimations) {
     // Blended animations
     const fromAnim = animPlayback.from;
@@ -444,7 +489,7 @@ function setupAnimation(id, mixer, animPlayback) {
     toAction.weight = blendFactor * toAnim.weight;
     toAction.play();
 
-    actionCache.set(id, [fromAction, toAction]);
+    actionCache.set(idStr, [fromAction, toAction]);
   }
 }
 
@@ -460,6 +505,10 @@ export function applyPatch(scene, patch, physicsWorld) {
       const material = MATERIAL_GLEAM.create_material(node.material);
       threeObj = new THREE.Mesh(geometry, material);
       applyTransform(threeObj, node.transform);
+
+      // Enable shadows by default for all meshes
+      threeObj.castShadow = true;
+      threeObj.receiveShadow = true;
 
       // Create physics body if specified
       if (node.physics && node.physics[0] && physicsWorld) {
@@ -523,7 +572,7 @@ export function applyPatch(scene, patch, physicsWorld) {
 
       // Create animation mixer once for this Model3D instance
       const mixer = new THREE.AnimationMixer(threeObj);
-      mixerCache.set(id, mixer);
+      mixerCache.set(idToString(id), mixer);
 
       // Setup animation if provided
       if (node.animation && node.animation[0]) {
@@ -558,14 +607,13 @@ export function applyPatch(scene, patch, physicsWorld) {
       // Create Three.js camera from Gleam camera config
       // Pass viewport if specified to calculate correct aspect ratio
       const viewport = node.viewport && node.viewport[0] ? node.viewport[0] : null;
-      threeObj = CAMERA.createThreeCamera(node.camera.projection, viewport);
+      threeObj = CAMERA.createThreeCamera(node.camera.projection, viewport, canvasElement);
 
       // Add AudioListener to the camera (required for Three.js audio to work)
       // The listener must be a child of the camera in the scene graph
       const listener = ASSET.getAudioListener();
       if (!threeObj.children.includes(listener)) {
         threeObj.add(listener);
-        console.log(`[Tiramisu] Added AudioListener to camera: ${id} (active: ${node.active})`);
       }
 
       // Apply node transform (position and rotation)
@@ -584,9 +632,9 @@ export function applyPatch(scene, patch, physicsWorld) {
       // Store viewport if specified
       if (node.viewport && node.viewport[0]) {
         const viewport = node.viewport[0];
-        cameraViewports.set(id, viewport);
+        cameraViewports.set(idToString(id), viewport);
       } else {
-        cameraViewports.delete(id);
+        cameraViewports.delete(idToString(id));
       }
 
       // If this camera is active, set it as the active camera for rendering
@@ -609,17 +657,17 @@ export function applyPatch(scene, patch, physicsWorld) {
       // Create particle system
       const particleSystem = new ParticleSystem(node.emitter, node.transform);
       particleSystem.setActive(node.active);
-      particleSystemCache.set(id, particleSystem);
+      particleSystemCache.set(idToString(id), particleSystem);
       threeObj = particleSystem.points;
     }
 
     if (threeObj) {
-      objectCache.set(id, threeObj);
+      objectCache.set(idToString(id), threeObj);
 
       // Add to parent or scene
       if (parent_id && parent_id[0]) {
         // parent_id is Option(String), [0] gets the Some value
-        const parentObj = objectCache.get(parent_id[0]);
+        const parentObj = objectCache.get(idToString(parent_id[0]));
         if (parentObj) {
           parentObj.add(threeObj);
         } else {
@@ -638,22 +686,33 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.RemoveNode) {
     const id = patch.id;
-    const obj = objectCache.get(id);
+    const idStr = idToString(id);
+    const obj = objectCache.get(idStr);
     if (obj) {
       scene.remove(obj);
       // Dispose geometry and material to free memory
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) obj.material.dispose();
-      objectCache.delete(id);
+      objectCache.delete(idStr);
 
       // Clean up animation mixer if exists
-      if (mixerCache.has(id)) {
-        mixerCache.delete(id);
-        actionCache.delete(id);
+      if (mixerCache.has(idStr)) {
+        mixerCache.delete(idStr);
+        actionCache.delete(idStr);
       }
 
-      // Stop audio if exists
-      AUDIO.stopAudio(id);
+      // For audio nodes, check if it's a one-shot sound that should play to completion
+      // Don't stop one-shot sounds - they'll clean up automatically when done
+      const audioSource = AUDIO.getAudioSourceForCleanup(id);
+      if (audioSource) {
+        // Only stop if it's a looping sound
+        if (audioSource.loop) {
+          AUDIO.stopAudio(id);
+        } else {
+          // Unregister but don't stop (let it play to completion)
+          AUDIO.unregisterAudioSource(id);
+        }
+      }
 
       // Remove physics body if exists
       if (physicsWorld) {
@@ -661,15 +720,15 @@ export function applyPatch(scene, patch, physicsWorld) {
       }
 
       // Clean up particle system if exists
-      if (particleSystemCache.has(id)) {
-        const particleSystem = particleSystemCache.get(id);
+      if (particleSystemCache.has(idStr)) {
+        const particleSystem = particleSystemCache.get(idStr);
         particleSystem.dispose();
-        particleSystemCache.delete(id);
+        particleSystemCache.delete(idStr);
       }
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateTransform) {
     const { id, transform } = patch;
-    const obj = objectCache.get(id);
+    const obj = objectCache.get(idToString(id));
     if (obj) {
       applyTransform(obj, transform);
       // Force update world matrix for this object and all children
@@ -684,21 +743,22 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateMaterial) {
     const { id, material } = patch;
-    const obj = objectCache.get(id);
+    const obj = objectCache.get(idToString(id));
     if (obj && obj.material) {
       obj.material.dispose();
       obj.material = MATERIAL_GLEAM.create_material(material);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateGeometry) {
     const { id, geometry } = patch;
-    const obj = objectCache.get(id);
+    const obj = objectCache.get(idToString(id));
     if (obj && obj.geometry) {
       obj.geometry.dispose();
       obj.geometry = GEOMETRY_GLEAM.create_geometry(geometry);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateLight) {
     const { id, light } = patch;
-    const oldLight = objectCache.get(id);
+    const idStr = idToString(id);
+    const oldLight = objectCache.get(idStr);
     if (oldLight) {
       const newLight = LIGHT_GLEAM.create_light(light);
       newLight.position.copy(oldLight.position);
@@ -707,11 +767,12 @@ export function applyPatch(scene, patch, physicsWorld) {
 
       scene.remove(oldLight);
       scene.add(newLight);
-      objectCache.set(id, newLight);
+      objectCache.set(idStr, newLight);
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateAnimation) {
     const { id, animation } = patch;
-    const mixer = mixerCache.get(id);
+    const idStr = idToString(id);
+    const mixer = mixerCache.get(idStr);
 
     if (!mixer) {
       console.warn('[Renderer] No mixer found for Model3D:', id);
@@ -723,14 +784,14 @@ export function applyPatch(scene, patch, physicsWorld) {
       setupAnimation(id, mixer, animation[0]);
     } else {
       // Stop all animations
-      const currentActions = actionCache.get(id);
+      const currentActions = actionCache.get(idStr);
       if (currentActions) {
         if (Array.isArray(currentActions)) {
           currentActions.forEach(action => action.stop());
         } else {
           currentActions.stop();
         }
-        actionCache.delete(id);
+        actionCache.delete(idStr);
       }
     }
   } else if (patch instanceof SCENE_GLEAM.UpdatePhysics) {
@@ -743,7 +804,7 @@ export function applyPatch(scene, patch, physicsWorld) {
       // Create new physics body if provided
       if (physics && physics[0]) {
         // Get current transform from Three.js object
-        const obj = objectCache.get(id);
+        const obj = objectCache.get(idToString(id));
         if (obj) {
           const transform = {
             position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
@@ -767,7 +828,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateInstances) {
     const { id, instances } = patch;
-    const obj = objectCache.get(id);
+    const obj = objectCache.get(idToString(id));
     if (obj && obj instanceof THREE.InstancedMesh) {
       updateInstancedMeshTransforms(obj, instances);
     } else {
@@ -775,7 +836,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateLODLevels) {
     const { id, levels } = patch;
-    const obj = objectCache.get(id);
+    const obj = objectCache.get(idToString(id));
     if (obj && obj instanceof THREE.LOD) {
       // Clear existing levels
       while (obj.levels.length > 0) {
@@ -812,7 +873,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateCamera) {
     const { id, camera_type, look_at } = patch;
-    const cameraObj = objectCache.get(id);
+    const cameraObj = objectCache.get(idToString(id));
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
       // Update look_at (handle nested transforms) if provided
       if (look_at && look_at[0]) {
@@ -843,7 +904,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.SetActiveCamera) {
     const id = patch.id;
-    const cameraObj = objectCache.get(id);
+    const cameraObj = objectCache.get(idToString(id));
     if (cameraObj && (cameraObj instanceof THREE.PerspectiveCamera || cameraObj instanceof THREE.OrthographicCamera)) {
       CAMERA.setCamera(cameraObj);
     } else {
@@ -851,7 +912,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateParticleEmitter) {
     const { id, emitter } = patch;
-    const particleSystem = particleSystemCache.get(id);
+    const particleSystem = particleSystemCache.get(idToString(id));
     if (particleSystem) {
       particleSystem.updateEmitter(emitter);
     } else {
@@ -859,7 +920,7 @@ export function applyPatch(scene, patch, physicsWorld) {
     }
   } else if (patch instanceof SCENE_GLEAM.UpdateParticleActive) {
     const { id, active } = patch;
-    const particleSystem = particleSystemCache.get(id);
+    const particleSystem = particleSystemCache.get(idToString(id));
     if (particleSystem) {
       particleSystem.setActive(active);
     } else {
@@ -876,8 +937,8 @@ export function applyPatch(scene, patch, physicsWorld) {
  */
 export function getCamerasWithViewports() {
   const cameras = [];
-  for (const [id, viewport] of cameraViewports.entries()) {
-    const camera = objectCache.get(id);
+  for (const [idStr, viewport] of cameraViewports.entries()) {
+    const camera = objectCache.get(idStr);
     if (camera) {
       cameras.push({ camera, viewport });
     }
@@ -944,7 +1005,10 @@ export function updateParticleSystems(deltaTime) {
 export function syncPhysicsTransforms(physicsWorld) {
   if (!physicsWorld) return; // No physics world, skip syncing
 
-  objectCache.forEach((obj, id) => {
+  objectCache.forEach((obj, idStr) => {
+    // Parse the ID string back to the original Gleam ID structure
+    const id = JSON.parse(idStr);
+
     // Get the rigid body by typed ID using PhysicsWorld's BiMap
     const body = PHYSICS.getBodyByTypedId(physicsWorld, id);
 
@@ -987,6 +1051,10 @@ export function createRenderer(options) {
     alpha: options.alpha,
   });
 
+  // Enable shadow maps
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+
   // Check if dimensions is None (Gleam's None is an empty object/falsy)
   // or if dimensions[0] exists (Some(Dimensions))
   let width, height, isFullscreen;
@@ -1010,18 +1078,28 @@ export function createRenderer(options) {
   // Add WebGL context loss/restore handling
   setupContextLossHandling(renderer);
 
-  // If fullscreen mode, add resize listener
+  // If fullscreen mode, add resize listener (only once)
   if (isFullscreen) {
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
+    // Initialize runtime guards namespace if not exists
+    if (!window.__tiramisu) {
+      window.__tiramisu = { initialized: {} };
+    }
 
-      // Update camera aspect ratio if it's a perspective camera
-      const camera = CAMERA.getCamera();
-      if (camera && camera instanceof THREE.PerspectiveCamera) {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-      }
-    });
+    if (!window.__tiramisu.initialized.resizeListener) {
+      window.__tiramisu.initialized.resizeListener = true;
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        // Update camera aspect ratio if it's a perspective camera
+        // Use canvas dimensions for correct aspect ratio
+        const camera = CAMERA.getCamera();
+        if (camera && camera instanceof THREE.PerspectiveCamera) {
+          const canvas = renderer.domElement;
+          camera.aspect = canvas.clientWidth / canvas.clientHeight;
+          camera.updateProjectionMatrix();
+        }
+      });
+    }
   }
 
   return renderer;
@@ -1034,18 +1112,19 @@ export function createRenderer(options) {
 function setupContextLossHandling(renderer) {
   const canvas = renderer.domElement;
 
+  // Only add listeners once per canvas (canvas-specific flag)
+  if (canvas.__tiramisuContextHandlersInitialized) return;
+  canvas.__tiramisuContextHandlersInitialized = true;
+
   canvas.addEventListener('webglcontextlost', (event) => {
     console.warn('[Tiramisu] WebGL context lost!');
     event.preventDefault(); // Prevent default to enable context restoration
-    // Stop rendering loop temporarily
-    // The game loop will handle this gracefully by checking if context exists
   }, false);
 
   canvas.addEventListener('webglcontextrestored', () => {
-    // Reinitialize renderer settings
+    console.log('[Tiramisu] WebGL context restored');
     renderer.setPixelRatio(window.devicePixelRatio);
-    // Clear caches - textures and geometries need to be re-uploaded to GPU
-    // The scene will be re-rendered, triggering resource re-creation
+    // Textures and geometries will be re-uploaded on next render
   }, false);
 }
 

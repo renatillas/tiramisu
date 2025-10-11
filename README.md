@@ -26,7 +26,11 @@ Tiramisu brings the power of functional programming and static type safety to ga
 ```gleam
 import gleam/option
 import tiramisu
+import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -36,48 +40,70 @@ type Model {
 }
 
 type Msg {
-  Frame
+  Tick
+}
+
+type Ids {
+  Cube
+  MainCamera
+  Sun
 }
 
 pub fn main() {
   tiramisu.run(
-    width: 800,
-    height: 600,
-    background: 0x111111,
+    dimensions: option.None,  // Fullscreen
+    background: 0x1a1a2e,
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0), effect.none())
+fn init(_ctx: tiramisu.Context(Ids)) {
+  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
-fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Ids)) {
   case msg {
-    Frame -> {
+    Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.none())
+      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) {
+fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
+  let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
+  let assert Ok(cube_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(cube_mat) =
+    material.new()
+    |> material.with_color(0x00ff00)
+    |> material.with_metalness(1.0)
+    |> material.with_roughness(0.3)
+    |> material.build()
+  let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
+
   [
+    scene.Camera(
+      id: MainCamera,
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+      active: True,
+      viewport: option.None,
+    ),
     scene.Mesh(
-      id: "cube",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        color: 0x00ff00,
-        metalness: 1.0,
-        roughness: 1.0,
-        map: option.None,
-        normal_map: option.None,
-      ),
+      id: Cube,
+      geometry: cube_geo,
+      material: cube_mat,
       transform: transform.identity
-        |> transform.set_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.rotate_y(model.rotation),
       physics: option.None,
+    ),
+    scene.Light(
+      id: Sun,
+      light: sun,
+      transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
   ]
 }

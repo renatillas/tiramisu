@@ -1,4 +1,5 @@
 import gleam/option
+import gleam/result
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
@@ -11,12 +12,16 @@ import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
-pub type Model {
-  Model(physics_world: physics.PhysicsWorld)
-}
-
 pub type Msg {
   Tick
+}
+
+pub type Id {
+  Sphere
+  AmbientLight
+  DirectionalLight
+  Ground
+  MainCamera
 }
 
 pub fn main() -> Nil {
@@ -29,21 +34,26 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Nil, Effect(Msg), option.Option(physics.PhysicsWorld(Id))) {
   // Initialize physics world with gravity
   let physics_world =
-    physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
-
-  let model = Model(physics_world: physics_world)
-
-  #(model, effect.tick(Tick))
+    physics.new_world(
+      physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0), correspondances: [
+        #(Sphere, "sphere"),
+        #(Ground, "ground"),
+      ]),
+    )
+  #(Nil, effect.tick(Tick), option.Some(physics_world))
 }
 
 fn update(
-  model: Model,
+  _model: Nil,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Nil, Effect(Msg), option.Option(physics.PhysicsWorld(Id))) {
+  let assert option.Some(physics_world) = ctx.physics_world
   case msg {
     Tick -> {
       // Step physics simulation
@@ -52,25 +62,24 @@ fn update(
         case input.is_key_just_pressed(ctx.input, input.Space) {
           True ->
             physics.apply_impulse(
-              model.physics_world,
-              "cube1",
+              physics_world,
+              Sphere,
               vec3.Vec3(0.0, 100.0, 0.0),
             )
-          False -> model.physics_world
+          False -> physics_world
         }
         |> physics.step(ctx.delta_time)
 
-      #(Model(physics_world:), effect.tick(Tick))
+      #(Nil, effect.tick(Tick), option.Some(physics_world))
     }
   }
 }
 
-fn view(_model: Model) -> List(scene.Node) {
-  // Get the cube's physics transform (or default if not found yet)
-  let cube_transform = case physics.get_transform("cube1") {
-    Ok(t) -> t
-    Error(_) -> transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
-  }
+fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+  let assert option.Some(physics_world) = context.physics_world
+  let cube_transform =
+    physics.get_transform(physics_world, Sphere)
+    |> result.unwrap(transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)))
 
   // Create camera that follows the cube with an offset
   let assert Ok(cam) =
@@ -78,7 +87,7 @@ fn view(_model: Model) -> List(scene.Node) {
 
   let cam =
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 3.0, 8.0)),
       look_at: option.Some(cube_transform.position),
@@ -88,7 +97,7 @@ fn view(_model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -96,7 +105,7 @@ fn view(_model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 2.0)
@@ -109,7 +118,7 @@ fn view(_model: Model) -> List(scene.Node) {
   // Ground plane (static physics body)
   let ground =
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(box) = geometry.box(20.0, 0.2, 20.0)
         box
@@ -131,12 +140,12 @@ fn view(_model: Model) -> List(scene.Node) {
     )
 
   // Falling cube (physics will control its position automatically)
-  let cube1 = create_sphere("cube1", 0xff4444)
+  let cube1 = create_sphere(Sphere, 0xff4444)
 
   [ground, cube1, cam, ..lights]
 }
 
-fn create_sphere(id: String, color: Int) -> scene.Node {
+fn create_sphere(id: Id, color: Int) -> scene.Node(Id) {
   scene.Mesh(
     id: id,
     geometry: {

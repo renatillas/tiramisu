@@ -17,6 +17,7 @@ import tiramisu/geometry
 import tiramisu/input
 import tiramisu/light
 import tiramisu/material
+import tiramisu/physics
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui
@@ -41,10 +42,23 @@ pub type Position {
   Position(x: Int, y: Int)
 }
 
+pub type Id {
+  EatingSound
+  GameOverSound
+  Ground
+  Snake(segment_id: Int)
+  RightEye
+  LeftEye
+  Food
+  MainCamera
+  AmbientLight
+  DirectionalLight
+}
+
 pub type Model {
   Model(
     input_bindings: input.InputBindings(Direction),
-    snake: List(Position),
+    snake: List(#(Int, Position)),
     direction: Direction,
     food: Position,
     score: Int,
@@ -53,6 +67,7 @@ pub type Model {
     move_interval: Float,
     asset_cache: asset.AssetCache,
     ate_food: Bool,
+    next_segment_id: Int,
   )
 }
 
@@ -149,7 +164,9 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
   ])
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(physics.PhysicsWorld(Id))) {
   let input_bindings =
     input.new_bindings()
     |> input.bind_key(input.KeyW, Up)
@@ -166,9 +183,9 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       AudioAssetsLoaded,
     ))
   let initial_snake = [
-    Position(10, 10),
-    Position(10, 11),
-    Position(10, 12),
+    #(0, Position(10, 10)),
+    #(1, Position(10, 11)),
+    #(2, Position(10, 12)),
   ]
   let model =
     Model(
@@ -182,23 +199,24 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       move_interval: initial_speed,
       asset_cache: asset.new_cache(),
       ate_food: False,
+      next_segment_id: 3,
     )
-  #(model, effect.batch([effect.tick(Tick), fruit_eat_sound]))
+  #(model, effect.batch([effect.tick(Tick), fruit_eat_sound]), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     AudioAssetsLoaded(audio_buffer) -> {
       let asset.BatchLoadResult(asset_cache, _) = audio_buffer
-      #(Model(..model, asset_cache:), effect.none())
+      #(Model(..model, asset_cache:), effect.none(), option.None)
     }
     RestartGame -> {
       // Reset UI and restart game
-      let #(new_model, game_effect) = init(ctx)
+      let #(new_model, game_effect, _) = init(ctx)
       #(
         new_model,
         effect.batch([
@@ -206,6 +224,7 @@ fn update(
           ui.dispatch_to_lustre(RestartGame),
           ui.dispatch_to_lustre(UpdateScore(0)),
         ]),
+        option.None,
       )
     }
     Tick -> {
@@ -213,9 +232,13 @@ fn update(
         model.game_over,
         case input.is_key_pressed(ctx.input, input.KeyR) {
           True -> {
-            #(model, effect.from(fn(dispatch) { dispatch(RestartGame) }))
+            #(
+              model,
+              effect.from(fn(dispatch) { dispatch(RestartGame) }),
+              option.None,
+            )
           }
-          False -> #(model, effect.tick(Tick))
+          False -> #(model, effect.tick(Tick), option.None)
         },
       )
       // Handle direction input
@@ -226,11 +249,11 @@ fn update(
       let new_timer = model.move_timer +. ctx.delta_time
 
       // Validate direction change before moving
-      let assert [head, ..tail] = model.snake
+      let assert [#(_, head_pos), ..tail] = model.snake
       let safe_direction = case tail {
-        [neck, ..] -> {
-          let potential_head = move_position(head, new_direction)
-          case potential_head == neck {
+        [#(_, neck_pos), ..] -> {
+          let potential_head = move_position(head_pos, new_direction)
+          case potential_head == neck_pos {
             True -> model.direction
             False -> new_direction
           }
@@ -241,15 +264,16 @@ fn update(
       case new_timer >=. model.move_interval {
         True -> {
           // Move snake
-          let new_head = move_position(head, safe_direction)
+          let new_head_pos = move_position(head_pos, safe_direction)
 
           // Check collisions
           let hit_wall =
-            new_head.x < 0
-            || new_head.x >= grid_size
-            || new_head.y < 0
-            || new_head.y >= grid_size
-          let hit_self = list.contains(tail, new_head)
+            new_head_pos.x < 0
+            || new_head_pos.x >= grid_size
+            || new_head_pos.y < 0
+            || new_head_pos.y >= grid_size
+          let tail_positions = list.map(tail, fn(segment) { segment.1 })
+          let hit_self = list.contains(tail_positions, new_head_pos)
 
           case hit_wall || hit_self {
             True -> #(
@@ -258,24 +282,34 @@ fn update(
                 effect.tick(Tick),
                 ui.dispatch_to_lustre(GameOver),
               ]),
+              option.None,
             )
             False -> {
               // Check if ate food
-              let ate_food = new_head == model.food
-              let new_snake = case ate_food {
-                True -> [new_head, ..model.snake]
-                False -> [
-                  new_head,
-                  ..list.take(model.snake, list.length(model.snake) - 1)
-                ]
+              let ate_food = new_head_pos == model.food
+              let #(new_snake, next_id) = case ate_food {
+                True -> #(
+                  [#(model.next_segment_id, new_head_pos), ..model.snake],
+                  model.next_segment_id + 1,
+                )
+                False -> #(
+                  [
+                    #(model.next_segment_id, new_head_pos),
+                    ..list.take(model.snake, list.length(model.snake) - 1)
+                  ],
+                  model.next_segment_id + 1,
+                )
               }
 
               let #(new_food, new_score, new_interval) = case ate_food {
-                True -> #(
-                  generate_food(new_snake),
-                  model.score + 1,
-                  model.move_interval -. speed_increase,
-                )
+                True -> {
+                  let food_snake_positions = list.map(new_snake, fn(s) { s.1 })
+                  #(
+                    generate_food(food_snake_positions),
+                    model.score + 1,
+                    model.move_interval -. speed_increase,
+                  )
+                }
                 False -> #(model.food, model.score, model.move_interval)
               }
 
@@ -290,11 +324,13 @@ fn update(
                   move_timer: 0.0,
                   ate_food:,
                   move_interval: new_interval,
+                  next_segment_id: next_id,
                 ),
                 effect.batch([
                   effect.tick(Tick),
                   ui.dispatch_to_lustre(UpdateScore(new_score)),
                 ]),
+                option.None,
               )
             }
           }
@@ -302,6 +338,7 @@ fn update(
         False -> #(
           Model(..model, direction: safe_direction, move_timer: new_timer),
           effect.tick(Tick),
+          option.None,
         )
       }
     }
@@ -432,14 +469,14 @@ fn get_eye_positions(
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let fruit_audio = case
     asset.get_audio(model.asset_cache, "fruit-collect.wav"),
     model.ate_food
   {
     Ok(audio_buffer), True ->
       scene.Audio(
-        id: "eating-sound",
+        id: EatingSound,
         audio: audio.GlobalAudio(
           buffer: audio_buffer,
           config: audio.AudioConfig(
@@ -467,7 +504,7 @@ fn view(model: Model) -> List(scene.Node) {
   {
     Ok(audio_buffer), True -> [
       scene.Audio(
-        id: "game-over-sound",
+        id: GameOverSound,
         audio: audio.GlobalAudio(
           buffer: audio_buffer,
           config: audio.AudioConfig(
@@ -493,7 +530,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_node =
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 15.0, 15.0)),
       viewport: option.None,
@@ -504,7 +541,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -512,7 +549,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.8)
@@ -527,15 +564,17 @@ fn view(model: Model) -> List(scene.Node) {
   ]
 
   // Create snake segments
+  // Each segment has a persistent ID that follows it through its lifetime
   let snake_segments =
-    list.index_map(model.snake, fn(pos, idx) {
+    list.index_map(model.snake, fn(segment, idx) {
+      let #(segment_id, pos) = segment
       let world_pos = position_to_world(pos)
       let #(color, rotation) = case idx {
         0 -> #(0x4ecdc4, get_head_rotation(model.direction))
         _ -> #(0x3aafa9, vec3.Vec3(0.0, 0.0, 0.0))
       }
       scene.Mesh(
-        id: "snake_" <> int.to_string(idx),
+        id: Snake(segment_id),
         geometry: {
           let assert Ok(box) =
             geometry.box(
@@ -561,14 +600,14 @@ fn view(model: Model) -> List(scene.Node) {
 
   // Create eyes for the snake head
   let eyes = case model.snake {
-    [head, ..] -> {
-      let head_world = position_to_world(head)
+    [#(_, head_pos), ..] -> {
+      let head_world = position_to_world(head_pos)
       let #(left_eye_pos, right_eye_pos) =
         get_eye_positions(head_world, model.direction)
 
       [
         scene.Mesh(
-          id: "left_eye",
+          id: LeftEye,
           geometry: {
             let assert Ok(sphere) =
               geometry.sphere(
@@ -593,7 +632,7 @@ fn view(model: Model) -> List(scene.Node) {
           physics: option.None,
         ),
         scene.Mesh(
-          id: "right_eye",
+          id: RightEye,
           geometry: {
             let assert Ok(sphere) =
               geometry.sphere(
@@ -626,7 +665,7 @@ fn view(model: Model) -> List(scene.Node) {
   let food_world = position_to_world(model.food)
   let food_node =
     scene.Mesh(
-      id: "food",
+      id: Food,
       geometry: {
         let assert Ok(box) =
           geometry.box(
@@ -660,7 +699,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let ground_updated =
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(plane) =
           geometry.plane(

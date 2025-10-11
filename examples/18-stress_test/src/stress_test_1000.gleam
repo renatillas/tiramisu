@@ -4,6 +4,7 @@ import gleam/io
 import gleam/list
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
@@ -14,6 +15,13 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  CubesInstanced
+}
 
 pub type Model {
   Model(
@@ -31,7 +39,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    background: 0x0a0a1a,
+    background: background.Color(0x0a0a1a),
     dimensions: option.None,
     init: init,
     update: update,
@@ -39,7 +47,7 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   io.println("=== Stress Test: 1000 Nodes ===")
   io.println("Controls:")
   io.println("  SPACE - Toggle animation (test worst/best case)")
@@ -57,14 +65,15 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       cached_instances: initial_instances,
     ),
     effect.tick(Tick),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Check for key presses
@@ -140,11 +149,12 @@ fn update(
           cached_instances: new_cached_instances,
         ),
         effect.tick(Tick),
+        option.None,
       )
     }
 
     ToggleAnimation -> {
-      #(Model(..model, animate: !model.animate), effect.tick(Tick))
+      #(Model(..model, animate: !model.animate), effect.tick(Tick), option.None)
     }
   }
 }
@@ -176,14 +186,14 @@ fn compute_instances(time: Float) -> List(transform.Transform) {
   })
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   // Camera setup
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera_node =
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera:,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 500.0)),
       look_at: option.None,
@@ -193,7 +203,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
         light
@@ -201,7 +211,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.5)
@@ -221,7 +231,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let instanced_cubes =
     scene.InstancedMesh(
-      id: "cubes_instanced",
+      id: CubesInstanced,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 0.8, height: 0.8, depth: 0.8)

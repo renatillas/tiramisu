@@ -58,6 +58,9 @@ let touches = new Map(); // id -> {x, y}
 let touchesJustStarted = new Map();
 let touchesJustEnded = new Map();
 
+// Gamepad connection tracking (optimization to avoid expensive polling)
+let gamepadConnected = false;
+
 /**
  * Initialize keyboard input
  */
@@ -72,6 +75,17 @@ export function initKeyboard() {
   window.addEventListener('keyup', (e) => {
     keysPressed.delete(e.code);
     keysJustReleased.add(e.code);
+  });
+
+  // Track gamepad connections to optimize polling
+  window.addEventListener('gamepadconnected', () => {
+    gamepadConnected = true;
+  });
+
+  window.addEventListener('gamepaddisconnected', () => {
+    // Check if any gamepads are still connected
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    gamepadConnected = Array.from(gamepads).some(gp => gp && gp.connected);
   });
 }
 
@@ -131,8 +145,9 @@ export function initTouch(canvas) {
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       const rect = canvas.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      // Clamp coordinates to canvas bounds
+      const x = Math.max(0, Math.min(rect.width, touch.clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, touch.clientY - rect.top));
       touches.set(touch.identifier, { x, y });
       touchesJustStarted.set(touch.identifier, { x, y });
     }
@@ -143,8 +158,9 @@ export function initTouch(canvas) {
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       const rect = canvas.getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
+      // Clamp coordinates to canvas bounds
+      const x = Math.max(0, Math.min(rect.width, touch.clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, touch.clientY - rect.top));
       touches.set(touch.identifier, { x, y });
     }
   });
@@ -200,20 +216,33 @@ export function captureInputState() {
 
   // Gamepad state (support up to 4 gamepads)
   const gamepadStates = [];
-  for (let i = 0; i < 4; i++) {
-    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const gamepad = gamepads[i];
 
-    if (gamepad && gamepad.connected) {
-      const buttons = Array.from(gamepad.buttons).map(b => b.value);
-      const axes = Array.from(gamepad.axes);
-      gamepadStates.push(new INPUT_GLEAM.GamepadState(
-        true,
-        GLEAM.toList(buttons),
-        GLEAM.toList(axes)
-      ));
-    } else {
-      // Disconnected gamepad
+  // Optimization: Skip expensive polling if no gamepads are connected
+  if (gamepadConnected) {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < 4; i++) {
+      const gamepad = gamepads[i];
+
+      if (gamepad && gamepad.connected) {
+        const buttons = Array.from(gamepad.buttons).map(b => b.value);
+        const axes = Array.from(gamepad.axes);
+        gamepadStates.push(new INPUT_GLEAM.GamepadState(
+          true,
+          GLEAM.toList(buttons),
+          GLEAM.toList(axes)
+        ));
+      } else {
+        // Disconnected gamepad
+        gamepadStates.push(new INPUT_GLEAM.GamepadState(
+          false,
+          new GLEAM.Empty(),
+          new GLEAM.Empty()
+        ));
+      }
+    }
+  } else {
+    // No gamepads connected - return 4 disconnected states without polling
+    for (let i = 0; i < 4; i++) {
       gamepadStates.push(new INPUT_GLEAM.GamepadState(
         false,
         new GLEAM.Empty(),

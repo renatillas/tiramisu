@@ -8,6 +8,7 @@ import gleam/option
 import gleam/result
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -17,6 +18,15 @@ import tiramisu/object3d.{type Object3D}
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  LoadingCube
+  ErrorCube
+  Tiramisu
+}
 
 pub type LoadState {
   Loading
@@ -37,14 +47,14 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
   // Load the OBJ file with MTL materials
@@ -61,23 +71,23 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       ),
     )
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]))
+  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick))
+      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     ModelLoaded(object) -> {
       io.println("✅ Loaded bread model successfully!")
-      #(Model(..model, load_state: Loaded(object)), effect.none())
+      #(Model(..model, load_state: Loaded(object)), effect.none(), option.None)
     }
 
     LoadingFailed(error) -> {
@@ -87,17 +97,21 @@ fn update(
         asset.ParseError(msg) -> "Parse error: " <> msg
       }
       io.println("❌ Failed to load model: " <> error_msg)
-      #(Model(..model, load_state: Failed(error_msg)), effect.none())
+      #(
+        Model(..model, load_state: Failed(error_msg)),
+        effect.none(),
+        option.None,
+      )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       scene.Camera(
-        id: "main-camera",
+        id: MainCamera,
         camera: camera,
         transform: transform.at(position: vec3.Vec3(0.0, 1.0, 3.0)),
         look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -109,7 +123,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -117,7 +131,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 1.5)
@@ -132,7 +146,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a spinning cube while loading
       let loading_cube =
         scene.Mesh(
-          id: "loading",
+          id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 0.5, height: 0.5, depth: 0.5)
@@ -167,7 +181,7 @@ fn view(model: Model) -> List(scene.Node) {
       // Show a red cube to indicate error
       let error_cube =
         scene.Mesh(
-          id: "error",
+          id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
               geometry.box(width: 0.5, height: 0.5, depth: 0.5)
@@ -198,12 +212,12 @@ fn view(model: Model) -> List(scene.Node) {
       list.flatten([camera, error_cube, lights])
     }
 
-    Loaded(bread_model) -> {
+    Loaded(tiramisu_model) -> {
       // Show the loaded bread model
       let model_node =
         scene.Model3D(
-          id: "bread",
-          object: bread_model,
+          id: Tiramisu,
+          object: tiramisu_model,
           transform: transform.Transform(
             position: vec3.Vec3(0.0, 0.0, 0.0),
             rotation: vec3.Vec3(0.0, model.rotation, 0.0),

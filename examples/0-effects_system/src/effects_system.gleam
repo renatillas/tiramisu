@@ -2,11 +2,11 @@
 ///
 /// Demonstrates the effect system with tick and custom effects
 import gleam/float
-import gleam/int
 import gleam/list
 import gleam/option
 import plinth/javascript/global
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -29,6 +29,13 @@ pub type Cube {
   )
 }
 
+pub type Id {
+  MainCamera
+  AmbientLight
+  DirectionalLight
+  CubeId(Int)
+}
+
 pub type Msg {
   Tick
   AddCube
@@ -37,25 +44,28 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   #(
     Model(cubes: [], next_id: 0),
     effect.batch([effect.tick(Tick), schedule_add_cube()]),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Update cube positions based on velocity
@@ -73,7 +83,7 @@ fn update(
       let filtered_cubes =
         list.filter(updated_cubes, fn(cube) { cube.position.y >. -10.0 })
 
-      #(Model(..model, cubes: filtered_cubes), effect.tick(Tick))
+      #(Model(..model, cubes: filtered_cubes), effect.tick(Tick), option.None)
     }
 
     AddCube -> {
@@ -92,6 +102,7 @@ fn update(
       #(
         Model(cubes: [new_cube, ..model.cubes], next_id: model.next_id + 1),
         schedule_add_cube(),
+        option.None,
       )
     }
   }
@@ -123,7 +134,7 @@ fn list_at(list: List(a), index: Int) -> Result(a, Nil) {
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -132,7 +143,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_node =
     scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
       look_at: option.None,
@@ -143,7 +154,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(intensity: 0.6, color: 0xffffff)
         light
@@ -151,7 +162,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) =
           light.directional(intensity: 0.8, color: 0xffffff)
@@ -171,7 +182,7 @@ fn view(model: Model) -> List(scene.Node) {
         material.new() |> material.with_color(cube.color) |> material.build
 
       scene.Mesh(
-        id: "cube-" <> int.to_string(cube.id),
+        id: CubeId(cube.id),
         geometry: box_geometry,
         material: cube_material,
         transform: transform.Transform(

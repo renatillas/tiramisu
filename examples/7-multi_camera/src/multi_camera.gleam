@@ -5,6 +5,7 @@ import gleam/list
 import gleam/option
 import gleam_community/maths
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
@@ -27,6 +28,21 @@ pub type Model {
   Model(current_view: CameraView, rotation: Float, show_performance: Bool)
 }
 
+pub type Id {
+  CameraTopdown
+  CameraSide
+  CameraFirstperson
+  CameraOrbiting
+  CameraOverlay
+  AmbientLight
+  DirectionalLight
+  RotatingCube
+  Ground
+  Grid
+  Sphere(Int)
+  Pillar(Int)
+}
+
 pub type Msg {
   Tick
 }
@@ -34,14 +50,16 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   io.println("=== Multi-Camera Demo ===")
   io.println("")
   io.println("This demo shows multiple cameras viewing the same scene.")
@@ -62,14 +80,15 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
   #(
     Model(current_view: TopDown, rotation: 0.0, show_performance: False),
     effect.tick(Tick),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Camera switching
@@ -158,6 +177,7 @@ fn update(
           show_performance: show_performance,
         ),
         effect.tick(Tick),
+        option.None,
       )
     }
   }
@@ -172,7 +192,7 @@ fn camera_view_to_string(view: CameraView) -> String {
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   // Create multiple cameras with different perspectives
 
   // 1. Top-down camera (bird's eye view)
@@ -181,7 +201,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_topdown =
     scene.Camera(
-      id: "camera_topdown",
+      id: CameraTopdown,
       camera: cam_topdown,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -195,7 +215,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_side =
     scene.Camera(
-      id: "camera_side",
+      id: CameraSide,
       camera: cam_side,
       transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
       look_at: option.Some(vec3.Vec3(0.0, 20.0, 0.0)),
@@ -209,7 +229,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_firstperson =
     scene.Camera(
-      id: "camera_firstperson",
+      id: CameraFirstperson,
       camera: cam_firstperson,
       transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
       look_at: option.Some(vec3.Vec3(0.0, 6.0, 0.0)),
@@ -227,7 +247,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_orbiting =
     scene.Camera(
-      id: "camera_orbiting",
+      id: CameraOrbiting,
       camera: cam_orbiting,
       transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -240,7 +260,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   let camera_overlay =
     scene.Camera(
-      id: "camera_overlay",
+      id: CameraOverlay,
       camera: cam_overlay,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -251,7 +271,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Lights
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
         light
@@ -259,7 +279,7 @@ fn view(model: Model) -> List(scene.Node) {
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.8)
@@ -278,7 +298,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Central rotating cube
   let rotating_cube =
     scene.Mesh(
-      id: "rotating_cube",
+      id: RotatingCube,
       geometry: {
         let assert Ok(geometry) =
           geometry.box(width: 4.0, height: 4.0, depth: 4.0)
@@ -302,7 +322,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Ground plane
   let ground =
     scene.Mesh(
-      id: "ground",
+      id: Ground,
       geometry: {
         let assert Ok(geometry) = geometry.plane(width: 100.0, height: 100.0)
         geometry
@@ -334,7 +354,7 @@ fn view(model: Model) -> List(scene.Node) {
       let z = maths.sin(angle) *. radius
 
       scene.Mesh(
-        id: "sphere_" <> int.to_string(i),
+        id: Sphere(i),
         geometry: {
           let assert Ok(geometry) =
             geometry.sphere(
@@ -361,7 +381,7 @@ fn view(model: Model) -> List(scene.Node) {
   // Tall pillars at corners
   let pillars = [
     scene.Mesh(
-      id: "pillar_1",
+      id: Pillar(1),
       geometry: {
         let assert Ok(geometry) =
           geometry.cylinder(
@@ -387,7 +407,7 @@ fn view(model: Model) -> List(scene.Node) {
       physics: option.None,
     ),
     scene.Mesh(
-      id: "pillar_2",
+      id: Pillar(2),
       geometry: {
         let assert Ok(geometry) =
           geometry.cylinder(
@@ -413,7 +433,7 @@ fn view(model: Model) -> List(scene.Node) {
       physics: option.None,
     ),
     scene.Mesh(
-      id: "pillar_3",
+      id: Pillar(3),
       geometry: {
         let assert Ok(geometry) =
           geometry.cylinder(
@@ -439,7 +459,7 @@ fn view(model: Model) -> List(scene.Node) {
       physics: option.None,
     ),
     scene.Mesh(
-      id: "pillar_4",
+      id: Pillar(4),
       geometry: {
         let assert Ok(geometry) =
           geometry.cylinder(
@@ -468,7 +488,7 @@ fn view(model: Model) -> List(scene.Node) {
 
   // Grid for reference
   let grid =
-    scene.DebugGrid(id: "grid", size: 100.0, divisions: 20, color: 0x444466)
+    scene.DebugGrid(id: Grid, size: 100.0, divisions: 20, color: 0x444466)
 
   // Combine all cameras and scene objects
   list.flatten([

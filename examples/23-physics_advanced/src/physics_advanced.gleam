@@ -15,6 +15,7 @@ import gleam/option
 import gleam/result
 import gleam/string
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
@@ -30,7 +31,7 @@ import vec/vec3
 pub fn main() {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
@@ -371,7 +372,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_collider(physics.Box(20.0, 0.5, 20.0))
           |> physics.body_friction(1.0)
           |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -397,7 +398,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.lock_rotation_x()
           |> physics.lock_rotation_z()
           |> physics.body_collision_groups(membership: [1], filter: [0, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -420,7 +421,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_restitution(0.7)
           |> physics.body_friction(0.3)
           |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -453,7 +454,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_friction(0.5)
           |> physics.body_angular_damping(0.1)
           |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -476,7 +477,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_restitution(0.9)
           |> physics.body_friction(0.1)
           |> physics.body_collision_groups(membership: [2], filter: [0, 1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -494,7 +495,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_collider(physics.Box(0.25, 2.5, 10.0))
           |> physics.body_friction(0.5)
           |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )
@@ -511,7 +512,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
           |> physics.body_collider(physics.Box(0.25, 2.5, 10.0))
           |> physics.body_friction(0.5)
           |> physics.body_collision_groups(membership: [0], filter: [1, 2])
-          |> physics.build_body()
+          |> physics.build()
         body
       }),
     )

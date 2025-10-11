@@ -33,6 +33,7 @@
 
 import gleam/javascript/promise.{type Promise}
 import gleam/list
+import tiramisu/background.{type Background}
 
 /// Opaque effect type that can dispatch messages back to the application.
 ///
@@ -161,3 +162,37 @@ pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
 /// ```
 @external(javascript, "./ffi/effects.mjs", "requestAnimationFrame")
 pub fn tick(msg: msg) -> Effect(msg)
+
+/// Change the scene background dynamically.
+///
+/// Allows you to switch between color, texture, or cube texture backgrounds
+/// at runtime from your update function.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/effect
+///
+/// type Msg {
+///   Tick
+///   ChangeToNight
+///   ChangeToDawn
+/// }
+///
+/// fn update(model, msg, ctx) {
+///   case msg {
+///     ChangeToNight -> #(
+///       model,
+///       effect.set_background(tiramisu.Color(0x0a0a1e)),
+///     )
+///     ChangeToDawn -> #(
+///       model,
+///       effect.set_background(tiramisu.Texture("assets/dawn-sky.jpg")),
+///     )
+///     Tick -> #(model, effect.tick(Tick))
+///   }
+/// }
+/// ```
+@external(javascript, "./ffi/effects.mjs", "setBackground")
+pub fn set_background(background: Background) -> Effect(msg)

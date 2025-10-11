@@ -8,6 +8,7 @@
 import gleam/list
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -28,31 +29,33 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
-  #(Model(rotation: 0.0), effect.tick(Tick))
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
+  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick))
+      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -155,7 +158,7 @@ fn create_mesh(
   y: Float,
   rotation: Float,
   color: Int,
-) -> scene.Node {
+) -> scene.Node(String) {
   let assert Ok(material) =
     material.new() |> material.with_color(color) |> material.build
 

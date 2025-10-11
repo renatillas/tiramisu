@@ -8,11 +8,9 @@
 
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 import structures/bimap
 import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
@@ -441,7 +439,7 @@ pub fn body_collision_groups(
 /// Build the final rigid body from the builder
 ///
 /// Returns an error if no collider was set.
-pub fn build_body(builder: RigidBodyBuilder) -> Result(RigidBody, String) {
+pub fn build(builder: RigidBodyBuilder) -> Result(RigidBody, String) {
   case builder.collider {
     option.Some(collider) ->
       Ok(RigidBody(

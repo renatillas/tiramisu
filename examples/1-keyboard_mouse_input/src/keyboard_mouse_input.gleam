@@ -8,6 +8,7 @@
 /// - Mouse Wheel: Scale the cube up/down
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -34,14 +35,16 @@ pub type Msg {
 pub fn main() -> Nil {
   tiramisu.run(
     dimensions: option.None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let model =
     Model(
       position: vec3.Vec3(0.0, 0.0, -5.0),
@@ -49,14 +52,14 @@ fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
       scale: 1.0,
       color: 0x4ecdc4,
     )
-  #(model, effect.tick(Tick))
+  #(model, effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Keyboard movement (WASD)
@@ -117,12 +120,12 @@ fn update(
           color: color,
         )
 
-      #(new_model, effect.tick(Tick))
+      #(new_model, effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   [
