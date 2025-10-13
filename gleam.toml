@@ -5,14 +5,14 @@ description = "A 3D game framework for building performant web games in Gleam"
 licences = ["MIT"]
 repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 
-[documentation]
-pages = [
-    { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
-    { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
-    { title = "Performance guide", path = "performance_guide.html", source = "./docs/performance-guide.md" },
-    { title = "Spatial Partitioning guide", path = "spatial_partitioning_guide.html", source = "./docs/spatial-partitioning-guide.md" },
-    { title = "Examples", path = "", source = "https://github.com/renatillas/tiramisu/tree/main/examples"},
-]
+# [documentation]
+# pages = [
+#     { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
+#     { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
+#     { title = "Performance guide", path = "performance_guide.html", source = "./docs/performance-guide.md" },
+#     { title = "Spatial Partitioning guide", path = "spatial_partitioning_guide.html", source = "./docs/spatial-partitioning-guide.md" },
+#     { title = "Examples", path = "", source = "https://github.com/renatillas/tiramisu/tree/main/examples"},
+# ]
 
 
 [dependencies]

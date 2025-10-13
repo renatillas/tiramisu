@@ -28,7 +28,7 @@ import gleam/dict.{type Dict}
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option
 import gleam/order
 import tiramisu/audio.{type AudioBuffer}
 import tiramisu/object3d.{type AnimationClip, type Object3D}
@@ -351,11 +351,11 @@ pub fn get_obj(cache: AssetCache, url: String) -> Result(Object3D, AssetError) {
   }
 }
 
-/// Try to get any asset (returns Option)
-pub fn try_get(cache: AssetCache, url: String) -> Option(LoadedAsset) {
+/// Try to get any asset 
+pub fn get(cache: AssetCache, url: String) -> Result(LoadedAsset, AssetError) {
   case dict.get(cache.asset, url) {
-    Ok(CacheEntry(asset, _)) -> option.Some(asset)
-    Error(_) -> option.None
+    Ok(CacheEntry(asset, _)) -> Ok(asset)
+    Error(_) -> Error(AssetNotFound(url))
   }
 }
 
