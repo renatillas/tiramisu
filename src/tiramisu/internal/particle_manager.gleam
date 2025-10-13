@@ -70,15 +70,23 @@ pub fn create_particle_system(
 
   // Create Three.js PointsMaterial with proper configuration
   let base_size = particle_emitter.get_size(emitter)
-  let material = create_points_material_ffi(
-    base_size,      // size
-    True,           // vertexColors - use per-particle colors
-    True,           // transparent - enable alpha blending
-    1.0,            // opacity
-    False,          // depthWrite - particles shouldn't write depth
-    get_additive_blending_ffi(),  // blending - additive for glow effect
-    True,           // sizeAttenuation - particles get smaller with distance
-  )
+  let material =
+    create_points_material_ffi(
+      base_size,
+      // size
+      True,
+      // vertexColors - use per-particle colors
+      True,
+      // transparent - enable alpha blending
+      1.0,
+      // opacity
+      False,
+      // depthWrite - particles shouldn't write depth
+      get_additive_blending_ffi(),
+      // blending - additive for glow effect
+      True,
+      // sizeAttenuation - particles get smaller with distance
+    )
 
   // Create Three.js Points object
   let points = create_points_ffi(geometry, material)

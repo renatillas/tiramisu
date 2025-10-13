@@ -1,5 +1,5 @@
-import gleeunit
 import gleam/list
+import gleeunit
 import tiramisu/spatial
 import vec/vec3
 

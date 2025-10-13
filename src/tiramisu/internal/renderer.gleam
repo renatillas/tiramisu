@@ -448,7 +448,8 @@ pub fn get_physics_world(
 /// Resume AudioContext and play any pending audio sources
 /// Call this after user interaction to enable audio playback
 pub fn resume_audio_context(state: RendererState(id)) -> RendererState(id) {
-  let new_audio_manager = audio_manager.resume_audio_context(state.audio_manager)
+  let new_audio_manager =
+    audio_manager.resume_audio_context(state.audio_manager)
   RendererState(..state, audio_manager: new_audio_manager)
 }
 
@@ -1155,7 +1156,11 @@ fn handle_remove_node(state: RendererState(id), id: id) -> RendererState(id) {
 
       // Remove physics body if it exists - update physics world in state
       let new_state =
-        RendererState(..state, cache: new_cache, audio_manager: new_audio_manager)
+        RendererState(
+          ..state,
+          cache: new_cache,
+          audio_manager: new_audio_manager,
+        )
       case new_state.physics_world {
         Some(world) -> {
           let new_world = physics.remove_body(world, id)
@@ -1517,11 +1522,14 @@ fn handle_update_particle_emitter(
   case object_cache.get_particle_system(state.cache, id) {
     Some(cached_system) -> {
       // Unwrap, update emitter, and wrap back
-      let particle_state = particle_manager.unwrap_from_cache_entry(cached_system)
-      let updated_state = particle_manager.update_emitter(particle_state, emitter)
+      let particle_state =
+        particle_manager.unwrap_from_cache_entry(cached_system)
+      let updated_state =
+        particle_manager.update_emitter(particle_state, emitter)
       let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
 
-      let new_cache = object_cache.add_particle_system(state.cache, id, wrapped_system)
+      let new_cache =
+        object_cache.add_particle_system(state.cache, id, wrapped_system)
       RendererState(..state, cache: new_cache)
     }
     None -> state
@@ -1536,11 +1544,13 @@ fn handle_update_particle_active(
   case object_cache.get_particle_system(state.cache, id) {
     Some(cached_system) -> {
       // Unwrap, update active state, and wrap back
-      let particle_state = particle_manager.unwrap_from_cache_entry(cached_system)
+      let particle_state =
+        particle_manager.unwrap_from_cache_entry(cached_system)
       let updated_state = particle_manager.set_active(particle_state, active)
       let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
 
-      let new_cache = object_cache.add_particle_system(state.cache, id, wrapped_system)
+      let new_cache =
+        object_cache.add_particle_system(state.cache, id, wrapped_system)
       RendererState(..state, cache: new_cache)
     }
     None -> state
@@ -1684,12 +1694,15 @@ pub fn update_particle_systems(
       let #(string_id, cached_system) = entry
 
       // Unwrap, update, and wrap back
-      let particle_state = particle_manager.unwrap_from_cache_entry(cached_system)
-      let updated_state = particle_manager.update_particles(particle_state, delta_time)
+      let particle_state =
+        particle_manager.unwrap_from_cache_entry(cached_system)
+      let updated_state =
+        particle_manager.update_particles(particle_state, delta_time)
       let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
 
       // Update cache with new state (using string ID directly)
-      let new_particles = dict.insert(cache.particles, string_id, wrapped_system)
+      let new_particles =
+        dict.insert(cache.particles, string_id, wrapped_system)
       object_cache.CacheState(..cache, particles: new_particles)
     })
 

@@ -1,5 +1,5 @@
-import gleeunit
 import gleam/list
+import gleeunit
 import tiramisu/background
 
 pub fn main() {

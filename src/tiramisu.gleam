@@ -263,7 +263,10 @@ pub fn run(
       alpha: False,
       dimensions: dimensions
         |> option.map(fn(dimensions) {
-          renderer.Dimensions(height: dimensions.height, width: dimensions.width)
+          renderer.Dimensions(
+            height: dimensions.height,
+            width: dimensions.width,
+          )
         }),
     ))
 
@@ -379,7 +382,6 @@ fn start_loop(
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil
-
 
 /// Get the current window aspect ratio (width / height).
 ///

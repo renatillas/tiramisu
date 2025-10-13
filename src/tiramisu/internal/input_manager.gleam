@@ -2,7 +2,6 @@
 ///
 /// This module wraps the JavaScript InputManager class as an opaque type.
 /// Input state is still managed mutably in JavaScript for performance.
-
 import tiramisu/input
 import tiramisu/internal/renderer
 

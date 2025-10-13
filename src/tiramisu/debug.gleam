@@ -157,7 +157,10 @@ pub fn get_performance_stats() -> PerformanceStats
 
 /// Enable/disable collision shape visualization for a specific physics world
 @external(javascript, "../tiramisu.ffi.mjs", "showColliders")
-fn show_colliders_ffi(physics_world: physics.PhysicsWorld(id), enabled: Bool) -> Nil
+fn show_colliders_ffi(
+  physics_world: physics.PhysicsWorld(id),
+  enabled: Bool,
+) -> Nil
 
 pub const color_red = 0xff0000
 
