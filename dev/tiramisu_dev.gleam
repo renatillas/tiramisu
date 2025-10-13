@@ -4,6 +4,8 @@ import gleam/list
 import gleam/option
 import gleamy/bench
 import tiramisu/animation
+import tiramisu/geometry
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -38,11 +40,11 @@ pub fn main() {
       ),
     ],
     [
-      bench.Function("scene.diff", fn(pair: ScenePair) {
+      bench.Function("scene.diff", fn(pair: ScenePair(String)) {
         scene.diff(pair.previous, pair.current)
       }),
     ],
-    [bench.Duration(100), bench.Warmup(10)],
+    [bench.Duration(1000), bench.Warmup(100)],
   )
   |> bench.table([bench.IPS, bench.Min, bench.Mean, bench.Max, bench.P(99)])
   |> io.println
@@ -81,7 +83,7 @@ pub fn main() {
         animation.ease(animation.EaseInOutSine, t)
       }),
     ],
-    [bench.Duration(100), bench.Warmup(10)],
+    [bench.Duration(1000), bench.Warmup(100)],
   )
   |> bench.table([bench.IPS, bench.Min, bench.Mean])
   |> io.println
@@ -106,21 +108,20 @@ pub fn main() {
   |> io.println
 }
 
-pub type ScenePair {
-  ScenePair(previous: List(scene.Node), current: List(scene.Node))
+pub type ScenePair(id) {
+  ScenePair(previous: List(scene.Node(id)), current: List(scene.Node(id)))
 }
 
 // --- Helper Functions ---
 
-fn create_flat_scene(count: Int) -> List(scene.Node) {
-  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
+  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   list.range(0, count - 1)
@@ -138,15 +139,17 @@ fn create_flat_scene(count: Int) -> List(scene.Node) {
   })
 }
 
-fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
-  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_flat_scene_offset(
+  count: Int,
+  offset: Float,
+) -> List(scene.Node(String)) {
+  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   list.range(0, count - 1)
@@ -164,19 +167,18 @@ fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
   })
 }
 
-fn create_nested_scene(depth: Int) -> List(scene.Node) {
+fn create_nested_scene(depth: Int) -> List(scene.Node(String)) {
   [create_nested_group(depth, 0)]
 }
 
-fn create_nested_group(depth: Int, current: Int) -> scene.Node {
-  let assert Ok(box_geo) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
+  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(red_material) =
-    scene.basic_material(
+    material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
 
   case current >= depth {

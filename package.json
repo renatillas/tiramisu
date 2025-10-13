@@ -1,10 +1,19 @@
 {
   "name": "tiramisu",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "type": "module",
   "description": "A declarative 3D game engine for Gleam",
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.11.2",
     "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "eslint": "^9.37.0",
+    "globals": "^16.4.0"
+  },
+  "scripts": {
+    "lint": "eslint ./src/ --ext .mjs"
   }
+
 }

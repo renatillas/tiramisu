@@ -8,8 +8,12 @@
 import gleam/list
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -24,47 +28,43 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
-    background: 0x1a1a2e,
+    dimensions: option.None,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
-  #(Model(rotation: 0.0), effect.tick(Tick))
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
+  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick))
+      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera =
     camera
     |> scene.Camera(
       id: "main_camera",
       camera: _,
-      transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       look_at: option.None,
       active: True,
       viewport: option.None,
@@ -74,8 +74,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.4)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
         light
       },
       transform: transform.identity,
@@ -84,7 +83,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.Transform(
@@ -96,28 +95,29 @@ fn view(model: Model) -> List(scene.SceneNode) {
   ]
 
   // Grid layout: 3 rows x 3 columns
-  let assert Ok(box_geom) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+  let assert Ok(box_geom) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
   let assert Ok(sphere_geom) =
-    scene.sphere(radius: 1.2, width_segments: 32, height_segments: 32)
-  let assert Ok(cone_geom) = scene.cone(radius: 1.0, height: 2.0, segments: 32)
-  let assert Ok(plane_geom) = scene.plane(width: 2.5, height: 2.5)
-  let assert Ok(circle_geom) = scene.circle(radius: 1.3, segments: 32)
+    geometry.sphere(radius: 1.2, width_segments: 32, height_segments: 32)
+  let assert Ok(cone_geom) =
+    geometry.cone(radius: 1.0, height: 2.0, segments: 32)
+  let assert Ok(plane_geom) = geometry.plane(width: 2.5, height: 2.5)
+  let assert Ok(circle_geom) = geometry.circle(radius: 1.3, segments: 32)
   let assert Ok(cylinder_geom) =
-    scene.cylinder(
+    geometry.cylinder(
       radius_top: 1.0,
       radius_bottom: 1.0,
       height: 2.0,
       radial_segments: 32,
     )
   let assert Ok(torus_geom) =
-    scene.torus(
+    geometry.torus(
       radius: 1.0,
       tube: 0.4,
       radial_segments: 16,
       tubular_segments: 32,
     )
-  let assert Ok(tetrahedron_geom) = scene.tetrahedron(radius: 1.5, detail: 0)
-  let assert Ok(icosahedron_geom) = scene.icosahedron(radius: 1.3, detail: 0)
+  let assert Ok(tetrahedron_geom) = geometry.tetrahedron(radius: 1.5, detail: 0)
+  let assert Ok(icosahedron_geom) = geometry.icosahedron(radius: 1.3, detail: 0)
 
   let geometries = [
     // Row 1
@@ -153,20 +153,14 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
 fn create_mesh(
   id: String,
-  geometry: scene.Geometry,
+  geometry: geometry.Geometry,
   x: Float,
   y: Float,
   rotation: Float,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node(String) {
   let assert Ok(material) =
-    scene.standard_material(
-      color: color,
-      metalness: 0.2,
-      roughness: 0.6,
-      map: option.None,
-      normal_map: option.None,
-    )
+    material.new() |> material.with_color(color) |> material.build
 
   scene.Mesh(
     id: id,

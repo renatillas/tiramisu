@@ -5,10 +5,14 @@ import gleam/list
 import gleam/option
 import gleam_community/maths
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -24,6 +28,26 @@ pub type Model {
   )
 }
 
+pub type Id {
+  MainCamera
+  AmbientLight
+  DirectionalLight
+  Cube1
+  Sphere1
+  Grid
+  AxesOrigin
+  CubeBbox
+  SphereDebug
+  ConnectionLine
+  RayUp
+  MovingPoint
+  CrossMarker
+  AxesMoving
+  Trail
+  Corner(Int)
+  TransformBox
+}
+
 pub type Msg {
   Tick
   ToggleDebug
@@ -32,16 +56,15 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
-    background: 0x0a0a1a,
+    dimensions: option.None,
+    background: background.Color(0x0a0a1a),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   io.println("Debug Visualization Example")
   io.println("Controls:")
   io.println("  D - Toggle debug visualizations")
@@ -56,14 +79,14 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       path_points: [],
     )
 
-  #(model, effect.tick(Tick))
+  #(model, effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       // Animate rotation
@@ -125,6 +148,7 @@ fn update(
           path_points: new_path,
         ),
         effect.tick(Tick),
+        option.None,
       )
     }
 
@@ -136,30 +160,30 @@ fn update(
           False -> "OFF"
         },
       )
-      #(Model(..model, debug_enabled: !model.debug_enabled), effect.none())
+      #(
+        Model(..model, debug_enabled: !model.debug_enabled),
+        effect.none(),
+        option.None,
+      )
     }
 
     TogglePerformance -> {
       #(
         Model(..model, show_performance: !model.show_performance),
         effect.none(),
+        option.None,
       )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let camera =
     camera
     |> scene.Camera(
-      id: "main_camera",
+      id: MainCamera,
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -169,19 +193,18 @@ fn view(model: Model) -> List(scene.SceneNode) {
     |> list.wrap
   let lights = [
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.6)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
         light
       },
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 1.0)
+          light.directional(color: 0xffffff, intensity: 1.0)
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 5.0)),
@@ -191,23 +214,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
   // Some example objects to debug
   let objects = [
     scene.Mesh(
-      id: "cube1",
+      id: Cube1,
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(geometry) =
+          geometry.box(width: 2.0, height: 2.0, depth: 2.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x4a90e2,
-            metalness: 0.3,
-            roughness: 0.7,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0x4a90e2)
+          |> material.with_metalness(0.3)
+          |> material.with_roughness(0.7)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -218,24 +237,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
       physics: option.None,
     ),
     scene.Mesh(
-      id: "sphere1",
+      id: Sphere1,
       geometry: {
         let assert Ok(geometry) =
-          scene.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+          geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0xe24a4a,
-            metalness: 0.5,
-            roughness: 0.5,
-            map: option.None,
-            normal_map: option.None,
-            ao_map: option.None,
-            roughness_map: option.None,
-            metalness_map: option.None,
-          )
+          material.new()
+          |> material.with_color(0xe24a4a)
+          |> material.with_metalness(0.5)
+          |> material.with_roughness(0.5)
+          |> material.build()
         material
       },
       transform: transform.Transform(
@@ -252,15 +266,15 @@ fn view(model: Model) -> List(scene.SceneNode) {
     False -> []
     True -> {
       // Grid at ground level
-      let grid = debug.grid("grid", 20.0, 20, debug.color_white)
+      let grid = debug.grid(Grid, 20.0, 20, debug.color_white)
 
       // Coordinate axes at origin
-      let axes_origin = debug.axes("axes_origin", vec3f.zero, 2.0)
+      let axes_origin = debug.axes(AxesOrigin, vec3f.zero, 2.0)
 
       // Bounding box around cube
       let cube_bbox =
         debug.bounding_box(
-          "cube_bbox",
+          CubeBbox,
           vec3.Vec3(-5.0, 0.0, -1.0),
           vec3.Vec3(-3.0, 2.0, 1.0),
           debug.color_green,
@@ -269,7 +283,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       // Wireframe sphere around actual sphere
       let sphere_debug =
         debug.sphere(
-          "sphere_debug",
+          SphereDebug,
           vec3.Vec3(4.0, 1.5, 0.0),
           2.0,
           debug.color_red,
@@ -278,7 +292,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       // Line between objects
       let connection_line =
         debug.line(
-          "connection",
+          ConnectionLine,
           vec3.Vec3(-4.0, 1.0, 0.0),
           vec3.Vec3(4.0, 1.5, 0.0),
           debug.color_cyan,
@@ -287,7 +301,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       // Ray from origin pointing up
       let ray_up =
         debug.ray(
-          "ray_up",
+          RayUp,
           vec3f.zero,
           vec3.Vec3(0.0, 1.0, 0.0),
           5.0,
@@ -297,7 +311,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
       // Animated point following circular path
       let moving_point =
         debug.point(
-          "moving_point",
+          MovingPoint,
           model.animated_position,
           0.3,
           debug.color_magenta,
@@ -305,36 +319,41 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
       // Cross marker at moving point
       let cross_marker =
-        debug.cross("cross", model.animated_position, 0.8, debug.color_orange)
+        debug.cross(
+          CrossMarker,
+          model.animated_position,
+          0.8,
+          debug.color_orange,
+        )
 
       // Axes at animated position
-      let axes_moving = debug.axes("axes_moving", model.animated_position, 1.0)
+      let axes_moving = debug.axes(AxesMoving, model.animated_position, 1.0)
 
       // Path showing trail
-      let trail = debug.path("trail", model.path_points, debug.color_blue)
+      let trail = debug.path(Trail, model.path_points, debug.color_blue)
 
       // Corner markers
       let corners = [
         debug.point(
-          "corner1",
+          Corner(1),
           vec3.Vec3(8.0, 0.0, 8.0),
           0.2,
           debug.color_purple,
         ),
         debug.point(
-          "corner2",
+          Corner(2),
           vec3.Vec3(-8.0, 0.0, 8.0),
           0.2,
           debug.color_purple,
         ),
         debug.point(
-          "corner3",
+          Corner(3),
           vec3.Vec3(8.0, 0.0, -8.0),
           0.2,
           debug.color_purple,
         ),
         debug.point(
-          "corner4",
+          Corner(4),
           vec3.Vec3(-8.0, 0.0, -8.0),
           0.2,
           debug.color_purple,
@@ -350,7 +369,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
         )
       let box_from_transform =
         debug.box_from_transform(
-          "transform_box",
+          TransformBox,
           transform_box,
           debug.color_yellow,
         )

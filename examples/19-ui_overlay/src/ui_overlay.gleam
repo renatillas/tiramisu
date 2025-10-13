@@ -20,9 +20,13 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect as game_effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui
@@ -218,6 +222,13 @@ fn health_color(health: Float) -> String {
 
 // --- Tiramisu Game ---
 
+pub type Id {
+  MainCamera
+  Ambient
+  Directional
+  Cube
+}
+
 pub type GameModel {
   GameModel(
     rotation: Float,
@@ -236,16 +247,15 @@ pub type GameMsg {
 
 fn start_game() -> Nil {
   tiramisu.run(
-    width: 800,
-    height: 600,
-    background: 0x1a1a2e,
+    dimensions: option.None,
+    background: background.Color(0x1a1a2e),
     init: game_init,
     update: game_update,
     view: game_view,
   )
 }
 
-fn game_init(_ctx: tiramisu.Context) {
+fn game_init(_ctx: tiramisu.Context(Id)) {
   #(
     GameModel(
       rotation: 0.0,
@@ -255,19 +265,28 @@ fn game_init(_ctx: tiramisu.Context) {
       paused: True,
     ),
     game_effect.tick(Tick),
+    option.None,
   )
 }
 
-fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
+fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
   case msg {
-    Pause -> #(GameModel(..model, paused: True), game_effect.none())
+    Pause -> #(
+      GameModel(..model, paused: True),
+      game_effect.none(),
+      option.None,
+    )
 
-    Resume -> #(GameModel(..model, paused: False), game_effect.none())
+    Resume -> #(
+      GameModel(..model, paused: False),
+      game_effect.none(),
+      option.None,
+    )
 
     Tick -> {
       // Skip updates if paused
       case model.paused {
-        True -> #(model, game_effect.tick(Tick))
+        True -> #(model, game_effect.tick(Tick), option.None)
         False -> {
           // Update rotation
           let new_rotation = model.rotation +. ctx.delta_time
@@ -332,26 +351,21 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
             ]
           }
 
-          #(new_model, game_effect.batch(effects))
+          #(new_model, game_effect.batch(effects), option.None)
         }
       }
     }
   }
 }
 
-fn game_view(model: GameModel) {
+fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
   [
     // Camera
     scene.Camera(
-      id: "main-camera",
+      id: MainCamera,
       camera: {
         let assert Ok(cam) =
-          camera.perspective(
-            field_of_view: 75.0,
-            aspect: 800.0 /. 600.0,
-            near: 0.1,
-            far: 1000.0,
-          )
+          camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
         cam
       },
       transform: transform.at(vec3.Vec3(0.0, 0.0, 20.0)),
@@ -361,47 +375,40 @@ fn game_view(model: GameModel) {
     ),
     // Lights
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
     ),
     scene.Light(
-      id: "directional",
+      id: Directional,
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+          light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Rotating cube
     scene.Mesh(
-      id: "cube",
+      id: Cube,
       geometry: {
-        let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
+        let assert Ok(geometry) =
+          geometry.box(width: 1.0, height: 1.0, depth: 1.0)
         geometry
       },
       material: {
         let assert Ok(material) =
-          scene.standard_material(
-            color: 0x4ecdc4,
-            metalness: 0.5,
-            roughness: 0.3,
-            map: None,
-            normal_map: None,
-            ao_map: None,
-            roughness_map: None,
-            metalness_map: None,
-          )
+          material.new()
+          |> material.with_color(0x4ecdc4)
+          |> material.build()
         material
       },
       transform: transform.identity
-        |> transform.set_position(model.position)
-        |> transform.set_rotation(vec3.Vec3(
+        |> transform.with_position(model.position)
+        |> transform.with_rotation(vec3.Vec3(
           model.rotation,
           model.rotation *. 0.7,
           0.0,

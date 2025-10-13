@@ -18,7 +18,8 @@
       "Bash(fi)",
       "Bash(done)",
       "Bash(for file in examples/{7..19}-*/src/*.gleam example-games/*/src/*.gleam)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": []

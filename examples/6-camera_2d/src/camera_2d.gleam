@@ -1,10 +1,15 @@
 /// Camera 2D Example
 ///
 /// Demonstrates 2D camera modes and orthographic projection
+import gleam/float
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -19,37 +24,44 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 800,
-    height: 600,
-    background: 0x1a1a2e,
+    dimensions: option.None,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
-  #(Model(time: 0.0), effect.tick(Tick))
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
+  #(Model(time: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_time = model.time +. ctx.delta_time
-      #(Model(time: new_time), effect.tick(Tick))
+      #(Model(time: new_time), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
+  // Use actual canvas dimensions for proper aspect ratio on all devices
+  let cam = camera.camera_2d(
+    width: float.round(ctx.canvas_width),
+    height: float.round(ctx.canvas_height),
+  )
+
   [
     scene.Camera(
       id: "camera",
-      camera: camera.camera_2d(800, 600),
+      camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
       look_at: option.None,
@@ -58,7 +70,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 1.0)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
         light
       },
       transform: transform.identity,
@@ -67,17 +79,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "center",
       geometry: {
-        let assert Ok(geom) = scene.plane(width: 50.0, height: 50.0)
+        let assert Ok(geom) = geometry.plane(width: 50.0, height: 50.0)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0x4ecdc4,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0x4ecdc4,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+          )
         mat
       },
       transform: transform.Transform(
@@ -91,17 +103,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "top-left",
       geometry: {
-        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0xff6b6b,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0xff6b6b,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+          )
         mat
       },
       transform: transform.Transform(
@@ -114,17 +126,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "top-right",
       geometry: {
-        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0xffe66d,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0xffe66d,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+          )
         mat
       },
       transform: transform.Transform(
@@ -137,17 +149,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "bottom-left",
       geometry: {
-        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0x95e1d3,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0x95e1d3,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+          )
         mat
       },
       transform: transform.Transform(
@@ -160,17 +172,17 @@ fn view(model: Model) -> List(scene.SceneNode) {
     scene.Mesh(
       id: "bottom-right",
       geometry: {
-        let assert Ok(geom) = scene.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
         geom
       },
       material: {
-        let assert Ok(mat) = scene.basic_material(
-          color: 0xf38181,
-          transparent: False,
-          opacity: 1.0,
-          map: option.None,
-          normal_map: option.None,
-        )
+        let assert Ok(mat) =
+          material.basic(
+            color: 0xf38181,
+            transparent: False,
+            opacity: 1.0,
+            map: option.None,
+          )
         mat
       },
       transform: transform.Transform(

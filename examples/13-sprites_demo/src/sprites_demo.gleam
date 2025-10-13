@@ -9,16 +9,29 @@ import gleam/result
 import gleam_community/maths
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
-import tiramisu/scene.{type Texture}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+
+pub type Id {
+  MainCamera
+  Ambient
+  Sprite1
+  Sprite2
+  Sprite3
+  Sprite4
+}
 
 pub type Model {
   Model(
     rotation: Float,
-    textures: Dict(String, Texture),
+    textures: Dict(String, asset.Texture),
     loading_complete: Bool,
   )
 }
@@ -26,21 +39,20 @@ pub type Model {
 pub type Msg {
   NoOp
   Tick
-  TextureLoaded(String, Texture)
+  TextureLoaded(String, asset.Texture)
 }
 
 pub fn main() -> Nil {
   tiramisu.run(
-    width: 1200,
-    height: 800,
-    background: 0x1a1a2e,
+    dimensions: option.None,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   let model =
     Model(rotation: 0.0, textures: dict.new(), loading_complete: False)
 
@@ -69,19 +81,19 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
       )
     })
 
-  #(model, effect.batch([effect.tick(Tick), ..load_effects]))
+  #(model, effect.batch([effect.tick(Tick), ..load_effects]), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
-    NoOp -> #(model, effect.none())
+    NoOp -> #(model, effect.none(), option.None)
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time *. 0.5
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick))
+      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     TextureLoaded(name, tex) -> {
@@ -90,23 +102,19 @@ fn update(
       #(
         Model(..model, textures: new_textures, loading_complete:),
         effect.none(),
+        option.None,
       )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model, _) -> List(scene.Node(Id)) {
   let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 1200.0 /. 800.0,
-      near: 0.1,
-      far: 1000.0,
-    )
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
       |> scene.Camera(
-        id: "main-camera",
+        id: MainCamera,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
         active: True,
         look_at: option.None,
@@ -118,9 +126,9 @@ fn view(model: Model) -> List(scene.SceneNode) {
 
   let lights =
     scene.Light(
-      id: "ambient",
+      id: Ambient,
       light: {
-        let assert Ok(light) = scene.ambient_light(color: 0xffffff, intensity: 1.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.5)
         light
       },
       transform: transform.identity,
@@ -139,19 +147,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
             let y = 3.0 *. maths.sin(model.rotation)
 
             scene.Mesh(
-              id: "sprite1",
+              id: Sprite1,
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -165,19 +173,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
             let x = 3.0 *. maths.cos(0.0 -. model.rotation)
             let y = 3.0 *. maths.sin(0.0 -. model.rotation)
             scene.Mesh(
-              id: "sprite2",
+              id: Sprite2,
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -189,19 +197,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
         dict.get(model.textures, "emoji3")
           |> result.map(fn(tex) {
             scene.Mesh(
-              id: "sprite3",
+              id: Sprite3,
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 1.5, height: 1.5)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 1.5, height: 1.5)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },
@@ -218,19 +226,19 @@ fn view(model: Model) -> List(scene.SceneNode) {
           |> result.map(fn(tex) {
             let y = maths.sin(model.rotation *. 2.0) *. 2.0
             scene.Mesh(
-              id: "sprite4",
+              id: Sprite4,
               geometry: {
-                let assert Ok(geometry) = scene.plane(width: 2.0, height: 2.0)
+                let assert Ok(geometry) =
+                  geometry.plane(width: 2.0, height: 2.0)
                 geometry
               },
               material: {
                 let assert Ok(material) =
-                  scene.basic_material(
+                  material.basic(
                     color: 0xffffff,
                     transparent: True,
                     opacity: 1.0,
                     map: option.Some(tex),
-                    normal_map: option.None,
                   )
                 material
               },

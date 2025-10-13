@@ -1,31 +1,70 @@
-import gleam/option.{type Option}
-import vec/vec3
+import gleam/option
 
 // --- Public Types ---
 
 /// Audio buffer type (opaque, wraps Web Audio API AudioBuffer)
 pub type AudioBuffer
 
+/// Audio group categories for volume control
+pub type AudioGroup {
+  /// Sound effects (footsteps, gunshots, etc.)
+  SFX
+  /// Background music
+  Music
+  /// Voice lines and dialogue
+  Voice
+  /// Ambient sounds (wind, rain, etc.)
+  Ambient
+  /// Custom group with a name
+  Custom(String)
+}
+
+/// Audio playback state
+pub type AudioState {
+  /// Audio is playing
+  Playing
+  /// Audio is stopped (reset to beginning)
+  Stopped
+  /// Audio is paused (can be resumed)
+  Paused
+}
+
+/// Fade configuration for smooth transitions
+pub type FadeConfig {
+  /// No fade (instant transition)
+  NoFade
+  /// Fade in/out over specified milliseconds
+  Fade(duration_ms: Int)
+}
+
 /// Audio playback configuration
 pub type AudioConfig {
   AudioConfig(
+    /// Playback state (Playing, Stopped, Paused)
+    state: AudioState,
     /// Volume (0.0 to 1.0)
     volume: Float,
     /// Whether to loop the audio
     loop: Bool,
     /// Playback rate (1.0 = normal speed)
     playback_rate: Float,
-    /// Whether the audio should autoplay
-    autoplay: Bool,
+    /// Fade configuration for state transitions
+    fade: FadeConfig,
+    /// Audio group for volume control (optional)
+    group: option.Option(AudioGroup),
+    /// Callback when audio ends (for non-looping audio)
+    on_end: option.Option(fn() -> Nil),
   )
 }
 
 /// Type of audio (global or positional)
 pub type Audio {
   /// Global audio (2D, same volume everywhere)
-  GlobalAudio
+  GlobalAudio(buffer: AudioBuffer, config: AudioConfig)
   /// Positional audio (3D, volume based on distance)
   PositionalAudio(
+    buffer: AudioBuffer,
+    config: AudioConfig,
     /// Maximum hearing distance
     ref_distance: Float,
     /// How quickly audio fades with distance
@@ -40,34 +79,111 @@ pub type AudioSource
 
 // --- Constructor Functions ---
 
-/// Create default audio config
+/// Create default audio config (stopped, no fade)
 pub fn config() -> AudioConfig {
-  AudioConfig(volume: 1.0, loop: False, playback_rate: 1.0, autoplay: False)
+  AudioConfig(
+    state: Stopped,
+    volume: 1.0,
+    loop: False,
+    playback_rate: 1.0,
+    fade: NoFade,
+    group: option.None,
+    on_end: option.None,
+  )
 }
 
-/// Set volume (0.0 to 1.0)
-pub fn set_volume(config: AudioConfig, volume: Float) -> AudioConfig {
+/// Create audio config that starts playing
+pub fn playing() -> AudioConfig {
+  AudioConfig(
+    state: Playing,
+    volume: 1.0,
+    loop: False,
+    playback_rate: 1.0,
+    fade: NoFade,
+    group: option.None,
+    on_end: option.None,
+  )
+}
+
+/// Set playback state (Playing, Stopped, Paused)
+pub fn with_state(config: AudioConfig, state: AudioState) -> AudioConfig {
+  AudioConfig(..config, state: state)
+}
+
+/// Set audio to playing
+pub fn with_playing(config: AudioConfig) -> AudioConfig {
+  AudioConfig(..config, state: Playing)
+}
+
+/// Set audio to stopped
+pub fn with_stopped(config: AudioConfig) -> AudioConfig {
+  AudioConfig(..config, state: Stopped)
+}
+
+/// Set audio to paused
+pub fn with_paused(config: AudioConfig) -> AudioConfig {
+  AudioConfig(..config, state: Paused)
+}
+
+/// Set fade configuration
+pub fn with_fade(config: AudioConfig, duration_ms: Int) -> AudioConfig {
+  AudioConfig(..config, fade: Fade(duration_ms))
+}
+
+/// Set no fade (instant transitions)
+pub fn with_no_fade(config: AudioConfig) -> AudioConfig {
+  AudioConfig(..config, fade: NoFade)
+}
+
+/// Set volume in config (0.0 to 1.0)
+pub fn with_volume(config: AudioConfig, volume: Float) -> AudioConfig {
   AudioConfig(..config, volume: volume)
 }
 
-/// Set looping
-pub fn set_loop(config: AudioConfig, loop: Bool) -> AudioConfig {
+/// Set looping in config
+pub fn with_loop(config: AudioConfig, loop: Bool) -> AudioConfig {
   AudioConfig(..config, loop: loop)
 }
 
-/// Set playback rate (1.0 = normal, 2.0 = double speed, etc.)
-pub fn set_playback_rate(config: AudioConfig, rate: Float) -> AudioConfig {
+/// Set playback rate in config (1.0 = normal, 2.0 = double speed, etc.)
+pub fn with_playback_rate(config: AudioConfig, rate: Float) -> AudioConfig {
   AudioConfig(..config, playback_rate: rate)
 }
 
-/// Set autoplay
-pub fn set_autoplay(config: AudioConfig, autoplay: Bool) -> AudioConfig {
-  AudioConfig(..config, autoplay: autoplay)
+/// Set audio group in config
+pub fn with_group(config: AudioConfig, group: AudioGroup) -> AudioConfig {
+  AudioConfig(..config, group: option.Some(group))
+}
+
+/// Set callback to be called when audio ends (for non-looping audio)
+///
+/// This is useful for one-shot sounds like SFX where you need to know
+/// when the sound has finished playing.
+///
+/// ## Example
+///
+/// ```gleam
+/// audio.config()
+/// |> audio.with_state(audio.Playing)
+/// |> audio.with_on_end(fn() {
+///   // Audio finished playing
+///   io.println("SFX finished!")
+/// })
+/// ```
+pub fn with_on_end(config: AudioConfig, callback: fn() -> Nil) -> AudioConfig {
+  AudioConfig(..config, on_end: option.Some(callback))
+}
+
+/// Create global audio (2D, same volume everywhere)
+pub fn global(buffer: AudioBuffer, config: AudioConfig) -> Audio {
+  GlobalAudio(buffer: buffer, config: config)
 }
 
 /// Create a default positional audio configuration
-pub fn positional() -> Audio {
+pub fn positional(buffer: AudioBuffer, config: AudioConfig) -> Audio {
   PositionalAudio(
+    buffer: buffer,
+    config: config,
     ref_distance: 1.0,
     rolloff_factor: 1.0,
     max_distance: 10_000.0,
@@ -75,152 +191,50 @@ pub fn positional() -> Audio {
 }
 
 /// Set reference distance for positional audio
-pub fn set_ref_distance(audio: Audio, distance: Float) -> Audio {
+pub fn with_ref_distance(audio: Audio, distance: Float) -> Audio {
   case audio {
-    PositionalAudio(_, rolloff, max) ->
+    PositionalAudio(buffer, config, _, rolloff, max) ->
       PositionalAudio(
+        buffer: buffer,
+        config: config,
         ref_distance: distance,
         rolloff_factor: rolloff,
         max_distance: max,
       )
-    GlobalAudio -> GlobalAudio
+    GlobalAudio(_, _) -> audio
   }
 }
 
 /// Set rolloff factor for positional audio
-pub fn set_rolloff_factor(audio: Audio, factor: Float) -> Audio {
+pub fn with_rolloff_factor(audio: Audio, factor: Float) -> Audio {
   case audio {
-    PositionalAudio(ref, _, max) ->
+    PositionalAudio(buffer, config, ref, _, max) ->
       PositionalAudio(
+        buffer: buffer,
+        config: config,
         ref_distance: ref,
         rolloff_factor: factor,
         max_distance: max,
       )
-    GlobalAudio -> GlobalAudio
+    GlobalAudio(_, _) -> audio
   }
 }
 
 /// Set maximum distance for positional audio
-pub fn set_max_distance(audio: Audio, distance: Float) -> Audio {
+pub fn with_max_distance(audio: Audio, distance: Float) -> Audio {
   case audio {
-    PositionalAudio(ref, rolloff, _) ->
+    PositionalAudio(buffer, config, ref, rolloff, _) ->
       PositionalAudio(
+        buffer: buffer,
+        config: config,
         ref_distance: ref,
         rolloff_factor: rolloff,
         max_distance: distance,
       )
-    GlobalAudio -> GlobalAudio
+    GlobalAudio(_, _) -> audio
   }
 }
-
-// --- Audio Control ---
-
-/// Play an audio source
-pub fn play(source_id: String) -> Nil {
-  play_audio_ffi(source_id)
-}
-
-/// Pause an audio source
-pub fn pause(source_id: String) -> Nil {
-  pause_audio_ffi(source_id)
-}
-
-/// Stop an audio source (resets to beginning)
-pub fn stop(source_id: String) -> Nil {
-  stop_audio_ffi(source_id)
-}
-
-/// Set volume of a playing audio source
-pub fn set_source_volume(source_id: String, volume: Float) -> Nil {
-  set_volume_ffi(source_id, volume)
-}
-
-/// Check if an audio source is playing
-pub fn is_playing(source_id: String) -> Bool {
-  is_playing_ffi(source_id)
-}
-
-/// Get current playback time in seconds
-pub fn get_current_time(source_id: String) -> Float {
-  get_time_ffi(source_id)
-}
-
-/// Set current playback time in seconds
-pub fn set_current_time(source_id: String, time: Float) -> Nil {
-  set_time_ffi(source_id, time)
-}
-
-// --- Scene Integration ---
-
-/// Audio node for the scene graph
-/// This is a declarative way to add audio to the scene
-pub type AudioNode {
-  AudioNode(
-    id: String,
-    config: AudioConfig,
-    audio_type: Audio,
-    position: Option(vec3.Vec3(Float)),
-  )
-}
-
-/// Create a global audio node (2D audio)
-pub fn global_audio(id: String, config: AudioConfig) -> AudioNode {
-  AudioNode(
-    id: id,
-    config: config,
-    audio_type: GlobalAudio,
-    position: option.None,
-  )
-}
-
-/// Create a positional audio node (3D audio at a position)
-pub fn positional_audio(
-  id: String,
-  config: AudioConfig,
-  position: vec3.Vec3(Float),
-) -> AudioNode {
-  AudioNode(
-    id: id,
-    config: config,
-    audio_type: positional(),
-    position: option.Some(position),
-  )
-}
-
-/// Create a positional audio node with custom settings
-pub fn positional_audio_custom(
-  id: String,
-  config: AudioConfig,
-  position: vec3.Vec3(Float),
-  audio_type: Audio,
-) -> AudioNode {
-  AudioNode(
-    id: id,
-    config: config,
-    audio_type: audio_type,
-    position: option.Some(position),
-  )
-}
-
-// --- FFI Functions ---
-
-@external(javascript, "./ffi/audio.mjs", "playAudio")
-fn play_audio_ffi(source_id: String) -> Nil
-
-@external(javascript, "./ffi/audio.mjs", "pauseAudio")
-fn pause_audio_ffi(source_id: String) -> Nil
-
-@external(javascript, "./ffi/audio.mjs", "stopAudio")
-fn stop_audio_ffi(source_id: String) -> Nil
-
-@external(javascript, "./ffi/audio.mjs", "setAudioVolume")
-fn set_volume_ffi(source_id: String, volume: Float) -> Nil
-
-@external(javascript, "./ffi/audio.mjs", "isAudioPlaying")
-fn is_playing_ffi(source_id: String) -> Bool
-
-@external(javascript, "./ffi/audio.mjs", "getAudioTime")
-fn get_time_ffi(source_id: String) -> Float
-
-@external(javascript, "./ffi/audio.mjs", "setAudioTime")
-fn set_time_ffi(source_id: String, time: Float) -> Nil
+// Note: Audio group volume control has been migrated to the audio manager.
+// Group volumes are now part of the immutable audio manager state in the renderer.
+// To control group volumes, use effects that manipulate the audio manager state
+// (functionality to be added in future versions).

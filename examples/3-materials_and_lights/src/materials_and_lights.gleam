@@ -4,8 +4,12 @@ import gleam/option
 import gleam_community/maths
 import tiramisu
 import tiramisu/asset
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -25,7 +29,7 @@ pub type Msg {
 
 pub fn main() -> Nil {
   tiramisu.run(
-    background: 0x0a0a0a,
+    background: background.Color(0x0a0a0a),
     init: init,
     update: update,
     view: view,
@@ -33,7 +37,9 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   // Define all textures to load
   let textures = [
     // Wood floor textures
@@ -67,28 +73,33 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg)) {
   #(
     Model(rotation: 0.0, light_intensity: 1.0, assets: option.None),
     effect.batch([effect.tick(Tick), load_effect]),
+    option.None,
   )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick))
+      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     AssetsLoaded(result) -> {
       // Store the loaded assets in the model
-      #(Model(..model, assets: option.Some(result.cache)), effect.tick(Tick))
+      #(
+        Model(..model, assets: option.Some(result.cache)),
+        effect.tick(Tick),
+        option.None,
+      )
     }
   }
 }
 
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -106,8 +117,7 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Light(
       id: "ambient",
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0x404040, intensity: 0.3)
+        let assert Ok(light) = light.ambient(color: 0x404040, intensity: 0.3)
         light
       },
       transform: transform.identity,
@@ -116,7 +126,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "directional",
       light: {
         let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 2.0)
+          light.directional(color: 0xffffff, intensity: 2.0)
         light
       },
       transform: transform.Transform(
@@ -133,7 +143,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "point",
       light: {
         let assert Ok(light) =
-          scene.point_light(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
+          light.point(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
         light
       },
       transform: transform.Transform(
@@ -146,7 +156,7 @@ fn view(model: Model) -> List(scene.Node) {
       id: "hemisphere",
       light: {
         let assert Ok(light) =
-          scene.hemisphere_light(
+          light.hemisphere(
             sky_color: 0xffffff,
             ground_color: 0xff0000,
             intensity: 1.0,
@@ -162,7 +172,7 @@ fn view(model: Model) -> List(scene.Node) {
   ]
 
   let assert Ok(box_geom) =
-    scene.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
+    geometry.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
 
   // Get textures from cache if loaded
   let wood_color =
@@ -175,7 +185,7 @@ fn view(model: Model) -> List(scene.Node) {
       asset.get_texture(cache, "wood-floor/WoodFloor041_1K-JPG_NormalGL.jpg")
       |> option.from_result
     })
-  let wood_ao =
+  let wood_ambient_oclusion =
     option.then(model.assets, fn(cache) {
       asset.get_texture(
         cache,
@@ -248,26 +258,46 @@ fn view(model: Model) -> List(scene.Node) {
 
   // Create materials with textures
   let assert Ok(basic_mat) =
-    scene.basic_material(
+    material.basic(
       color: 0xff6b6b,
       transparent: False,
       opacity: 1.0,
       map: option.None,
-      normal_map: option.None,
     )
-  let assert Ok(standard_mat) =
-    scene.standard_material(
-      color: 0xffffff,
-      metalness: 0.0,
-      roughness: 1.0,
-      map: wood_color,
-      normal_map: wood_normal,
-      ambient_oclusion_map: wood_ao,
-      roughness_map: wood_roughness,
-      metalness_map: option.None,
-    )
+
+  let standard_material = case
+    wood_color,
+    wood_normal,
+    wood_ambient_oclusion,
+    wood_roughness
+  {
+    option.Some(color),
+      option.Some(normal),
+      option.Some(ambient_oclusion),
+      option.Some(roughness)
+    -> {
+      let assert Ok(standard_mat) =
+        material.new()
+        |> material.with_color(0xffffff)
+        |> material.with_metalness(0.0)
+        |> material.with_roughness(1.0)
+        |> material.with_color_map(color)
+        |> material.with_normal_map(normal)
+        |> material.with_ambient_oclusion_map(ambient_oclusion)
+        |> material.with_roughness_map(roughness)
+        |> material.build()
+      standard_mat
+    }
+    _, _, _, _ -> {
+      let assert Ok(standard_mat) =
+        material.new()
+        |> material.build()
+      standard_mat
+    }
+  }
+
   let assert Ok(phong_mat) =
-    scene.phong_material(
+    material.phong(
       color: 0xffffff,
       shininess: 100.0,
       map: onyx_color,
@@ -275,14 +305,14 @@ fn view(model: Model) -> List(scene.Node) {
       ambient_oclusion_map: option.None,
     )
   let assert Ok(lambert_mat) =
-    scene.lambert_material(
+    material.lambert(
       color: 0xffffff,
       map: snow_color,
       normal_map: snow_normal,
       ambient_oclusion_map: snow_ao,
     )
   let assert Ok(toon_mat) =
-    scene.toon_material(
+    material.toon(
       color: 0xf38181,
       map: option.None,
       normal_map: option.None,
@@ -304,7 +334,7 @@ fn view(model: Model) -> List(scene.Node) {
     scene.Mesh(
       id: "standard",
       geometry: box_geom,
-      material: standard_mat,
+      material: standard_material,
       transform: transform.Transform(
         position: vec3.Vec3(-3.0, 2.0, 0.0),
         rotation: vec3.Vec3(0.0, model.rotation, 0.0),
@@ -347,24 +377,43 @@ fn view(model: Model) -> List(scene.Node) {
     ),
   ]
 
-  let assert Ok(plane_geom) = scene.plane(width: 20.0, height: 20.0)
-  let assert Ok(ground_mat) =
-    scene.standard_material(
-      color: 0xffffff,
-      metalness: 0.0,
-      roughness: 1.0,
-      map: paving_color,
-      normal_map: paving_normal,
-      ambient_oclusion_map: paving_ao,
-      roughness_map: paving_roughness,
-      metalness_map: option.None,
-    )
+  let assert Ok(plane_geom) = geometry.plane(width: 20.0, height: 20.0)
+  let ground_material = case
+    paving_color,
+    paving_normal,
+    paving_ao,
+    paving_roughness
+  {
+    option.Some(color),
+      option.Some(normal),
+      option.Some(ao),
+      option.Some(roughness)
+    -> {
+      let assert Ok(ground_mat) =
+        material.new()
+        |> material.with_color(0xffffff)
+        |> material.with_metalness(0.0)
+        |> material.with_roughness(1.0)
+        |> material.with_color_map(color)
+        |> material.with_normal_map(normal)
+        |> material.with_ambient_oclusion_map(ao)
+        |> material.with_roughness_map(roughness)
+        |> material.build()
+      ground_mat
+    }
+    _, _, _, _ -> {
+      let assert Ok(ground_mat) =
+        material.new()
+        |> material.build()
+      ground_mat
+    }
+  }
 
   let ground = [
     scene.Mesh(
       id: "ground",
       geometry: plane_geom,
-      material: ground_mat,
+      material: ground_material,
       transform: transform.Transform(
         position: vec3.Vec3(0.0, -2.0, 0.0),
         rotation: vec3.Vec3(-1.5708, 0.0, 0.0),

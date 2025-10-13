@@ -1,4 +1,5 @@
 import gleam/int
+import gleam/javascript/promise
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/set
@@ -12,9 +13,15 @@ import tetris/piece
 import tetris/position
 import tetris/ui
 import tiramisu
+import tiramisu/asset
+import tiramisu/audio
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
 import tiramisu/input
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui as tiramisu_ui
@@ -30,23 +37,53 @@ const grid_height = 20
 // Model
 pub type Model {
   Model(
+    player_moved: Bool,
     game_state: game.GameState,
     drop_timer: Float,
     camera: camera.Camera,
     last_move_time: Float,
     last_rotate_time: Float,
     previous_piece_shape: piece.Shape,
+    assets_cache: option.Option(asset.AssetCache),
   )
+}
+
+pub type Id {
+  MoveSfx
+  AmbientLight
+  DirectionalLight
+  MainCamera
+  LockedBlock(Int)
+  CurrentBlock(Int)
+  GridOutLine
 }
 
 // Messages
 pub type Msg {
   Tick
   Restart
+  LoadedAssets(asset.BatchLoadResult)
 }
 
 // Initialize
-pub fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
+pub fn init(
+  _ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+  let assets = [
+    asset.AudioAsset("wav/Select-1-(Saw).wav"),
+    asset.AudioAsset("wav/Cursor-1-(Saw).wav"),
+    asset.AudioAsset("wav/Error-2-(Saw).wav"),
+  ]
+
+  let effects =
+    effect.batch([
+      effect.from_promise(promise.map(
+        asset.load_batch_simple(assets),
+        LoadedAssets,
+      )),
+      effect.tick(Tick),
+    ])
+
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -54,37 +91,50 @@ pub fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
 
   let model =
     Model(
+      player_moved: False,
       game_state: initial_game,
       drop_timer: 0.0,
       camera: cam,
       last_move_time: 0.0,
       last_rotate_time: 0.0,
       previous_piece_shape: initial_game.current_piece.piece_type,
+      assets_cache: option.None,
     )
 
-  #(model, effect.tick(Tick))
+  #(model, effects, option.None)
 }
 
 // Update
 pub fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(Id),
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
+    LoadedAssets(batch_result) -> {
+      #(
+        Model(..model, assets_cache: option.Some(batch_result.cache)),
+        effect.none(),
+        option.None,
+      )
+    }
     Restart -> {
-      let #(new_model, init_effect) = init(ctx)
+      let #(new_model, _, _) = init(ctx)
       #(
         new_model,
         effect.batch([
-          init_effect,
-          tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(
-            new_model.game_state,
-          )),
+          tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(new_model.game_state)),
         ]),
+        option.None,
       )
     }
     Tick -> {
+      // Reset player_moved from previous frame (for audio one-shot behavior)
+      let model = case model.player_moved {
+        True -> Model(..model, player_moved: False)
+        False -> model
+      }
+
       let move_cooldown = 0.15
       let rotate_cooldown = 0.2
 
@@ -95,9 +145,6 @@ pub fn update(
       let right_pressed =
         input.is_key_pressed(ctx.input, input.ArrowRight)
         || input.is_key_pressed(ctx.input, input.KeyD)
-      let down_pressed =
-        input.is_key_pressed(ctx.input, input.ArrowDown)
-        || input.is_key_pressed(ctx.input, input.KeyS)
       let rotate_pressed =
         input.is_key_pressed(ctx.input, input.ArrowUp)
         || input.is_key_pressed(ctx.input, input.KeyW)
@@ -107,42 +154,41 @@ pub fn update(
       let can_move = model.last_move_time >=. move_cooldown
       let can_rotate = model.last_rotate_time >=. rotate_cooldown
 
-      let #(new_state, new_move_time, new_rotate_time) = case
+      let #(new_state, new_move_time, new_rotate_time, player_moved) = case
         left_pressed && can_move,
         right_pressed && can_move,
         rotate_pressed && can_rotate,
-        down_pressed,
         drop_pressed
       {
-        True, _, _, _, _ -> #(
+        True, _, _, _ -> #(
           game.move_left(model.game_state),
           0.0,
           model.last_rotate_time,
+          True,
         )
-        _, True, _, _, _ -> #(
+        _, True, _, _ -> #(
           game.move_right(model.game_state),
           0.0,
           model.last_rotate_time,
+          True,
         )
-        _, _, True, _, _ -> #(
+        _, _, True, _ -> #(
           game.rotate(model.game_state),
           model.last_move_time,
           0.0,
+          True,
         )
-        _, _, _, True, _ -> #(
-          game.soft_drop(model.game_state),
-          model.last_move_time,
-          model.last_rotate_time,
-        )
-        _, _, _, _, True -> #(
+        _, _, _, True -> #(
           game.hard_drop(model.game_state),
           model.last_move_time,
           model.last_rotate_time,
+          True,
         )
-        _, _, _, _, _ -> #(
+        _, _, _, _ -> #(
           model.game_state,
           model.last_move_time,
           model.last_rotate_time,
+          False,
         )
       }
 
@@ -175,6 +221,8 @@ pub fn update(
 
       let updated_model =
         Model(
+          ..model,
+          player_moved:,
           game_state: final_state,
           drop_timer: final_drop_timer,
           camera: model.camera,
@@ -191,17 +239,38 @@ pub fn update(
             updated_model.game_state,
           )),
         ]),
+        option.None,
       )
     }
   }
 }
 
 // View
-pub fn view(model: Model) -> List(scene.SceneNode) {
+pub fn view(
+  model: Model,
+  _context: tiramisu.Context(Id),
+) -> List(scene.Node(Id)) {
+  // Only add audio node when player actually moved (for one-shot sound effect)
+  let move_audio_node = case model.assets_cache, model.player_moved {
+    option.Some(cache), True ->
+      case asset.get_audio(cache, "wav/Select-1-(Saw).wav") {
+        Ok(buffer) -> [
+          scene.Audio(
+            id: MoveSfx,
+            audio: audio.GlobalAudio(
+              buffer:,
+              config: audio.config() |> audio.with_state(audio.Playing),
+            ),
+          ),
+        ]
+        Error(_) -> []
+      }
+    _, _ -> []
+  }
   // Camera
   let camera_node =
     scene.Camera(
-      id: "main",
+      id: MainCamera,
       camera: model.camera,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
       look_at: Some(vec3.Vec3(5.0, 10.0, 0.0)),
@@ -212,10 +281,9 @@ pub fn view(model: Model) -> List(scene.SceneNode) {
   // Lights
   let ambient_light =
     scene.Light(
-      id: "ambient",
+      id: AmbientLight,
       light: {
-        let assert Ok(light) =
-          scene.ambient_light(color: 0xffffff, intensity: 0.5)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
       },
       transform: transform.identity,
@@ -223,10 +291,9 @@ pub fn view(model: Model) -> List(scene.SceneNode) {
 
   let directional_light =
     scene.Light(
-      id: "directional",
+      id: DirectionalLight,
       light: {
-        let assert Ok(light) =
-          scene.directional_light(color: 0xffffff, intensity: 0.8)
+        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.8)
         light
       },
       transform: transform.at(position: vec3.Vec3(10.0, 15.0, 10.0)),
@@ -255,6 +322,7 @@ pub fn view(model: Model) -> List(scene.SceneNode) {
   [camera_node, ambient_light, directional_light, grid_outline]
   |> list.append(current_piece_blocks)
   |> list.append(locked_blocks)
+  |> list.append(move_audio_node)
 }
 
 // Helper: Create a block for the current piece
@@ -262,26 +330,21 @@ fn create_block(
   pos: position.Position,
   index: Int,
   color: Int,
-) -> scene.SceneNode {
+) -> scene.Node(Id) {
   let assert Ok(geometry) =
-    scene.box(width: block_size, height: block_size, depth: block_size)
+    geometry.box(width: block_size, height: block_size, depth: block_size)
   let assert Ok(material) =
-    scene.standard_material(
-      color: color,
-      metalness: 0.3,
-      roughness: 0.7,
-      map: None,
-      normal_map: None,
-      ambient_oclusion_map: None,
-      roughness_map: None,
-      metalness_map: None,
-    )
+    material.new()
+    |> material.with_color(color)
+    |> material.with_metalness(0.3)
+    |> material.with_roughness(0.7)
+    |> material.build()
 
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
   scene.Mesh(
-    id: "current_block_" <> int.to_string(index),
+    id: CurrentBlock(index),
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
@@ -290,26 +353,19 @@ fn create_block(
 }
 
 // Helper: Create a locked block
-fn create_locked_block(pos: position.Position, index: Int) -> scene.SceneNode {
+fn create_locked_block(pos: position.Position, index: Int) -> scene.Node(Id) {
   let assert Ok(geometry) =
-    scene.box(width: block_size, height: block_size, depth: block_size)
+    geometry.box(width: block_size, height: block_size, depth: block_size)
   let assert Ok(material) =
-    scene.standard_material(
-      color: 0x808080,
-      metalness: 0.2,
-      roughness: 0.8,
-      map: None,
-      normal_map: None,
-      ambient_oclusion_map: None,
-      roughness_map: None,
-      metalness_map: None,
-    )
+    material.new()
+    |> material.with_color(0x808080)
+    |> material.build()
 
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
   scene.Mesh(
-    id: "locked_block_" <> int.to_string(index),
+    id: LockedBlock(index),
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
@@ -318,27 +374,20 @@ fn create_locked_block(pos: position.Position, index: Int) -> scene.SceneNode {
 }
 
 // Helper: Create grid outline
-fn create_grid_outline() -> scene.SceneNode {
+fn create_grid_outline() -> scene.Node(Id) {
   let assert Ok(geometry) =
-    scene.box(
+    geometry.box(
       width: int.to_float(grid_width) *. block_size +. 0.2,
       height: int.to_float(grid_height) *. block_size +. 0.2,
       depth: 0.1,
     )
   let assert Ok(material) =
-    scene.standard_material(
-      color: 0x333333,
-      metalness: 0.1,
-      roughness: 0.9,
-      map: None,
-      normal_map: None,
-      ambient_oclusion_map: None,
-      roughness_map: None,
-      metalness_map: None,
-    )
+    material.new()
+    |> material.with_color(0x333333)
+    |> material.build()
 
   scene.Mesh(
-    id: "grid_outline",
+    id: GridOutLine,
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(
@@ -360,7 +409,7 @@ pub fn main() {
   // Start the game
   tiramisu.run(
     dimensions: None,
-    background: 0x1a1a2e,
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
