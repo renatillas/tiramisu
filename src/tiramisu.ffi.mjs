@@ -4,7 +4,7 @@ import * as RENDERER from './tiramisu/internal/renderer.mjs';
 import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
 import * as INPUT from './tiramisu/input.mjs';
-import { getActiveCamera, setSceneBackgroundColor, setSceneBackgroundTexture, setSceneBackgroundCubeTexture, loadTexture, loadCubeTexture } from './threejs.ffi.mjs';
+import { getActiveCamera, setSceneBackgroundColor, setSceneBackgroundTexture, setSceneBackgroundCubeTexture, loadTexture, loadEquirectangularTexture, loadCubeTexture } from './threejs.ffi.mjs';
 
 // ============================================================================
 // MANAGER CLASSES - Encapsulate mutable state
@@ -173,11 +173,24 @@ export class InputManager {
 
     // Mouse
     canvas.addEventListener('mousemove', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      this.mouse.x = e.clientX - rect.left;
-      this.mouse.y = e.clientY - rect.top;
-      this.mouse.deltaX = this.mouse.x - this.mouse.lastX;
-      this.mouse.deltaY = this.mouse.y - this.mouse.lastY;
+      // When pointer lock is active, use movementX/Y directly
+      // Otherwise, calculate delta from position change
+      const isPointerLocked = document.pointerLockElement === canvas ||
+                             document.webkitPointerLockElement === canvas ||
+                             document.mozPointerLockElement === canvas;
+
+      if (isPointerLocked) {
+        // Use movement deltas directly from pointer lock API
+        this.mouse.deltaX = e.movementX || e.webkitMovementX || e.mozMovementX || 0;
+        this.mouse.deltaY = e.movementY || e.webkitMovementY || e.mozMovementY || 0;
+      } else {
+        // Calculate delta from position change
+        const rect = canvas.getBoundingClientRect();
+        this.mouse.x = e.clientX - rect.left;
+        this.mouse.y = e.clientY - rect.top;
+        this.mouse.deltaX = this.mouse.x - this.mouse.lastX;
+        this.mouse.deltaY = this.mouse.y - this.mouse.lastY;
+      }
     });
 
     canvas.addEventListener('mousedown', (e) => {
@@ -450,7 +463,7 @@ export function createInputManager(canvas) {
 /**
  * Set background on Three.js scene based on Gleam Background type
  * @param {THREE.Scene} scene - Three.js scene object
- * @param {Object} background - Gleam Background ADT (Color, Texture, or CubeTexture)
+ * @param {Object} background - Gleam Background ADT (Color, Texture, EquirectangularTexture, or CubeTexture)
  */
 export async function setBackground(scene, background) {
   const bgType = background.constructor.name;
@@ -470,6 +483,20 @@ export async function setBackground(scene, background) {
         setSceneBackgroundTexture(scene, texture);
       } catch (error) {
         console.error('[Tiramisu] Failed to load background texture:', error);
+        // Fallback to black color
+        setSceneBackgroundColor(scene, 0x000000);
+      }
+      break;
+    }
+    case 'EquirectangularTexture': {
+      // Background.EquirectangularTexture(String) - spherical 360° texture URL
+      const url = background[0];
+      try {
+        const texture = await loadEquirectangularTexture(url);
+        console.log(texture)
+        setSceneBackgroundTexture(scene, texture);
+      } catch (error) {
+        console.error('[Tiramisu] Failed to load equirectangular texture:', error);
         // Fallback to black color
         setSceneBackgroundColor(scene, 0x000000);
       }
@@ -1760,14 +1787,6 @@ function runEffect(effect, dispatch) {
 export function getCanvasDimensions(renderer) {
   const canvas = renderer.domElement;
   return [canvas.clientWidth, canvas.clientHeight];
-}
-
-/**
- * Get the current window aspect ratio
- * @returns {number} width / height
- */
-export function getWindowAspectRatio() {
-  return window.innerWidth / window.innerHeight;
 }
 
 /**

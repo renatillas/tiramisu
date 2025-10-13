@@ -234,7 +234,3 @@ pub fn with_max_distance(audio: Audio, distance: Float) -> Audio {
     GlobalAudio(_, _) -> audio
   }
 }
-// Note: Audio group volume control has been migrated to the audio manager.
-// Group volumes are now part of the immutable audio manager state in the renderer.
-// To control group volumes, use effects that manipulate the audio manager state
-// (functionality to be added in future versions).

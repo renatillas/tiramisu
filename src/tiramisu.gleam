@@ -127,15 +127,6 @@ pub type Dimensions {
 ///
 /// Contains timing information, input state, canvas dimensions, and physics world for the current frame.
 ///
-/// ## Fields
-///
-/// - `delta_time`: Time in seconds since the last frame (useful for frame-rate independent movement)
-/// - `input`: Current input state (keyboard, mouse, touch)
-/// - `canvas_width`: Current canvas width in pixels (useful for coordinate conversion)
-/// - `canvas_height`: Current canvas height in pixels (useful for coordinate conversion)
-/// - `physics_world`: Optional physics world (set via init function return value)
-/// - `input_manager`: Internal input manager (managed by the engine, do not access directly)
-///
 /// ## Example
 ///
 /// ```gleam
@@ -382,22 +373,3 @@ fn start_loop(
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil
-
-/// Get the current window aspect ratio (width / height).
-///
-/// **Note**: This function is rarely needed in v2.0.0 since cameras automatically
-/// calculate aspect ratio from viewport or window dimensions.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu
-///
-/// pub fn update(model: Model, msg: Msg, ctx: Context) {
-///   let aspect = tiramisu.get_window_aspect_ratio()
-///   // Use aspect for custom calculations
-///   // ...
-/// }
-/// ```
-@external(javascript, "./tiramisu.ffi.mjs", "getWindowAspectRatio")
-pub fn get_window_aspect_ratio() -> Float

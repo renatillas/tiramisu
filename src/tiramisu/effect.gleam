@@ -213,6 +213,14 @@ pub fn set_background(background: Background) -> Effect(msg) {
         })
         Nil
       }
+      background.EquirectangularTexture(url) -> {
+        // Load equirectangular texture asynchronously
+        load_equirectangular_texture_ffi(url)
+        |> promise.tap(fn(texture) {
+          set_scene_background_texture_ffi(scene, texture)
+        })
+        Nil
+      }
       background.CubeTexture(urls) -> {
         // Load cube texture asynchronously
         load_cube_texture_ffi(urls)
@@ -243,6 +251,9 @@ fn set_scene_background_cube_texture_ffi(
 
 @external(javascript, "../threejs.ffi.mjs", "loadTexture")
 fn load_texture_ffi(url: String) -> Promise(Dynamic)
+
+@external(javascript, "../threejs.ffi.mjs", "loadEquirectangularTexture")
+fn load_equirectangular_texture_ffi(url: String) -> Promise(Dynamic)
 
 @external(javascript, "../threejs.ffi.mjs", "loadCubeTexture")
 fn load_cube_texture_ffi(urls: List(String)) -> Promise(Dynamic)

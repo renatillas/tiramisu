@@ -90,15 +90,15 @@ pub fn box_from_transform(
 
 /// Create multiple lines forming a path through points
 pub fn path(
-  id_prefix: id,
+  id: fn(Int) -> id,
   points: List(Vec3(Float)),
   color: Int,
 ) -> List(scene.Node(id)) {
-  create_path_lines(id_prefix, points, color, 0, [])
+  create_path_lines(id, points, color, 0, [])
 }
 
 fn create_path_lines(
-  id: id,
+  id: fn(Int) -> id,
   points: List(Vec3(Float)),
   color: Int,
   index: Int,
@@ -107,7 +107,7 @@ fn create_path_lines(
   case points {
     [] | [_] -> list.reverse(acc)
     [p1, p2, ..rest] -> {
-      let line_node = line(id, p1, p2, color)
+      let line_node = line(id(index), p1, p2, color)
       create_path_lines(id, [p2, ..rest], color, index + 1, [line_node, ..acc])
     }
   }

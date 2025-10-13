@@ -959,9 +959,6 @@ type BufferedAction(action) {
 
 /// Create a new buffered input system
 ///
-/// ## Arguments
-///
-/// - `buffer_frames`: Number of frames to keep actions in buffer (e.g., 5 frames = ~83ms at 60fps)
 pub fn with_buffer(buffer_frames buffer_frames: Int) -> BufferedInput(action) {
   BufferedInput(buffer: [], buffer_frames: buffer_frames, frame_counter: 0)
 }

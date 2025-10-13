@@ -1165,6 +1165,27 @@ export function loadTexture(url) {
 }
 
 /**
+ * Load equirectangular texture (360° spherical texture)
+ * @param {string} url
+ * @returns {Promise<THREE.Texture>}
+ */
+export function loadEquirectangularTexture(url) {
+  const loader = new THREE.TextureLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      },
+      undefined,
+      (error) => reject(error)
+    );
+  });
+}
+
+/**
  * Load cube texture (skybox)
  * @param {string[]} urls - Array of 6 URLs [px, nx, py, ny, pz, nz]
  * @returns {Promise<THREE.CubeTexture>}

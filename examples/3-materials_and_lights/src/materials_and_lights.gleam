@@ -1,3 +1,4 @@
+import gleam/float
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
@@ -8,6 +9,7 @@ import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
+import tiramisu/input
 import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
@@ -19,17 +21,22 @@ pub type Model {
     rotation: Float,
     light_intensity: Float,
     assets: option.Option(asset.AssetCache),
+    camera_position: vec3.Vec3(Float),
+    camera_rotation: vec3.Vec3(Float),
+    pointer_locked: Bool,
   )
 }
 
 pub type Msg {
   Tick
   AssetsLoaded(asset.BatchLoadResult)
+  PointerLocked
+  PointerLockFailed
 }
 
 pub fn main() -> Nil {
   tiramisu.run(
-    background: background.Color(0x0a0a0a),
+    background: background.EquirectangularTexture("nightsky/PSX_NIGHTSKY.png"),
     init: init,
     update: update,
     view: view,
@@ -71,7 +78,14 @@ fn init(
     |> effect.from_promise
 
   #(
-    Model(rotation: 0.0, light_intensity: 1.0, assets: option.None),
+    Model(
+      rotation: 0.0,
+      light_intensity: 1.0,
+      assets: option.None,
+      camera_position: vec3.Vec3(0.0, 2.0, 10.0),
+      camera_rotation: vec3.Vec3(0.0, 0.0, 0.0),
+      pointer_locked: False,
+    ),
     effect.batch([effect.tick(Tick), load_effect]),
     option.None,
   )
@@ -85,16 +99,155 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
+
+      // Request pointer lock on click or 'C' key (when not already locked)
+      let should_request_lock = case model.pointer_locked {
+        False ->
+          input.is_left_button_just_pressed(ctx.input)
+          || input.is_key_just_pressed(ctx.input, input.KeyC)
+        True -> False
+      }
+
+      let pointer_lock_effect = case should_request_lock {
+        True ->
+          effect.request_pointer_lock(
+            on_success: PointerLocked,
+            on_error: PointerLockFailed,
+          )
+        False -> effect.none()
+      }
+
+      // Exit pointer lock on Escape key
+      let #(should_exit_pointer_lock, exit_lock_effect) = case
+        input.is_key_just_pressed(ctx.input, input.Escape),
+        model.pointer_locked
+      {
+        True, True -> #(True, effect.exit_pointer_lock())
+        _, _ -> #(False, effect.none())
+      }
+
+      // Camera movement speed
+      let move_speed = 5.0 *. ctx.delta_time
+      let mouse_sensitivity = 0.003
+
+      // Handle rotation input with mouse delta first
+      let vec3.Vec3(cam_pitch, cam_yaw, cam_roll) = model.camera_rotation
+      let #(mouse_dx, mouse_dy) = input.mouse_delta(ctx.input)
+
+      let #(cam_yaw, cam_pitch) = case model.pointer_locked {
+        True -> {
+          // Use mouse delta for rotation when pointer is locked
+          let new_yaw = cam_yaw -. mouse_dx *. mouse_sensitivity
+          let new_pitch = cam_pitch -. mouse_dy *. mouse_sensitivity
+          #(new_yaw, new_pitch)
+        }
+        False ->
+          case input.is_right_button_pressed(ctx.input) {
+            True -> {
+              // Use mouse delta when right mouse button is held (not locked)
+              let new_yaw = cam_yaw -. mouse_dx *. mouse_sensitivity
+              let new_pitch = cam_pitch -. mouse_dy *. mouse_sensitivity
+              #(new_yaw, new_pitch)
+            }
+            False -> #(cam_yaw, cam_pitch)
+          }
+      }
+
+      // Clamp pitch to avoid flipping
+      let cam_pitch = float.max(-1.5, float.min(1.5, cam_pitch))
+
+      // Calculate forward/right vectors based on NEW camera rotation
+      // For movement, we only use yaw (horizontal rotation) to avoid flying up/down
+      let forward_x = maths.sin(cam_yaw)
+      let forward_z = maths.cos(cam_yaw)
+      let right_x = maths.cos(cam_yaw)
+      let right_z = 0.0 -. maths.sin(cam_yaw)
+
+      // Handle movement input (WASD)
+      let vec3.Vec3(cam_x, cam_y, cam_z) = model.camera_position
+
+      let cam_x = case input.is_key_pressed(ctx.input, input.KeyW) {
+        True -> cam_x +. forward_x *. move_speed
+        False -> cam_x
+      }
+      let cam_z = case input.is_key_pressed(ctx.input, input.KeyW) {
+        True -> cam_z +. forward_z *. move_speed
+        False -> cam_z
+      }
+
+      let cam_x = case input.is_key_pressed(ctx.input, input.KeyS) {
+        True -> cam_x -. forward_x *. move_speed
+        False -> cam_x
+      }
+      let cam_z = case input.is_key_pressed(ctx.input, input.KeyS) {
+        True -> cam_z -. forward_z *. move_speed
+        False -> cam_z
+      }
+
+      let cam_x = case input.is_key_pressed(ctx.input, input.KeyD) {
+        True -> cam_x -. right_x *. move_speed
+        False -> cam_x
+      }
+      let cam_z = case input.is_key_pressed(ctx.input, input.KeyD) {
+        True -> cam_z -. right_z *. move_speed
+        False -> cam_z
+      }
+
+      let cam_x = case input.is_key_pressed(ctx.input, input.KeyA) {
+        True -> cam_x +. right_x *. move_speed
+        False -> cam_x
+      }
+      let cam_z = case input.is_key_pressed(ctx.input, input.KeyA) {
+        True -> cam_z +. right_z *. move_speed
+        False -> cam_z
+      }
+
+      // Vertical movement (Space/Shift)
+      let cam_y = case input.is_key_pressed(ctx.input, input.Space) {
+        True -> cam_y +. move_speed
+        False -> cam_y
+      }
+      let cam_y = case input.is_key_pressed(ctx.input, input.ShiftLeft) {
+        True -> cam_y -. move_speed
+        False -> cam_y
+      }
+
+      // Update pointer_locked state if we're exiting
+      let pointer_locked = case should_exit_pointer_lock {
+        True -> False
+        False -> model.pointer_locked
+      }
+
+      #(
+        Model(
+          ..model,
+          rotation: new_rotation,
+          camera_position: vec3.Vec3(cam_x, cam_y, cam_z),
+          camera_rotation: vec3.Vec3(cam_pitch, cam_yaw, cam_roll),
+          pointer_locked: pointer_locked,
+        ),
+        effect.batch([effect.tick(Tick), pointer_lock_effect, exit_lock_effect]),
+        option.None,
+      )
     }
 
     AssetsLoaded(result) -> {
       // Store the loaded assets in the model
       #(
         Model(..model, assets: option.Some(result.cache)),
-        effect.tick(Tick),
+        effect.none(),
         option.None,
       )
+    }
+
+    PointerLocked -> {
+      // Pointer lock was successfully activated
+      #(Model(..model, pointer_locked: True), effect.none(), option.None)
+    }
+
+    PointerLockFailed -> {
+      // Pointer lock failed (user might have denied it)
+      #(Model(..model, pointer_locked: False), effect.none(), option.None)
     }
   }
 }
@@ -103,14 +256,32 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
+  // Calculate look-at target for FPS camera
+  // This ensures pitch and yaw work correctly in world space
+  let vec3.Vec3(cam_pitch, cam_yaw, _) = model.camera_rotation
+  let vec3.Vec3(cam_x, cam_y, cam_z) = model.camera_position
+
+  // Calculate forward direction from yaw and pitch
+  let forward_x = maths.sin(cam_yaw) *. maths.cos(cam_pitch)
+  let forward_y = maths.sin(cam_pitch)
+  let forward_z = maths.cos(cam_yaw) *. maths.cos(cam_pitch)
+
+  // Look-at target is position + forward direction
+  let look_at_target =
+    vec3.Vec3(cam_x +. forward_x, cam_y +. forward_y, cam_z +. forward_z)
+
   let camera = camera
   let camera =
     scene.Camera(
       id: "main_camera",
       camera:,
-      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 10.0)),
+      transform: transform.Transform(
+        position: model.camera_position,
+        rotation: vec3.Vec3(0.0, 0.0, 0.0),
+        scale: vec3.Vec3(1.0, 1.0, 1.0),
+      ),
       active: True,
-      look_at: option.None,
+      look_at: option.Some(look_at_target),
       viewport: option.None,
     )
   let lights = [

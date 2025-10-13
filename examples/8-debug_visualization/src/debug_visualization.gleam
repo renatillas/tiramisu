@@ -43,7 +43,7 @@ pub type Id {
   MovingPoint
   CrossMarker
   AxesMoving
-  Trail
+  Trail(Int)
   Corner(Int)
   TransformBox
 }
