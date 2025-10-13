@@ -93,6 +93,6 @@
 - The `tiramisu/internal/particle_manager` module has been added.
 - The `tiramisu/internal/physics_manager` module has been removed.
 
-## v1.0.0 - 2024-XX-XX
+## v1.0.0 - 2025-10-08
 
 - Initial release.
