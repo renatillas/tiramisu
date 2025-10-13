@@ -1,6 +1,8 @@
 # 🍰 Tiramisu
 
-![tiramisu-logo](Tiramisu-logo-03.png)
+<img width="720" height="720" alt="Tiramisu-logo-03" src="https://github.com/user-attachments/assets/e4dff9c1-e132-4caa-82fc-37220990857b" />
+
+
 **A type-safe 3D game engine for Gleam**
 
 Tiramisu brings the power of functional programming and static type safety to game development, leveraging Three.js for professional-grade 3D rendering while maintaining Gleam's elegant, immutable design principles.
