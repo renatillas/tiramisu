@@ -23,6 +23,7 @@ import gleam/option.{type Option, None, Some}
 import tiramisu/audio.{type Audio}
 import tiramisu/camera
 import tiramisu/geometry.{type Geometry}
+import tiramisu/internal/audio_manager
 import tiramisu/internal/object_cache.{
   type AnimationAction, type AnimationActions, type AnimationMixer,
   type CacheState, type ThreeObject,
@@ -82,8 +83,10 @@ pub type RendererState(id) {
     cache: CacheState,
     /// Optional physics world
     physics_world: Option(physics.PhysicsWorld(id)),
-    /// Audio manager (opaque Dynamic to avoid circular dependency)
-    audio_manager: Dynamic,
+    /// Audio manager state (Gleam-managed)
+    audio_manager: audio_manager.AudioManagerState,
+    /// Audio listener (singleton, attached to camera)
+    audio_listener: object3d.Object3D,
   )
 }
 
@@ -337,26 +340,9 @@ fn clear_lod_levels_ffi(lod: object3d.Object3D) -> Nil
 // FFI DECLARATIONS - AUDIO
 // ============================================================================
 
-@external(javascript, "../../tiramisu.ffi.mjs", "playAudio")
-fn play_audio_ffi(
-  manager: Dynamic,
-  id: Dynamic,
-  buffer: Dynamic,
-  config: Dynamic,
-  audio_type: Audio,
-) -> Nil
-
-@external(javascript, "../../tiramisu.ffi.mjs", "updateAudioConfig")
-fn update_audio_config_ffi(manager: Dynamic, id: Dynamic, config: Dynamic) -> Nil
-
-@external(javascript, "../../tiramisu.ffi.mjs", "getAudioSourceForCleanup")
-fn get_audio_source_for_cleanup_ffi(manager: Dynamic, id: Dynamic) -> Dynamic
-
-@external(javascript, "../../tiramisu.ffi.mjs", "unregisterAudioSource")
-fn unregister_audio_source_ffi(manager: Dynamic, id: Dynamic) -> Nil
-
-@external(javascript, "../../tiramisu.ffi.mjs", "getAudioListener")
-fn get_audio_listener_ffi() -> object3d.Object3D
+// Audio listener creation (singleton, attached to camera)
+@external(javascript, "../../threejs.ffi.mjs", "createAudioListener")
+fn create_audio_listener_ffi() -> object3d.Object3D
 
 // ============================================================================
 // FFI DECLARATIONS - DEBUG VISUALIZATION
@@ -415,21 +401,22 @@ fn dispose_material_ffi(material: object3d.Object3D) -> Nil
 // ============================================================================
 
 /// Create a new renderer with full state management
-pub fn create(
-  options: RendererOptions,
-  audio_manager: Dynamic,
-) -> RendererState(id) {
+pub fn create(options: RendererOptions) -> RendererState(id) {
   let renderer = create_renderer_ffi(options)
   let scene = create_scene_ffi()
   let canvas = get_dom_element(renderer)
   set_canvas(canvas)
+
+  // Create audio listener (singleton)
+  let audio_listener = create_audio_listener_ffi()
 
   RendererState(
     renderer: renderer,
     scene: scene,
     cache: object_cache.init(),
     physics_world: None,
-    audio_manager: audio_manager,
+    audio_manager: audio_manager.init(),
+    audio_listener: audio_listener,
   )
 }
 
@@ -458,12 +445,11 @@ pub fn get_physics_world(
   state.physics_world
 }
 
-/// Set the audio manager for the renderer
-pub fn set_audio_manager(
-  state: RendererState(id),
-  audio_manager: Dynamic,
-) -> RendererState(id) {
-  RendererState(..state, audio_manager: audio_manager)
+/// Resume AudioContext and play any pending audio sources
+/// Call this after user interaction to enable audio playback
+pub fn resume_audio_context(state: RendererState(id)) -> RendererState(id) {
+  let new_audio_manager = audio_manager.resume_audio_context(state.audio_manager)
+  RendererState(..state, audio_manager: new_audio_manager)
 }
 
 // ============================================================================
@@ -867,38 +853,28 @@ fn handle_add_audio(
   parent_id: Option(id),
 ) -> RendererState(id) {
   // Extract buffer and config from Audio type
-  case audio {
-    audio.GlobalAudio(buffer: buffer, config: config) -> {
-      let buffer_dynamic = to_dynamic(buffer)
-      let config_dynamic = to_dynamic(config)
-      let id_dynamic = to_dynamic(id)
-      play_audio_ffi(
-        state.audio_manager,
-        id_dynamic,
-        buffer_dynamic,
-        config_dynamic,
-        audio,
-      )
-    }
+  let #(buffer, config) = case audio {
+    audio.GlobalAudio(buffer: buffer, config: config) -> #(buffer, config)
     audio.PositionalAudio(
       buffer: buffer,
       config: config,
       ref_distance: _,
       rolloff_factor: _,
       max_distance: _,
-    ) -> {
-      let buffer_dynamic = to_dynamic(buffer)
-      let config_dynamic = to_dynamic(config)
-      let id_dynamic = to_dynamic(id)
-      play_audio_ffi(
-        state.audio_manager,
-        id_dynamic,
-        buffer_dynamic,
-        config_dynamic,
-        audio,
-      )
-    }
+    ) -> #(buffer, config)
   }
+
+  // Create audio source using Gleam audio manager with state-managed listener
+  let listener_dynamic = to_dynamic(state.audio_listener)
+  let #(new_audio_manager, _source_data) =
+    audio_manager.create_audio_source(
+      state.audio_manager,
+      id,
+      buffer,
+      config,
+      audio,
+      listener_dynamic,
+    )
 
   // Create placeholder group to track in cache
   let placeholder = create_group_ffi()
@@ -906,7 +882,7 @@ fn handle_add_audio(
   add_to_scene_or_parent(state, three_obj, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, three_obj)
-  RendererState(..state, cache: new_cache)
+  RendererState(..state, cache: new_cache, audio_manager: new_audio_manager)
 }
 
 // Helper: Calculate aspect ratio for camera
@@ -968,8 +944,7 @@ fn handle_add_camera(
   }
 
   // Add audio listener to camera
-  let listener = get_audio_listener_ffi()
-  add_child_ffi(camera_obj, listener)
+  add_child_ffi(camera_obj, state.audio_listener)
 
   apply_transform_ffi(camera_obj, transform)
 
@@ -1171,24 +1146,16 @@ fn handle_remove_node(state: RendererState(id), id: id) -> RendererState(id) {
       dispose_geometry_ffi(geometry)
       dispose_material_ffi(material)
 
-      // Stop audio if it's an audio node
-      let id_dynamic = to_dynamic(id)
-      let audio_source =
-        get_audio_source_for_cleanup_ffi(state.audio_manager, id_dynamic)
-      // Audio source is null or an object with .loop property
-      case audio_source {
-        _ -> {
-          // TODO: Check if looping, then stop or unregister accordingly
-          // For now, just try to unregister
-          unregister_audio_source_ffi(state.audio_manager, id_dynamic)
-        }
-      }
+      // Stop audio if it's an audio node (using Gleam audio manager)
+      let new_audio_manager =
+        audio_manager.unregister_audio_source(state.audio_manager, id)
 
       // Remove from all caches
       let new_cache = object_cache.remove_all(state.cache, id)
 
       // Remove physics body if it exists - update physics world in state
-      let new_state = RendererState(..state, cache: new_cache)
+      let new_state =
+        RendererState(..state, cache: new_cache, audio_manager: new_audio_manager)
       case new_state.physics_world {
         Some(world) -> {
           let new_world = physics.remove_body(world, id)
@@ -1427,26 +1394,23 @@ fn handle_update_audio(
   id: id,
   audio: Audio,
 ) -> RendererState(id) {
-  let config = case audio {
-    audio.GlobalAudio(buffer: _, config: config) -> Some(config)
+  // Extract buffer and config from Audio type
+  let #(buffer, config) = case audio {
+    audio.GlobalAudio(buffer: buffer, config: config) -> #(buffer, config)
     audio.PositionalAudio(
-      buffer: _,
+      buffer: buffer,
       config: config,
       ref_distance: _,
       rolloff_factor: _,
       max_distance: _,
-    ) -> Some(config)
+    ) -> #(buffer, config)
   }
 
-  case config {
-    Some(audio_config) -> {
-      let id_dynamic = to_dynamic(id)
-      let config_dynamic = to_dynamic(audio_config)
-      update_audio_config_ffi(state.audio_manager, id_dynamic, config_dynamic)
-      state
-    }
-    None -> state
-  }
+  // Update audio config using Gleam audio manager
+  let new_audio_manager =
+    audio_manager.update_audio_config(state.audio_manager, id, buffer, config)
+
+  RendererState(..state, audio_manager: new_audio_manager)
 }
 
 fn handle_update_instances(

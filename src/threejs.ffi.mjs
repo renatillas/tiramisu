@@ -1840,25 +1840,6 @@ export function setAttributeNeedsUpdate(attribute, needsUpdate) {
 
 
 // ============================================================================
-// ASSET LOADING - AUDIO LISTENER SINGLETON
-// ============================================================================
-
-// Global audio listener singleton
-let globalAudioListener = null;
-
-/**
- * Get or create the global audio listener
- * This is attached to the camera and is needed for positional audio
- * @returns {THREE.AudioListener}
- */
-export function getAudioListener() {
-  if (!globalAudioListener) {
-    globalAudioListener = new THREE.AudioListener();
-  }
-  return globalAudioListener;
-}
-
-// ============================================================================
 // RENDERER PATCH APPLICATION - IMPERATIVE OPERATIONS
 // ============================================================================
 

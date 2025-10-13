@@ -1,6 +1,7 @@
 /// Camera 2D Example
 ///
 /// Demonstrates 2D camera modes and orthographic projection
+import gleam/float
 import gleam/option
 import tiramisu
 import tiramisu/background
@@ -50,11 +51,17 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
+  // Use actual canvas dimensions for proper aspect ratio on all devices
+  let cam = camera.camera_2d(
+    width: float.round(ctx.canvas_width),
+    height: float.round(ctx.canvas_height),
+  )
+
   [
     scene.Camera(
       id: "camera",
-      camera: camera.camera_2d(800, 600),
+      camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
       look_at: option.None,

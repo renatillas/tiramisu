@@ -6,6 +6,7 @@
 /// Key concepts:
 /// - Audio state (Playing, Stopped, Paused) is part of the model
 /// - Fade configuration is declarative
+/// - Volume controls are per-audio-source in the model
 /// - The view function expresses desired audio state
 /// - The renderer automatically handles transitions
 import gleam/dict.{type Dict}
@@ -66,7 +67,7 @@ pub type Model {
     music_buffer: option.Option(audio.AudioBuffer),
     sfx_buffer: option.Option(audio.AudioBuffer),
     loading: Bool,
-    // Volume controls (0.0 to 1.0)
+    // Individual volume controls (0.0 to 1.0)
     music_volume: Float,
     sfx_volume: Float,
   )
@@ -193,70 +194,17 @@ fn update(
       }
 
       // Volume controls
-      // Q/A - Decrease/Increase Music group volume
-      // W/S - Decrease/Increase SFX group volume
-      // E/D - Decrease/Increase individual music volume
+      // Q/A - Decrease/Increase Music volume
+      // W/S - Decrease/Increase SFX volume
       let volume_delta = 0.1
 
       // Check volume key presses
-      let music_group_dec = input.is_key_just_pressed(ctx.input, input.KeyQ)
-      let music_group_inc = input.is_key_just_pressed(ctx.input, input.KeyA)
-      let sfx_group_dec = input.is_key_just_pressed(ctx.input, input.KeyW)
-      let sfx_group_inc = input.is_key_just_pressed(ctx.input, input.KeyS)
-      let music_vol_dec = input.is_key_just_pressed(ctx.input, input.KeyE)
-      let music_vol_inc = input.is_key_just_pressed(ctx.input, input.KeyD)
+      let music_vol_dec = input.is_key_just_pressed(ctx.input, input.KeyQ)
+      let music_vol_inc = input.is_key_just_pressed(ctx.input, input.KeyA)
+      let sfx_vol_dec = input.is_key_just_pressed(ctx.input, input.KeyW)
+      let sfx_vol_inc = input.is_key_just_pressed(ctx.input, input.KeyS)
 
-      // Music group volume control
-      let _ = case music_group_dec, music_group_inc {
-        True, _ -> {
-          let current = audio.get_group_volume(audio.Music)
-          let new_vol = current -. volume_delta
-          let clamped = case new_vol <. 0.0 {
-            True -> 0.0
-            False -> new_vol
-          }
-          audio.set_group_volume(audio.Music, clamped)
-          io.println("Music Group Volume: " <> float_to_percentage(clamped))
-        }
-        _, True -> {
-          let current = audio.get_group_volume(audio.Music)
-          let new_vol = current +. volume_delta
-          let clamped = case new_vol >. 1.0 {
-            True -> 1.0
-            False -> new_vol
-          }
-          audio.set_group_volume(audio.Music, clamped)
-          io.println("Music Group Volume: " <> float_to_percentage(clamped))
-        }
-        _, _ -> Nil
-      }
-
-      // SFX group volume control
-      let _ = case sfx_group_dec, sfx_group_inc {
-        True, _ -> {
-          let current = audio.get_group_volume(audio.SFX)
-          let new_vol = current -. volume_delta
-          let clamped = case new_vol <. 0.0 {
-            True -> 0.0
-            False -> new_vol
-          }
-          audio.set_group_volume(audio.SFX, clamped)
-          io.println("SFX Group Volume: " <> float_to_percentage(clamped))
-        }
-        _, True -> {
-          let current = audio.get_group_volume(audio.SFX)
-          let new_vol = current +. volume_delta
-          let clamped = case new_vol >. 1.0 {
-            True -> 1.0
-            False -> new_vol
-          }
-          audio.set_group_volume(audio.SFX, clamped)
-          io.println("SFX Group Volume: " <> float_to_percentage(clamped))
-        }
-        _, _ -> Nil
-      }
-
-      // Individual music volume control
+      // Music volume control
       let music_volume = case music_vol_dec, music_vol_inc {
         True, _ -> {
           let new_vol = model.music_volume -. volume_delta
@@ -264,9 +212,7 @@ fn update(
             True -> 0.0
             False -> new_vol
           }
-          io.println(
-            "Music Individual Volume: " <> float_to_percentage(clamped),
-          )
+          io.println("Music Volume: " <> float_to_percentage(clamped))
           clamped
         }
         _, True -> {
@@ -275,12 +221,33 @@ fn update(
             True -> 1.0
             False -> new_vol
           }
-          io.println(
-            "Music Individual Volume: " <> float_to_percentage(clamped),
-          )
+          io.println("Music Volume: " <> float_to_percentage(clamped))
           clamped
         }
         _, _ -> model.music_volume
+      }
+
+      // SFX volume control
+      let sfx_volume = case sfx_vol_dec, sfx_vol_inc {
+        True, _ -> {
+          let new_vol = model.sfx_volume -. volume_delta
+          let clamped = case new_vol <. 0.0 {
+            True -> 0.0
+            False -> new_vol
+          }
+          io.println("SFX Volume: " <> float_to_percentage(clamped))
+          clamped
+        }
+        _, True -> {
+          let new_vol = model.sfx_volume +. volume_delta
+          let clamped = case new_vol >. 1.0 {
+            True -> 1.0
+            False -> new_vol
+          }
+          io.println("SFX Volume: " <> float_to_percentage(clamped))
+          clamped
+        }
+        _, _ -> model.sfx_volume
       }
 
       #(
@@ -291,6 +258,7 @@ fn update(
           next_sfx_id: next_sfx_id,
           music_state: music_state,
           music_volume: music_volume,
+          sfx_volume: sfx_volume,
         ),
         effect.tick(Tick),
         option.None,
@@ -335,9 +303,8 @@ fn print_instructions(other_buffer_loaded: option.Option(a)) -> Nil {
       io.println("  [SPACE] Play SFX (overlapping sounds - press rapidly!)")
       io.println("")
       io.println("Volume Controls:")
-      io.println("  [Q/A] Decrease/Increase Music GROUP volume")
-      io.println("  [W/S] Decrease/Increase SFX GROUP volume")
-      io.println("  [E/D] Decrease/Increase individual Music volume")
+      io.println("  [Q/A] Decrease/Increase Music volume")
+      io.println("  [W/S] Decrease/Increase SFX volume")
       io.println("")
     }
     option.None -> Nil
@@ -412,7 +379,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         let #(id, state) = instance
         let sfx_config =
           audio.config()
-          |> audio.with_volume(1.0)
+          |> audio.with_volume(model.sfx_volume)
           |> audio.with_loop(False)
           |> audio.with_group(audio.SFX)
           |> audio.with_state(state)

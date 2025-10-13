@@ -1,6 +1,6 @@
 {
   "name": "tiramisu",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "type": "module",
   "description": "A declarative 3D game engine for Gleam",
   "dependencies": {

@@ -142,6 +142,7 @@ pub fn create_audio_source(
   buffer: AudioBuffer,
   config: AudioConfig,
   audio_type: Audio,
+  audio_listener: Dynamic,
 ) -> #(AudioManagerState, AudioSourceData) {
   let string_id = id.to_string(id)
 
@@ -159,8 +160,8 @@ pub fn create_audio_source(
     Error(_) -> state
   }
 
-  // Get audio listener
-  let listener = get_audio_listener_ffi()
+  // Use provided audio listener
+  let listener = audio_listener
 
   // Create appropriate audio source based on type
   let three_source = case audio_type {
@@ -688,10 +689,6 @@ fn do_unwrap_audio_buffer(buffer: AudioBuffer) -> Dynamic
 // ============================================================================
 // FFI FUNCTIONS
 // ============================================================================
-
-// Audio Listener
-@external(javascript, "../../tiramisu.ffi.mjs", "getAudioListener")
-fn get_audio_listener_ffi() -> Dynamic
 
 // Audio creation
 @external(javascript, "../../threejs.ffi.mjs", "createAudio")

@@ -6,13 +6,35 @@
 //// ## Quick Example
 ////
 //// ```gleam
+//// import gleam/option
 //// import tiramisu/camera
+//// import tiramisu/scene
+//// import tiramisu/transform
+//// import vec/vec3
 ////
-//// // 3D perspective camera
-//// let assert Ok(cam_3d) = camera.perspective(fov: 75.0, aspect: 16.0 /. 9.0, near: 0.1, far: 1000.0)
+//// // 3D perspective camera (aspect ratio calculated automatically)
+//// let assert Ok(cam_3d) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
+////
+//// scene.Camera(
+////   id: "main",
+////   camera: cam_3d,
+////   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
+////   look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+////   active: True,
+////   viewport: option.None,
+//// )
 ////
 //// // 2D orthographic camera
 //// let cam_2d = camera.camera_2d(width: 800, height: 600)
+////
+//// scene.Camera(
+////   id: "ui",
+////   camera: cam_2d,
+////   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+////   look_at: option.None,
+////   active: False,
+////   viewport: option.None,
+//// )
 //// ```
 
 import gleam/bool

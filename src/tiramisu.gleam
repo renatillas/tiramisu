@@ -6,50 +6,75 @@
 //// ## Quick Example
 ////
 //// ```gleam
+//// import gleam/option
 //// import tiramisu
+//// import tiramisu/camera
 //// import tiramisu/effect
+//// import tiramisu/geometry
+//// import tiramisu/material
 //// import tiramisu/scene
 //// import tiramisu/transform
+//// import vec/vec3
 ////
 //// type Model {
 ////   Model(rotation: Float)
 //// }
 ////
 //// type Msg {
-////   Frame
+////   Tick
+//// }
+////
+//// type Ids {
+////   Cube
+////   MainCamera
 //// }
 ////
 //// pub fn main() {
 ////   tiramisu.run(
-////     dimensions: None,
-////     background: background.Color(0x111111),
+////     dimensions: option.None,
+////     background: tiramisu.Color(0x111111),
 ////     init: init,
 ////     update: update,
 ////     view: view,
 ////   )
 //// }
 ////
-//// fn init(_ctx: tiramisu.Context) {
-////   #(Model(rotation: 0.0), effect.none())
+//// fn init(_ctx: tiramisu.Context(Ids)) {
+////   #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 //// }
 ////
-//// fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+//// fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Ids)) {
 ////   case msg {
-////     Frame -> {
+////     Tick -> {
 ////       let new_rotation = model.rotation +. ctx.delta_time
-////       #(Model(rotation: new_rotation), effect.none())
+////       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
 ////     }
 ////   }
 //// }
 ////
-//// fn view(model: Model) {
+//// fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
+////   let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
+////   let assert Ok(cube_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+////   let assert Ok(cube_mat) =
+////     material.new()
+////     |> material.with_color(0xff0000)
+////     |> material.build()
+////
 ////   [
+////     scene.Camera(
+////       id: MainCamera,
+////       camera: cam,
+////       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+////       look_at: option.None,
+////       active: True,
+////       viewport: option.None,
+////     ),
 ////     scene.Mesh(
-////       id: "cube",
-////       geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-////       material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+////       id: Cube,
+////       geometry: cube_geo,
+////       material: cube_mat,
 ////       transform: transform.identity
-////         |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+////         |> transform.rotate_y(model.rotation),
 ////       physics: option.None,
 ////     ),
 ////   ]
@@ -60,7 +85,7 @@ import gleam/option.{type Option}
 import tiramisu/background.{type Background}
 import tiramisu/effect
 import tiramisu/input
-import tiramisu/internal/managers
+import tiramisu/internal/input_manager
 import tiramisu/internal/renderer
 import tiramisu/physics
 import tiramisu/scene
@@ -83,14 +108,14 @@ pub type Scene
 /// // Fullscreen mode
 /// tiramisu.run(
 ///   dimensions: None,
-///   background: 0x111111,
+///   background: tiramisu.Color(0x111111),
 ///   // ...
 /// )
 ///
 /// // Fixed size
 /// tiramisu.run(
 ///   dimensions: Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-///   background: 0x111111,
+///   background: tiramisu.Color(0x111111),
 ///   // ...
 /// )
 /// ```
@@ -137,8 +162,7 @@ pub type Context(id) {
     canvas_width: Float,
     canvas_height: Float,
     physics_world: Option(physics.PhysicsWorld(id)),
-    input_manager: managers.InputManager,
-    audio_manager: managers.AudioManager,
+    input_manager: input_manager.InputManager,
   )
 }
 
@@ -183,35 +207,39 @@ pub type Context(id) {
 ///   // Fullscreen mode with color background
 ///   tiramisu.run(
 ///     dimensions: None,
-///     background: background.Color(0x111111),
+///     background: tiramisu.Color(0x111111),
 ///     init: fn(_ctx) {
-///       #(Model(rotation: 0.0), effect.batch([
-///         effect.on_animation_frame(Tick),
-///       ]))
+///       #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 ///     },
 ///     update: fn(model, msg, ctx) {
 ///       case msg {
 ///         Tick -> #(
 ///           Model(rotation: model.rotation +. ctx.delta_time),
-///           effect.on_animation_frame(Tick),
+///           effect.tick(Tick),
+///           option.None,
 ///         )
 ///       }
 ///     },
-///     view: fn(model) {
+///     view: fn(model, _ctx) {
+///       let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
+///       let assert Ok(geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+///       let assert Ok(mat) = material.new() |> material.with_color(0xff0000) |> material.build()
+///
 ///       [
 ///         scene.Camera(
 ///           id: "main-camera",
-///           camera: camera.perspective(fov: 75.0, near: 0.1, far: 1000.0),
-///           transform: transform.at(vec3.Vec3(0.0, 0.0, 5.0)),
+///           camera: cam,
+///           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+///           look_at: option.None,
 ///           active: True,
 ///           viewport: option.None,
 ///         ),
 ///         scene.Mesh(
 ///           id: "cube",
-///           geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-///           material: scene.BasicMaterial(0xff0000, False, 1.0, option.None),
+///           geometry: geo,
+///           material: mat,
 ///           transform: transform.identity
-///             |> transform.set_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+///             |> transform.rotate_y(model.rotation),
 ///           physics: option.None,
 ///         ),
 ///       ]
@@ -228,39 +256,31 @@ pub fn run(
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   view view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil {
-  // Create audio manager first (needed by renderer)
-  let audio_manager = managers.new_audio_manager()
-
-  // Create renderer state
+  // Create renderer state (audio manager is initialized internally)
   let renderer_state =
-    renderer.create(
-      renderer.RendererOptions(
-        antialias: True,
-        alpha: False,
-        dimensions: dimensions
-          |> option.map(fn(dimensions) {
-            renderer.Dimensions(
-              height: dimensions.height,
-              width: dimensions.width,
-            )
-          }),
-      ),
-      to_dynamic(audio_manager),
-    )
+    renderer.create(renderer.RendererOptions(
+      antialias: True,
+      alpha: False,
+      dimensions: dimensions
+        |> option.map(fn(dimensions) {
+          renderer.Dimensions(height: dimensions.height, width: dimensions.width)
+        }),
+    ))
 
   // Set background on the Three.js scene
   let scene_obj = renderer.get_scene(renderer_state)
   set_background(scene_obj, background)
 
-  // Get initial canvas dimensions
+  // Get canvas and append to DOM first (so dimensions are available)
   let webgl_renderer = renderer.get_renderer(renderer_state)
+  let canvas = renderer.get_dom_element(webgl_renderer)
+  append_to_dom(canvas)
+
+  // Now get canvas dimensions (after it's in the DOM)
   let #(initial_width, initial_height) = get_canvas_dimensions(webgl_renderer)
 
-  // Get canvas for input manager
-  let canvas = renderer.get_dom_element(webgl_renderer)
-
   // Create input manager
-  let input_manager = managers.new_input_manager(canvas)
+  let input_manager = input_manager.new(canvas)
 
   // Initial context with empty input (no physics_world yet)
   let initial_context =
@@ -271,7 +291,6 @@ pub fn run(
       canvas_height: initial_height,
       physics_world: option.None,
       input_manager: input_manager,
-      audio_manager: audio_manager,
     )
 
   // Initialize game state
@@ -286,7 +305,6 @@ pub fn run(
       canvas_height: initial_height,
       physics_world: physics_world,
       input_manager: input_manager,
-      audio_manager: audio_manager,
     )
 
   // Set physics world in renderer state if provided
@@ -300,9 +318,6 @@ pub fn run(
   // Get initial scene nodes
   let initial_nodes = view(initial_state, context_with_physics)
 
-  // Append renderer to DOM (input already initialized via InputManager)
-  append_to_dom(canvas)
-
   // Apply initial scene using renderer.gleam
   let renderer_state_after_init =
     apply_initial_scene_gleam(renderer_state_with_physics, initial_nodes)
@@ -313,10 +328,7 @@ pub fn run(
   {
     option.Some(updated_world) -> {
       // Convert opaque physics world back to typed physics world
-      Context(
-        ..context_with_physics,
-        physics_world: option.Some(updated_world),
-      )
+      Context(..context_with_physics, physics_world: option.Some(updated_world))
     }
     option.None -> context_with_physics
   }
@@ -368,30 +380,21 @@ fn start_loop(
   view: fn(state, Context(id)) -> List(scene.Node(id)),
 ) -> Nil
 
-/// Helper to cast AudioManager to Dynamic (identity function)
-@external(javascript, "./tiramisu.ffi.mjs", "identity")
-fn to_dynamic(value: a) -> b
 
 /// Get the current window aspect ratio (width / height).
 ///
-/// Useful for creating cameras that match the viewport dimensions,
-/// especially when using fullscreen mode (width: 0, height: 0).
+/// **Note**: This function is rarely needed in v2.0.0 since cameras automatically
+/// calculate aspect ratio from viewport or window dimensions.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import tiramisu
-/// import tiramisu/camera
 ///
-/// pub fn view(model: Model) {
+/// pub fn update(model: Model, msg: Msg, ctx: Context) {
 ///   let aspect = tiramisu.get_window_aspect_ratio()
-///   let assert Ok(cam) = camera.perspective(
-///     field_of_view: 75.0,
-///     aspect: aspect,
-///     near: 0.1,
-///     far: 1000.0,
-///   )
-///   // ... rest of scene
+///   // Use aspect for custom calculations
+///   // ...
 /// }
 /// ```
 @external(javascript, "./tiramisu.ffi.mjs", "getWindowAspectRatio")

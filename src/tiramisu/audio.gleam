@@ -92,19 +92,6 @@ pub fn config() -> AudioConfig {
   )
 }
 
-/// Create audio config with a group
-pub fn config_with_group(group: AudioGroup) -> AudioConfig {
-  AudioConfig(
-    state: Stopped,
-    volume: 1.0,
-    loop: False,
-    playback_rate: 1.0,
-    fade: NoFade,
-    group: option.Some(group),
-    on_end: option.None,
-  )
-}
-
 /// Create audio config that starts playing
 pub fn playing() -> AudioConfig {
   AudioConfig(
@@ -248,56 +235,7 @@ pub fn with_max_distance(audio: Audio, distance: Float) -> Audio {
   }
 }
 
-// --- Audio Groups ---
-
-///
-/// Audio groups provide global volume control for categories of sounds.
-/// These are the only imperative functions in the audio API, as they control
-/// global settings rather than individual audio source state.
-/// Set volume for an entire audio group (0.0 to 1.0)
-pub fn set_group_volume(group: AudioGroup, volume: Float) -> Nil {
-  set_group_volume_ffi(audio_group_to_string(group), volume)
-}
-
-/// Get current volume for an audio group
-pub fn get_group_volume(group: AudioGroup) -> Float {
-  get_group_volume_ffi(audio_group_to_string(group))
-}
-
-/// Mute an entire audio group
-pub fn mute_group(group: AudioGroup) -> Nil {
-  mute_group_ffi(audio_group_to_string(group))
-}
-
-/// Unmute an entire audio group
-pub fn unmute_group(group: AudioGroup) -> Nil {
-  unmute_group_ffi(audio_group_to_string(group))
-}
-
-// --- Helper Functions ---
-
-/// Convert AudioGroup to string for FFI
-fn audio_group_to_string(group: AudioGroup) -> String {
-  case group {
-    SFX -> "sfx"
-    Music -> "music"
-    Voice -> "voice"
-    Ambient -> "ambient"
-    Custom(name) -> name
-  }
-}
-
-// --- FFI Functions ---
-
-/// FFI functions for audio groups (global settings)
-@external(javascript, "../tiramisu.ffi.mjs", "setGroupVolume")
-fn set_group_volume_ffi(group: String, volume: Float) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "getGroupVolume")
-fn get_group_volume_ffi(group: String) -> Float
-
-@external(javascript, "../tiramisu.ffi.mjs", "muteGroup")
-fn mute_group_ffi(group: String) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "unmuteGroup")
-fn unmute_group_ffi(group: String) -> Nil
+// Note: Audio group volume control has been migrated to the audio manager.
+// Group volumes are now part of the immutable audio manager state in the renderer.
+// To control group volumes, use effects that manipulate the audio manager state
+// (functionality to be added in future versions).

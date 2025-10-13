@@ -52,7 +52,7 @@ type Ids {
 pub fn main() {
   tiramisu.run(
     dimensions: option.None,  // Fullscreen
-    background: 0x1a1a2e,
+    background: tiramisu.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
@@ -116,7 +116,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
 Add Tiramisu to your Gleam project:
 
 ```sh
-gleam add tiramisu@1
+gleam add tiramisu@2
 ```
 
 ### Configure your gleam.toml

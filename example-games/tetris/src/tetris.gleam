@@ -119,11 +119,10 @@ pub fn update(
       )
     }
     Restart -> {
-      let #(new_model, init_effect, _) = init(ctx)
+      let #(new_model, _, _) = init(ctx)
       #(
         new_model,
         effect.batch([
-          init_effect,
           tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(new_model.game_state)),
         ]),
         option.None,

@@ -55,7 +55,7 @@ pub fn main() -> Nil {
 fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   let model = Model(rotation: 0.0, load_state: Loading(0, 0, "Starting..."))
 
-  // Define asset to load (example URLs - replace with real asset)
+  // Define assets to load
   let asset_to_load = [
     asset.TextureAsset("metal-color.png"),
     asset.TextureAsset("metal-normal.png"),
@@ -219,7 +219,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         }
       }
 
-      // Try to get textures (may fail with example URLs)
+      // Try to get textures
       let cube_nodes = case
         asset.get_texture(cache, "metal-color.png"),
         asset.get_texture(cache, "metal-normal.png")

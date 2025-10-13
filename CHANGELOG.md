@@ -1,0 +1,98 @@
+# Changelog
+
+## v2.0.0 - 2025-10-13
+
+- The `background` parameter now requires a `Background` type instead of a hex integer.
+- The `Background` type has been added with `Color`, `Texture`, and `CubeTexture` constructors.
+- The `width` and `height` parameters have been replaced with a single `dimensions` parameter.
+- The `Dimensions` type has been added.
+- The `aspect` parameter has been removed from `camera.perspective()`.
+- The `camera.set_position()` function has been removed.
+- The `camera.set_look_at()` function has been removed.
+- The `distance` parameter has been removed from `camera.camera_2d()`.
+- Camera position is now configured via the `transform` field on `scene.Camera` nodes.
+- Camera look-at is now configured via the `look_at` field on `scene.Camera` nodes.
+- The `scene.BoxGeometry` constructor has been removed.
+- The `scene.SphereGeometry` constructor has been removed.
+- The `scene.PlaneGeometry` constructor has been removed.
+- The `scene.CylinderGeometry` constructor has been removed.
+- The `scene.ConeGeometry` constructor has been removed.
+- The `scene.TorusGeometry` constructor has been removed.
+- The `scene.TorusKnotGeometry` constructor has been removed.
+- The `tiramisu/geometry` module has been added.
+- The `geometry.box()` function has been added.
+- The `geometry.sphere()` function has been added.
+- The `geometry.plane()` function has been added.
+- The `geometry.cylinder()` function has been added.
+- The `geometry.cone()` function has been added.
+- The `geometry.torus()` function has been added.
+- The `geometry.torus_knot()` function has been added.
+- Geometry constructors now return `Result(Geometry, GeometryError)`.
+- The `GeometryError` type has been added.
+- The `scene.StandardMaterial` constructor has been removed.
+- The `scene.BasicMaterial` constructor has been removed.
+- The `tiramisu/material` module has been added.
+- The `material.new()` function has been added.
+- The `material.standard()` function has been added.
+- The `material.basic()` function has been added.
+- The `material.with_color()` function has been added.
+- The `material.with_metalness()` function has been added.
+- The `material.with_roughness()` function has been added.
+- The `material.with_map()` function has been added.
+- The `material.with_normal_map()` function has been added.
+- The `material.with_ao_map()` function has been added.
+- The `material.with_roughness_map()` function has been added.
+- The `material.with_metalness_map()` function has been added.
+- The `material.build()` function has been added.
+- Material constructors now return `Result(Material, MaterialError)`.
+- The `MaterialError` type has been added.
+- The `scene.DirectionalLight` constructor has been removed.
+- The `scene.PointLight` constructor has been removed.
+- The `scene.AmbientLight` constructor has been removed.
+- The `scene.SpotLight` constructor has been removed.
+- The `tiramisu/light` module has been added.
+- The `light.directional()` function has been added.
+- The `light.point()` function has been added.
+- The `light.ambient()` function has been added.
+- The `light.spot()` function has been added.
+- Light constructors now return `Result(Light, LightError)`.
+- The `LightError` type has been added.
+- The `light_type` field on `scene.Light` nodes has been renamed to `light`.
+- State machines are now generic over state type instead of string-based.
+- The `state_machine.new()` function now takes a state value instead of a string.
+- The `state_machine.add_state()` function now takes a state value instead of a string.
+- The `state_machine.add_transition()` function now takes state values instead of strings.
+- The `canvas_width` field has been added to the `Context` type.
+- The `canvas_height` field has been added to the `Context` type.
+- Fullscreen mode is now supported via `dimensions: option.None`.
+- Touch coordinate alignment has been fixed.
+- The `src/tiramisu/ffi/` directory has been removed.
+- The `src/tiramisu/ffi/asset.mjs` file has been removed.
+- The `src/tiramisu/ffi/audio.mjs` file has been removed.
+- The `src/tiramisu/ffi/camera.mjs` file has been removed.
+- The `src/tiramisu/ffi/debug.mjs` file has been removed.
+- The `src/tiramisu/ffi/effects.mjs` file has been removed.
+- The `src/tiramisu/ffi/gltf.mjs` file has been removed.
+- The `src/tiramisu/ffi/input_capture.mjs` file has been removed.
+- The `src/tiramisu/ffi/obj.mjs` file has been removed.
+- The `src/tiramisu/ffi/object3d.mjs` file has been removed.
+- The `src/tiramisu/ffi/physics.mjs` file has been removed.
+- The `src/tiramisu/ffi/renderer.mjs` file has been removed.
+- The `src/tiramisu/ffi/stl.mjs` file has been removed.
+- The `src/tiramisu/ffi/test_helpers.mjs` file has been removed.
+- The `src/tiramisu/ffi/texture.mjs` file has been removed.
+- The `src/tiramisu/ffi/ui.mjs` file has been removed.
+- The `src/threejs.ffi.mjs` file has been added with pure Three.js bindings.
+- The `src/rapier.ffi.mjs` file has been added with pure Rapier physics bindings.
+- The `src/tiramisu.ffi.mjs` file has been added with consolidated game engine logic.
+- The `tiramisu/internal/animation_manager` module has been added.
+- The `tiramisu/internal/audio_manager` module has been added.
+- The `tiramisu/internal/camera_manager` module has been added.
+- The `tiramisu/internal/id` module has been added.
+- The `tiramisu/internal/object_cache` module has been added.
+- The `tiramisu/internal/particle_manager` module has been added.
+- The `tiramisu/internal/physics_manager` module has been removed.
+
+## v1.0.0 - 2024-XX-XX
+
+- Initial release.
