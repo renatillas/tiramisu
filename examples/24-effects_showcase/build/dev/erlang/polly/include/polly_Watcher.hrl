@@ -1,1 +1,0 @@
--record(watcher, {stop :: fun(() -> nil)}).

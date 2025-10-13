@@ -1,1 +1,0 @@
--record(timestamp, {seconds :: integer(), nanoseconds :: integer()}).

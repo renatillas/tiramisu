@@ -1,1 +1,0 @@
--record(unknown_build_tool, {name :: binary()}).

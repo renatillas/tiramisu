@@ -1,1 +1,0 @@
--record(plane_geometry, {width :: float(), height :: float()}).

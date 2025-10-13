@@ -1,1 +1,0 @@
--record(pong_frame, {payload :: bitstring()}).

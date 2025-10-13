@@ -1,1 +1,0 @@
--record(supervisor, {pid :: gleam@erlang@process:pid_()}).

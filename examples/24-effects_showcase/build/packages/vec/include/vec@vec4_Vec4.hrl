@@ -1,1 +1,0 @@
--record(vec4, {x :: any(), y :: any(), z :: any(), w :: any()}).

@@ -1,1 +1,0 @@
--record(bad_component_name, {name :: binary()}).

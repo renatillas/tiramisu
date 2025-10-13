@@ -1,1 +1,0 @@
--record(changed, {path :: binary()}).

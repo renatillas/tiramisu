@@ -1,1 +1,0 @@
--record(loaded_model, {data :: tiramisu@asset:g_l_t_f_data()}).

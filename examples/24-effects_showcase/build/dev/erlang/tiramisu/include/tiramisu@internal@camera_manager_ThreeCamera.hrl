@@ -1,1 +1,0 @@
--record(three_camera, {camera_object :: gleam@dynamic:dynamic_()}).

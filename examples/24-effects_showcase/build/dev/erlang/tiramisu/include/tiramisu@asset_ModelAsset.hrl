@@ -1,1 +1,0 @@
--record(model_asset, {url :: binary()}).

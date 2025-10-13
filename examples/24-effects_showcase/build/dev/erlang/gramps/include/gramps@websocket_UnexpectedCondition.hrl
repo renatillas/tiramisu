@@ -1,1 +1,0 @@
--record(unexpected_condition, {body :: bitstring()}).

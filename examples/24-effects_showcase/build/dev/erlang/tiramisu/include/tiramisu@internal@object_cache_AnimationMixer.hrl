@@ -1,1 +1,0 @@
--record(animation_mixer, {mixer :: gleam@dynamic:dynamic_()}).

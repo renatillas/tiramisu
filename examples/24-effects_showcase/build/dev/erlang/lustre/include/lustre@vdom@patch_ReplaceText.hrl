@@ -1,1 +1,0 @@
--record(replace_text, {kind :: integer(), content :: binary()}).

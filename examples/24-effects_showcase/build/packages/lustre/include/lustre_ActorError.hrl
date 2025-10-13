@@ -1,1 +1,0 @@
--record(actor_error, {reason :: gleam@otp@actor:start_error()}).

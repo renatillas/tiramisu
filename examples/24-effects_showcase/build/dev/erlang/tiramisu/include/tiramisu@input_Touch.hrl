@@ -1,1 +1,0 @@
--record(touch, {id :: integer(), x :: float(), y :: float()}).

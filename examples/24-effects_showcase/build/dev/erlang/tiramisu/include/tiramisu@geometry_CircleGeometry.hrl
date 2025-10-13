@@ -1,1 +1,0 @@
--record(circle_geometry, {radius :: float(), segments :: integer()}).

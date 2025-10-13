@@ -1,1 +1,0 @@
--record(range, {offset :: integer(), limit :: gleam@option:option(integer())}).

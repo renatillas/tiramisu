@@ -1,1 +1,0 @@
--record(index, {index :: integer(), parent :: lustre@vdom@path:path()}).

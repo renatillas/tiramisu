@@ -1,1 +1,0 @@
--record(has_style, {name :: binary(), value :: binary()}).

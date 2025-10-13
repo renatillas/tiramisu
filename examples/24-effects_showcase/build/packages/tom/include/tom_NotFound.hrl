@@ -1,1 +1,0 @@
--record(not_found, {key :: list(binary())}).

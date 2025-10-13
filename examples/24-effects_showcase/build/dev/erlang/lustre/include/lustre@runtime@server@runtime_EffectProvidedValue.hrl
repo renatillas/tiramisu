@@ -1,1 +1,0 @@
--record(effect_provided_value, {key :: binary(), value :: gleam@json:json()}).

@@ -1,1 +1,0 @@
--record(provide, {kind :: integer(), key :: binary(), value :: gleam@json:json()}).

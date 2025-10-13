@@ -1,1 +1,0 @@
--record(invalid_asset_type, {url :: binary()}).

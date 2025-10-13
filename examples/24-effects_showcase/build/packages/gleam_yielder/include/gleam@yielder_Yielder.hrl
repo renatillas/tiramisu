@@ -1,1 +1,0 @@
--record(yielder, {continuation :: fun(() -> gleam@yielder:action(any()))}).

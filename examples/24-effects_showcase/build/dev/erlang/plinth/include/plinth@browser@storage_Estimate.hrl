@@ -1,1 +1,0 @@
--record(estimate, {quota :: integer(), usage :: integer()}).

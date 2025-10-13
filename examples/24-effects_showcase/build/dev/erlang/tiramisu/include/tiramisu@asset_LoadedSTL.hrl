@@ -1,1 +1,0 @@
--record(loaded_s_t_l, {geometry :: tiramisu@asset:buffer_geometry()}).

@@ -1,1 +1,0 @@
--record(less_than_two_segment_count_height, {count :: integer()}).

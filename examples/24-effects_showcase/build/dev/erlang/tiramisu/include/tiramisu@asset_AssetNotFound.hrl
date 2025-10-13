@@ -1,1 +1,0 @@
--record(asset_not_found, {url :: binary()}).

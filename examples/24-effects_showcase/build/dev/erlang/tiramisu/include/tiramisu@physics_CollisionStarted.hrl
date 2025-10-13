@@ -1,1 +1,0 @@
--record(collision_started, {body_a :: binary(), body_b :: binary()}).

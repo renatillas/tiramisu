@@ -1,1 +1,0 @@
--record(monitor_reported_down, {monitor :: gleam@erlang@process:monitor()}).

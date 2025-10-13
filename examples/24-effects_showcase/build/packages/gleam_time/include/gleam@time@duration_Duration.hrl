@@ -1,1 +1,0 @@
--record(duration, {seconds :: integer(), nanoseconds :: integer()}).

@@ -1,1 +1,0 @@
--record(three_object, {object :: tiramisu@object3d:object3_d()}).

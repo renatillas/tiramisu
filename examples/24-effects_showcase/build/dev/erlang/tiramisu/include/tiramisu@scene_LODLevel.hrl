@@ -1,1 +1,0 @@
--record(l_o_d_level, {distance :: float(), node :: tiramisu@scene:node_(any())}).

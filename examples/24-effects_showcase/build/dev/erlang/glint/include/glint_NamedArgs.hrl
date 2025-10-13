@@ -1,1 +1,0 @@
--record(named_args, {internal :: gleam@dict:dict(binary(), binary())}).

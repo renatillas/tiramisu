@@ -1,1 +1,0 @@
--record(less_than_three_segment_count_width, {count :: integer()}).

@@ -1,1 +1,0 @@
--record(could_not_verify_bun_hash, {expected :: binary(), actual :: binary()}).

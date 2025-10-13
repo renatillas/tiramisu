@@ -1,1 +1,0 @@
--record(could_not_initialise_dev_tools, {reason :: simplifile:file_error()}).

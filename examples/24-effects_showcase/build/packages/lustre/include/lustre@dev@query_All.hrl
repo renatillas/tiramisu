@@ -1,1 +1,0 @@
--record(all, {'of' :: list(lustre@dev@query:selector())}).

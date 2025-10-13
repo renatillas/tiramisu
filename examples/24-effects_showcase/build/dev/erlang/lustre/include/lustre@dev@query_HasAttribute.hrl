@@ -1,1 +1,0 @@
--record(has_attribute, {name :: binary(), value :: binary()}).

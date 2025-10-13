@@ -1,1 +1,0 @@
--record(replace_inner_html, {kind :: integer(), inner_html :: binary()}).

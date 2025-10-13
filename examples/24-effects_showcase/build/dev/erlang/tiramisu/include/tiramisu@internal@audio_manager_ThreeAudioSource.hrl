@@ -1,1 +1,0 @@
--record(three_audio_source, {source :: gleam@dynamic:dynamic_()}).

@@ -1,1 +1,0 @@
--record(audio_asset, {url :: binary()}).

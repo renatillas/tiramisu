@@ -1,1 +1,0 @@
--record(connection_info, {port :: integer(), ip_address :: mist:ip_address()}).

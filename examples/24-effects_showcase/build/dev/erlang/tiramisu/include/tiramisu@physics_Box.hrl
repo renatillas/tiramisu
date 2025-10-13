@@ -1,1 +1,0 @@
--record(box, {width :: float(), height :: float(), depth :: float()}).

@@ -1,1 +1,0 @@
--record(ecdsa_params, {hash :: plinth@browser@crypto@subtle:digest_algorithm()}).

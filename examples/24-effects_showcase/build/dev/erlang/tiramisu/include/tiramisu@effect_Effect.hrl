@@ -1,1 +1,0 @@
--record(effect, {perform :: fun((fun((any()) -> nil)) -> nil)}).

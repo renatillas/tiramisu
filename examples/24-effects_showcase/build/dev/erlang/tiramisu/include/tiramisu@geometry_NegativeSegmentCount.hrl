@@ -1,1 +1,0 @@
--record(negative_segment_count, {count :: integer()}).

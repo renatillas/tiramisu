@@ -1,1 +1,0 @@
--record(asset_load_error, {url :: binary(), reason :: binary()}).

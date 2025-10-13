@@ -1,1 +1,0 @@
--record(tls_alert, {code :: binary(), detail :: binary()}).

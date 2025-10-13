@@ -1,1 +1,0 @@
--module(plinth@javascript@console).

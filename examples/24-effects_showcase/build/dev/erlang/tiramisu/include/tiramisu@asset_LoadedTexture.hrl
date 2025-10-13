@@ -1,1 +1,0 @@
--record(loaded_texture, {texture :: tiramisu@asset:texture()}).

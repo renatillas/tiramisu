@@ -1,1 +1,0 @@
--record(policy_violation, {body :: bitstring()}).

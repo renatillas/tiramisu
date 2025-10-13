@@ -1,1 +1,0 @@
--record(possible, {kind :: integer()}).

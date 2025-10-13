@@ -1,1 +1,0 @@
--record(s_t_l_asset, {url :: binary()}).

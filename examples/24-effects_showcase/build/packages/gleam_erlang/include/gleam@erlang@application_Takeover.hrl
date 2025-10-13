@@ -1,1 +1,0 @@
--record(takeover, {previous :: gleam@erlang@node:node_()}).

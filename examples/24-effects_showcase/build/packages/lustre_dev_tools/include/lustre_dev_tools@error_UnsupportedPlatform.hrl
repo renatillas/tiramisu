@@ -1,1 +1,0 @@
--record(unsupported_platform, {os :: binary(), arch :: binary()}).

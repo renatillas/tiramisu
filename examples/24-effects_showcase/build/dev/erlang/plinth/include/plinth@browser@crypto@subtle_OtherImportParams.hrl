@@ -1,1 +1,0 @@
--record(other_import_params, {name :: binary()}).

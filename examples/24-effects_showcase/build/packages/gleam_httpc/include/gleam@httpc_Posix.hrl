@@ -1,1 +1,0 @@
--record(posix, {code :: binary()}).

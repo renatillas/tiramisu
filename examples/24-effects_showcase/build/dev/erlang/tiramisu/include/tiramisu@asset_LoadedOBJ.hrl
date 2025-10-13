@@ -1,1 +1,0 @@
--record(loaded_o_b_j, {object :: tiramisu@object3d:object3_d()}).

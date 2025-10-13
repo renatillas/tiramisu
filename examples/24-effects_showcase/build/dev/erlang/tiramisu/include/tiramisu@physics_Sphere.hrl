@@ -1,1 +1,0 @@
--record(sphere, {radius :: float()}).

@@ -1,1 +1,0 @@
--record(created, {path :: binary()}).

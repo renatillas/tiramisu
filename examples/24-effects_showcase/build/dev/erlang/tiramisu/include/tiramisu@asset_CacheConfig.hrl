@@ -1,1 +1,0 @@
--record(cache_config, {max_size :: integer(), current_time :: integer()}).

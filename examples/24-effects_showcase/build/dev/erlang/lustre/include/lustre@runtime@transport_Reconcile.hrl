@@ -1,1 +1,0 @@
--record(reconcile, {kind :: integer(), patch :: lustre@vdom@patch:patch(any())}).

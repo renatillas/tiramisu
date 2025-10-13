@@ -1,1 +1,0 @@
--module(tiramisu@internal@animation_manager).

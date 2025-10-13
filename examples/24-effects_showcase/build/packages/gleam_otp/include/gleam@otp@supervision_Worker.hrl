@@ -1,1 +1,0 @@
--record(worker, {shutdown_ms :: integer()}).

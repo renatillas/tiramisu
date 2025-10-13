@@ -1,1 +1,0 @@
--record(could_not_locate_tailwind_binary, {path :: binary()}).

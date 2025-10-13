@@ -1,1 +1,0 @@
--record(animation_action, {action :: gleam@dynamic:dynamic_()}).

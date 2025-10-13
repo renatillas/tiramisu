@@ -1,1 +1,0 @@
--record(dispatch, {message :: any()}).

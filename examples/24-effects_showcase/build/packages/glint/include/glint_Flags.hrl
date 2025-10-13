@@ -1,1 +1,0 @@
--record(flags, {internal :: gleam@dict:dict(binary(), glint:flag_entry())}).
