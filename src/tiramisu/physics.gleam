@@ -11,7 +11,7 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
-import structures/bimap
+import tiramisu/internal/id
 import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
 
@@ -34,14 +34,13 @@ pub opaque type PhysicsWorld(id) {
     /// Declared rigid body configurations (from scene)
     bodies: Dict(id, RigidBody),
     /// Actual Rapier rigid body handles
-    rapier_bodies: Dict(String, RapierRigidBody),
+    rapier_bodies: Dict(id, RapierRigidBody),
     /// Commands to be applied during the next physics step
     pending_commands: List(PhysicsCommand(id)),
     /// Mapping from collider handles to body string IDs
-    collider_to_body: Dict(Int, String),
+    collider_to_body: Dict(Int, id),
     /// Collision events from the last physics step
     collision_events: List(CollisionEvent),
-    bimap: bimap.BiMap(id, String),
   )
 }
 
@@ -168,6 +167,7 @@ pub type WorldConfig(id) {
   WorldConfig(
     /// Gravity vector (typically Vec3(0.0, -9.81, 0.0))
     gravity: Vec3(Float),
+    /// Deprecated. You can just pass a empty list here
     correspondances: List(#(id, String)),
   )
 }
@@ -201,7 +201,6 @@ pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
   // Initialize the Rapier world via physics_manager
   // Convert config to Dynamic for physics_manager
   let #(world, queue) = create_world(config)
-  let bimap = create_bimap(config.correspondances)
 
   PhysicsWorld(
     world,
@@ -211,15 +210,7 @@ pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
     pending_commands: [],
     collider_to_body: dict.new(),
     collision_events: [],
-    bimap:,
   )
-}
-
-fn create_bimap(correspondances: List(#(body, String))) {
-  list.fold(over: correspondances, from: bimap.new(), with: fn(acc, item) {
-    let #(body, string) = item
-    bimap.insert(acc, body, string)
-  })
 }
 
 /// Builder for creating rigid bodies with a fluent API
@@ -438,45 +429,38 @@ pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
 
 /// Apply a single physics command via FFI
 fn apply_command(
-  command: PhysicsCommand(body),
-  bimap: bimap.BiMap(body, String),
-  rapier_bodies: Dict(String, RapierRigidBody),
+  command: PhysicsCommand(id),
+  rapier_bodies: Dict(id, RapierRigidBody),
 ) -> Result(Nil, Nil) {
   // Extract the ID and convert to string using BiMap, then get Rapier body
   case command {
     ApplyForce(id, force) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       add_body_force_ffi(rapier_body, force.x, force.y, force.z, True)
       Ok(Nil)
     }
     ApplyImpulse(id, impulse) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       apply_body_impulse_ffi(rapier_body, impulse.x, impulse.y, impulse.z, True)
       Ok(Nil)
     }
     SetVelocity(id, velocity) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       set_body_linvel_ffi(rapier_body, velocity.x, velocity.y, velocity.z, True)
       Ok(Nil)
     }
     SetAngularVelocity(id, velocity) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       set_body_angvel_ffi(rapier_body, velocity.x, velocity.y, velocity.z, True)
       Ok(Nil)
     }
     ApplyTorque(id, torque) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       add_body_torque_ffi(rapier_body, torque.x, torque.y, torque.z, True)
       Ok(Nil)
     }
     ApplyTorqueImpulse(id, impulse) -> {
-      use string_id <- result.try(bimap.get(bimap, id))
-      use rapier_body <- result.try(dict.get(rapier_bodies, string_id))
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
       apply_body_torque_impulse_ffi(
         rapier_body,
         impulse.x,
@@ -492,10 +476,10 @@ fn apply_command(
 /// Step the physics simulation forward
 /// This should be called in your update function each frame
 /// Returns updated world with new transforms for all bodies
-pub fn step(world: PhysicsWorld(body)) -> PhysicsWorld(body) {
+pub fn step(world: PhysicsWorld(id)) -> PhysicsWorld(id) {
   // Apply all pending commands
   list.each(world.pending_commands, fn(command) {
-    let _ = apply_command(command, world.bimap, world.rapier_bodies)
+    let _ = apply_command(command, world.rapier_bodies)
     Nil
   })
 
@@ -504,7 +488,9 @@ pub fn step(world: PhysicsWorld(body)) -> PhysicsWorld(body) {
 
   // Drain collision events from the queue
   let collision_events =
-    drain_collision_events(world.queue, world.collider_to_body)
+    world.collider_to_body
+    |> dict.map_values(fn(_, body_id) { id.to_string(body_id) })
+    |> drain_collision_events(world.queue, _)
 
   // Return world with cleared commands and updated events
   PhysicsWorld(
@@ -559,8 +545,7 @@ pub fn get_transform(
   physics_world: PhysicsWorld(id),
   id: id,
 ) -> Result(Transform, Nil) {
-  use string_id <- result.try(bimap.get(physics_world.bimap, id))
-  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, string_id))
+  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, id))
   // Get translation and rotation from Rapier body
   let translation = get_body_translation_ffi(rapier_body)
   let rotation_quat = get_body_rotation_ffi(rapier_body)
@@ -607,8 +592,7 @@ pub fn get_body_transform_raw(
   physics_world: PhysicsWorld(id),
   id: id,
 ) -> Result(#(Vec3(Float), Quaternion), Nil) {
-  use string_id <- result.try(bimap.get(physics_world.bimap, id))
-  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, string_id))
+  use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, id))
 
   // Get translation and rotation directly from Rapier body
   let translation = get_body_translation_ffi(rapier_body)
@@ -680,8 +664,7 @@ pub fn get_velocity(
   world: PhysicsWorld(body),
   id: body,
 ) -> Result(Vec3(Float), Nil) {
-  use string_id <- result.try(bimap.get(world.bimap, id))
-  use rapier_body <- result.try(dict.get(world.rapier_bodies, string_id))
+  use rapier_body <- result.try(dict.get(world.rapier_bodies, id))
   let vel = get_body_linvel_ffi(rapier_body)
   Ok(vec3.Vec3(vel.x, vel.y, vel.z))
 }
@@ -705,8 +688,7 @@ pub fn get_angular_velocity(
   world: PhysicsWorld(body),
   id: body,
 ) -> Result(Vec3(Float), Nil) {
-  use string_id <- result.try(bimap.get(world.bimap, id))
-  use rapier_body <- result.try(dict.get(world.rapier_bodies, string_id))
+  use rapier_body <- result.try(dict.get(world.rapier_bodies, id))
   let vel = get_body_angvel_ffi(rapier_body)
   Ok(vec3.Vec3(vel.x, vel.y, vel.z))
 }
@@ -787,24 +769,19 @@ pub fn raycast(
 
       // Look up the body ID from collider handle
       case dict.get(world.collider_to_body, collider_handle) {
-        Ok(string_id) -> {
+        Ok(id) -> {
           // Convert string ID to typed ID
-          case bimap.get_val(world.bimap, string_id) {
-            Ok(typed_id) -> {
-              // Extract hit point and normal from hit info
-              let toi = get_hit_toi_ffi(hit_info)
-              let point = ray_point_at_ffi(ray, toi)
-              let normal = get_hit_normal_ffi(hit_info)
+          // Extract hit point and normal from hit info
+          let toi = get_hit_toi_ffi(hit_info)
+          let point = ray_point_at_ffi(ray, toi)
+          let normal = get_hit_normal_ffi(hit_info)
 
-              Ok(RaycastHit(
-                id: typed_id,
-                point: vec3.Vec3(point.x, point.y, point.z),
-                normal: vec3.Vec3(normal.x, normal.y, normal.z),
-                distance: toi,
-              ))
-            }
-            Error(_) -> Error(Nil)
-          }
+          Ok(RaycastHit(
+            id:,
+            point: vec3.Vec3(point.x, point.y, point.z),
+            normal: vec3.Vec3(normal.x, normal.y, normal.z),
+            distance: toi,
+          ))
         }
         Error(_) -> Error(Nil)
       }
@@ -861,15 +838,6 @@ pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent) {
   world.collision_events
 }
 
-// --- Helper Functions for FFI ---
-
-/// Convert a typed ID to a string ID using the BiMap
-/// This is called from JavaScript when creating/removing physics bodies
-@internal
-pub fn id_to_string(world: PhysicsWorld(id), id: id) -> Result(String, Nil) {
-  bimap.get(world.bimap, id)
-}
-
 /// Iterate over all physics bodies and call a function for each
 /// This keeps all internal field access within the physics module
 @internal
@@ -878,29 +846,23 @@ pub fn for_each_body(
   callback: fn(id, Transform) -> Nil,
 ) -> Nil {
   // Access rapier_bodies directly - this ensures we're within the module where the opaque type is defined
-  for_each_body_internal(world.rapier_bodies, world.bimap, world, callback)
+  for_each_body_internal(world.rapier_bodies, world, callback)
 }
 
 // Internal helper that does the actual iteration
 fn for_each_body_internal(
-  rapier_bodies: dict.Dict(String, RapierRigidBody),
-  bimap: bimap.BiMap(id, String),
+  rapier_bodies: dict.Dict(id, RapierRigidBody),
   world: PhysicsWorld(id),
   callback: fn(id, Transform) -> Nil,
 ) -> Nil {
   // Get all string IDs from rapier_bodies
-  let string_ids = dict.keys(rapier_bodies)
+  let ids = dict.keys(rapier_bodies)
 
   // For each string ID, convert to typed ID and get transform
-  list.each(string_ids, fn(string_id) {
-    case bimap.get_val(bimap, string_id) {
-      Ok(typed_id) -> {
-        // Get the transform for this body
-        case get_transform(world, typed_id) {
-          Ok(transform) -> callback(typed_id, transform)
-          Error(_) -> Nil
-        }
-      }
+  list.each(ids, fn(id) {
+    // Get the transform for this body
+    case get_transform(world, id) {
+      Ok(transform) -> callback(id, transform)
       Error(_) -> Nil
     }
   })
@@ -915,17 +877,11 @@ pub fn for_each_body_raw(
   world: PhysicsWorld(id),
   callback: fn(id, Vec3(Float), Quaternion) -> Nil,
 ) -> Nil {
-  let string_ids = dict.keys(world.rapier_bodies)
+  let ids = dict.keys(world.rapier_bodies)
 
-  list.each(string_ids, fn(string_id) {
-    case bimap.get_val(world.bimap, string_id) {
-      Ok(typed_id) -> {
-        case get_body_transform_raw(world, typed_id) {
-          Ok(#(position, quaternion)) ->
-            callback(typed_id, position, quaternion)
-          Error(_) -> Nil
-        }
-      }
+  list.each(ids, fn(id) {
+    case get_body_transform_raw(world, id) {
+      Ok(#(position, quaternion)) -> callback(id, position, quaternion)
       Error(_) -> Nil
     }
   })
@@ -1139,144 +1095,124 @@ pub fn create_body(
   config: RigidBody,
   transform: Transform,
 ) -> PhysicsWorld(id) {
-  // Convert ID to string
-  case bimap.get(world.bimap, id) {
-    Ok(string_id) -> {
-      // Create rigid body descriptor
-      let body_desc = case config.kind {
-        Dynamic -> create_dynamic_body_desc_ffi()
-        Kinematic -> create_kinematic_body_desc_ffi()
-        Fixed -> create_fixed_body_desc_ffi()
-      }
-
-      // Set transform
-      let pos = transform.position
-      set_body_translation_ffi(body_desc, pos.x, pos.y, pos.z)
-
-      // Convert Euler angles to quaternion
-      let quat =
-        euler_to_quat_ffi(
-          transform.rotation.x,
-          transform.rotation.y,
-          transform.rotation.z,
-        )
-      set_body_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
-
-      // Set damping
-      set_linear_damping_ffi(body_desc, config.linear_damping)
-      set_angular_damping_ffi(body_desc, config.angular_damping)
-
-      // Set CCD
-      case config.ccd_enabled {
-        True -> set_ccd_enabled_ffi(body_desc, True)
-        False -> Nil
-      }
-
-      // Set axis locks
-      set_enabled_translations_ffi(
-        body_desc,
-        !config.axis_locks.lock_translation_x,
-        !config.axis_locks.lock_translation_y,
-        !config.axis_locks.lock_translation_z,
-        True,
-      )
-      set_enabled_rotations_ffi(
-        body_desc,
-        !config.axis_locks.lock_rotation_x,
-        !config.axis_locks.lock_rotation_y,
-        !config.axis_locks.lock_rotation_z,
-        True,
-      )
-
-      // Create rigid body
-      let rapier_body = create_rigid_body_ffi(world.world, body_desc)
-
-      // Create collider descriptor
-      let collider_desc = case config.collider {
-        Box(width, height, depth) ->
-          create_cuboid_collider_desc_ffi(
-            width /. 2.0,
-            height /. 2.0,
-            depth /. 2.0,
-          )
-        Sphere(radius) -> create_ball_collider_desc_ffi(radius)
-        Capsule(half_height, radius) ->
-          create_capsule_collider_desc_ffi(half_height, radius)
-        Cylinder(half_height, radius) ->
-          create_cylinder_collider_desc_ffi(half_height, radius)
-      }
-
-      // Set collider properties
-      set_collider_restitution_ffi(collider_desc, config.restitution)
-      set_collider_friction_ffi(collider_desc, config.friction)
-
-      // Set mass if provided
-      case config.mass {
-        option.Some(mass) -> set_collider_mass_ffi(collider_desc, mass)
-        option.None -> Nil
-      }
-
-      // Set collision groups if provided
-      case config.collision_groups {
-        option.Some(groups) -> {
-          let bitmask = collision_groups_to_bitmask(groups)
-          set_collider_collision_groups_ffi(collider_desc, bitmask)
-        }
-        option.None -> Nil
-      }
-
-      // Create collider attached to body
-      let collider =
-        create_collider_ffi(world.world, collider_desc, rapier_body)
-
-      // Register collider handle for collision event tracking
-      let collider_handle = get_collider_handle_ffi(collider)
-
-      // Store body and collider mapping in world
-      PhysicsWorld(
-        ..world,
-        bodies: dict.insert(world.bodies, id, config),
-        rapier_bodies: dict.insert(world.rapier_bodies, string_id, rapier_body),
-        collider_to_body: dict.insert(
-          world.collider_to_body,
-          collider_handle,
-          string_id,
-        ),
-      )
-    }
-    Error(_) -> world
+  // Create rigid body descriptor
+  let body_desc = case config.kind {
+    Dynamic -> create_dynamic_body_desc_ffi()
+    Kinematic -> create_kinematic_body_desc_ffi()
+    Fixed -> create_fixed_body_desc_ffi()
   }
+
+  // Set transform
+  let pos = transform.position
+  set_body_translation_ffi(body_desc, pos.x, pos.y, pos.z)
+
+  // Convert Euler angles to quaternion
+  let quat =
+    euler_to_quat_ffi(
+      transform.rotation.x,
+      transform.rotation.y,
+      transform.rotation.z,
+    )
+  set_body_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
+
+  // Set damping
+  set_linear_damping_ffi(body_desc, config.linear_damping)
+  set_angular_damping_ffi(body_desc, config.angular_damping)
+
+  // Set CCD
+  case config.ccd_enabled {
+    True -> set_ccd_enabled_ffi(body_desc, True)
+    False -> Nil
+  }
+
+  // Set axis locks
+  set_enabled_translations_ffi(
+    body_desc,
+    !config.axis_locks.lock_translation_x,
+    !config.axis_locks.lock_translation_y,
+    !config.axis_locks.lock_translation_z,
+    True,
+  )
+  set_enabled_rotations_ffi(
+    body_desc,
+    !config.axis_locks.lock_rotation_x,
+    !config.axis_locks.lock_rotation_y,
+    !config.axis_locks.lock_rotation_z,
+    True,
+  )
+
+  // Create rigid body
+  let rapier_body = create_rigid_body_ffi(world.world, body_desc)
+
+  // Create collider descriptor
+  let collider_desc = case config.collider {
+    Box(width, height, depth) ->
+      create_cuboid_collider_desc_ffi(width /. 2.0, height /. 2.0, depth /. 2.0)
+    Sphere(radius) -> create_ball_collider_desc_ffi(radius)
+    Capsule(half_height, radius) ->
+      create_capsule_collider_desc_ffi(half_height, radius)
+    Cylinder(half_height, radius) ->
+      create_cylinder_collider_desc_ffi(half_height, radius)
+  }
+
+  // Set collider properties
+  set_collider_restitution_ffi(collider_desc, config.restitution)
+  set_collider_friction_ffi(collider_desc, config.friction)
+
+  // Set mass if provided
+  case config.mass {
+    option.Some(mass) -> set_collider_mass_ffi(collider_desc, mass)
+    option.None -> Nil
+  }
+
+  // Set collision groups if provided
+  case config.collision_groups {
+    option.Some(groups) -> {
+      let bitmask = collision_groups_to_bitmask(groups)
+      set_collider_collision_groups_ffi(collider_desc, bitmask)
+    }
+    option.None -> Nil
+  }
+
+  // Create collider attached to body
+  let collider = create_collider_ffi(world.world, collider_desc, rapier_body)
+
+  // Register collider handle for collision event tracking
+  let collider_handle = get_collider_handle_ffi(collider)
+
+  // Store body and collider mapping in world
+  PhysicsWorld(
+    ..world,
+    bodies: dict.insert(world.bodies, id, config),
+    rapier_bodies: dict.insert(world.rapier_bodies, id, rapier_body),
+    collider_to_body: dict.insert(world.collider_to_body, collider_handle, id),
+  )
 }
 
 /// Remove a rigid body from the physics world
 /// This is called by the renderer when a scene node with physics is removed
 @internal
 pub fn remove_body(world: PhysicsWorld(id), id: id) -> PhysicsWorld(id) {
-  case bimap.get(world.bimap, id) {
-    Ok(string_id) -> {
-      case dict.get(world.rapier_bodies, string_id) {
-        Ok(rapier_body) -> {
-          // Get all collider handles for this body and remove them from mapping
-          let num_colliders = get_body_num_colliders_ffi(rapier_body)
-          let collider_handles =
-            get_body_collider_handles(rapier_body, num_colliders)
+  case dict.get(world.rapier_bodies, id) {
+    Ok(rapier_body) -> {
+      // Get all collider handles for this body and remove them from mapping
+      let num_colliders = get_body_num_colliders_ffi(rapier_body)
+      let collider_handles =
+        get_body_collider_handles(rapier_body, num_colliders)
 
-          let updated_collider_map =
-            list.fold(collider_handles, world.collider_to_body, fn(map, handle) {
-              dict.delete(map, handle)
-            })
+      let updated_collider_map =
+        list.fold(collider_handles, world.collider_to_body, fn(map, handle) {
+          dict.delete(map, handle)
+        })
 
-          // Remove the rigid body
-          remove_rigid_body_ffi(world.world, rapier_body)
-          PhysicsWorld(
-            ..world,
-            bodies: dict.delete(world.bodies, id),
-            rapier_bodies: dict.delete(world.rapier_bodies, string_id),
-            collider_to_body: updated_collider_map,
-          )
-        }
-        Error(_) -> world
-      }
+      // Remove the rigid body
+      remove_rigid_body_ffi(world.world, rapier_body)
+      PhysicsWorld(
+        ..world,
+        bodies: dict.delete(world.bodies, id),
+        rapier_bodies: dict.delete(world.rapier_bodies, id),
+        collider_to_body: updated_collider_map,
+      )
     }
     Error(_) -> world
   }
