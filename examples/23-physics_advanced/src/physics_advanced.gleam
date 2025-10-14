@@ -43,12 +43,10 @@ pub fn main() {
 pub type Model {
   Model(
     rotation: Float,
-    // Track collision events
     last_collision_message: String,
-    // Track player state for raycast ground detection
     is_grounded: Bool,
-    // Track debug visualization state
     show_debug_colliders: Bool,
+    cubes: Int,
   )
 }
 
@@ -68,6 +66,7 @@ pub type Ids {
   Cube
   AmbientLight
   SunLight
+  NewCube(Int)
 }
 
 // --- Init ---
@@ -107,6 +106,7 @@ fn init(
       last_collision_message: "",
       is_grounded: False,
       show_debug_colliders: False,
+      cubes: 0,
     ),
     effect.tick(Tick),
     option.Some(physics_world),
@@ -300,6 +300,7 @@ fn update(
           last_collision_message: last_collision_message,
           is_grounded: is_grounded,
           show_debug_colliders: show_debug_colliders,
+          cubes: model.cubes + 1,
         ),
         effect.batch([effect.tick(Tick), effect]),
         option.Some(physics_world),
@@ -432,6 +433,32 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       }),
     )
 
+  let new_cubes =
+    list.map(list.range(model.cubes, model.cubes + 10), fn(index) {
+      scene.Mesh(
+        id: NewCube(index),
+        geometry: box_geo,
+        material: cube1_mat,
+        transform: case physics.get_transform(physics_world, NewCube(index)) {
+          Ok(t) -> t
+          Error(_) -> transform.at(position: vec3.Vec3(-3.0, 8.0, 0.0))
+        },
+        physics: option.Some({
+          physics.new_rigid_body(physics.Dynamic)
+          |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+          |> physics.with_mass(1.0)
+          |> physics.with_restitution(0.7)
+          |> physics.with_friction(0.3)
+          |> physics.with_collision_groups(membership: [2], can_collide_with: [
+            0,
+            1,
+            2,
+          ])
+          |> physics.build()
+        }),
+      )
+    })
+
   // Cube2 - Spinning cube with torque
   let spinning_cube =
     scene.Mesh(
@@ -553,5 +580,6 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       light: directional_light,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
     ),
+    ..new_cubes
   ]
 }

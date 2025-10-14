@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.1.0 - 2025-10-14
+
+- The `WorldConfig`'s parameter `correspondences` has been deprecated to let users interact with physics objects created dinamically.
+
 ## v2.0.0 - 2025-10-13
 
 - The `background` parameter now requires a `Background` type instead of a hex integer.
