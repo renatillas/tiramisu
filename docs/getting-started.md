@@ -2,7 +2,9 @@
 
 Tiramisu is a type-safe 3D game engine for Gleam, built on Three.js. It follows the **Model-View-Update (MVU)** architecture, making game state management predictable and testable.
 
-## Installation
+## Quick Start with Mascarpone 🧀
+
+**The easiest way to start** is using [Mascarpone](https://hexdocs.pm/mascarpone/), an interactive CLI tool that scaffolds complete Tiramisu projects.
 
 ### Create a New Project
 
@@ -11,30 +13,65 @@ gleam new my_game
 cd my_game
 ```
 
+### Run Mascarpone
+
+```bash
+gleam add mascarpone
+gleam run -m mascarpone
+```
+
+The interactive TUI will guide you through:
+
+1. **Lustre Integration** - Choose whether to include Lustre for UI overlays (menus, HUDs)
+2. **Project Template** - Select from:
+   - **2D Game** - Orthographic camera and sprite setup
+   - **3D Game** - Perspective camera with lighting
+   - **Physics Demo** - Physics-enabled objects
+
+Mascarpone automatically:
+- ✅ Configures `gleam.toml` with all dependencies
+- ✅ Sets up Three.js and Rapier3D CDN imports
+- ✅ Creates a working game example
+- ✅ Adds necessary stylesheets for fullscreen games
+- ✅ Generates `.gitignore` for Gleam projects
+
+### Run Your Game
+
+```bash
+gleam run -m lustre/dev start
+```
+
+Open your browser and navigate to http://localhost:1234 - you should see your game running!
+
+---
+
+## Manual Installation (Alternative)
+
+If you prefer to set up your project manually or add Tiramisu to an existing project:
+
 ### Add Tiramisu Dependency
 
 ```bash
 gleam add tiramisu
 ```
 
-Then install dependencies:
+### Configure your gleam.toml
 
-```bash
-gleam deps download
-```
-
-### Add additional configuration to your gleam.toml
+Add Three.js, Rapier, and styling configuration:
 
 ```toml
 [tools.lustre.html]
 scripts = [
   { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
 ]
+stylesheets = [
+  { content = "body { margin: 0; padding: 0; overflow: hidden; } canvas { display: block; }" }
+]
 ```
 
-## Your First Game: Hello Cube
+## Your First Game: Hello Cube (Manual Setup)
 
-Let's create a spinning 3D cube in under 50 lines of code.
+If you used Mascarpone, you already have a working game! This section shows how to create a spinning 3D cube manually if you chose the manual installation path.
 
 ### Create the Game File
 
@@ -45,9 +82,12 @@ import gleam/option
 import tiramisu
 import tiramisu/camera
 import tiramisu/effect
+import tiramisu/geometry
+import tiramisu/light
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
-import tiramisu/vec3
+import vec/vec3
 
 // Model: Game state
 pub type Model {
@@ -61,9 +101,8 @@ pub type Msg {
 
 pub fn main() {
   tiramisu.run(
-    width: 800,
-    height: 600,
-    background: 0x1a1a2e,  // Dark blue background
+    dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
+    background: tiramisu.Color(0x1a1a2e),  // Dark blue background
     init: init,
     update: update,
     view: view,
@@ -92,64 +131,73 @@ fn update(
 // Render the scene
 fn view(model: Model) -> List(scene.SceneNode) {
   // Create camera
-  let assert Ok(camera) =
-    camera.perspective(
-      field_of_view: 75.0,
-      aspect: 800.0 /. 600.0,
-      near: 0.1,
-      far: 1000.0,
-    )
-    |> result.map(fn(camera) {
-      camera
-      |> camera.set_position(vec3.Vec3(0.0, 0.0, 5.0))
-      |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-      |> scene.Camera(
-        id: "main",
-        camera: _,
-        transform: transform.identity,
-        active: True,
-        viewport: option.None,
-      )
-  })
+  let assert Ok(cam) = camera.perspective(
+    field_of_view: 75.0,
+    near: 0.1,
+    far: 1000.0,
+  )
+
+  let camera_node = scene.Camera(
+    id: "main",
+    camera: cam,
+    transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+    look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+    active: True,
+    viewport: option.None,
+  )
 
   // Create rotating cube
-  let cube =
-    scene.Mesh(
-      id: "cube",
-      geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-      material: scene.StandardMaterial(
-        color: 0x4ecdc4,
-        metalness: 0.5,
-        roughness: 0.5,
-        map: option.None,
-        normal_map: option.None,
-      ),
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 0.0, 0.0),
-        rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
-      physics: option.None,
-    )
+  let assert Ok(cube_geometry) = geometry.box(
+    width: 1.0,
+    height: 1.0,
+    depth: 1.0,
+  )
+
+  let assert Ok(cube_material) =
+    material.new()
+    |> material.with_color(0x4ecdc4)
+    |> material.with_metalness(0.5)
+    |> material.with_roughness(0.5)
+    |> material.build()
+
+  let cube = scene.Mesh(
+    id: "cube",
+    geometry: cube_geometry,
+    material: cube_material,
+    transform: transform.Transform(
+      position: vec3.Vec3(0.0, 0.0, 0.0),
+      rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
+      scale: vec3.Vec3(1.0, 1.0, 1.0),
+    ),
+    physics: option.None,
+  )
 
   // Add lights
-  let ambient =
-    scene.Light(
-      id: "ambient",
-      light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
-      transform: transform.identity,
-    )
+  let assert Ok(ambient_light) = light.ambient(
+    intensity: 0.5,
+    color: 0xffffff,
+  )
 
-  let directional =
-    scene.Light(
-      id: "sun",
-      light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
-      transform: transform.Transform(
-        position: vec3.Vec3(5.0, 5.0, 5.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
-    )
+  let ambient = scene.Light(
+    id: "ambient",
+    light: ambient_light,
+    transform: transform.identity,
+  )
+
+  let assert Ok(directional_light) = light.directional(
+    intensity: 0.8,
+    color: 0xffffff,
+  )
+
+  let directional = scene.Light(
+    id: "sun",
+    light: directional_light,
+    transform: transform.Transform(
+      position: vec3.Vec3(5.0, 5.0, 5.0),
+      rotation: vec3.Vec3(0.0, 0.0, 0.0),
+      scale: vec3.Vec3(1.0, 1.0, 1.0),
+    ),
+  )
 
   [camera_node, cube, ambient, directional]
 }
@@ -161,29 +209,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
 gleam run -m lustre/dev start
 ```
 
-
-Open your browser and navigate to the displayed URL. You should see a spinning teal cube!
+Open your browser and navigate to http://localhost:1234. You should see a spinning teal cube!
 
 ## Understanding the Code
 
 ### Model-View-Update Architecture
 
 Tiramisu follows the **MVU pattern** (also called The Elm Architecture):
-
-```
-┌─────────────────────────────────────────┐
-│                                         │
-│  ┌──────┐    ┌────────┐    ┌──────┐   │
-│  │ Init │ -> │ Model  │ -> │ View │   │
-│  └──────┘    └────────┘    └──────┘   │
-│                   ▲            │        │
-│                   │            ▼        │
-│              ┌────────┐    ┌──────┐   │
-│              │ Update │ <- │  Msg │   │
-│              └────────┘    └──────┘   │
-│                                         │
-└─────────────────────────────────────────┘
-```
 
 1. **init**: Create initial game state and effects
 2. **view**: Render the current state as a scene
@@ -195,13 +227,15 @@ Tiramisu follows the **MVU pattern** (also called The Elm Architecture):
 
 #### 1. Context
 
-The `Context` type provides timing and input information:
+The `Context` type provides timing, input, and canvas dimension information:
 
 ```gleam
 pub type Context {
   Context(
-    delta_time: Float,  // Time since last frame (seconds)
-    input: InputState,  // Keyboard, mouse, touch state
+    delta_time: Float,      // Time since last frame (seconds)
+    input: InputState,      // Keyboard, mouse, touch state
+    canvas_width: Float,    // Current canvas width in pixels
+    canvas_height: Float,   // Current canvas height in pixels
   )
 }
 ```

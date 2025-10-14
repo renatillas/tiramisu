@@ -43,20 +43,29 @@ Basic 3D objects with geometry and material:
 
 ```gleam
 import gleam/option
+import tiramisu/geometry
+import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
+let assert Ok(cube_geometry) = geometry.box(
+  width: 1.0,
+  height: 1.0,
+  depth: 1.0,
+)
+
+let assert Ok(cube_material) =
+  material.new()
+  |> material.with_color(0x4ecdc4)
+  |> material.with_metalness(0.5)
+  |> material.with_roughness(0.5)
+  |> material.build()
+
 scene.Mesh(
   id: "cube",  // Unique identifier
-  geometry: scene.BoxGeometry(1.0, 1.0, 1.0),
-  material: scene.StandardMaterial(
-    color: 0x4ecdc4,
-    metalness: 0.5,
-    roughness: 0.5,
-    map: option.None,
-    normal_map: option.None,
-  ),
+  geometry: cube_geometry,
+  material: cube_material,
   transform: transform.Transform(
     position: vec3.Vec3(0.0, 0.0, 0.0),
     rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -68,17 +77,23 @@ scene.Mesh(
 
 ### Geometry Types
 
-Built-in geometries:
+Built-in geometries (all return `Result(Geometry, GeometryError)`):
 
 ```gleam
+import tiramisu/geometry
+
 // Box
-scene.BoxGeometry(width: 2.0, height: 1.0, depth: 1.0)
+let assert Ok(box_geo) = geometry.box(width: 2.0, height: 1.0, depth: 1.0)
 
 // Sphere
-scene.SphereGeometry(radius: 1.0, width_segments: 32, height_segments: 16)
+let assert Ok(sphere_geo) = geometry.sphere(
+  radius: 1.0,
+  width_segments: 32,
+  height_segments: 16,
+)
 
 // Cylinder
-scene.CylinderGeometry(
+let assert Ok(cylinder_geo) = geometry.cylinder(
   radius_top: 1.0,
   radius_bottom: 1.0,
   height: 2.0,
@@ -86,16 +101,16 @@ scene.CylinderGeometry(
 )
 
 // Plane
-scene.PlaneGeometry(width: 10.0, height: 10.0)
+let assert Ok(plane_geo) = geometry.plane(width: 10.0, height: 10.0)
 
 // Circle
-scene.CircleGeometry(radius: 1.0, segments: 32)
+let assert Ok(circle_geo) = geometry.circle(radius: 1.0, segments: 32)
 
 // Cone
-scene.ConeGeometry(radius: 1.0, height: 2.0, segments: 32)
+let assert Ok(cone_geo) = geometry.cone(radius: 1.0, height: 2.0, segments: 32)
 
 // Torus
-scene.TorusGeometry(
+let assert Ok(torus_geo) = geometry.torus(
   radius: 1.0,
   tube: 0.4,
   radial_segments: 16,
@@ -103,18 +118,47 @@ scene.TorusGeometry(
 )
 
 // Polyhedra
-scene.TetrahedronGeometry(radius: 1.0, detail: 0)
-scene.IcosahedronGeometry(radius: 1.0, detail: 0)
+let assert Ok(tetra_geo) = geometry.tetrahedron(radius: 1.0, detail: 0)
+let assert Ok(icosa_geo) = geometry.icosahedron(radius: 1.0, detail: 0)
 
 // Custom (loaded from file)
-scene.CustomGeometry(buffer_geometry)
+geometry.custom(buffer_geometry)
 ```
 
 ### Material Types
 
+All materials are created using the `material` module and return `Result(Material, MaterialError)`.
+
+**StandardMaterial** - PBR (physically-based) with metalness/roughness (recommended):
+```gleam
+import tiramisu/material
+
+// Builder pattern (recommended)
+let assert Ok(mat) =
+  material.new()
+  |> material.with_color(0x4ecdc4)
+  |> material.with_metalness(0.8)  // 0.0 = non-metal, 1.0 = metal
+  |> material.with_roughness(0.2)  // 0.0 = smooth, 1.0 = rough
+  |> material.with_map(texture)
+  |> material.with_normal_map(normal_texture)
+  |> material.build()
+
+// Or direct constructor with all parameters
+let assert Ok(mat2) = material.standard(
+  color: 0x4ecdc4,
+  metalness: 0.8,
+  roughness: 0.2,
+  map: option.Some(texture),
+  normal_map: option.Some(normal_texture),
+  ambient_oclusion_map: option.None,
+  roughness_map: option.None,
+  metalness_map: option.None,
+)
+```
+
 **BasicMaterial** - Unlit, flat color:
 ```gleam
-scene.BasicMaterial(
+let assert Ok(basic_mat) = material.basic(
   color: 0xff0000,
   transparent: False,
   opacity: 1.0,
@@ -122,20 +166,9 @@ scene.BasicMaterial(
 )
 ```
 
-**StandardMaterial** - PBR (physically-based) with metalness/roughness:
-```gleam
-scene.StandardMaterial(
-  color: 0x4ecdc4,
-  metalness: 0.8,  // 0.0 = non-metal, 1.0 = metal
-  roughness: 0.2,  // 0.0 = smooth, 1.0 = rough
-  map: option.Some(texture),
-  normal_map: option.Some(normal_texture),
-)
-```
-
 **PhongMaterial** - Classic Phong shading:
 ```gleam
-scene.PhongMaterial(
+let assert Ok(phong_mat) = material.phong(
   color: 0xffe66d,
   shininess: 100.0,
   map: option.None,
@@ -144,7 +177,7 @@ scene.PhongMaterial(
 
 **LambertMaterial** - Matte, diffuse-only:
 ```gleam
-scene.LambertMaterial(
+let assert Ok(lambert_mat) = material.lambert(
   color: 0x95e1d3,
   map: option.None,
 )
@@ -152,7 +185,7 @@ scene.LambertMaterial(
 
 **ToonMaterial** - Cel-shaded:
 ```gleam
-scene.ToonMaterial(
+let assert Ok(toon_mat) = material.toon(
   color: 0xf38181,
   map: option.None,
 )
@@ -160,20 +193,28 @@ scene.ToonMaterial(
 
 ### Lights
 
+All lights are created using the `light` module and return `Result(Light, LightError)`.
+
 **AmbientLight** - Uniform lighting from all directions:
 ```gleam
+import tiramisu/light
+
+let assert Ok(ambient) = light.ambient(intensity: 0.5, color: 0xffffff)
+
 scene.Light(
   id: "ambient",
-  light_type: scene.AmbientLight(color: 0xffffff, intensity: 0.5),
+  light: ambient,
   transform: transform.identity,
 )
 ```
 
 **DirectionalLight** - Parallel rays (like the sun):
 ```gleam
+let assert Ok(sun) = light.directional(intensity: 0.8, color: 0xffffff)
+
 scene.Light(
   id: "sun",
-  light_type: scene.DirectionalLight(color: 0xffffff, intensity: 0.8),
+  light: sun,
   transform: transform.Transform(
     position: vec3.Vec3(10.0, 10.0, 10.0),
     rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -184,13 +225,15 @@ scene.Light(
 
 **PointLight** - Radiates from a point:
 ```gleam
+let assert Ok(lamp) = light.point(
+  intensity: 1.0,
+  color: 0xff6b6b,
+  distance: 50.0,
+)
+
 scene.Light(
   id: "lamp",
-  light_type: scene.PointLight(
-    color: 0xff6b6b,
-    intensity: 1.0,
-    distance: 50.0,
-  ),
+  light: lamp,
   transform: transform.Transform(
     position: vec3.Vec3(0.0, 5.0, 0.0),
     rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -201,15 +244,17 @@ scene.Light(
 
 **SpotLight** - Cone of light:
 ```gleam
+let assert Ok(spotlight) = light.spot(
+  intensity: 1.0,
+  color: 0xffffff,
+  distance: 100.0,
+  angle: 0.5,      // Radians
+  penumbra: 0.2,   // Soft edge
+)
+
 scene.Light(
   id: "spotlight",
-  light_type: scene.SpotLight(
-    color: 0xffffff,
-    intensity: 1.0,
-    distance: 100.0,
-    angle: 0.5,      // Radians
-    penumbra: 0.2,   // Soft edge
-  ),
+  light: spotlight,
   transform: transform.Transform(
     position: vec3.Vec3(0.0, 10.0, 0.0),
     rotation: vec3.Vec3(-1.57, 0.0, 0.0),  // Point down
@@ -220,13 +265,15 @@ scene.Light(
 
 **HemisphereLight** - Sky + ground colors:
 ```gleam
+let assert Ok(hemi) = light.hemisphere(
+  intensity: 0.6,
+  sky_color: 0x0077ff,
+  ground_color: 0x553311,
+)
+
 scene.Light(
   id: "hemi",
-  light_type: scene.HemisphereLight(
-    sky_color: 0x0077ff,
-    ground_color: 0x553311,
-    intensity: 0.6,
-  ),
+  light: hemi,
   transform: transform.identity,
 )
 ```
@@ -237,21 +284,18 @@ scene.Light(
 ```gleam
 import tiramisu/camera
 
+// Aspect ratio is calculated automatically from viewport/window dimensions
 let assert Ok(cam) = camera.perspective(
   field_of_view: 75.0,
-  aspect: 16.0 /. 9.0,
   near: 0.1,
   far: 1000.0,
 )
 
-let cam = cam
-  |> camera.set_position(vec3.Vec3(0.0, 5.0, 10.0))
-  |> camera.look(at: vec3.Vec3(0.0, 0.0, 0.0))
-
 scene.Camera(
   id: "main",
   camera: cam,
-  transform: transform.identity,
+  transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
+  look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Point camera at origin
   active: True,  // This camera is used for rendering
   viewport: option.None,
 )
@@ -277,14 +321,41 @@ scene.Camera(
 )
 ```
 
+**2D Helper** (orthographic camera for pixel-perfect 2D):
+```gleam
+// Creates orthographic camera with automatic aspect ratio
+let cam = camera.camera_2d(width: 800, height: 600)
+
+scene.Camera(
+  id: "2d",
+  camera: cam,
+  transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),  // Distance from scene
+  active: True,
+  viewport: option.None,
+)
+```
+
 **Multiple Cameras** (picture-in-picture):
 ```gleam
+let assert Ok(main_cam) = camera.perspective(
+  field_of_view: 75.0,
+  near: 0.1,
+  far: 1000.0,
+)
+
+let assert Ok(minimap_cam) = camera.perspective(
+  field_of_view: 60.0,
+  near: 0.1,
+  far: 1000.0,
+)
+
 [
   // Main camera (full screen)
   scene.Camera(
     id: "main",
     camera: main_cam,
     transform: transform.identity,
+    look_at: option.None,
     active: True,
     viewport: option.None,
   ),
@@ -293,6 +364,7 @@ scene.Camera(
     id: "minimap",
     camera: minimap_cam,
     transform: transform.at(position: vec3.Vec3(0.0, 100.0, 0.0)),
+    look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
     active: False,
     viewport: option.Some(#(800, 450, 200, 150)),  // x, y, width, height
   ),
@@ -304,6 +376,26 @@ scene.Camera(
 Group nodes contain children, creating parent-child relationships:
 
 ```gleam
+let assert Ok(body_geo) = geometry.box(width: 1.0, height: 2.0, depth: 1.0)
+let assert Ok(body_mat) =
+  material.new()
+  |> material.with_color(0x4ecdc4)
+  |> material.build()
+
+let assert Ok(weapon_geo) = geometry.box(width: 0.2, height: 0.2, depth: 1.5)
+let assert Ok(weapon_mat) =
+  material.new()
+  |> material.with_color(0x888888)
+  |> material.build()
+
+let assert Ok(healthbar_geo) = geometry.plane(width: 1.0, height: 0.1)
+let assert Ok(healthbar_mat) = material.basic(
+  color: 0x00ff00,
+  transparent: False,
+  opacity: 1.0,
+  map: option.None,
+)
+
 scene.Group(
   id: "player",
   transform: player_transform,
@@ -311,16 +403,16 @@ scene.Group(
     // Body mesh
     scene.Mesh(
       id: "player_body",
-      geometry: scene.BoxGeometry(1.0, 2.0, 1.0),
-      material: scene.StandardMaterial(...),
+      geometry: body_geo,
+      material: body_mat,
       transform: transform.identity,  // Relative to parent
       physics: option.None,
     ),
     // Weapon (attached to player)
     scene.Mesh(
       id: "weapon",
-      geometry: scene.BoxGeometry(0.2, 0.2, 1.5),
-      material: scene.StandardMaterial(...),
+      geometry: weapon_geo,
+      material: weapon_mat,
       transform: transform.Transform(
         position: vec3.Vec3(0.5, 0.5, 0.0),  // Offset from player center
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -331,8 +423,8 @@ scene.Group(
     // Health bar (UI element)
     scene.Mesh(
       id: "health_bar",
-      geometry: scene.PlaneGeometry(1.0, 0.1),
-      material: scene.BasicMaterial(color: 0x00ff00, ...),
+      geometry: healthbar_geo,
+      material: healthbar_mat,
       transform: transform.Transform(
         position: vec3.Vec3(0.0, 1.5, 0.0),  // Above player
         rotation: vec3.Vec3(0.0, 0.0, 0.0),
@@ -404,10 +496,22 @@ let transforms = list.range(0, 999)
     )
   })
 
+let assert Ok(tree_geo) = geometry.cylinder(
+  radius_top: 0.5,
+  radius_bottom: 0.5,
+  height: 3.0,
+  radial_segments: 8,
+)
+
+let assert Ok(tree_mat) =
+  material.new()
+  |> material.with_color(0x8b4513)
+  |> material.build()
+
 scene.InstancedMesh(
   id: "trees",
-  geometry: scene.CylinderGeometry(0.5, 0.5, 3.0, 8),
-  material: scene.StandardMaterial(color: 0x8b4513, ...),
+  geometry: tree_geo,
+  material: tree_mat,
   instances: transforms,  // All instances in 1 draw call!
 )
 ```
@@ -422,6 +526,29 @@ scene.InstancedMesh(
 Automatically switch detail based on distance:
 
 ```gleam
+// Assume these are loaded or created elsewhere
+let complex_geometry = ...  // 10,000 triangles
+let medium_geometry = ...   // 2,000 triangles
+let low_geometry = ...      // 500 triangles
+
+let assert Ok(detailed_material) =
+  material.new()
+  |> material.with_color(0x808080)
+  |> material.build()
+
+let assert Ok(simple_material) =
+  material.new()
+  |> material.with_color(0x808080)
+  |> material.build()
+
+let assert Ok(billboard_geo) = geometry.plane(width: 10.0, height: 15.0)
+let assert Ok(billboard_mat) = material.basic(
+  color: 0x808080,
+  transparent: True,
+  opacity: 0.8,
+  map: option.Some(building_texture),
+)
+
 scene.LOD(
   id: "building",
   transform: transform.at(position: vec3.Vec3(100.0, 0.0, 50.0)),
@@ -431,7 +558,7 @@ scene.LOD(
       distance: 0.0,
       node: scene.Mesh(
         id: "building_high",
-        geometry: complex_geometry,  // 10,000 triangles
+        geometry: complex_geometry,
         material: detailed_material,
         transform: transform.identity,
         physics: option.None,
@@ -442,7 +569,7 @@ scene.LOD(
       distance: 50.0,
       node: scene.Mesh(
         id: "building_medium",
-        geometry: medium_geometry,  // 2,000 triangles
+        geometry: medium_geometry,
         material: simple_material,
         transform: transform.identity,
         physics: option.None,
@@ -453,7 +580,7 @@ scene.LOD(
       distance: 150.0,
       node: scene.Mesh(
         id: "building_low",
-        geometry: low_geometry,  // 500 triangles
+        geometry: low_geometry,
         material: simple_material,
         transform: transform.identity,
         physics: option.None,
@@ -464,13 +591,8 @@ scene.LOD(
       distance: 500.0,
       node: scene.Mesh(
         id: "building_billboard",
-        geometry: scene.PlaneGeometry(10.0, 15.0),
-        material: scene.BasicMaterial(
-          color: 0x808080,
-          transparent: True,
-          opacity: 0.8,
-          map: option.Some(building_texture),
-        ),
+        geometry: billboard_geo,
+        material: billboard_mat,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -564,39 +686,21 @@ let static_mesh = scene.Mesh(
 ### 1. Use Meaningful IDs
 
 ```gleam
-// ❌ Bad: Ambiguous
+// ❌ Bad: String ids with ambiguous ids
 id: "mesh1"
 
-// ✅ Good: Descriptive
-id: "player_body"
-id: "enemy_goblin_1"
-id: "ui_health_bar"
+// ✅ Good: Typed Ids with descriptive names
+pub type Id {
+  PlayerBody
+  EnemyGoblin(goblin_index: Int)
+  Ground
+}
+id: PlayerBody
+id: EnemyGoblin(10)
+id: Ground
 ```
 
-### 2. Cache Static Scenes
-
-```gleam
-pub type Model {
-  Model(
-    scene_dirty: Bool,
-    cached_scene: List(SceneNode),
-    ...
-  )
-}
-
-fn view(model: Model) -> List(SceneNode) {
-  case model.scene_dirty {
-    True -> {
-      let scene = build_scene(model)
-      // Update model.cached_scene = scene in update function
-      scene
-    }
-    False -> model.cached_scene  // Reuse! Dirty flagging optimization
-  }
-}
-```
-
-### 3. Keep Hierarchies Shallow
+### 2. Keep Hierarchies Shallow
 
 ```gleam
 // ❌ Bad: Deep nesting (slow)
@@ -615,7 +719,7 @@ Group(
 Group("player", children: [body, weapon, ui])
 ```
 
-### 4. Use InstancedMesh for Repeated Objects
+### 3. Use InstancedMesh for Repeated Objects
 
 ```gleam
 // ❌ Bad: 100 separate meshes
@@ -709,7 +813,3 @@ scene.DebugPoint(
 - Use LOD for distant objects
 - Cache static scenes for performance
 
-**Next steps:**
-- [Performance Guide](./performance-guide.md) - Optimization techniques
-- [Animation Guide](./animation-guide.md) - Tweens and state machines
-- [Physics Guide](./physics-guide.md) - Rigid bodies and collisions

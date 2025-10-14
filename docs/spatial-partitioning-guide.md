@@ -514,8 +514,3 @@ fn enemies_in_awareness_zone(
 - O(log n) insert and query (vs O(n) naive search)
 - 10-100x faster for 1000+ objects
 - Essential for large, dynamic scenes
-
-**Next steps:**
-- [Performance Guide](./performance-guide.md) - Full optimization strategies
-- [Scene Graph Guide](./scene-graph-guide.md) - Understanding the scene structure
-- [Physics Guide](./physics-guide.md) - Collision detection and response

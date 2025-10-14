@@ -114,9 +114,36 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
 
 ---
 
-## 📦 Installation
+## 🧀 Quick Project Setup with Mascarpone
 
-Add Tiramisu to your Gleam project:
+**The fastest way to start a new Tiramisu project:**
+
+```sh
+gleam add mascarpone
+gleam run -m mascarpone
+```
+
+[Mascarpone](https://hexdocs.pm/mascarpone/) is an interactive CLI tool that scaffolds complete Tiramisu projects with:
+
+- 🎨 **Beautiful TUI** - Interactive project configuration
+- 🎮 **Multiple Templates** - Choose from 2D games, 3D games, or physics demos
+- 📦 **Automatic Setup** - Configured `gleam.toml`, dependencies, and CDN imports
+- 🖥️ **Lustre Integration** - Optional UI overlays for menus and HUDs
+- ⚡ **Working Examples** - Start with a functional game, not an empty file
+
+After creating your project, just run:
+
+```sh
+gleam run -m lustre/dev start
+```
+
+Then open http://localhost:1234 to see your game!
+
+---
+
+## 📦 Manual Installation
+
+Alternatively, add Tiramisu to an existing Gleam project:
 
 ```sh
 gleam add tiramisu@2
@@ -142,15 +169,6 @@ stylesheets = [
 ```
 
 **Note**: The `stylesheets` configuration removes default body margins and prevents scrollbars, which is essential for fullscreen games.
-
----
-
-## 📚 Documentation
-
-- [**Getting Started**](https://hexdocs.pm/tiramisu/getting_started.html) - Your first Tiramisu game
-- [**Scene Graph Guide**](https://hexdocs.pm/tiramisu/scene_graph_guide.html) - Understanding scene hierarchies
-- [**Performance Guide**](https://hexdocs.pm/tiramisu/performance_guide.html) - Optimization techniques
-- [**API Reference**](https://hexdocs.pm/tiramisu/) - Complete API documentation
 
 ---
 
