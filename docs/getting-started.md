@@ -16,7 +16,7 @@ cd my_game
 ### Run Mascarpone
 
 ```bash
-gleam add mascarpone
+gleam add --dev mascarpone 
 gleam run -m mascarpone
 ```
 

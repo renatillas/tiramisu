@@ -119,7 +119,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
 **The fastest way to start a new Tiramisu project:**
 
 ```sh
-gleam add mascarpone
+gleam add --dev mascarpone
 gleam run -m mascarpone
 ```
 
