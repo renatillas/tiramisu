@@ -167,8 +167,6 @@ pub type WorldConfig(id) {
   WorldConfig(
     /// Gravity vector (typically Vec3(0.0, -9.81, 0.0))
     gravity: Vec3(Float),
-    /// Deprecated. You can just pass a empty list here
-    correspondances: List(#(id, String)),
   )
 }
 
