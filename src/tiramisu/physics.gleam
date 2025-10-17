@@ -594,52 +594,6 @@ pub fn get_body_transform_raw(
   Ok(#(translation, quaternion))
 }
 
-/// Rotate a vector by a quaternion.
-///
-/// This is useful for transforming directions (like forward, right, up) by a body's rotation.
-///
-/// ## Example
-///
-/// ```gleam
-/// // Get vehicle's forward direction
-/// case physics.get_body_transform_raw(physics_world, vehicle_id) {
-///   Ok(#(_position, quat)) -> {
-///     let forward = physics.rotate_vector_by_quaternion(
-///       vec3.Vec3(0.0, 0.0, -1.0),
-///       quat
-///     )
-///     // Now forward points in the vehicle's forward direction
-///   }
-///   Error(_) -> vec3.Vec3(0.0, 0.0, -1.0)
-/// }
-/// ```
-pub fn rotate_vector_by_quaternion(v: Vec3(Float), q: Quaternion) -> Vec3(Float) {
-  // Quaternion-vector rotation formula: v' = q * v * q^-1
-  // Optimized formula: v' = v + 2 * cross(q.xyz, cross(q.xyz, v) + q.w * v)
-  let qx = q.x
-  let qy = q.y
-  let qz = q.z
-  let qw = q.w
-
-  // First cross product: q.xyz × v
-  let cx1 = qy *. v.z -. qz *. v.y
-  let cy1 = qz *. v.x -. qx *. v.z
-  let cz1 = qx *. v.y -. qy *. v.x
-
-  // Add q.w * v
-  let tx = cx1 +. qw *. v.x
-  let ty = cy1 +. qw *. v.y
-  let tz = cz1 +. qw *. v.z
-
-  // Second cross product: q.xyz × t
-  let cx2 = qy *. tz -. qz *. ty
-  let cy2 = qz *. tx -. qx *. tz
-  let cz2 = qx *. ty -. qy *. tx
-
-  // Final result: v + 2 * cross result
-  vec3.Vec3(v.x +. 2.0 *. cx2, v.y +. 2.0 *. cy2, v.z +. 2.0 *. cz2)
-}
-
 // --- Forces and Impulses (Functional API) ---
 
 /// Queue a force to be applied to a rigid body during the next physics step.
@@ -827,31 +781,6 @@ pub fn raycast(
     }
     Error(_) -> Error(Nil)
   }
-}
-
-/// Cast a ray and return all hits along the ray
-///
-/// Returns hits sorted by distance (closest first).
-///
-/// ## Example
-///
-/// ```gleam
-/// // Check what's in front of the player
-/// let hits = physics.raycast_all(world, origin, direction, max_distance: 100.0)
-///
-/// // Find first enemy hit
-/// let enemy_hit = list.find(hits, fn(hit) {
-///   string.starts_with(hit.body_id, "enemy_")
-/// })
-/// ```
-pub fn raycast_all(
-  _world: PhysicsWorld(id),
-  origin _origin: Vec3(Float),
-  direction _direction: Vec3(Float),
-  max_distance _max_distance: Float,
-) -> List(RaycastHit(id)) {
-  // TODO: Implement using Rapier's intersectionsWithRay
-  []
 }
 
 /// Get all collision events that occurred during the last physics step.
