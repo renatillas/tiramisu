@@ -520,6 +520,29 @@ export function setColliderSolverGroups(desc, groups) {
   desc.setSolverGroups(groups);
 }
 
+/**
+ * Set collider translation (position offset relative to rigid body)
+ * @param {RAPIER.ColliderDesc} desc
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ */
+export function setColliderTranslation(desc, x, y, z) {
+  desc.setTranslation(x, y, z);
+}
+
+/**
+ * Set collider rotation (rotation offset relative to rigid body)
+ * @param {RAPIER.ColliderDesc} desc
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @param {number} w
+ */
+export function setColliderRotation(desc, x, y, z, w) {
+  desc.setRotation({ x, y, z, w });
+}
+
 // ============================================================================
 // COLLIDERS
 // ============================================================================

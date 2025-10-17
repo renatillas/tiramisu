@@ -1,6 +1,6 @@
 # 🍰 Tiramisu
 
-<img width="720" height="720" alt="Tiramisu-logo-03" src="https://github.com/user-attachments/assets/e4dff9c1-e132-4caa-82fc-37220990857b" />
+<img alt="Tiramisu-logo-03" src="https://github.com/user-attachments/assets/e4dff9c1-e132-4caa-82fc-37220990857b" />
 
 
 **A type-safe 3D game engine for Gleam**
@@ -29,6 +29,7 @@ Tiramisu brings the power of functional programming and static type safety to ga
 ```gleam
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -55,7 +56,7 @@ type Ids {
 pub fn main() {
   tiramisu.run(
     dimensions: option.None,  // Fullscreen
-    background: tiramisu.Color(0x1a1a2e),
+    background: background.Color(0x1a1a2e),
     init: init,
     update: update,
     view: view,
