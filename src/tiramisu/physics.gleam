@@ -619,10 +619,7 @@ pub fn get_body_transform_raw(
 ///   Error(_) -> vec3.Vec3(0.0, 0.0, -1.0)
 /// }
 /// ```
-pub fn rotate_vector_by_quaternion(
-  v: Vec3(Float),
-  q: Quaternion,
-) -> Vec3(Float) {
+pub fn rotate_vector_by_quaternion(v: Vec3(Float), q: Quaternion) -> Vec3(Float) {
   // Quaternion-vector rotation formula: v' = q * v * q^-1
   // Optimized formula: v' = v + 2 * cross(q.xyz, cross(q.xyz, v) + q.w * v)
   let qx = q.x

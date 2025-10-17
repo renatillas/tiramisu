@@ -280,7 +280,8 @@ pub fn collider(
   case shape {
     physics.Box(_offset, width, height, depth) ->
       collider_box(id, width, height, depth, transform, color)
-    physics.Sphere(_offset, radius) -> collider_sphere(id, radius, transform, color)
+    physics.Sphere(_offset, radius) ->
+      collider_sphere(id, radius, transform, color)
     physics.Capsule(_offset, half_height, radius) ->
       collider_capsule(id, half_height, radius, transform, color)
     physics.Cylinder(_offset, half_height, radius) ->
