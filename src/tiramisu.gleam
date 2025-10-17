@@ -175,7 +175,6 @@ pub type Context(id) {
 /// ## Camera Setup
 ///
 /// You must include a `Camera` scene node with `active: True` in your initial scene.
-/// Use `effect.set_active_camera(id)` to switch between cameras at runtime.
 ///
 /// ## Example
 ///

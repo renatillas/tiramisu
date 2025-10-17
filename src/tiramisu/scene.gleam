@@ -150,7 +150,6 @@ pub type Node(id) {
   Light(id: id, light: light.Light, transform: transform.Transform)
   /// Camera - defines a viewpoint in the scene
   /// Only one camera can be active at a time for rendering (when viewport is None)
-  /// Use effect.set_active_camera(id) to switch between cameras
   /// Set viewport to render in a specific area (for picture-in-picture effects)
   Camera(
     id: id,
