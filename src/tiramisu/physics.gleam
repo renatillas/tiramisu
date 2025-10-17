@@ -1094,21 +1094,6 @@ pub fn create_world(config: WorldConfig(id)) {
 }
 
 // ============================================================================
-// WORLD STEPPING
-// ============================================================================
-
-/// Step the physics world forward by delta_time
-pub fn step_world(physics_world: PhysicsWorld(id)) -> Nil {
-  // Note: Rapier's step() doesn't take a delta_time parameter
-  // It uses a fixed timestep internally
-
-  // Step the simulation
-  step_world_ffi(physics_world.world, physics_world.queue)
-
-  Nil
-}
-
-// ============================================================================
 // FFI FUNCTIONS - WORLD MANAGEMENT
 // ============================================================================
 

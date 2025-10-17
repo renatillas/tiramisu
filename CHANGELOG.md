@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.0 - 2025-10-17
+
+- The `WorldConfig`'s parameter `correspondences` has been removed from the physics module.
+- The function `step_world` from the module physics has been removed in favour of the `step` function.
+- Fixed references to tiramisu.Color and tiramisu.Texture, as they should be background.Color and background.Texture.
+- The `RigidBody` type from the physics module is now opaque 
+
+
 ## v2.1.0 - 2025-10-14
 
 - The `WorldConfig`'s parameter `correspondences` has been deprecated to let users interact with physics objects created dinamically.
