@@ -8,6 +8,7 @@
 //// ```gleam
 //// import gleam/option
 //// import tiramisu
+//// import tiramisu/background
 //// import tiramisu/camera
 //// import tiramisu/effect
 //// import tiramisu/geometry
@@ -32,7 +33,7 @@
 //// pub fn main() {
 ////   tiramisu.run(
 ////     dimensions: option.None,
-////     background: tiramisu.Color(0x111111),
+////     background: background.Color(0x111111),
 ////     init: init,
 ////     update: update,
 ////     view: view,
@@ -104,18 +105,19 @@ pub type Scene
 /// ```gleam
 /// import gleam/option.{None, Some}
 /// import tiramisu
+/// import tiramisu/background
 ///
 /// // Fullscreen mode
 /// tiramisu.run(
 ///   dimensions: None,
-///   background: tiramisu.Color(0x111111),
+///   background: background.Color(0x111111),
 ///   // ...
 /// )
 ///
 /// // Fixed size
 /// tiramisu.run(
 ///   dimensions: Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-///   background: tiramisu.Color(0x111111),
+///   background: background.Color(0x111111),
 ///   // ...
 /// )
 /// ```
@@ -180,6 +182,7 @@ pub type Context(id) {
 /// ```gleam
 /// import gleam/option.{None, Some}
 /// import tiramisu
+/// import tiramisu/background
 /// import tiramisu/camera
 /// import tiramisu/effect
 /// import tiramisu/scene
@@ -198,7 +201,7 @@ pub type Context(id) {
 ///   // Fullscreen mode with color background
 ///   tiramisu.run(
 ///     dimensions: None,
-///     background: tiramisu.Color(0x111111),
+///     background: background.Color(0x111111),
 ///     init: fn(_ctx) {
 ///       #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 ///     },

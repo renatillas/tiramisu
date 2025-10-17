@@ -80,6 +80,7 @@ Replace the contents of `src/my_game.gleam` with:
 ```gleam
 import gleam/option
 import tiramisu
+import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -102,7 +103,7 @@ pub type Msg {
 pub fn main() {
   tiramisu.run(
     dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-    background: tiramisu.Color(0x1a1a2e),  // Dark blue background
+    background: background.Color(0x1a1a2e),  // Dark blue background
     init: init,
     update: update,
     view: view,

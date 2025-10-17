@@ -178,6 +178,7 @@ pub fn tick(msg: msg) -> Effect(msg) {
 ///
 /// ```gleam
 /// import tiramisu
+/// import tiramisu/background
 /// import tiramisu/effect
 ///
 /// type Msg {
@@ -190,11 +191,11 @@ pub fn tick(msg: msg) -> Effect(msg) {
 ///   case msg {
 ///     ChangeToNight -> #(
 ///       model,
-///       effect.set_background(tiramisu.Color(0x0a0a1e)),
+///       effect.set_background(background.Color(0x0a0a1e)),
 ///     )
 ///     ChangeToDawn -> #(
 ///       model,
-///       effect.set_background(tiramisu.Texture("assets/dawn-sky.jpg")),
+///       effect.set_background(background.Texture("assets/dawn-sky.jpg")),
 ///     )
 ///     Tick -> #(model, effect.tick(Tick))
 ///   }

@@ -227,25 +227,26 @@ tiramisu.run(
 **New:**
 ```gleam
 import tiramisu
+import tiramisu/background
 
 // Solid color background (most common)
 tiramisu.run(
   dimensions: None,
-  background: tiramisu.Color(0x111111),
+  background: background.Color(0x111111),
   // ...
 )
 
 // Texture background
 tiramisu.run(
   dimensions: None,
-  background: tiramisu.Texture("assets/sky.jpg"),
+  background: background.Texture("assets/sky.jpg"),
   // ...
 )
 
 // Skybox with cube texture (6 faces)
 tiramisu.run(
   dimensions: None,
-  background: tiramisu.CubeTexture([
+  background: background.CubeTexture([
     "assets/skybox/px.jpg",  // positive x
     "assets/skybox/nx.jpg",  // negative x
     "assets/skybox/py.jpg",  // positive y
@@ -257,13 +258,13 @@ tiramisu.run(
 )
 ```
 
-**Migration:** Wrap all existing hex color backgrounds with `tiramisu.Color()`:
+**Migration:** Wrap all existing hex color backgrounds with `background.Color()`:
 ```gleam
 // Change this:
 background: 0x1a1a2e
 
 // To this:
-background: tiramisu.Color(0x1a1a2e)
+background: background.Color(0x1a1a2e)
 ```
 
 #### 2. Canvas Dimensions API
@@ -285,14 +286,14 @@ import gleam/option
 // Fullscreen mode (recommended)
 tiramisu.run(
   dimensions: option.None,
-  background: tiramisu.Color(0x111111),
+  background: background.Color(0x111111),
   // ...
 )
 
 // Or fixed size
 tiramisu.run(
   dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-  background: tiramisu.Color(0x111111),
+  background: background.Color(0x111111),
   // ...
 )
 ```
