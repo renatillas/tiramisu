@@ -1424,8 +1424,8 @@ fn drain_collision_events_ffi(
   queue: RapierEventQueue,
 ) -> List(#(Int, Int, Bool))
 
-pub type RapierBodyDesc
+type RapierBodyDesc
 
-pub type RapierColliderDesc
+type RapierColliderDesc
 
-pub type RapierCollider
+type RapierCollider
