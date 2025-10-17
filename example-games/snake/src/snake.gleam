@@ -562,11 +562,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(10.0, 20.0, 10.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(10.0, 20.0, 10.0)),
     ),
   ]
 
@@ -596,11 +592,8 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             material.new() |> material.with_color(color) |> material.build()
           material
         },
-        transform: transform.Transform(
-          position: world_pos,
-          rotation: rotation,
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+        transform: transform.at(position: world_pos)
+          |> transform.with_rotation(rotation),
         physics: option.None,
       )
     })
@@ -631,11 +624,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
               |> material.build()
             material
           },
-          transform: transform.Transform(
-            position: left_eye_pos,
-            rotation: vec3.Vec3(0.0, 0.0, 0.0),
-            scale: vec3.Vec3(1.0, 1.0, 1.0),
-          ),
+          transform: transform.at(position: left_eye_pos),
           physics: option.None,
         ),
         scene.Mesh(
@@ -656,11 +645,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
               |> material.build()
             material
           },
-          transform: transform.Transform(
-            position: right_eye_pos,
-            rotation: vec3.Vec3(0.0, 0.0, 0.0),
-            scale: vec3.Vec3(1.0, 1.0, 1.0),
-          ),
+          transform: transform.at(position: right_eye_pos),
           physics: option.None,
         ),
       ]
@@ -689,11 +674,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: food_world,
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: food_world),
       physics: option.None,
     )
     |> list.wrap
@@ -722,11 +703,8 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, -0.5, 0.0),
-        rotation: vec3.Vec3(-1.5708, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, -0.5, 0.0))
+        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
     |> list.wrap

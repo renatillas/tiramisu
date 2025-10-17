@@ -92,11 +92,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 0.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.None,
     ),
     // Grid of squares in 2D space
@@ -116,11 +112,8 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-150.0, 150.0, -1.0),
-        rotation: vec3.Vec3(0.0, 0.0, model.time),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-150.0, 150.0, -1.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -139,11 +132,8 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(150.0, 150.0, -1.0),
-        rotation: vec3.Vec3(0.0, 0.0, model.time),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(150.0, 150.0, -1.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -162,11 +152,8 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-150.0, -150.0, -1.0),
-        rotation: vec3.Vec3(0.0, 0.0, model.time),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-150.0, -150.0, -1.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -185,11 +172,8 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(150.0, -150.0, -1.0),
-        rotation: vec3.Vec3(0.0, 0.0, model.time),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(150.0, -150.0, -1.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
       physics: option.None,
     ),
   ]

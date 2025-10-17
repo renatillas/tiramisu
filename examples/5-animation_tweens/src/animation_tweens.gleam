@@ -141,11 +141,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(10.0, 10.0, 10.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
     ),
     scene.Mesh(
       id: "sphere",
@@ -161,11 +157,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           |> material.build()
         mat
       },
-      transform: transform.Transform(
-        position: position,
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: position),
       physics: option.None,
     ),
     scene.Mesh(
@@ -184,11 +176,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-5.0, 0.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-5.0, 0.0, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -207,11 +195,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           )
         mat
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(5.0, 0.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(5.0, 0.0, 0.0)),
       physics: option.None,
     ),
   ]

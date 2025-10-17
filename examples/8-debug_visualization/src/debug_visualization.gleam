@@ -229,11 +229,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-4.0, 1.0, 0.0),
-        rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-4.0, 1.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -252,11 +249,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(4.0, 1.5, 0.0),
-        rotation: vec3f.zero,
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(4.0, 1.5, 0.0)),
       physics: option.None,
     ),
   ]
@@ -362,11 +355,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
       // Box from transform
       let transform_box =
-        transform.Transform(
-          position: vec3.Vec3(0.0, 5.0, 0.0),
-          rotation: vec3f.zero,
-          scale: vec3.Vec3(3.0, 1.0, 3.0),
-        )
+        transform.at(position: vec3.Vec3(0.0, 5.0, 0.0))
+        |> transform.with_scale(vec3.Vec3(3.0, 1.0, 3.0))
       let box_from_transform =
         debug.box_from_transform(
           TransformBox,

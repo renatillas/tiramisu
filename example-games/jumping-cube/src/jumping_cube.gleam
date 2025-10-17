@@ -40,12 +40,7 @@ fn init(
 ) -> #(Nil, Effect(Msg), option.Option(physics.PhysicsWorld(Id))) {
   // Initialize physics world with gravity
   let physics_world =
-    physics.new_world(
-      physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0), correspondances: [
-        #(Sphere, "sphere"),
-        #(Ground, "ground"),
-      ]),
-    )
+    physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
   #(Nil, effect.tick(Tick), option.Some(physics_world))
 }
 
@@ -91,7 +86,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 3.0, 8.0)),
-      look_at: option.Some(cube_transform.position),
+      look_at: option.Some(transform.position(cube_transform)),
       active: True,
       viewport: option.None,
     )
@@ -136,7 +131,12 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(20.0, 0.2, 20.0))
+        |> physics.with_collider(physics.Box(
+          transform.identity,
+          20.0,
+          0.2,
+          20.0,
+        ))
         |> physics.with_restitution(0.0)
         |> physics.build(),
       ),
@@ -167,7 +167,7 @@ fn create_sphere(id: Id, color: Int) -> scene.Node(Id) {
     transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
     physics: option.Some(
       physics.new_rigid_body(physics.Dynamic)
-      |> physics.with_collider(physics.Sphere(1.0))
+      |> physics.with_collider(physics.Sphere(transform.identity, 1.0))
       |> physics.with_mass(1.0)
       |> physics.with_restitution(0.5)
       |> physics.with_friction(0.5)

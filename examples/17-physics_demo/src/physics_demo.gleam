@@ -44,14 +44,7 @@ pub fn main() -> Nil {
 fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
   // Initialize physics world with gravity
   let physics_world =
-    physics.new_world(
-      physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0), correspondances: [
-        #(Cube1, "cube-1"),
-        #(Cube2, "cube-2"),
-        #(Cube3, "cube-3"),
-        #(Ground, "ground"),
-      ]),
-    )
+    physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0)))
 
   #(Model(False), effect.tick(Tick), option.Some(physics_world))
 }
@@ -132,7 +125,12 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
       physics: option.Some(
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(20.0, 0.2, 20.0))
+        |> physics.with_collider(physics.Box(
+          transform.identity,
+          20.0,
+          0.2,
+          20.0,
+        ))
         |> physics.with_restitution(0.0)
         |> physics.build(),
       ),
@@ -160,7 +158,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(1.0)
         |> physics.with_restitution(0.5)
         |> physics.with_friction(0.5)
@@ -187,7 +185,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(1.0)
         |> physics.with_restitution(0.6)
         |> physics.with_friction(0.3)
@@ -214,7 +212,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(1.0)
         |> physics.with_restitution(0.4)
         |> physics.with_friction(0.6)

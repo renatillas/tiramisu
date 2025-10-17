@@ -82,21 +82,7 @@ fn init(
 
   // Initialize physics world with gravity
   let physics_world =
-    physics.new_world(
-      physics.WorldConfig(gravity: vec3.Vec3(0.0, -20.0, 0.0), correspondances: [
-        #(Ground, "ground"),
-        #(MainCamera, "main-camera"),
-        #(WallRight, "wall-right"),
-        #(WallLeft, "wall-left"),
-        #(Floor, "floor"),
-        #(Player, "player"),
-        #(Ball, "ball"),
-        #(SpinningCube, "spinning-cube"),
-        #(Cube, "cube"),
-        #(AmbientLight, "ambient-light"),
-        #(SunLight, "sun-light"),
-      ]),
-    )
+    physics.new_world(physics.WorldConfig(gravity: vec3.Vec3(0.0, -20.0, 0.0)))
 
   print_instructions()
 
@@ -175,7 +161,7 @@ fn update(
       // Raycast downward from player to detect ground
       // Start raycast from bottom of player (center - half height - small offset)
       let player_pos = case physics.get_transform(physics_world, Player) {
-        Ok(t) -> t.position
+        Ok(t) -> transform.position(t)
         Error(_) -> vec3.Vec3(0.0, 5.0, 0.0)
       }
 
@@ -371,7 +357,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       transform: transform.at(position: vec3.Vec3(0.0, -0.25, 0.0)),
       physics: option.Some({
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(20.0, 0.5, 20.0))
+        |> physics.with_collider(physics.Box(transform.identity, 20.0, 0.5, 20.0))
         |> physics.with_friction(1.0)
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,
@@ -394,7 +380,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(2.0)
         |> physics.with_friction(0.5)
         |> physics.with_linear_damping(0.5)
@@ -420,7 +406,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       },
       physics: option.Some({
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(1.0)
         |> physics.with_restitution(0.7)
         |> physics.with_friction(0.3)
@@ -445,7 +431,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
         },
         physics: option.Some({
           physics.new_rigid_body(physics.Dynamic)
-          |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+          |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
           |> physics.with_mass(1.0)
           |> physics.with_restitution(0.7)
           |> physics.with_friction(0.3)
@@ -480,7 +466,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Box(1.0, 1.0, 1.0))
+        |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
         |> physics.with_mass(1.5)
         |> physics.with_restitution(0.3)
         |> physics.with_friction(0.5)
@@ -506,7 +492,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       },
       physics: option.Some(
         physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Sphere(radius: 0.5))
+        |> physics.with_collider(physics.Sphere(transform.identity, 0.5))
         |> physics.with_mass(0.8)
         |> physics.with_restitution(0.9)
         |> physics.with_friction(0.1)
@@ -528,7 +514,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       transform: transform.at(position: vec3.Vec3(-5.0, 2.5, 0.0)),
       physics: option.Some(
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(0.5, 5.0, 20.0))
+        |> physics.with_collider(physics.Box(transform.identity, 0.5, 5.0, 20.0))
         |> physics.with_friction(0.5)
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,
@@ -545,7 +531,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       transform: transform.at(position: vec3.Vec3(5.0, 2.5, 0.0)),
       physics: option.Some(
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(0.5, 5.0, 20.0))
+        |> physics.with_collider(physics.Box(transform.identity, 0.5, 5.0, 20.0))
         |> physics.with_friction(0.5)
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,

@@ -285,11 +285,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           light.directional(color: 0xffffff, intensity: 0.8)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(30.0, 40.0, 30.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(30.0, 40.0, 30.0)),
     ),
   ]
 
@@ -311,11 +307,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 6.0, 0.0),
-        rotation: vec3.Vec3(model.rotation, model.rotation *. 0.7, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 6.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation *. 0.7, 0.0)),
       physics: option.None,
     )
 
@@ -334,12 +327,9 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 0.0, 0.0),
-        rotation: vec3.Vec3(-1.5708, 0.0, 0.0),
-        // -90 degrees to make it horizontal
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      // -90 degrees to make it horizontal
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
 
@@ -369,11 +359,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             material.new() |> material.with_color(0x4ecdc4) |> material.build()
           material
         },
-        transform: transform.Transform(
-          position: vec3.Vec3(x, 3.0, z),
-          rotation: vec3.Vec3(0.0, 0.0, 0.0),
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+        transform: transform.at(position: vec3.Vec3(x, 3.0, z)),
         physics: option.None,
       )
     })
@@ -399,11 +385,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(25.0, 6.0, 25.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(25.0, 6.0, 25.0)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -425,11 +407,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-25.0, 6.0, 25.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-25.0, 6.0, 25.0)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -451,11 +429,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(25.0, 6.0, -25.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(25.0, 6.0, -25.0)),
       physics: option.None,
     ),
     scene.Mesh(
@@ -477,11 +451,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> material.build()
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-25.0, 6.0, -25.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-25.0, 6.0, -25.0)),
       physics: option.None,
     ),
   ]

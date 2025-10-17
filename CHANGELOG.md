@@ -6,6 +6,23 @@
 - The function `step_world` from the module physics has been removed in favour of the `step` function.
 - Fixed references to tiramisu.Color and tiramisu.Texture, as they should be background.Color and background.Texture.
 - The `RigidBody` type from the physics module is now opaque 
+- The `Transform` type is now opaque - fields cannot be accessed directly
+- Direct field access (e.g., `transform.position`) must be replaced with accessor functions
+- The `Quaternion` type has been moved from the `physics` module to the `transform` module
+- Added `transform.position(t)` - Get position from a transform
+- Added `transform.rotation(t)` - Get rotation as Euler angles (radians)
+- Added `transform.rotation_quaternion(t)` - Get rotation as a quaternion
+- Added `transform.scale(t)` - Get scale from a transform
+- Added `transform.with_euler_rotation(t, euler)` - Set rotation using Euler angles
+- Added `transform.with_quaternion_rotation(t, quat)` - Set rotation using a quaternion
+- Added `transform.with_rotation(t, euler)` - Alias for `with_euler_rotation` (backwards compatible)
+- Added `transform.euler_to_quaternion(euler)` - Convert Euler angles to quaternion
+- Added `transform.quaternion_to_euler(quat)` - Convert quaternion to Euler angles
+- Added `transform.identity_quaternion` - The identity quaternion (no rotation)
+- Rotations are now stored internally as quaternions to avoid gimbal lock
+- `rotate_by()` now uses proper quaternion multiplication for accurate rotation composition
+- All quaternion/Euler conversions implemented in pure Gleam (no FFI)
+- Smoother rotation interpolation with spherical linear interpolation (slerp)
 
 
 ## v2.1.0 - 2025-10-14

@@ -213,11 +213,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                   )
                 material
               },
-              transform: transform.Transform(
-                position: vec3.Vec3(0.0, 0.0, 0.0),
-                rotation: vec3.Vec3(0.0, 0.0, model.rotation *. 2.0),
-                scale: vec3.Vec3(1.0, 1.0, 1.0),
-              ),
+              transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.rotation *. 2.0)),
               physics: option.None,
             )
           }),

@@ -235,11 +235,9 @@ fn create_main_cube(model: Model) -> List(scene.Node(String)) {
       id: "cube",
       geometry: box,
       material: cube_material,
-      transform: transform.Transform(
-        position: model.cube_position,
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(model.cube_scale, model.cube_scale, model.cube_scale),
-      ),
+      transform: transform.at(position: model.cube_position)
+        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.scale_uniform(model.cube_scale),
       physics: option.None,
     ),
   ]

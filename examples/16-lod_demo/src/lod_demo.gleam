@@ -175,11 +175,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           light.directional(color: 0xffffff, intensity: 0.7)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(50.0, 50.0, 50.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(50.0, 50.0, 50.0)),
     ),
   ]
 
@@ -288,11 +284,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           scene.LODLevel(distance: 100.0, node: billboard),
           // 100+ units
         ],
-        transform: transform.Transform(
-          position: vec3.Vec3(0.0, 0.0, fz),
-          rotation: vec3.Vec3(0.0, 0.0, 0.0),
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+        transform: transform.at(position: vec3.Vec3(0.0, 0.0, fz)),
       )
     })
 

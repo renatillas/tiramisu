@@ -90,11 +90,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           light.point(color: 0xfffb00, intensity: 100.5, distance: 100.0)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 0.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
     ),
   ]
 
@@ -117,11 +113,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           )
         material
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 0.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
   ]
@@ -132,11 +125,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       // Planet 1 group (rotates around sun)
       scene.Group(
         id: Planet1Orbit,
-        transform: transform.Transform(
-          position: vec3.Vec3(0.0, 0.0, 0.0),
-          rotation: vec3.Vec3(0.0, model.rotation *. 0.5, 0.0),
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 0.5, 0.0)),
         children: [
           scene.Mesh(
             id: Planet1,
@@ -156,21 +146,15 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                 |> material.build
               material
             },
-            transform: transform.Transform(
-              position: vec3.Vec3(4.0, 0.0, 0.0),
-              rotation: vec3.Vec3(0.0, model.rotation *. 2.0, 0.0),
-              scale: vec3.Vec3(1.0, 1.0, 1.0),
-            ),
+            transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 2.0, 0.0)),
             physics: option.None,
           ),
           // Moon orbiting planet1
           scene.Group(
             id: Moon1Orbit,
-            transform: transform.Transform(
-              position: vec3.Vec3(4.0, 0.0, 0.0),
-              rotation: vec3.Vec3(0.0, model.rotation *. 2.0, 0.0),
-              scale: vec3.Vec3(1.0, 1.0, 1.0),
-            ),
+            transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 2.0, 0.0)),
             children: [
               scene.Mesh(
                 id: Moon1,
@@ -190,11 +174,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                     |> material.build()
                   material
                 },
-                transform: transform.Transform(
-                  position: vec3.Vec3(1.0, 0.0, 0.0),
-                  rotation: vec3.Vec3(0.0, 0.0, 0.0),
-                  scale: vec3.Vec3(1.0, 1.0, 1.0),
-                ),
+                transform: transform.at(position: vec3.Vec3(1.0, 0.0, 0.0)),
                 physics: option.None,
               ),
             ],
@@ -204,11 +184,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       // Planet 2 group (rotates around sun)
       scene.Group(
         id: Planet2Orbit,
-        transform: transform.Transform(
-          position: vec3.Vec3(0.0, 0.0, 0.0),
-          rotation: vec3.Vec3(0.0, model.rotation *. 0.3, 0.0),
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 0.3, 0.0)),
         children: [
           scene.Mesh(
             id: Planet2,
@@ -228,11 +205,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                 |> material.build()
               material
             },
-            transform: transform.Transform(
-              position: vec3.Vec3(7.0, 0.0, 0.0),
-              rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-              scale: vec3.Vec3(1.0, 1.0, 1.0),
-            ),
+            transform: transform.at(position: vec3.Vec3(7.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
             physics: option.None,
           ),
         ],

@@ -275,11 +275,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     scene.Camera(
       id: "main_camera",
       camera:,
-      transform: transform.Transform(
-        position: model.camera_position,
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: model.camera_position),
       active: True,
       look_at: option.Some(look_at_target),
       viewport: option.None,
@@ -300,15 +296,11 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           light.directional(color: 0xffffff, intensity: 2.0)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(
+      transform: transform.at(position: vec3.Vec3(
           10.0 *. maths.cos(model.rotation),
           10.0,
           10.0 *. maths.sin(model.rotation),
-        ),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+        )),
     ),
     scene.Light(
       id: "point",
@@ -317,11 +309,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           light.point(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(-5.0, 3.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-5.0, 3.0, 0.0)),
     ),
     scene.Light(
       id: "hemisphere",
@@ -334,11 +322,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
           )
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 10.0, 0.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
     ),
   ]
 
@@ -495,55 +479,40 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       id: "basic",
       geometry: box_geom,
       material: basic_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(-6.0, 2.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-6.0, 2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "standard",
       geometry: box_geom,
       material: standard_material,
-      transform: transform.Transform(
-        position: vec3.Vec3(-3.0, 2.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "phong",
       geometry: box_geom,
       material: phong_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 2.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "lambert",
       geometry: box_geom,
       material: lambert_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(3.0, 2.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(3.0, 2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
     scene.Mesh(
       id: "toon",
       geometry: box_geom,
       material: toon_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(6.0, 2.0, 0.0),
-        rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(6.0, 2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
   ]
@@ -585,11 +554,8 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       id: "ground",
       geometry: plane_geom,
       material: ground_material,
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, -2.0, 0.0),
-        rotation: vec3.Vec3(-1.5708, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, -2.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     ),
   ]

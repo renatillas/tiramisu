@@ -161,11 +161,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           light.directional(intensity: 0.8, color: 0xffffff)
         light
       },
-      transform: transform.Transform(
-        position: vec3.Vec3(10.0, 10.0, 10.0),
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
     ),
   ]
 
@@ -178,15 +174,13 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         id: CubeId(cube.id),
         geometry: box_geometry,
         material: cube_material,
-        transform: transform.Transform(
-          position: cube.position,
-          rotation: vec3.Vec3(
+        transform: transform.at(position: cube.position)
+          |> transform.with_euler_rotation(vec3.Vec3(
             cube.position.y *. 0.5,
             cube.position.x *. 0.5,
             0.0,
-          ),
-          scale: vec3.Vec3(1.0, 1.0, 1.0),
-        ),
+          ))
+          |> transform.with_scale(vec3.Vec3(1.0, 1.0, 1.0)),
         physics: option.None,
       )
     })

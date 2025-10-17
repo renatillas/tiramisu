@@ -234,11 +234,8 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
               )
             material
           },
-          transform: transform.Transform(
-            position: vec3.Vec3(0.0, 0.0, 0.0),
-            rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
-            scale: vec3.Vec3(1.0, 1.0, 1.0),
-          ),
+          transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
           physics: option.None,
         )
         |> list.wrap
@@ -264,11 +261,8 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
               |> material.build()
             material
           },
-          transform: transform.Transform(
-            position: vec3.Vec3(0.0, 0.0, 0.0),
-            rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-            scale: vec3.Vec3(1.0, 1.0, 1.0),
-          ),
+          transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
         |> list.wrap
@@ -301,11 +295,8 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         scene.Model3D(
           id: GltfModel,
           object: gltf_model.scene,
-          transform: transform.Transform(
-            position: vec3.Vec3(0.0, 0.0, 0.0),
-            rotation: vec3.Vec3(0.0, model.rotation, 0.0),
-            scale: vec3.Vec3(1.0, 1.0, 1.0),
-          ),
+          transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
         )
