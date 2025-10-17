@@ -67,22 +67,25 @@ pub fn box_from_transform(
   t: transform.Transform,
   color: Int,
 ) -> scene.Node(id) {
-  let half_x = t.scale.x /. 2.0
-  let half_y = t.scale.y /. 2.0
-  let half_z = t.scale.z /. 2.0
+  let scale = transform.scale(t)
+  let pos = transform.position(t)
+
+  let half_x = scale.x /. 2.0
+  let half_y = scale.y /. 2.0
+  let half_z = scale.z /. 2.0
 
   let min =
     vec3.Vec3(
-      t.position.x -. half_x,
-      t.position.y -. half_y,
-      t.position.z -. half_z,
+      pos.x -. half_x,
+      pos.y -. half_y,
+      pos.z -. half_z,
     )
 
   let max =
     vec3.Vec3(
-      t.position.x +. half_x,
-      t.position.y +. half_y,
-      t.position.z +. half_z,
+      pos.x +. half_x,
+      pos.y +. half_y,
+      pos.z +. half_z,
     )
 
   bounding_box(id, min, max, color)
@@ -356,7 +359,7 @@ fn collider_sphere(
   transform: Transform,
   color: Int,
 ) -> scene.Node(id) {
-  let center = transform.position
+  let center = transform.position(transform)
   sphere(id, center, radius, color)
 }
 
@@ -566,20 +569,25 @@ fn generate_cylinder_wireframe(
 
 /// Transform a point by a transform (position + rotation + scale)
 fn transform_point(point: Vec3(Float), transform: Transform) -> Vec3(Float) {
+  // Get transform properties via accessor functions
+  let scale = transform.scale(transform)
+  let rotation_euler = transform.rotation(transform)
+  let position = transform.position(transform)
+
   // First apply scale
   let scaled =
     vec3.Vec3(
-      point.x *. transform.scale.x,
-      point.y *. transform.scale.y,
-      point.z *. transform.scale.z,
+      point.x *. scale.x,
+      point.y *. scale.y,
+      point.z *. scale.z,
     )
 
   // Then apply rotation (simplified - only Y rotation for now)
   // For full rotation support, we'd need to convert Euler to matrix
-  let rotated = rotate_y(scaled, transform.rotation.y)
+  let rotated = rotate_y(scaled, rotation_euler.y)
 
   // Finally apply translation
-  vec3f.add(rotated, transform.position)
+  vec3f.add(rotated, position)
 }
 
 /// Rotate a point around the Y axis

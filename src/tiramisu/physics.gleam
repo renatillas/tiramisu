@@ -12,7 +12,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import tiramisu/internal/id
-import tiramisu/transform.{type Transform}
+import tiramisu/transform.{type Quaternion, type Transform}
 import vec/vec3.{type Vec3}
 
 type RapierWorld
@@ -20,10 +20,6 @@ type RapierWorld
 type RapierEventQueue
 
 type RapierRigidBody
-
-pub type Quaternion {
-  Quaternion(x: Float, y: Float, z: Float, w: Float)
-}
 
 /// Opaque handle to the Rapier physics world
 /// This is part of your Model and gets updated each frame
@@ -1036,11 +1032,10 @@ fn get_body_translation_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
 @external(javascript, "../rapier.ffi.mjs", "getBodyRotation")
 fn get_body_rotation_ffi(body: RapierRigidBody) -> Quaternion
 
+// Quaternion/Euler conversion is now done in Gleam in transform.gleam
+// We still use the FFI version here for get_transform as it's already in Rapier
 @external(javascript, "../rapier.ffi.mjs", "quaternionToEuler")
 fn quat_to_euler_ffi(x: Float, y: Float, z: Float, w: Float) -> vec3.Vec3(Float)
-
-@external(javascript, "../rapier.ffi.mjs", "eulerToQuaternion")
-fn euler_to_quat_ffi(x: Float, y: Float, z: Float) -> Quaternion
 
 // Raycasting FFI using Rapier
 type RapierRay
@@ -1131,16 +1126,11 @@ pub fn create_body(
   }
 
   // Set transform
-  let pos = transform.position
+  let pos = transform.position(transform)
   set_body_translation_ffi(body_desc, pos.x, pos.y, pos.z)
 
-  // Convert Euler angles to quaternion
-  let quat =
-    euler_to_quat_ffi(
-      transform.rotation.x,
-      transform.rotation.y,
-      transform.rotation.z,
-    )
+  // Get quaternion rotation directly from transform
+  let quat = transform.rotation_quaternion(transform)
   set_body_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
 
   // Set damping
@@ -1190,12 +1180,11 @@ pub fn create_body(
   }
 
   // Set collider offset (position)
-  let pos = offset.position
+  let pos = transform.position(offset)
   set_collider_translation_ffi(collider_desc, pos.x, pos.y, pos.z)
 
-  // Set collider offset (rotation) - convert Euler to quaternion
-  let quat =
-    euler_to_quat_ffi(offset.rotation.x, offset.rotation.y, offset.rotation.z)
+  // Set collider offset (rotation) - get quaternion directly from transform
+  let quat = transform.rotation_quaternion(offset)
   set_collider_rotation_ffi(collider_desc, quat.x, quat.y, quat.z, quat.w)
 
   // Set collider properties

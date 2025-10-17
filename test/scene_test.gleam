@@ -85,7 +85,7 @@ pub fn diff_transform_change_test() {
 
   case patches {
     [scene.UpdateTransform(id: Cube1, transform: t)] -> {
-      assert t.position == vec3.Vec3(5.0, 0.0, 0.0)
+      assert transform.position(t) == vec3.Vec3(5.0, 0.0, 0.0)
     }
     _ -> should.fail()
   }

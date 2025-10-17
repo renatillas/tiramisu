@@ -173,7 +173,7 @@ pub fn tween_transform_test() {
     |> animation.update_tween(1.0)
 
   let value = animation.get_tween_value(tween)
-  assert value.position == vec3.Vec3(5.0, 0.0, 0.0)
+  assert transform.position(value) == vec3.Vec3(5.0, 0.0, 0.0)
 }
 
 // --- Tween Utilities Tests ---

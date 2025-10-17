@@ -92,7 +92,7 @@ pub fn create_particle_system(
   let points = create_points_ffi(geometry, material)
 
   // Apply transform
-  let pos = transform.position
+  let pos = transform.position(transform)
   set_position_ffi(points, pos.x, pos.y, pos.z)
 
   ParticleSystemState(
@@ -148,7 +148,7 @@ fn spawn_particle(state: ParticleSystemState) -> ParticleSystemState {
 /// Initialize a new particle with randomized properties
 fn init_particle(emitter: ParticleEmitter, transform: Transform) -> Particle {
   // Get emitter position from transform
-  let pos = transform.position
+  let pos = transform.position(transform)
 
   // Get emitter properties
   let base_velocity = particle_emitter.get_velocity(emitter)
