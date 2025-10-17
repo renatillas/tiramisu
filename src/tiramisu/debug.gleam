@@ -74,19 +74,9 @@ pub fn box_from_transform(
   let half_y = scale.y /. 2.0
   let half_z = scale.z /. 2.0
 
-  let min =
-    vec3.Vec3(
-      pos.x -. half_x,
-      pos.y -. half_y,
-      pos.z -. half_z,
-    )
+  let min = vec3.Vec3(pos.x -. half_x, pos.y -. half_y, pos.z -. half_z)
 
-  let max =
-    vec3.Vec3(
-      pos.x +. half_x,
-      pos.y +. half_y,
-      pos.z +. half_z,
-    )
+  let max = vec3.Vec3(pos.x +. half_x, pos.y +. half_y, pos.z +. half_z)
 
   bounding_box(id, min, max, color)
 }
@@ -576,11 +566,7 @@ fn transform_point(point: Vec3(Float), transform: Transform) -> Vec3(Float) {
 
   // First apply scale
   let scaled =
-    vec3.Vec3(
-      point.x *. scale.x,
-      point.y *. scale.y,
-      point.z *. scale.z,
-    )
+    vec3.Vec3(point.x *. scale.x, point.y *. scale.y, point.z *. scale.z)
 
   // Then apply rotation (simplified - only Y rotation for now)
   // For full rotation support, we'd need to convert Euler to matrix

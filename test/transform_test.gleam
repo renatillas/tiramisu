@@ -70,8 +70,10 @@ pub fn rotate_test() {
   // Test that rotate_by correctly composes rotations using quaternions
   let t =
     transform.identity
-    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))  // 90° around Y
-    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))  // Another 90° around Y
+    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))
+    // 90° around Y
+    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))
+  // Another 90° around Y
 
   // After two 90° rotations around Y, we should be at ~180° (3.14 radians)
   let epsilon = 0.01
