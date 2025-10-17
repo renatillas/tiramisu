@@ -15,11 +15,11 @@ import tiramisu/internal/id
 import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
 
-pub type RapierWorld
+type RapierWorld
 
-pub type RapierEventQueue
+type RapierEventQueue
 
-pub type RapierRigidBody
+type RapierRigidBody
 
 pub type Quaternion {
   Quaternion(x: Float, y: Float, z: Float, w: Float)
@@ -1084,7 +1084,7 @@ fn get_hit_normal_ffi(hit: RapierRayHit) -> vec3.Vec3(Float)
 
 /// Initialize the global physics world
 /// Takes a WorldConfig as Dynamic and extracts gravity
-pub fn create_world(config: WorldConfig(id)) {
+fn create_world(config: WorldConfig(id)) -> #(RapierWorld, RapierEventQueue) {
   // Create Rapier world
   let world =
     create_world_ffi(config.gravity.x, config.gravity.y, config.gravity.z)
