@@ -29,10 +29,26 @@ pub fn with_rotation_test() {
   // Compare quaternions instead of Euler angles to avoid representation ambiguity
   let expected_quat = transform.euler_to_quaternion(rot)
   let actual_quat = transform.rotation_quaternion(t)
-  assert float.loosely_equals(expected_quat.x, actual_quat.x, tolerating: 0.0001)
-  assert float.loosely_equals(expected_quat.y, actual_quat.y, tolerating: 0.0001)
-  assert float.loosely_equals(expected_quat.z, actual_quat.z, tolerating: 0.0001)
-  assert float.loosely_equals(expected_quat.w, actual_quat.w, tolerating: 0.0001)
+  assert float.loosely_equals(
+    expected_quat.x,
+    actual_quat.x,
+    tolerating: 0.0001,
+  )
+  assert float.loosely_equals(
+    expected_quat.y,
+    actual_quat.y,
+    tolerating: 0.0001,
+  )
+  assert float.loosely_equals(
+    expected_quat.z,
+    actual_quat.z,
+    tolerating: 0.0001,
+  )
+  assert float.loosely_equals(
+    expected_quat.w,
+    actual_quat.w,
+    tolerating: 0.0001,
+  )
   assert transform.scale(t) == vec3.Vec3(1.0, 1.0, 1.0)
 }
 
@@ -86,7 +102,8 @@ pub fn rotate_test() {
 
   // After two 90° rotations around Y, we should have a 180° Y rotation
   // Compare quaternions since Euler angles can have multiple representations
-  let expected_quat = transform.euler_to_quaternion(vec3.Vec3(0.0, maths.pi(), 0.0))
+  let expected_quat =
+    transform.euler_to_quaternion(vec3.Vec3(0.0, maths.pi(), 0.0))
   let actual_quat = transform.rotation_quaternion(t)
 
   // Allow some tolerance for floating point math

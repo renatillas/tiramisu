@@ -296,10 +296,19 @@ pub fn text(
   use <- bool.guard(text == "", Error(EmptyText))
   use <- bool.guard(size <=. 0.0, Error(NonPositiveSize(size)))
   use <- bool.guard(depth <. 0.0, Error(NonPositiveDepth(depth)))
-  use <- bool.guard(curve_segments < 1, Error(NegativeSegmentCount(curve_segments)))
-  use <- bool.guard(bevel_thickness <. 0.0, Error(NegativeBevelThickness(bevel_thickness)))
+  use <- bool.guard(
+    curve_segments < 1,
+    Error(NegativeSegmentCount(curve_segments)),
+  )
+  use <- bool.guard(
+    bevel_thickness <. 0.0,
+    Error(NegativeBevelThickness(bevel_thickness)),
+  )
   use <- bool.guard(bevel_size <. 0.0, Error(NegativeBevelSize(bevel_size)))
-  use <- bool.guard(bevel_segments < 1, Error(NegativeSegmentCount(bevel_segments)))
+  use <- bool.guard(
+    bevel_segments < 1,
+    Error(NegativeSegmentCount(bevel_segments)),
+  )
 
   Ok(TextGeometry(
     text,
