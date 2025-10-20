@@ -43,6 +43,12 @@ pub type Texture
 /// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
 pub type BufferGeometry
 
+/// Opaque type for Three.js Font (for TextGeometry).
+///
+/// Created via `asset.load_font()` and used in text geometries.
+/// Fonts must be in typeface.json format.
+pub type Font
+
 // --- Public Types ---
 /// STL loading error
 pub type LoadError {
@@ -79,6 +85,12 @@ pub type AssetType {
   /// which are properly parsed. Textures are assumed to be in the same directory as
   /// the MTL file.
   OBJAsset(obj_url: String, mtl_url: option.Option(String))
+  /// Font for TextGeometry (typeface.json format)
+  ///
+  /// Fonts must be in Three.js typeface.json format. You can convert TTF/OTF fonts
+  /// using the facetype.js converter or download pre-converted fonts from the
+  /// Three.js repository (examples/fonts/).
+  FontAsset(url: String)
 }
 
 /// A loaded asset (opaque to enforce type safety)
@@ -88,6 +100,7 @@ pub opaque type LoadedAsset {
   LoadedAudio(audio: AudioBuffer)
   LoadedSTL(geometry: BufferGeometry)
   LoadedOBJ(object: Object3D)
+  LoadedFont(font: Font)
 }
 
 // Internal constructors for FFI use
@@ -114,6 +127,11 @@ pub fn loaded_stl(geometry: BufferGeometry) -> LoadedAsset {
 @internal
 pub fn loaded_obj(object: Object3D) -> LoadedAsset {
   LoadedOBJ(object)
+}
+
+@internal
+pub fn loaded_font(font: Font) -> LoadedAsset {
+  LoadedFont(font)
 }
 
 /// Asset loading error
@@ -235,6 +253,17 @@ pub fn load_asset(asset: AssetType) -> Promise(Result(LoadedAsset, AssetError)) 
           Error(LoadError(msg)) -> Error(AssetLoadError(obj_url, msg))
           Error(InvalidUrl(_)) -> Error(AssetLoadError(obj_url, "Invalid URL"))
           Error(ParseError(msg)) -> Error(AssetLoadError(obj_url, msg))
+        }
+      })
+    }
+
+    FontAsset(url) -> {
+      promise.map(load_font(url), fn(result) {
+        case result {
+          Ok(font) -> Ok(LoadedFont(font))
+          Error(LoadError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
+          Error(ParseError(msg)) -> Error(AssetLoadError(url, msg))
         }
       })
     }
@@ -593,3 +622,51 @@ fn load_obj_ffi(
   obj_url: String,
   mtl_url: String,
 ) -> Promise(Result(Object3D, String))
+
+/// Load a font file (typeface.json format) for use with TextGeometry.
+///
+/// Three.js fonts must be in typeface.json format. You can:
+/// - Download pre-converted fonts from Three.js repository (examples/fonts/)
+/// - Convert TTF/OTF fonts using facetype.js converter
+///
+/// ## Example
+///
+/// ```gleam
+/// import gleam/javascript/promise
+/// import tiramisu/asset
+///
+/// let load_effect = asset.load_font("fonts/helvetiker_regular.typeface.json")
+///   |> promise.map(fn(result) {
+///     case result {
+///       Ok(font) -> FontLoaded(font)
+///       Error(err) -> LoadFailed(err)
+///     }
+///   })
+/// ```
+///
+/// ## Returns
+///
+/// A Promise that resolves to:
+/// - `Ok(Font)`: Loaded font ready for TextGeometry
+/// - `Error(LoadError)`: File not found
+/// - `Error(InvalidUrl)`: Invalid URL provided
+/// - `Error(ParseError)`: Failed to parse font file
+pub fn load_font(url: String) -> Promise(Result(Font, LoadError)) {
+  // Validate URL
+  case url == "" {
+    True -> promise.resolve(Error(InvalidUrl(url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_font_ffi(url)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(font) -> Ok(font)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadFontSafe")
+fn load_font_ffi(url: String) -> Promise(Result(Font, String))

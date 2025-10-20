@@ -681,7 +681,7 @@ export async function loadBatch(assets, onProgress) {
  * Get URL from AssetType
  */
 function getAssetUrl(asset) {
-  // AssetType variants: ModelAsset, TextureAsset, AudioAsset, STLAsset
+  // AssetType variants: ModelAsset, TextureAsset, AudioAsset, STLAsset, FontAsset
   // Each has a 'url' field
   return asset.url;
 }
@@ -729,6 +729,14 @@ async function loadAssetByType(asset) {
       }
       return result;
     });
+  } else if (typeName === 'FontAsset') {
+    // Load font using safe wrapper
+    return loadFontSafe(url).then(result => {
+      if (result.isOk()) {
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_font(result[0]));
+      }
+      return result;
+    });
   } else {
     return Promise.resolve(new GLEAM.Error(`Unknown asset type: ${typeName}`));
   }
@@ -750,6 +758,21 @@ export async function loadTextureSafe(url) {
     return new GLEAM.Ok(texture);
   } catch (error) {
     return new GLEAM.Error(error.message || 'Failed to load texture');
+  }
+}
+
+/**
+ * Safe font loader that wraps Three.js FontLoader with Result type
+ * @param {string} url
+ * @returns {Promise<Result<Font, string>>}
+ */
+export async function loadFontSafe(url) {
+  const THREE_FFI = await import('./threejs.ffi.mjs');
+  try {
+    const font = await THREE_FFI.loadFont(url);
+    return new GLEAM.Ok(font);
+  } catch (error) {
+    return new GLEAM.Error(error.message || 'Failed to load font');
   }
 }
 

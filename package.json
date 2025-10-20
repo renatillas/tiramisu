@@ -15,5 +15,4 @@
   "scripts": {
     "lint": "eslint ./src/ --ext .mjs"
   }
-
 }

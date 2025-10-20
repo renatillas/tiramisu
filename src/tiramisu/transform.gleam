@@ -53,65 +53,29 @@ pub opaque type Transform {
 
 // --- Quaternion <-> Euler Conversion Functions ---
 
-/// Convert Euler angles (pitch, yaw, roll) to a quaternion.
+/// Convert Euler angles to a quaternion using Three.js's conversion.
 ///
-/// Uses XYZ rotation order (pitch -> yaw -> roll).
-pub fn euler_to_quaternion(euler: vec3.Vec3(Float)) -> Quaternion {
-  let pitch = euler.x
-  let yaw = euler.y
-  let roll = euler.z
+/// Uses XYZ rotation order matching Three.js default.
+/// - euler.x = rotation around X axis (radians)
+/// - euler.y = rotation around Y axis (radians)
+/// - euler.z = rotation around Z axis (radians)
+@external(javascript, "../threejs.ffi.mjs", "eulerToQuaternion")
+pub fn euler_to_quaternion(euler: vec3.Vec3(Float)) -> Quaternion
 
-  // Half angles
-  let cy = maths.cos(yaw *. 0.5)
-  let sy = maths.sin(yaw *. 0.5)
-  let cp = maths.cos(pitch *. 0.5)
-  let sp = maths.sin(pitch *. 0.5)
-  let cr = maths.cos(roll *. 0.5)
-  let sr = maths.sin(roll *. 0.5)
-
-  // Compute quaternion components
-  Quaternion(
-    x: sr *. cp *. cy -. cr *. sp *. sy,
-    y: cr *. sp *. cy +. sr *. cp *. sy,
-    z: cr *. cp *. sy -. sr *. sp *. cy,
-    w: cr *. cp *. cy +. sr *. sp *. sy,
-  )
-}
-
-/// Convert a quaternion to Euler angles (pitch, yaw, roll).
+/// Convert a quaternion to Euler angles using Three.js's conversion.
 ///
-/// Returns angles in radians using XYZ rotation order.
+/// Returns angles in radians using XYZ rotation order matching Three.js default.
+/// - result.x = rotation around X axis (radians)
+/// - result.y = rotation around Y axis (radians)
+/// - result.z = rotation around Z axis (radians)
+@external(javascript, "../threejs.ffi.mjs", "quaternionToEuler")
+fn quaternion_to_euler_ffi(q: Quaternion) -> vec3.Vec3(Float)
+
+/// Convert a quaternion to Euler angles.
+///
+/// Returns angles in radians using XYZ rotation order matching Three.js default.
 pub fn quaternion_to_euler(q: Quaternion) -> vec3.Vec3(Float) {
-  // Roll (x-axis rotation)
-  let sinr_cosp = 2.0 *. { q.w *. q.x +. q.y *. q.z }
-  let cosr_cosp = 1.0 -. 2.0 *. { q.x *. q.x +. q.y *. q.y }
-  let roll = maths.atan2(sinr_cosp, cosr_cosp)
-
-  // Pitch (y-axis rotation)
-  let sinp = 2.0 *. { q.w *. q.y -. q.z *. q.x }
-  let pitch = case float.absolute_value(sinp) >=. 1.0 {
-    True -> {
-      // Use 90 degrees if out of range (gimbal lock)
-      let sign = case sinp >. 0.0 {
-        True -> 1.0
-        False -> -1.0
-      }
-      sign *. maths.pi() /. 2.0
-    }
-    False -> {
-      case maths.asin(sinp) {
-        Ok(val) -> val
-        Error(_) -> 0.0
-      }
-    }
-  }
-
-  // Yaw (z-axis rotation)
-  let siny_cosp = 2.0 *. { q.w *. q.z +. q.x *. q.y }
-  let cosy_cosp = 1.0 -. 2.0 *. { q.y *. q.y +. q.z *. q.z }
-  let yaw = maths.atan2(siny_cosp, cosy_cosp)
-
-  vec3.Vec3(pitch, yaw, roll)
+  quaternion_to_euler_ffi(q)
 }
 
 // --- Constants ---
@@ -161,13 +125,13 @@ pub fn position(transform: Transform) -> vec3.Vec3(Float) {
 
 /// Get the rotation of a transform as Euler angles (in radians).
 ///
-/// Returns rotation as pitch (x), yaw (y), roll (z) in radians.
+/// Returns rotation as Vec3(x_rotation, y_rotation, z_rotation) in radians.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// let euler = transform.rotation(my_transform)
-/// // Returns vec3.Vec3(pitch, yaw, roll)
+/// // Returns vec3.Vec3(x_rotation, y_rotation, z_rotation)
 /// ```
 pub fn rotation(transform: Transform) -> vec3.Vec3(Float) {
   quaternion_to_euler(transform.rotation)
@@ -405,17 +369,11 @@ pub fn compose(first: Transform, second: Transform) -> Transform {
   )
 }
 
-/// Multiply two quaternions (q1 * q2).
+/// Multiply two quaternions (q1 * q2) using Three.js.
 ///
 /// Represents the combined rotation of applying q1 then q2.
-fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion {
-  Quaternion(
-    x: q1.w *. q2.x +. q1.x *. q2.w +. q1.y *. q2.z -. q1.z *. q2.y,
-    y: q1.w *. q2.y -. q1.x *. q2.z +. q1.y *. q2.w +. q1.z *. q2.x,
-    z: q1.w *. q2.z +. q1.x *. q2.y -. q1.y *. q2.x +. q1.z *. q2.w,
-    w: q1.w *. q2.w -. q1.x *. q2.x -. q1.y *. q2.y -. q1.z *. q2.z,
-  )
-}
+@external(javascript, "../threejs.ffi.mjs", "multiplyQuaternions")
+fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion
 
 /// Create a transform that looks at a target position from a source position.
 ///
@@ -424,9 +382,9 @@ fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion {
 /// converts to quaternion internally.
 ///
 /// Returns rotation where:
-/// - **Pitch (X)**: rotation around X axis (looking up/down)
-/// - **Yaw (Y)**: rotation around Y axis (turning left/right)
-/// - **Roll (Z)**: rotation around Z axis (typically 0 for look-at)
+/// - **X rotation**: rotation around X axis (looking up/down)
+/// - **Y rotation**: rotation around Y axis (turning left/right)
+/// - **Z rotation**: rotation around Z axis (typically 0 for look-at)
 ///
 /// ## Example
 ///
@@ -460,20 +418,19 @@ pub fn look_at(
       }
     }
 
-  // Calculate pitch (rotation around X axis - looking up/down)
+  // Calculate rotation around X axis (looking up/down)
   // atan2(y, horizontal_distance) gives angle from horizontal plane
-  let pitch = maths.atan2(direction.y, horizontal_distance)
+  let x_rotation = maths.atan2(direction.y, horizontal_distance)
 
-  // Calculate yaw (rotation around Y axis - looking left/right)
+  // Calculate rotation around Y axis (looking left/right)
   // atan2(x, z) gives angle from forward (Z) axis
-  // Note: In Three.js, positive Z is backward, so we negate
-  let yaw = maths.atan2(direction.x, direction.z)
+  let y_rotation = maths.atan2(direction.x, direction.z)
 
-  // Roll is typically 0 for standard look-at (no barrel roll)
-  let roll = 0.0
+  // Z rotation is typically 0 for standard look-at (no barrel roll)
+  let z_rotation = 0.0
 
   // Convert Euler angles to quaternion
-  let euler = vec3.Vec3(pitch, yaw, roll)
+  let euler = vec3.Vec3(x_rotation, y_rotation, z_rotation)
   let quat = euler_to_quaternion(euler)
 
   Transform(position: from, rotation: quat, scale: vec3f.one)

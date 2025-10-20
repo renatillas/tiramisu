@@ -26,6 +26,18 @@ pub opaque type Geometry {
   TetrahedronGeometry(radius: Float, detail: Int)
   IcosahedronGeometry(radius: Float, detail: Int)
   CustomGeometry(asset.BufferGeometry)
+  TextGeometry(
+    text: String,
+    font: asset.Font,
+    size: Float,
+    depth: Float,
+    curve_segments: Int,
+    bevel_enabled: Bool,
+    bevel_thickness: Float,
+    bevel_size: Float,
+    bevel_offset: Float,
+    bevel_segments: Int,
+  )
 }
 
 pub type GeometryError {
@@ -37,6 +49,10 @@ pub type GeometryError {
   LessThanThreeSegmentCountWidth(count: Int)
   LessThanTwoSegmentCountHeight(count: Int)
   NegativeSegmentCount(count: Int)
+  EmptyText
+  NonPositiveSize(size: Float)
+  NegativeBevelThickness(thickness: Float)
+  NegativeBevelSize(size: Float)
 }
 
 @internal
@@ -227,6 +243,78 @@ pub fn icosahedron(
   Ok(IcosahedronGeometry(radius, detail))
 }
 
+/// Create validated 3D text geometry from a loaded font.
+///
+/// Renders text as 3D geometry with optional beveling (rounded edges).
+/// Requires a font loaded via `asset.load_font()`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/geometry
+/// import tiramisu/asset
+///
+/// // After loading font...
+/// let assert Ok(text) = geometry.text(
+///   text: "Hello!",
+///   font: my_font,
+///   size: 1.0,
+///   depth: 0.2,
+///   curve_segments: 12,
+///   bevel_enabled: True,
+///   bevel_thickness: 0.05,
+///   bevel_size: 0.02,
+///   bevel_offset: 0.0,
+///   bevel_segments: 5,
+/// )
+/// ```
+///
+/// ## Parameters
+///
+/// - `text`: String to render (must not be empty)
+/// - `font`: Loaded font from `asset.load_font()`
+/// - `size`: Text size (must be positive)
+/// - `depth`: Extrusion depth for 3D effect (0 for flat, >0 for 3D)
+/// - `curve_segments`: Quality of curves (more = smoother but more triangles)
+/// - `bevel_enabled`: Whether to add rounded edges
+/// - `bevel_thickness`: How deep bevels cut into text
+/// - `bevel_size`: How far bevels extend outward
+/// - `bevel_offset`: Starting distance of bevel from outline
+/// - `bevel_segments`: Smoothness of bevel (more = rounder)
+pub fn text(
+  text text: String,
+  font font: asset.Font,
+  size size: Float,
+  depth depth: Float,
+  curve_segments curve_segments: Int,
+  bevel_enabled bevel_enabled: Bool,
+  bevel_thickness bevel_thickness: Float,
+  bevel_size bevel_size: Float,
+  bevel_offset bevel_offset: Float,
+  bevel_segments bevel_segments: Int,
+) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(text == "", Error(EmptyText))
+  use <- bool.guard(size <=. 0.0, Error(NonPositiveSize(size)))
+  use <- bool.guard(depth <. 0.0, Error(NonPositiveDepth(depth)))
+  use <- bool.guard(curve_segments < 1, Error(NegativeSegmentCount(curve_segments)))
+  use <- bool.guard(bevel_thickness <. 0.0, Error(NegativeBevelThickness(bevel_thickness)))
+  use <- bool.guard(bevel_size <. 0.0, Error(NegativeBevelSize(bevel_size)))
+  use <- bool.guard(bevel_segments < 1, Error(NegativeSegmentCount(bevel_segments)))
+
+  Ok(TextGeometry(
+    text,
+    font,
+    size,
+    depth,
+    curve_segments,
+    bevel_enabled,
+    bevel_thickness,
+    bevel_size,
+    bevel_offset,
+    bevel_segments,
+  ))
+}
+
 @internal
 pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
   case geometry {
@@ -251,6 +339,30 @@ pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
       create_sphere_geometry(radius, width_segments, height_segments)
     TetrahedronGeometry(radius:, detail:) ->
       create_tetrahedron_geometry(radius, detail)
+    TextGeometry(
+      text:,
+      font:,
+      size:,
+      depth:,
+      curve_segments:,
+      bevel_enabled:,
+      bevel_thickness:,
+      bevel_size:,
+      bevel_offset:,
+      bevel_segments:,
+    ) ->
+      create_text_geometry(
+        text,
+        font,
+        size,
+        depth,
+        curve_segments,
+        bevel_enabled,
+        bevel_thickness,
+        bevel_size,
+        bevel_offset,
+        bevel_segments,
+      )
     TorusGeometry(radius:, tube:, radial_segments:, tubular_segments:) ->
       create_torus_geometry(radius, tube, radial_segments, tubular_segments)
   }
@@ -308,4 +420,18 @@ fn create_torus_geometry(
   tube: Float,
   radial_segments: Int,
   tubular_segments: Int,
+) -> ThreeGeometry
+
+@external(javascript, "../threejs.ffi.mjs", "createTextGeometry")
+fn create_text_geometry(
+  text: String,
+  font: asset.Font,
+  size: Float,
+  depth: Float,
+  curve_segments: Int,
+  bevel_enabled: Bool,
+  bevel_thickness: Float,
+  bevel_size: Float,
+  bevel_offset: Float,
+  bevel_segments: Int,
 ) -> ThreeGeometry

@@ -12,6 +12,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { Quaternion } from './tiramisu/transform.mjs';
+import { Vec3 } from '../vec/vec/vec3.mjs';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -493,6 +497,62 @@ export function createIcosahedronGeometry(radius, detail) {
  */
 export function disposeGeometry(geometry) {
   geometry.dispose();
+}
+
+/**
+ * Load font for text geometry
+ * @param {string} url - URL to typeface.json font file
+ * @returns {Promise<Font>}
+ */
+export function loadFont(url) {
+  const loader = new FontLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (font) => resolve(font),
+      undefined,
+      (error) => reject(error)
+    );
+  });
+}
+
+/**
+ * Create text geometry
+ * @param {string} text - The text to render
+ * @param {Font} font - The loaded font
+ * @param {number} size - Text size
+ * @param {number} depth - Extrusion depth (3D thickness)
+ * @param {number} curveSegments - Number of points on curves
+ * @param {boolean} bevelEnabled - Enable beveling
+ * @param {number} bevelThickness - Bevel depth
+ * @param {number} bevelSize - Bevel extension distance
+ * @param {number} bevelOffset - Bevel start offset
+ * @param {number} bevelSegments - Number of bevel segments
+ * @returns {THREE.BufferGeometry}
+ */
+export function createTextGeometry(
+  text,
+  font,
+  size,
+  depth,
+  curveSegments,
+  bevelEnabled,
+  bevelThickness,
+  bevelSize,
+  bevelOffset,
+  bevelSegments
+) {
+  return new TextGeometry(text, {
+    font: font,
+    size: size,
+    depth: depth,
+    curveSegments: curveSegments,
+    bevelEnabled: bevelEnabled,
+    bevelThickness: bevelThickness,
+    bevelSize: bevelSize,
+    bevelOffset: bevelOffset,
+    bevelSegments: bevelSegments
+  });
 }
 
 // ============================================================================
@@ -1867,11 +1927,11 @@ export function setAttributeNeedsUpdate(attribute, needsUpdate) {
 /**
  * Apply transform to Three.js object
  * @param {THREE.Object3D} object
- * @param {Object} transform - {position: {x, y, z}, rotation: {x, y, z}, scale: {x, y, z}}
+ * @param {Object} transform - {position: {x, y, z}, rotation: {x, y, z, w} (quaternion), scale: {x, y, z}}
  */
 export function applyTransform(object, transform) {
   object.position.set(transform.position.x, transform.position.y, transform.position.z);
-  object.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+  object.quaternion.set(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
   object.scale.set(transform.scale.x, transform.scale.y, transform.scale.z);
 }
 
@@ -2192,4 +2252,43 @@ export function getObjectQuaternion(object) {
  */
 export function setObjectQuaternion(object, x, y, z, w) {
   object.quaternion.set(x, y, z, w);
+}
+
+// ============================================================================
+// EULER <-> QUATERNION CONVERSION
+// ============================================================================
+
+/**
+ * Convert Euler angles to Quaternion using Three.js's built-in conversion
+ * @param {Vec3} euler - Euler angles as Vec3(x, y, z) in radians
+ * @returns {Quaternion} Quaternion
+ */
+export function eulerToQuaternion(euler) {
+  const threeEuler = new THREE.Euler(euler.x, euler.y, euler.z, 'XYZ');
+  const threeQuaternion = new THREE.Quaternion().setFromEuler(threeEuler);
+  return new Quaternion(threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w);
+}
+
+/**
+ * Convert Quaternion to Euler angles using Three.js's built-in conversion
+ * @param {Quaternion} q - Quaternion
+ * @returns {Vec3} Euler angles as Vec3(x, y, z) in radians
+ */
+export function quaternionToEuler(q) {
+  const threeQuaternion = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+  const threeEuler = new THREE.Euler().setFromQuaternion(threeQuaternion, 'XYZ');
+  return new Vec3(threeEuler.x, threeEuler.y, threeEuler.z);
+}
+
+/**
+ * Multiply two quaternions using Three.js
+ * @param {Quaternion} q1 - First quaternion
+ * @param {Quaternion} q2 - Second quaternion
+ * @returns {Quaternion} Result of q1 * q2
+ */
+export function multiplyQuaternions(q1, q2) {
+  const threeQ1 = new THREE.Quaternion(q1.x, q1.y, q1.z, q1.w);
+  const threeQ2 = new THREE.Quaternion(q2.x, q2.y, q2.z, q2.w);
+  threeQ1.multiply(threeQ2);
+  return new Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
 }

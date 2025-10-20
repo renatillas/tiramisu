@@ -178,7 +178,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> transform.with_euler_rotation(vec3.Vec3(
             cube.position.y *. 0.5,
             cube.position.x *. 0.5,
-            0.0,
+            cube.position.z *. 0.5,
           ))
           |> transform.with_scale(vec3.Vec3(1.0, 1.0, 1.0)),
         physics: option.None,

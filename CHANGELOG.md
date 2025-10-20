@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.1 - 2025-10-20
+
+### Fixed
+- **Critical rotation bug**: Fixed `applyTransform` FFI function to correctly use quaternions instead of incorrectly treating quaternion components as Euler angles, which caused objects to rotate on multiple axes when they should only rotate on one
+- Euler/Quaternion conversions now use Three.js's built-in conversion functions via FFI for 100% compatibility with Three.js rotation behavior
+- Quaternion multiplication now uses Three.js's built-in `multiply()` function via FFI for accurate rotation composition
+- Test suite updated to handle Euler angle representation ambiguity by comparing quaternions directly instead of Euler angles
+
 ## v3.0.0 - 2025-10-17
 
 - The `WorldConfig`'s parameter `correspondences` has been removed from the physics module.

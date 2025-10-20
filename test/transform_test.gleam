@@ -1,5 +1,8 @@
+import gleam/float
+import gleam_community/maths
 import tiramisu/transform
 import vec/vec3
+import vec/vec3f
 
 pub fn identity_test() {
   let t = transform.identity
@@ -23,7 +26,13 @@ pub fn with_rotation_test() {
   let t = transform.with_rotation(transform.identity, rot)
 
   assert transform.position(t) == vec3.Vec3(0.0, 0.0, 0.0)
-  assert transform.rotation(t) == rot
+  // Compare quaternions instead of Euler angles to avoid representation ambiguity
+  let expected_quat = transform.euler_to_quaternion(rot)
+  let actual_quat = transform.rotation_quaternion(t)
+  assert float.loosely_equals(expected_quat.x, actual_quat.x, tolerating: 0.0001)
+  assert float.loosely_equals(expected_quat.y, actual_quat.y, tolerating: 0.0001)
+  assert float.loosely_equals(expected_quat.z, actual_quat.z, tolerating: 0.0001)
+  assert float.loosely_equals(expected_quat.w, actual_quat.w, tolerating: 0.0001)
   assert transform.scale(t) == vec3.Vec3(1.0, 1.0, 1.0)
 }
 
@@ -47,7 +56,7 @@ pub fn set_rotation_test() {
   let rot = vec3.Vec3(0.5, 1.0, 1.5)
   let t = transform.with_rotation(transform.identity, rot)
 
-  assert transform.rotation(t) == rot
+  assert vec3f.loosely_equals(transform.rotation(t), rot, tolerating: 0.01)
 }
 
 pub fn set_scale_test() {
@@ -70,16 +79,21 @@ pub fn rotate_test() {
   // Test that rotate_by correctly composes rotations using quaternions
   let t =
     transform.identity
-    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))
+    |> transform.rotate_by(vec3.Vec3(0.0, maths.pi() /. 2.0, 0.0))
     // 90° around Y
-    |> transform.rotate_by(vec3.Vec3(0.0, 1.57, 0.0))
+    |> transform.rotate_by(vec3.Vec3(0.0, maths.pi() /. 2.0, 0.0))
   // Another 90° around Y
 
-  // After two 90° rotations around Y, we should be at ~180° (3.14 radians)
-  let epsilon = 0.01
-  let rotation = transform.rotation(t)
-  assert rotation.y >. 3.14 -. epsilon
-  assert rotation.y <. 3.14 +. epsilon
+  // After two 90° rotations around Y, we should have a 180° Y rotation
+  // Compare quaternions since Euler angles can have multiple representations
+  let expected_quat = transform.euler_to_quaternion(vec3.Vec3(0.0, maths.pi(), 0.0))
+  let actual_quat = transform.rotation_quaternion(t)
+
+  // Allow some tolerance for floating point math
+  assert float.loosely_equals(expected_quat.x, actual_quat.x, tolerating: 0.01)
+  assert float.loosely_equals(expected_quat.y, actual_quat.y, tolerating: 0.01)
+  assert float.loosely_equals(expected_quat.z, actual_quat.z, tolerating: 0.01)
+  assert float.loosely_equals(expected_quat.w, actual_quat.w, tolerating: 0.01)
 }
 
 pub fn scale_by_test() {
@@ -99,7 +113,11 @@ pub fn builder_pattern_test() {
     |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))
 
   assert transform.position(t) == vec3.Vec3(10.0, 20.0, 30.0)
-  assert transform.rotation(t) == vec3.Vec3(0.5, 1.0, 1.5)
+  assert vec3f.loosely_equals(
+    transform.rotation(t),
+    vec3.Vec3(0.5, 1.0, 1.5),
+    tolerating: 0.01,
+  )
   assert transform.scale(t) == vec3.Vec3(2.0, 2.0, 2.0)
 }
 

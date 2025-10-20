@@ -297,10 +297,10 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         light
       },
       transform: transform.at(position: vec3.Vec3(
-          10.0 *. maths.cos(model.rotation),
-          10.0,
-          10.0 *. maths.sin(model.rotation),
-        )),
+        10.0 *. maths.cos(model.rotation),
+        10.0,
+        10.0 *. maths.sin(model.rotation),
+      )),
     ),
     scene.Light(
       id: "point",
