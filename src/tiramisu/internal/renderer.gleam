@@ -1206,7 +1206,16 @@ fn handle_update_transform(
         False -> Nil
       }
 
-      state
+      // If this object has a physics body, update the physics body's transform too
+      let new_state = case state.physics_world {
+        Some(world) -> {
+          let new_world = physics.update_body_transform(world, id, transform)
+          RendererState(..state, physics_world: Some(new_world))
+        }
+        None -> state
+      }
+
+      new_state
     }
     None -> state
   }
@@ -1717,27 +1726,36 @@ pub fn update_particle_systems(
 ///
 /// Uses quaternions directly from Rapier to avoid rotation errors
 /// caused by quaternion-to-Euler-to-quaternion conversion.
+///
+/// Only syncs Dynamic bodies - Kinematic and Fixed bodies are controlled
+/// programmatically via scene transforms, not by the physics simulation.
 pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
   case state.physics_world {
     Some(world) -> {
       // Use raw quaternion data from physics to avoid conversion errors
-      physics.for_each_body_raw(world, fn(id, position, quaternion) {
-        // Get the Three.js object for this body
-        case object_cache.get_object(state.cache, id) {
-          Some(obj) -> {
-            let obj_dynamic = object_cache.unwrap_object(obj)
-            // Use identity scale since physics doesn't affect scale
-            let scale = vec3.Vec3(1.0, 1.0, 1.0)
-            // Apply transform using quaternion directly (no Euler conversion)
-            apply_transform_with_quaternion_ffi(
-              obj_dynamic,
-              to_dynamic(position),
-              to_dynamic(quaternion),
-              to_dynamic(scale),
-            )
-            update_matrix_world_ffi(obj_dynamic, True)
+      physics.for_each_body_raw(world, fn(id, position, quaternion, body_type) {
+        // Only sync Dynamic bodies - Kinematic/Fixed are controlled by scene
+        case body_type {
+          physics.Dynamic -> {
+            // Get the Three.js object for this body
+            case object_cache.get_object(state.cache, id) {
+              Some(obj) -> {
+                let obj_dynamic = object_cache.unwrap_object(obj)
+                // Use identity scale since physics doesn't affect scale
+                let scale = vec3.Vec3(1.0, 1.0, 1.0)
+                // Apply transform using quaternion directly (no Euler conversion)
+                apply_transform_with_quaternion_ffi(
+                  obj_dynamic,
+                  to_dynamic(position),
+                  to_dynamic(quaternion),
+                  to_dynamic(scale),
+                )
+                update_matrix_world_ffi(obj_dynamic, True)
+              }
+              None -> Nil
+            }
           }
-          None -> Nil
+          physics.Kinematic | physics.Fixed -> Nil
         }
       })
     }

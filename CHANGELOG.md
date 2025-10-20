@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.2 - 2025-10-20
+
+### Added
+- **Kinematic body control**: Kinematic physics bodies can now be moved programmatically via scene transforms - updating a mesh's transform will automatically sync to the physics body
+- `physics.update_body_transform()` internal function for syncing scene transforms to physics bodies
+- Physics sync optimization: Only Dynamic bodies are synced from physics to rendering; Kinematic and Fixed bodies are controlled by scene transforms
+
 ## v3.0.1 - 2025-10-20
 
 ### Fixed

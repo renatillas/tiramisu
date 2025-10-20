@@ -836,21 +836,22 @@ fn for_each_body_internal(
   })
 }
 
-/// Iterate over all physics bodies with raw quaternion data.
+/// Iterate over all physics bodies with raw quaternion data and body type.
 ///
 /// This is used by the renderer for physics synchronization, avoiding
 /// quaternion-to-Euler conversion which can cause rotation errors.
 @internal
 pub fn for_each_body_raw(
   world: PhysicsWorld(id),
-  callback: fn(id, Vec3(Float), Quaternion) -> Nil,
+  callback: fn(id, Vec3(Float), Quaternion, Body) -> Nil,
 ) -> Nil {
   let ids = dict.keys(world.rapier_bodies)
 
   list.each(ids, fn(id) {
-    case get_body_transform_raw(world, id) {
-      Ok(#(position, quaternion)) -> callback(id, position, quaternion)
-      Error(_) -> Nil
+    case get_body_transform_raw(world, id), dict.get(world.bodies, id) {
+      Ok(#(position, quaternion)), Ok(body_config) ->
+        callback(id, position, quaternion, body_config.kind)
+      _, _ -> Nil
     }
   })
 }
@@ -1056,11 +1057,11 @@ pub fn create_body(
 
   // Set transform
   let pos = transform.position(transform)
-  set_body_translation_ffi(body_desc, pos.x, pos.y, pos.z)
+  set_body_desc_translation_ffi(body_desc, pos.x, pos.y, pos.z)
 
   // Get quaternion rotation directly from transform
   let quat = transform.rotation_quaternion(transform)
-  set_body_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
+  set_body_desc_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
 
   // Set damping
   set_linear_damping_ffi(body_desc, config.linear_damping)
@@ -1150,6 +1151,45 @@ pub fn create_body(
   )
 }
 
+/// Update a rigid body's transform in the physics world
+/// This is called by the renderer when a scene node's transform is updated
+/// Primarily useful for Kinematic bodies that are controlled programmatically
+@internal
+pub fn update_body_transform(
+  world: PhysicsWorld(id),
+  id: id,
+  transform: Transform,
+) -> PhysicsWorld(id) {
+  case dict.get(world.rapier_bodies, id) {
+    Ok(rapier_body) -> {
+      // Get position and rotation from transform
+      let position = transform.position(transform)
+      let quaternion = transform.rotation_quaternion(transform)
+
+      // Update the rigid body's position and rotation in Rapier
+      // wake_up = True to ensure kinematic bodies apply their new position
+      set_body_translation_ffi(
+        rapier_body,
+        position.x,
+        position.y,
+        position.z,
+        True,
+      )
+      set_body_rotation_ffi(
+        rapier_body,
+        quaternion.x,
+        quaternion.y,
+        quaternion.z,
+        quaternion.w,
+        True,
+      )
+
+      world
+    }
+    Error(_) -> world
+  }
+}
+
 /// Remove a rigid body from the physics world
 /// This is called by the renderer when a scene node with physics is removed
 @internal
@@ -1207,7 +1247,7 @@ fn create_kinematic_body_desc_ffi() -> RapierBodyDesc
 fn create_fixed_body_desc_ffi() -> RapierBodyDesc
 
 @external(javascript, "../rapier.ffi.mjs", "setBodyTranslation")
-fn set_body_translation_ffi(
+fn set_body_desc_translation_ffi(
   desc: RapierBodyDesc,
   x: Float,
   y: Float,
@@ -1215,12 +1255,31 @@ fn set_body_translation_ffi(
 ) -> Nil
 
 @external(javascript, "../rapier.ffi.mjs", "setBodyRotation")
-fn set_body_rotation_ffi(
+fn set_body_desc_rotation_ffi(
   desc: RapierBodyDesc,
   x: Float,
   y: Float,
   z: Float,
   w: Float,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyTranslation2")
+fn set_body_translation_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  wake_up: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyRotation2")
+fn set_body_rotation_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+  w: Float,
+  wake_up: Bool,
 ) -> Nil
 
 @external(javascript, "../rapier.ffi.mjs", "setLinearDamping")
