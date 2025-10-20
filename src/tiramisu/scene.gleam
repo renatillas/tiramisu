@@ -174,6 +174,16 @@ pub type Node(id) {
     animation: Option(object3d.AnimationPlayback),
     physics: Option(physics.RigidBody),
   )
+  /// Instanced model - renders many copies of a loaded 3D model (FBX, GLTF, etc.)
+  /// Automatically creates instanced meshes for each unique mesh/material combination
+  /// Much more efficient than creating individual Model3D nodes for identical models
+  /// If physics is Some, creates one rigid body per instance at each instance's transform
+  InstancedModel(
+    id: id,
+    object: object3d.Object3D,
+    instances: List(transform.Transform),
+    physics: Option(physics.RigidBody),
+  )
   Audio(id: id, audio: audio.Audio)
   /// Particle system - spawn and animate many small particles for visual effects
   /// Particles are simulated in the FFI layer and rendered efficiently using Three.js Points
@@ -518,6 +528,17 @@ fn compare_nodes_detailed(
         curr_phys,
       )
 
+    InstancedModel(_, _, prev_instances, prev_phys),
+      InstancedModel(_, _, curr_instances, curr_phys)
+    ->
+      compare_instanced_model_fields(
+        id,
+        prev_instances,
+        prev_phys,
+        curr_instances,
+        curr_phys,
+      )
+
     Audio(_, prev_audio), Audio(_, curr_audio) ->
       case prev_audio != curr_audio {
         True -> [UpdateAudio(id, curr_audio)]
@@ -713,6 +734,29 @@ fn compare_model3d_fields(
 
   let patches = case prev_anim != curr_anim {
     True -> [UpdateAnimation(id, curr_anim), ..patches]
+    False -> patches
+  }
+
+  let patches = case prev_phys != curr_phys {
+    True -> [UpdatePhysics(id, curr_phys), ..patches]
+    False -> patches
+  }
+
+  patches
+}
+
+/// Compare InstancedModel fields using accumulator pattern
+fn compare_instanced_model_fields(
+  id: id,
+  prev_instances: List(transform.Transform),
+  prev_phys: Option(physics.RigidBody),
+  curr_instances: List(transform.Transform),
+  curr_phys: Option(physics.RigidBody),
+) -> List(Patch(id)) {
+  let patches = []
+
+  let patches = case prev_instances != curr_instances {
+    True -> [UpdateInstances(id, curr_instances), ..patches]
     False -> patches
   }
 

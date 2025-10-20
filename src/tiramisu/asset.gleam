@@ -38,6 +38,18 @@ import tiramisu/object3d.{type AnimationClip, type Object3D}
 /// Created via `asset.load_texture()` and used in materials.
 pub type Texture
 
+/// Texture filtering mode
+///
+/// Controls how textures are sampled when they're displayed at different sizes.
+pub type TextureFilter {
+  /// Linear filtering - smooth, blurred appearance (default in Three.js)
+  /// Good for realistic graphics and smooth gradients
+  LinearFilter
+  /// Nearest filtering - crisp, pixelated appearance
+  /// Perfect for pixel art, low-poly aesthetics, and retro games
+  NearestFilter
+}
+
 /// Opaque type for Three.js BufferGeometry.
 ///
 /// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
@@ -59,6 +71,10 @@ pub type LoadError {
 
 pub type GLTFData {
   GLTFData(scene: Object3D, animations: List(AnimationClip))
+}
+
+pub type FBXData {
+  FBXData(scene: Object3D, animations: List(AnimationClip))
 }
 
 /// Types of asset that can be loaded
@@ -85,6 +101,25 @@ pub type AssetType {
   /// which are properly parsed. Textures are assumed to be in the same directory as
   /// the MTL file.
   OBJAsset(obj_url: String, mtl_url: option.Option(String))
+  /// FBX 3D model with animations
+  ///
+  /// Supports loading Autodesk FBX models with embedded animations and materials.
+  /// The FBX loader automatically:
+  /// - Loads embedded textures and materials
+  /// - Loads skeletal animations
+  /// - Loads morph target animations
+  /// - Computes vertex normals if missing
+  /// - Handles both ASCII and binary FBX formats
+  ///
+  /// FBX files can contain multiple animations, which are returned as AnimationClips
+  /// that can be used with the animation system.
+  ///
+  /// **Texture Path**: If textures are in a different directory than the FBX file,
+  /// provide the `texture_path` to tell the loader where to find them. For example:
+  /// - FBX: "assets/PSX_Dungeon/Models/Door.fbx"
+  /// - Textures: "assets/PSX_Dungeon/Textures/"
+  /// - Use: `FBXAsset(url: "...", texture_path: Some("assets/PSX_Dungeon/Textures/"))`
+  FBXAsset(url: String, texture_path: option.Option(String))
   /// Font for TextGeometry (typeface.json format)
   ///
   /// Fonts must be in Three.js typeface.json format. You can convert TTF/OTF fonts
@@ -100,6 +135,7 @@ pub opaque type LoadedAsset {
   LoadedAudio(audio: AudioBuffer)
   LoadedSTL(geometry: BufferGeometry)
   LoadedOBJ(object: Object3D)
+  LoadedFBX(data: FBXData)
   LoadedFont(font: Font)
 }
 
@@ -127,6 +163,11 @@ pub fn loaded_stl(geometry: BufferGeometry) -> LoadedAsset {
 @internal
 pub fn loaded_obj(object: Object3D) -> LoadedAsset {
   LoadedOBJ(object)
+}
+
+@internal
+pub fn loaded_fbx(data: FBXData) -> LoadedAsset {
+  LoadedFBX(data)
 }
 
 @internal
@@ -257,6 +298,21 @@ pub fn load_asset(asset: AssetType) -> Promise(Result(LoadedAsset, AssetError)) 
       })
     }
 
+    FBXAsset(url, texture_path) -> {
+      let texture_path_str = case texture_path {
+        option.Some(path) -> path
+        option.None -> ""
+      }
+      promise.map(load_fbx(url, texture_path_str), fn(result) {
+        case result {
+          Ok(data) -> Ok(LoadedFBX(data))
+          Error(LoadError(msg)) -> Error(AssetLoadError(url, msg))
+          Error(InvalidUrl(_)) -> Error(AssetLoadError(url, "Invalid URL"))
+          Error(ParseError(msg)) -> Error(AssetLoadError(url, msg))
+        }
+      })
+    }
+
     FontAsset(url) -> {
       promise.map(load_font(url), fn(result) {
         case result {
@@ -377,6 +433,49 @@ pub fn get_obj(cache: AssetCache, url: String) -> Result(Object3D, AssetError) {
     Ok(CacheEntry(LoadedOBJ(object), _)) -> Ok(object)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
     Error(_) -> Error(AssetNotFound(url))
+  }
+}
+
+/// Get an FBX model from the cache
+///
+/// Returns the loaded FBX model data including the scene object and animations.
+/// FBX files can contain:
+/// - Skeletal animations for character animation
+/// - Morph target animations
+/// - Embedded textures and materials
+/// - Multiple mesh objects in a scene hierarchy
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(character_data) = asset.get_fbx(cache, "models/character.fbx")
+///
+/// scene.Model3D(
+///   id: "character",
+///   object: character_data.scene,
+///   transform: transform.identity,
+///   animation: option.Some(
+///     animation.state_machine(character_data.animations)
+///   ),
+///   physics: option.None,
+/// )
+/// ```
+pub fn get_fbx(cache: AssetCache, url: String) -> Result(FBXData, AssetError) {
+  case dict.get(cache.asset, url) {
+    Ok(CacheEntry(LoadedFBX(data), _)) -> Ok(data)
+    Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
+    Error(_) -> Error(AssetNotFound(url))
+  }
+}
+
+/// Get the scene object from a cached FBX model
+pub fn get_fbx_scene(
+  cache: AssetCache,
+  url: String,
+) -> Result(Object3D, AssetError) {
+  case get_fbx(cache, url) {
+    Ok(data) -> Ok(data.scene)
+    Error(err) -> Error(err)
   }
 }
 
@@ -623,6 +722,78 @@ fn load_obj_ffi(
   mtl_url: String,
 ) -> Promise(Result(Object3D, String))
 
+/// Load an FBX file with animations
+///
+/// Loads a 3D model in FBX format with full animation and material support.
+/// The loader handles:
+/// - **Skeletal Animations**: Bone-based character animations
+/// - **Morph Target Animations**: Vertex-based shape animations
+/// - **Embedded Textures**: Textures embedded in the FBX file
+/// - **Materials**: PBR and standard materials with properties
+/// - **Scene Hierarchy**: Complex object hierarchies preserved
+/// - **Both Formats**: ASCII and binary FBX files
+///
+/// ## Parameters
+///
+/// - `url`: Path to the FBX file
+/// - `texture_path`: Optional path to texture directory (if textures are separate from FBX)
+///
+/// ## Returns
+///
+/// A Promise that resolves to:
+/// - `Ok(FBXData)`: Loaded model with scene object and animation clips
+/// - `Error(LoadError)`: File not found
+/// - `Error(InvalidUrl)`: Invalid URL provided
+/// - `Error(ParseError)`: Failed to parse FBX file
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+/// import gleam/javascript/promise
+/// import gleam/option
+///
+/// // FBX with textures in same directory
+/// let load_effect = asset.load_fbx("models/character.fbx", "")
+///   |> promise.map(fn(result) {
+///     case result {
+///       Ok(fbx_data) -> ModelLoaded(fbx_data)
+///       Error(err) -> LoadFailed(err)
+///     }
+///   })
+///
+/// // FBX with textures in different directory
+/// let load_effect = asset.load_fbx(
+///   "assets/PSX_Dungeon/Models/Door.fbx",
+///   "assets/PSX_Dungeon/Textures/"
+/// )
+/// ```
+pub fn load_fbx(
+  url: String,
+  texture_path: String,
+) -> Promise(Result(FBXData, LoadError)) {
+  // Validate URL
+  case url == "" {
+    True -> promise.resolve(Error(InvalidUrl(url)))
+    False -> {
+      // Call safe wrapper that returns Result
+      load_fbx_ffi(url, texture_path)
+      |> promise.map(fn(result) {
+        case result {
+          Ok(data) -> Ok(data)
+          Error(msg) -> Error(LoadError(msg))
+        }
+      })
+    }
+  }
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "loadFBXSafe")
+fn load_fbx_ffi(url: String, texture_path: String) -> Promise(Result(
+  FBXData,
+  String,
+))
+
 /// Load a font file (typeface.json format) for use with TextGeometry.
 ///
 /// Three.js fonts must be in typeface.json format. You can:
@@ -670,3 +841,90 @@ pub fn load_font(url: String) -> Promise(Result(Font, LoadError)) {
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadFontSafe")
 fn load_font_ffi(url: String) -> Promise(Result(Font, String))
+
+/// Clone an Object3D for reuse in multiple scene locations
+///
+/// When you need to place the same model in multiple locations, you must clone it.
+/// Three.js doesn't allow the same Object3D to exist in multiple places in the scene graph.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+///
+/// let assert Ok(fbx_data) = asset.get_fbx(cache, "models/tree.fbx")
+///
+/// // Create multiple instances of the tree
+/// let tree1 = fbx_data.scene
+/// let tree2 = asset.clone_object3d(fbx_data.scene)
+/// let tree3 = asset.clone_object3d(fbx_data.scene)
+/// ```
+@external(javascript, "../threejs.ffi.mjs", "cloneObject3D")
+pub fn clone_object3d(object: Object3D) -> Object3D
+
+/// Set the filtering mode for a texture
+///
+/// Controls how the texture is sampled when displayed at different sizes.
+/// This should be called before using the texture in materials.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+///
+/// let assert Ok(texture) = asset.get_texture(cache, "textures/pixel_art.png")
+///
+/// // Make the texture crisp for pixel art
+/// asset.set_texture_filter(texture, asset.NearestFilter)
+/// ```
+@external(javascript, "../threejs.ffi.mjs", "setTextureFilter")
+fn set_texture_filter_ffi(texture: Texture, filter_mode: String) -> Nil
+
+/// Set the filtering mode for a texture
+pub fn set_texture_filter(texture: Texture, filter: TextureFilter) -> Nil {
+  let filter_str = case filter {
+    LinearFilter -> "LinearFilter"
+    NearestFilter -> "NearestFilter"
+  }
+  set_texture_filter_ffi(texture, filter_str)
+}
+
+/// Apply a texture to all materials in a loaded 3D model
+///
+/// This is useful when FBX files have missing or broken texture references.
+/// It will traverse the entire object hierarchy and apply the given texture
+/// to all mesh materials with the specified filtering mode.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+///
+/// // Load the FBX model
+/// let assert Ok(fbx_data) = asset.get_fbx(cache, "models/door.fbx")
+///
+/// // Load the texture separately
+/// let assert Ok(texture) = asset.get_texture(cache, "textures/door_texture.png")
+///
+/// // Apply texture with nearest filtering for crisp look
+/// asset.apply_texture_to_object(fbx_data.scene, texture, asset.NearestFilter)
+/// ```
+@external(javascript, "../threejs.ffi.mjs", "applyTextureToObject")
+fn apply_texture_to_object_ffi(
+  object: Object3D,
+  texture: Texture,
+  filter_mode: String,
+) -> Nil
+
+/// Apply a texture to all materials in a loaded 3D model
+pub fn apply_texture_to_object(
+  object: Object3D,
+  texture: Texture,
+  filter: TextureFilter,
+) -> Nil {
+  let filter_str = case filter {
+    LinearFilter -> "LinearFilter"
+    NearestFilter -> "NearestFilter"
+  }
+  apply_texture_to_object_ffi(object, texture, filter_str)
+}

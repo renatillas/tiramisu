@@ -20,7 +20,8 @@
       "Bash(for file in examples/{7..19}-*/src/*.gleam example-games/*/src/*.gleam)",
       "Bash(grep:*)",
       "Bash(sed:*)",
-      "Read(//Users/renata-amutio/Projects/renatillas/mascarpone/src/**)"
+      "Read(//Users/renata-amutio/Projects/renatillas/mascarpone/src/**)",
+      "Read(//Users/renata-amutio/Projects/renatillas/pondering_my_orb/src/**)"
     ],
     "deny": [],
     "ask": []

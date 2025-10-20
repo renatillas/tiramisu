@@ -1,5 +1,39 @@
 # Changelog
 
+## v3.1.0 - 2025-10-20
+
+### Added
+- **InstancedModel scene node**: Efficiently render many copies of loaded 3D models (FBX, GLTF, etc.)
+  - `scene.InstancedModel(id, object, instances)` - Automatically instances complex models with multiple meshes/materials
+  - Internally creates separate `InstancedMesh` for each unique mesh/material combination
+  - Dramatically improves performance: 10,000 models = a few draw calls instead of 10,000
+  - Works seamlessly with `asset.load_fbx()` and other model loaders
+  - Supports dynamic instance updates through the existing diff/patch system
+- **FBX model loading support**: Load Autodesk FBX files with animations and materials
+  - `asset.FBXAsset(url, texture_path)` - Load FBX files with optional texture directory path
+  - `asset.load_fbx(url, texture_path)` - Direct FBX loading function
+  - `asset.get_fbx(cache, url)` - Get FBX data from cache
+  - `asset.get_fbx_scene(cache, url)` - Get just the scene object from cached FBX
+  - `asset.FBXData` type containing scene and animations
+  - Automatic model centering at origin
+  - Support for both ASCII and binary FBX formats
+  - Skeletal and morph target animation support
+- **Texture filtering API**: Control texture appearance for pixel-perfect or smooth rendering
+  - `asset.TextureFilter` type with `LinearFilter` and `NearestFilter` variants
+  - `asset.set_texture_filter(texture, filter)` - Set filtering mode on any texture
+  - `asset.apply_texture_to_object(object, texture, filter)` - Apply texture to all materials in a model with specified filtering
+  - Perfect for retro/PSX aesthetics with crisp textures (`NearestFilter`)
+- **Object cloning for instancing**: Create independent copies of 3D models
+  - `asset.clone_object3d(object)` - Clone an Object3D for reuse in multiple scene locations
+  - Essential when placing the same model in multiple positions (Three.js limitation)
+- **Enhanced FBX loader with automatic texture fixing**:
+  - Attempts to automatically fix broken texture references in FBX files
+  - Logs detailed texture loading information for debugging
+  - Centers models at origin automatically
+
+### Changed
+- `apply_texture_to_object()` now requires a `TextureFilter` parameter for explicit control over texture appearance
+
 ## v3.0.2 - 2025-10-20
 
 ### Added

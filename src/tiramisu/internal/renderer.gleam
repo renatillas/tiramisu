@@ -195,6 +195,21 @@ fn create_lod_ffi() -> object3d.Object3D
 @external(javascript, "../../threejs.ffi.mjs", "cloneObject")
 fn clone_object_ffi(object: object3d.Object3D) -> object3d.Object3D
 
+@external(javascript, "../../threejs.ffi.mjs", "extractMeshMaterialPairs")
+fn extract_mesh_material_pairs_ffi(
+  object: object3d.Object3D,
+) -> MeshMaterialPairs
+
+// Opaque type for mesh/material pairs from FFI
+pub type MeshMaterialPairs
+
+// Access the arrays from the pairs object
+@external(javascript, "../../tiramisu.ffi.mjs", "getPairsGeometries")
+fn get_pairs_geometries_ffi(pairs: MeshMaterialPairs) -> List(geometry.ThreeGeometry)
+
+@external(javascript, "../../tiramisu.ffi.mjs", "getPairsMaterials")
+fn get_pairs_materials_ffi(pairs: MeshMaterialPairs) -> List(material.ThreeMaterial)
+
 // ============================================================================
 // FFI DECLARATIONS - MATERIAL AND GEOMETRY
 // ============================================================================
@@ -316,6 +331,12 @@ fn is_instanced_mesh_ffi(object: object3d.Object3D) -> Bool
 @external(javascript, "../../threejs.ffi.mjs", "updateInstancedMeshTransforms")
 fn update_instanced_mesh_transforms_ffi(
   mesh: object3d.Object3D,
+  instances: List(Transform),
+) -> Nil
+
+@external(javascript, "../../threejs.ffi.mjs", "updateGroupInstancedMeshes")
+fn update_group_instanced_meshes_ffi(
+  group: object3d.Object3D,
   instances: List(Transform),
 ) -> Nil
 
@@ -585,6 +606,9 @@ fn handle_add_node(
         parent_id,
       )
 
+    scene.InstancedModel(id: _, object: object, instances: instances, physics: physics) ->
+      handle_add_instanced_model(state, id, object, instances, physics, parent_id)
+
     scene.Audio(id: _, audio: audio) ->
       handle_add_audio(state, id, audio, parent_id)
 
@@ -712,6 +736,65 @@ fn handle_add_instanced_mesh(
   let new_cache = object_cache.add_object(state.cache, id, three_obj)
   RendererState(..state, cache: new_cache)
 }
+
+fn handle_add_instanced_model(
+  state: RendererState(id),
+  id: id,
+  object: object3d.Object3D,
+  instances: List(Transform),
+  physics: Option(RigidBody),
+  parent_id: Option(id),
+) -> RendererState(id) {
+  // Extract all mesh/material pairs from the loaded model
+  let pairs = extract_mesh_material_pairs_ffi(object)
+  let geometries = get_pairs_geometries_ffi(pairs)
+  let materials = get_pairs_materials_ffi(pairs)
+
+  // Create a group to hold all the instanced meshes
+  let group = create_group_ffi()
+
+  // For each unique mesh/material combination, create an InstancedMesh
+  let count = list.length(instances)
+
+  // Zip geometries and materials together and iterate
+  list.zip(geometries, materials)
+  |> list.each(fn(pair) {
+    let #(geometry, material) = pair
+    let instanced_mesh = create_instanced_mesh_ffi(geometry, material, count)
+
+    // Update all instance transforms
+    update_instanced_mesh_transforms_ffi(instanced_mesh, instances)
+
+    // Add the instanced mesh to the group
+    add_child_ffi(group, instanced_mesh)
+  })
+
+  // Add the group to the scene or parent
+  let three_obj = object_cache.wrap_object(group)
+  add_to_scene_or_parent(state, three_obj, parent_id)
+
+  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_state = RendererState(..state, cache: new_cache)
+
+  // Create physics bodies for each instance if specified
+  case physics, new_state.physics_world {
+    Some(physics_config), Some(world) -> {
+      // Create one physics body per instance with unique ID
+      let new_world =
+        list.index_fold(instances, world, fn(world_acc, instance_transform, idx) {
+          // Generate unique ID for this instance's physics body
+          let instance_id = generate_instance_id(id, idx)
+          physics.create_body(world_acc, instance_id, physics_config, instance_transform)
+        })
+      RendererState(..new_state, physics_world: Some(new_world))
+    }
+    _, _ -> new_state
+  }
+}
+
+// Helper to generate unique IDs for instance physics bodies
+@external(javascript, "../../tiramisu.ffi.mjs", "generateInstanceId")
+fn generate_instance_id(base_id: id, index: Int) -> id
 
 fn handle_add_light(
   state: RendererState(id),
@@ -1437,10 +1520,16 @@ fn handle_update_instances(
       let obj_dynamic = object_cache.unwrap_object(obj)
       case is_instanced_mesh_ffi(obj_dynamic) {
         True -> {
+          // Single InstancedMesh node
           update_instanced_mesh_transforms_ffi(obj_dynamic, instances)
           state
         }
-        False -> state
+        False -> {
+          // Could be a Group containing InstancedMeshes (InstancedModel)
+          // This will recursively update all InstancedMesh children
+          update_group_instanced_meshes_ffi(obj_dynamic, instances)
+          state
+        }
       }
     }
     None -> state

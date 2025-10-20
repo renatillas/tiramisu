@@ -729,6 +729,15 @@ async function loadAssetByType(asset) {
       }
       return result;
     });
+  } else if (typeName === 'FBXAsset') {
+    // Load FBX using safe wrapper - extract texture_path from asset
+    const texturePath = asset.texture_path && asset.texture_path[0] ? asset.texture_path[0] : '';
+    return loadFBXSafe(url, texturePath).then(result => {
+      if (result.isOk()) {
+        return new GLEAM.Ok(ASSETS_GLEAM.loaded_fbx(result[0]));
+      }
+      return result;
+    });
   } else if (typeName === 'FontAsset') {
     // Load font using safe wrapper
     return loadFontSafe(url).then(result => {
@@ -1026,6 +1035,159 @@ async function loadMTLWithTextures(mtlUrl, THREE) {
       (error) => reject(error)
     );
   });
+}
+
+/**
+ * Safe FBX loader with animations and texture fixing
+ * @param {string} url
+ * @param {string} texturePath - Optional path where textures are located (defaults to FBX file directory)
+ * @returns {Promise<Result<FBXData, string>>}
+ */
+export async function loadFBXSafe(url, texturePath = '') {
+  try {
+    const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
+    const THREE = await import('three');
+
+    return new Promise((resolve, reject) => {
+      const loadingManager = new THREE.LoadingManager();
+
+      // Track texture loading failures
+      const failedTextures = new Map();
+
+      loadingManager.onError = (url) => {
+        console.warn('[FBX Loader] Failed to load:', url);
+        failedTextures.set(url, true);
+      };
+
+      const fbxLoader = new FBXLoader(loadingManager);
+
+      // Set texture path - if provided, use it; otherwise use FBX file directory
+      const textureBasePath = texturePath.trim() !== ''
+        ? texturePath
+        : url.substring(0, url.lastIndexOf('/') + 1);
+
+      fbxLoader.setResourcePath(textureBasePath);
+
+      fbxLoader.load(
+        url,
+        // Success
+        async (fbx) => {
+          console.log('[FBX Loader] Loaded FBX:', url);
+          console.log('[FBX Loader] Using texture base path:', textureBasePath);
+
+          // Try to fix missing textures by searching for them
+          const textureLoader = new THREE.TextureLoader();
+          let texturesFixed = 0;
+
+          fbx.traverse((child) => {
+            if (child.isMesh) {
+              const material = child.material;
+
+              if (Array.isArray(material)) {
+                // Handle multi-material meshes
+                material.forEach(mat => fixMaterialTextures(mat, textureLoader, textureBasePath));
+              } else if (material) {
+                // Single material
+                if (fixMaterialTextures(material, textureLoader, textureBasePath)) {
+                  texturesFixed++;
+                }
+              }
+            }
+          });
+
+          if (texturesFixed > 0) {
+            console.log(`[FBX Loader] Fixed textures for ${texturesFixed} materials`);
+          }
+
+          // Center the model at origin
+          const box = new THREE.Box3().setFromObject(fbx);
+          const center = box.getCenter(new THREE.Vector3());
+          const size = box.getSize(new THREE.Vector3());
+
+          // Move all child meshes to center the model
+          fbx.traverse((child) => {
+            if (child.isMesh) {
+              child.position.sub(center);
+            }
+          });
+
+          console.log('[FBX Loader] Centered model at origin. Original center:', center);
+          console.log('[FBX Loader] Model size (width x height x depth):', size);
+
+          // Convert animations array to Gleam list and create FBXData
+          const animationsList = GLEAM.toList(fbx.animations || []);
+          const data = new ASSETS_GLEAM.FBXData(fbx, animationsList);
+          resolve(new GLEAM.Ok(data));
+        },
+        // Progress
+        undefined,
+        // Error
+        (error) => {
+          // Categorize errors
+          if (error.message && error.message.includes('404')) {
+            reject(new GLEAM.Error('File not found: ' + url));
+          } else if (error.message && (error.message.includes('Invalid') || error.message.includes('parse'))) {
+            reject(new GLEAM.Error(error.message));
+          } else {
+            reject(new GLEAM.Error(error.message || 'Failed to load FBX'));
+          }
+        }
+      );
+    });
+  } catch (error) {
+    return new GLEAM.Error(error.message || 'Failed to initialize FBX loader');
+  }
+}
+
+/**
+ * Try to fix material textures by loading them from the texture base path
+ * @param {THREE.Material} material
+ * @param {THREE.TextureLoader} textureLoader
+ * @param {string} textureBasePath
+ * @returns {boolean} - True if any textures were fixed
+ */
+function fixMaterialTextures(material, textureLoader, textureBasePath) {
+  let fixed = false;
+
+  // Check if material has a map property but it's not loaded or is broken
+  if (material.map && material.map.image === undefined) {
+    console.log('[FBX Loader] Material has broken map, attempting to fix:', material.name);
+
+    // Try to extract texture name from the map's source or userData
+    let textureName = null;
+
+    if (material.map.userData && material.map.userData.fileName) {
+      textureName = material.map.userData.fileName;
+    } else if (material.map.name) {
+      textureName = material.map.name;
+    }
+
+    if (textureName) {
+      // Remove any directory paths, just keep filename
+      textureName = textureName.split('/').pop().split('\\').pop();
+
+      console.log('[FBX Loader] Attempting to load texture:', textureBasePath + textureName);
+
+      try {
+        const newTexture = textureLoader.load(textureBasePath + textureName);
+        material.map = newTexture;
+        material.needsUpdate = true;
+        fixed = true;
+        console.log('[FBX Loader] Successfully loaded texture:', textureName);
+      } catch (error) {
+        console.warn('[FBX Loader] Failed to load texture:', textureName, error);
+      }
+    }
+  }
+
+  // Also check if there's no map at all - look in material name for hints
+  if (!material.map && material.name) {
+    console.log('[FBX Loader] Material has no map:', material.name);
+    // Material name might give us a hint about which texture to use
+    // This is very specific to the asset pack - you might need to adjust this
+  }
+
+  return fixed;
 }
 
 // ============================================================================
@@ -2194,4 +2356,39 @@ export async function clipboardRead() {
     .readText()
     .then((text) => new GLEAM.Ok(text))
     .catch((error) => new GLEAM.Error(error.message || 'Failed to read from clipboard'));
+}
+
+/**
+ * Get geometries array from mesh/material pairs object
+ * Converts JavaScript array to Gleam list
+ * @param {object} pairs - {geometries: Array, materials: Array}
+ * @returns {List}
+ */
+export function getPairsGeometries(pairs) {
+  // Convert JavaScript array to Gleam list format
+  return GLEAM.toList(pairs.geometries);
+}
+
+/**
+ * Get materials array from mesh/material pairs object
+ * Converts JavaScript array to Gleam list
+ * @param {object} pairs - {geometries: Array, materials: Array}
+ * @returns {List}
+ */
+export function getPairsMaterials(pairs) {
+  // Convert JavaScript array to Gleam list format
+  return GLEAM.toList(pairs.materials);
+}
+
+/**
+ * Generate a unique ID for an instance's physics body
+ * Combines base ID with instance index
+ * @param {*} baseId - The base ID (can be any type)
+ * @param {number} index - The instance index
+ * @returns {*} - Composite ID (tuple of base + index)
+ */
+export function generateInstanceId(baseId, index) {
+  // Return a tuple that combines the base ID with the index
+  // This creates unique IDs for each instance's physics body
+  return [baseId, index];
 }

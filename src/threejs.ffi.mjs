@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
@@ -1325,6 +1326,23 @@ export function loadSTL(url) {
   });
 }
 
+/**
+ * Load FBX model
+ * @param {string} url
+ * @returns {Promise<THREE.Group>}
+ */
+export function loadFBX(url) {
+  const loader = new FBXLoader();
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (fbx) => resolve(fbx),
+      undefined,
+      (error) => reject(error)
+    );
+  });
+}
+
 // ============================================================================
 // AUDIO
 // ============================================================================
@@ -2291,4 +2309,102 @@ export function multiplyQuaternions(q1, q2) {
   const threeQ2 = new THREE.Quaternion(q2.x, q2.y, q2.z, q2.w);
   threeQ1.multiply(threeQ2);
   return new Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
+}
+
+// ============================================================================
+// OBJECT3D UTILITIES - Helper functions for working with loaded models
+// ============================================================================
+
+/**
+ * Clone an Object3D with all its children, geometries, and materials
+ * @param {THREE.Object3D} object
+ * @returns {THREE.Object3D}
+ */
+export function cloneObject3D(object) {
+  return object.clone(true);
+}
+
+/**
+ * Set texture filtering mode
+ * @param {THREE.Texture} texture
+ * @param {string} filterMode - "LinearFilter" or "NearestFilter"
+ */
+export function setTextureFilter(texture, filterMode) {
+  const filter = filterMode === 'NearestFilter' ? THREE.NearestFilter : THREE.LinearFilter;
+  texture.minFilter = filter;
+  texture.magFilter = filter;
+  texture.generateMipmaps = (filterMode === 'LinearFilter');
+  texture.needsUpdate = true;
+}
+
+/**
+ * Apply a texture to all materials in an Object3D
+ * @param {THREE.Object3D} object
+ * @param {THREE.Texture} texture
+ * @param {string} filterMode - "LinearFilter" or "NearestFilter"
+ */
+export function applyTextureToObject(object, texture, filterMode) {
+  // Set texture filtering
+  setTextureFilter(texture, filterMode);
+
+  let count = 0;
+  object.traverse((child) => {
+    if (child.isMesh) {
+      const material = child.material;
+      if (Array.isArray(material)) {
+        material.forEach(mat => {
+          mat.map = texture;
+          mat.needsUpdate = true;
+          count++;
+        });
+      } else if (material) {
+        material.map = texture;
+        material.needsUpdate = true;
+        count++;
+      }
+    }
+  });
+  console.log(`[Tiramisu] Applied texture to ${count} materials with ${filterMode}`);
+}
+
+/**
+ * Extract all unique mesh/material pairs from an Object3D
+ * Returns Gleam lists of geometries and materials (parallel arrays)
+ * @param {THREE.Object3D} object
+ * @returns {{geometries: Array, materials: Array}}
+ */
+export function extractMeshMaterialPairs(object) {
+  const geometries = [];
+  const materials = [];
+
+  object.traverse((child) => {
+    if (child.isMesh && child.geometry && child.material) {
+      // Handle both single materials and material arrays
+      if (Array.isArray(child.material)) {
+        child.material.forEach(mat => {
+          geometries.push(child.geometry);
+          materials.push(mat);
+        });
+      } else {
+        geometries.push(child.geometry);
+        materials.push(child.material);
+      }
+    }
+  });
+
+  return { geometries, materials };
+}
+
+/**
+ * Update all instanced meshes in a group (recursively)
+ * Used for InstancedModel updates
+ * @param {THREE.Object3D} object
+ * @param {Array} instances - Array of transforms
+ */
+export function updateGroupInstancedMeshes(object, instances) {
+  object.traverse((child) => {
+    if (child instanceof THREE.InstancedMesh) {
+      updateInstancedMeshTransforms(child, instances);
+    }
+  });
 }
