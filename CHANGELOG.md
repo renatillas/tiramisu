@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.1.1 - 2025-10-21
+
+- Fix camera issue with look_at being cached and not using the updated look_at each frame.
+
 ## v3.1.0 - 2025-10-20
 
 ### Added
