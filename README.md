@@ -147,7 +147,7 @@ Then open http://localhost:1234 to see your game!
 Alternatively, add Tiramisu to an existing Gleam project:
 
 ```sh
-gleam add tiramisu@2
+gleam add tiramisu
 ```
 
 ### Configure your gleam.toml
