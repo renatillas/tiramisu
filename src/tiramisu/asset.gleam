@@ -789,10 +789,10 @@ pub fn load_fbx(
 }
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadFBXSafe")
-fn load_fbx_ffi(url: String, texture_path: String) -> Promise(Result(
-  FBXData,
-  String,
-))
+fn load_fbx_ffi(
+  url: String,
+  texture_path: String,
+) -> Promise(Result(FBXData, String))
 
 /// Load a font file (typeface.json format) for use with TextGeometry.
 ///

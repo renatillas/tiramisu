@@ -205,10 +205,14 @@ pub type MeshMaterialPairs
 
 // Access the arrays from the pairs object
 @external(javascript, "../../tiramisu.ffi.mjs", "getPairsGeometries")
-fn get_pairs_geometries_ffi(pairs: MeshMaterialPairs) -> List(geometry.ThreeGeometry)
+fn get_pairs_geometries_ffi(
+  pairs: MeshMaterialPairs,
+) -> List(geometry.ThreeGeometry)
 
 @external(javascript, "../../tiramisu.ffi.mjs", "getPairsMaterials")
-fn get_pairs_materials_ffi(pairs: MeshMaterialPairs) -> List(material.ThreeMaterial)
+fn get_pairs_materials_ffi(
+  pairs: MeshMaterialPairs,
+) -> List(material.ThreeMaterial)
 
 // ============================================================================
 // FFI DECLARATIONS - MATERIAL AND GEOMETRY
@@ -606,8 +610,20 @@ fn handle_add_node(
         parent_id,
       )
 
-    scene.InstancedModel(id: _, object: object, instances: instances, physics: physics) ->
-      handle_add_instanced_model(state, id, object, instances, physics, parent_id)
+    scene.InstancedModel(
+      id: _,
+      object: object,
+      instances: instances,
+      physics: physics,
+    ) ->
+      handle_add_instanced_model(
+        state,
+        id,
+        object,
+        instances,
+        physics,
+        parent_id,
+      )
 
     scene.Audio(id: _, audio: audio) ->
       handle_add_audio(state, id, audio, parent_id)
@@ -781,11 +797,20 @@ fn handle_add_instanced_model(
     Some(physics_config), Some(world) -> {
       // Create one physics body per instance with unique ID
       let new_world =
-        list.index_fold(instances, world, fn(world_acc, instance_transform, idx) {
-          // Generate unique ID for this instance's physics body
-          let instance_id = generate_instance_id(id, idx)
-          physics.create_body(world_acc, instance_id, physics_config, instance_transform)
-        })
+        list.index_fold(
+          instances,
+          world,
+          fn(world_acc, instance_transform, idx) {
+            // Generate unique ID for this instance's physics body
+            let instance_id = generate_instance_id(id, idx)
+            physics.create_body(
+              world_acc,
+              instance_id,
+              physics_config,
+              instance_transform,
+            )
+          },
+        )
       RendererState(..new_state, physics_world: Some(new_world))
     }
     _, _ -> new_state
