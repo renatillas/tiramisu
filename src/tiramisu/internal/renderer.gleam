@@ -1609,7 +1609,11 @@ fn handle_update_camera(
             Some(target) -> {
               apply_camera_look_at_ffi(obj_dynamic, target)
               // Update the stored lookAtTarget so it's used in future transform updates
-              set_camera_user_data_ffi(obj_dynamic, "lookAtTarget", to_dynamic(target))
+              set_camera_user_data_ffi(
+                obj_dynamic,
+                "lookAtTarget",
+                to_dynamic(target),
+              )
             }
             None -> {
               // If None, remove the stored lookAtTarget so the camera can rotate freely
