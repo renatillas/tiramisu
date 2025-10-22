@@ -129,7 +129,7 @@ fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
     let id = "node_" <> int.to_string(i)
     let x = int.to_float(i)
 
-    scene.Mesh(
+    scene.mesh(
       id: id,
       geometry: box_geo,
       material: red_material,
@@ -157,7 +157,7 @@ fn create_flat_scene_offset(
     let id = "node_" <> int.to_string(i)
     let x = int.to_float(i) +. offset
 
-    scene.Mesh(
+    scene.mesh(
       id: id,
       geometry: box_geo,
       material: red_material,
@@ -183,7 +183,7 @@ fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
 
   case current >= depth {
     True ->
-      scene.Mesh(
+      scene.mesh(
         id: "leaf_" <> int.to_string(current),
         geometry: box_geo,
         material: red_material,
@@ -192,7 +192,7 @@ fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
       )
 
     False ->
-      scene.Group(
+      scene.group(
         id: "group_" <> int.to_string(current),
         transform: transform.identity,
         children: [create_nested_group(depth, current + 1)],

@@ -150,7 +150,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 500.0)
 
   let camera_node =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera:,
       transform: transform.at(model.camera_position),
@@ -160,7 +160,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -168,7 +168,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -188,7 +188,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
       // Create different detail level meshes
       let high_detail =
-        scene.Mesh(
+        scene.mesh(
           id: High(i),
           geometry: {
             let assert Ok(geometry) =
@@ -209,7 +209,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         )
 
       let medium_detail =
-        scene.Mesh(
+        scene.mesh(
           id: Medium(i),
           geometry: {
             let assert Ok(geometry) =
@@ -230,7 +230,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         )
 
       let low_detail =
-        scene.Mesh(
+        scene.mesh(
           id: Low(i),
           geometry: {
             let assert Ok(geometry) =
@@ -251,7 +251,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         )
 
       let billboard =
-        scene.Mesh(
+        scene.mesh(
           id: Billboard(i),
           geometry: {
             let assert Ok(geometry) = geometry.plane(width: 8.0, height: 8.0)
@@ -272,7 +272,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         )
 
       // Create LOD with distance thresholds
-      scene.LOD(
+      scene.lod(
         id: LOD(i),
         levels: [
           scene.LODLevel(distance: 0.0, node: high_detail),
@@ -290,7 +290,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
   // Add ground grid for reference
   let ground =
-    scene.DebugGrid(id: Ground, size: 400.0, divisions: 40, color: 0x444444)
+    scene.debug_grid(id: Ground, size: 400.0, divisions: 40, color: 0x444444)
 
   list.flatten([[camera_node], lights, lod_objects, [ground]])
 }

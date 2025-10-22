@@ -8,6 +8,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import tiramisu
+import tiramisu/animation
 import tiramisu/asset
 import tiramisu/background
 import tiramisu/camera
@@ -16,7 +17,6 @@ import tiramisu/geometry
 import tiramisu/input
 import tiramisu/light
 import tiramisu/material
-import tiramisu/object3d
 import tiramisu/scene
 import tiramisu/state_machine
 import tiramisu/transform
@@ -92,7 +92,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.3
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0003
 
       // Update state machine if model is loaded
       let new_load_state = case model.load_state {
@@ -119,7 +119,7 @@ fn update(
           io.println("Available animations:")
           list.index_map(clips, fn(clip, idx) {
             io.println(
-              "  [" <> int.to_string(idx) <> "] " <> object3d.clip_name(clip),
+              "  [" <> int.to_string(idx) <> "] " <> animation.clip_name(clip),
             )
           })
           Nil
@@ -161,16 +161,16 @@ fn create_state_machine(
     [idle_clip, walk_clip, crouching_clip, ..] -> {
       // Create state machine
       let idle_anim =
-        object3d.new_animation(idle_clip)
-        |> object3d.set_loop(object3d.LoopRepeat)
+        animation.new_animation(idle_clip)
+        |> animation.set_loop(animation.LoopRepeat)
 
       let walk_anim =
-        object3d.new_animation(walk_clip)
-        |> object3d.set_loop(object3d.LoopRepeat)
+        animation.new_animation(walk_clip)
+        |> animation.set_loop(animation.LoopRepeat)
 
       let crouching_anim =
-        object3d.new_animation(crouching_clip)
-        |> object3d.set_loop(object3d.LoopRepeat)
+        animation.new_animation(crouching_clip)
+        |> animation.set_loop(animation.LoopRepeat)
 
       state_machine.new(Idle)
       |> state_machine.add_state(Idle, idle_anim, looping: True)
@@ -220,7 +220,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: Main,
         camera: _,
         look_at: option.None,
@@ -231,7 +231,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     })
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -239,7 +239,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -254,7 +254,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     Loading -> {
       // Show a spinning cube while loading
       let loading_cube =
-        scene.Mesh(
+        scene.mesh(
           id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
@@ -273,7 +273,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             scene
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(
+              model.rotation,
+              model.rotation,
+              0.0,
+            )),
           physics: option.None,
         )
       [loading_cube, ..lights]
@@ -282,7 +286,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     Failed(_error_msg) -> {
       // Show a red cube to indicate error
       let error_cube =
-        scene.Mesh(
+        scene.mesh(
           id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
@@ -299,7 +303,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
       [error_cube, ..lights]
@@ -309,19 +313,19 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       // Get animation from state machine
       let animation = case state_machine.get_current_animation(machine) {
         state_machine.Single(anim) ->
-          option.Some(object3d.SingleAnimation(anim))
+          option.Some(animation.SingleAnimation(anim))
         state_machine.Blend(from, to, factor) ->
-          option.Some(object3d.BlendedAnimations(from, to, factor))
+          option.Some(animation.BlendedAnimations(from, to, factor))
         state_machine.None -> option.None
       }
 
       // Show the character model with animation
       let character =
-        scene.Model3D(
+        scene.model_3d(
           id: Character,
           object: data.scene,
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
         )

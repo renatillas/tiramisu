@@ -1,3 +1,125 @@
+//// Material system for defining how 3D surfaces appear when rendered.
+////
+//// Materials control the visual appearance of meshes by defining how they interact with lights
+//// and what textures they display. Tiramisu provides several material types with different
+//// performance and visual characteristics.
+////
+//// ## Material Types
+////
+//// - **StandardMaterial**: Physically-based rendering (PBR) with metalness/roughness workflow - most realistic
+//// - **PhongMaterial**: Specular highlights for shiny plastic or ceramic
+//// - **LambertMaterial**: Matte diffuse surfaces like cloth or wood
+//// - **ToonMaterial**: Cartoon-style cel-shaded rendering
+//// - **BasicMaterial**: Unlit surfaces (no lighting calculations) - fastest
+//// - **SpriteMaterial**: 2D billboards that face the camera
+//// - **LineMaterial**: For rendering lines
+////
+//// ## Builder Pattern
+////
+//// For StandardMaterial (the most common choice), use the builder pattern for cleaner code:
+////
+//// ```gleam
+//// import tiramisu/material
+//// import gleam/option
+////
+//// // Builder pattern (recommended)
+//// let assert Ok(metal) = material.new()
+////   |> material.with_color(0xcccccc)
+////   |> material.with_metalness(1.0)
+////   |> material.with_roughness(0.3)
+////   |> material.build()
+////
+//// // Direct constructor (more explicit)
+//// let assert Ok(plastic) = material.standard(
+////   color: 0xff0000,
+////   metalness: 0.0,
+////   roughness: 0.5,
+////   transparent: False,
+////   opacity: 1.0,
+////   map: option.None,
+////   normal_map: option.None,
+////   ambient_oclusion_map: option.None,
+////   roughness_map: option.None,
+////   metalness_map: option.None,
+//// )
+//// ```
+////
+//// ## Texture Mapping
+////
+//// All materials (except LineMaterial) support textures:
+////
+//// ```gleam
+//// import tiramisu/asset
+////
+//// // Load textures
+//// let assert Ok(color_tex) = asset.get_texture(cache, "brick_color.jpg")
+//// let assert Ok(normal_tex) = asset.get_texture(cache, "brick_normal.jpg")
+////
+//// // Apply to material
+//// let assert Ok(brick_material) = material.new()
+////   |> material.with_color_map(color_tex)
+////   |> material.with_normal_map(normal_tex)
+////   |> material.with_roughness(0.8)
+////   |> material.build()
+//// ```
+////
+//// ## Material Examples
+////
+//// ### Metallic Surfaces
+//// ```gleam
+//// // Gold
+//// let assert Ok(gold) = material.new()
+////   |> material.with_color(0xffd700)
+////   |> material.with_metalness(1.0)
+////   |> material.with_roughness(0.3)
+////   |> material.build()
+////
+//// // Brushed steel
+//// let assert Ok(steel) = material.new()
+////   |> material.with_color(0xaaaaaa)
+////   |> material.with_metalness(1.0)
+////   |> material.with_roughness(0.5)
+////   |> material.build()
+//// ```
+////
+//// ### Non-Metallic Surfaces
+//// ```gleam
+//// // Plastic
+//// let assert Ok(plastic) = material.new()
+////   |> material.with_color(0xff0000)
+////   |> material.with_metalness(0.0)
+////   |> material.with_roughness(0.4)
+////   |> material.build()
+////
+//// // Matte wood (Lambert)
+//// let assert Ok(wood) = material.lambert(
+////   color: 0x8b4513,
+////   map: option.None,
+////   normal_map: option.None,
+////   ambient_oclusion_map: option.None,
+//// )
+//// ```
+////
+//// ### Special Effects
+//// ```gleam
+//// // Glass (transparent)
+//// let assert Ok(glass) = material.new()
+////   |> material.with_color(0x88ccff)
+////   |> material.with_metalness(0.0)
+////   |> material.with_roughness(0.0)
+////   |> material.with_transparent(True)
+////   |> material.with_opacity(0.3)
+////   |> material.build()
+////
+//// // Cartoon cel-shading
+//// let assert Ok(toon) = material.toon(
+////   color: 0xff0000,
+////   map: option.None,
+////   normal_map: option.None,
+////   ambient_oclusion_map: option.None,
+//// )
+//// ```
+
 import gleam/bool
 import gleam/option.{type Option}
 import tiramisu/asset
@@ -207,6 +329,36 @@ pub fn sprite(
   Ok(SpriteMaterial(color:, transparent:, opacity:, map:))
 }
 
+/// Create a Lambert material for matte, non-shiny surfaces.
+///
+/// Lambert materials use diffuse-only lighting with no specular highlights, making them
+/// ideal for cloth, wood, concrete, or other matte surfaces. Cheaper than Phong or Standard.
+///
+/// **Color**: Base color without lighting (0x000000 to 0xFFFFFF).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/material
+/// import gleam/option
+///
+/// // Matte red cloth
+/// let assert Ok(cloth) = material.lambert(
+///   color: 0xcc0000,
+///   map: option.None,
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+///
+/// // Wood with texture
+/// let assert Ok(color_tex) = asset.get_texture(cache, "wood.jpg")
+/// let assert Ok(wood) = material.lambert(
+///   color: 0xffffff,  // White base color (texture provides color)
+///   map: option.Some(color_tex),
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+/// ```
 pub fn lambert(
   color color: Int,
   map map: Option(asset.Texture),
@@ -220,6 +372,38 @@ pub fn lambert(
   Ok(LambertMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
 }
 
+/// Create a Phong material for shiny surfaces with specular highlights.
+///
+/// Phong materials add specular highlights to simulate shiny surfaces like plastic,
+/// ceramic, or polished surfaces. More expensive than Lambert but cheaper than Standard.
+///
+/// **Color**: Base diffuse color (0x000000 to 0xFFFFFF).
+/// **Shininess**: Specular highlight size. Higher = smaller, sharper highlight (typical: 30-100).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/material
+/// import gleam/option
+///
+/// // Shiny red plastic
+/// let assert Ok(plastic) = material.phong(
+///   color: 0xff0000,
+///   shininess: 80.0,
+///   map: option.None,
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+///
+/// // Ceramic with low shininess (larger highlight)
+/// let assert Ok(ceramic) = material.phong(
+///   color: 0xf5f5dc,
+///   shininess: 30.0,
+///   map: option.None,
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+/// ```
 pub fn phong(
   color color: Int,
   shininess shininess: Float,
@@ -235,6 +419,36 @@ pub fn phong(
   Ok(PhongMaterial(color:, shininess:, map:, normal_map:, ambient_oclusion_map:))
 }
 
+/// Create a Toon material for cartoon-style cel-shaded rendering.
+///
+/// Toon materials create a cartoon/anime aesthetic by using banded shading instead of
+/// smooth gradients. Colors are quantized into distinct bands, creating a hand-drawn look.
+///
+/// **Color**: Base color (0x000000 to 0xFFFFFF).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/material
+/// import gleam/option
+///
+/// // Cartoon character
+/// let assert Ok(toon_mat) = material.toon(
+///   color: 0xff6b35,
+///   map: option.None,
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+///
+/// // Cel-shaded with texture
+/// let assert Ok(color_tex) = asset.get_texture(cache, "character.png")
+/// let assert Ok(toon_textured) = material.toon(
+///   color: 0xffffff,  // White base (texture provides color)
+///   map: option.Some(color_tex),
+///   normal_map: option.None,
+///   ambient_oclusion_map: option.None,
+/// )
+/// ```
 pub fn toon(
   color color: Int,
   map map: Option(asset.Texture),
@@ -252,17 +466,8 @@ pub fn toon(
 
 /// Builder for standard (PBR) materials with sensible defaults.
 ///
-/// Start with `new_standard_material()`, chain setter methods, then call `build()`.
-///
-/// ## Example
-///
-/// ```gleam
-/// let material = material.new()
-///   |> material.with_color(0xff0000)
-///   |> material.with_metalness(0.8)
-///   |> material.with_roughness(0.3)
-///   |> material.build()
-/// ```
+/// Use this opaque type with the builder functions to construct StandardMaterials
+/// using a fluent interface.
 pub opaque type StandardMaterialBuilder {
   StandardMaterialBuilder(
     color: Int,
@@ -278,6 +483,28 @@ pub opaque type StandardMaterialBuilder {
   )
 }
 
+/// Create a new StandardMaterial builder with sensible defaults.
+///
+/// **Default values:**
+/// - Color: 0x808080 (medium gray)
+/// - Metalness: 0.5 (semi-metallic)
+/// - Roughness: 0.5 (semi-rough)
+/// - Transparent: False
+/// - Opacity: 1.0 (fully opaque)
+/// - All texture maps: None
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/material
+///
+/// // Start building a material
+/// let assert Ok(metal) = material.new()
+///   |> material.with_color(0xcccccc)
+///   |> material.with_metalness(1.0)
+///   |> material.with_roughness(0.3)
+///   |> material.build()
+/// ```
 pub fn new() -> StandardMaterialBuilder {
   StandardMaterialBuilder(
     color: 0x808080,
@@ -293,6 +520,16 @@ pub fn new() -> StandardMaterialBuilder {
   )
 }
 
+/// Set the base color.
+///
+/// **Color**: Hex color from 0x000000 (black) to 0xFFFFFF (white).
+///
+/// ## Example
+///
+/// ```gleam
+/// material.new()
+///   |> material.with_color(0xff0000)  // Red
+/// ```
 pub fn with_color(
   builder: StandardMaterialBuilder,
   color: Int,
@@ -300,6 +537,21 @@ pub fn with_color(
   StandardMaterialBuilder(..builder, color: color)
 }
 
+/// Set the metalness value.
+///
+/// **Metalness**: 0.0 = non-metal (plastic, wood, fabric), 1.0 = pure metal (gold, steel).
+///
+/// ## Example
+///
+/// ```gleam
+/// // Metallic surface
+/// material.new()
+///   |> material.with_metalness(1.0)
+///
+/// // Non-metallic surface
+/// material.new()
+///   |> material.with_metalness(0.0)
+/// ```
 pub fn with_metalness(
   builder: StandardMaterialBuilder,
   metalness: Float,
@@ -307,6 +559,21 @@ pub fn with_metalness(
   StandardMaterialBuilder(..builder, metalness: metalness)
 }
 
+/// Set the roughness value.
+///
+/// **Roughness**: 0.0 = mirror-smooth (polished), 1.0 = completely rough (matte).
+///
+/// ## Example
+///
+/// ```gleam
+/// // Polished chrome
+/// material.new()
+///   |> material.with_roughness(0.1)
+///
+/// // Rough concrete
+/// material.new()
+///   |> material.with_roughness(0.9)
+/// ```
 pub fn with_roughness(
   builder: StandardMaterialBuilder,
   roughness: Float,
@@ -314,6 +581,20 @@ pub fn with_roughness(
   StandardMaterialBuilder(..builder, roughness: roughness)
 }
 
+/// Set the color/albedo texture map.
+///
+/// The texture modulates the base color. Common practice is to set base color to white (0xFFFFFF)
+/// when using a color map.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(texture) = asset.get_texture(cache, "brick_color.jpg")
+///
+/// material.new()
+///   |> material.with_color(0xffffff)  // White base
+///   |> material.with_color_map(texture)
+/// ```
 pub fn with_color_map(
   builder: StandardMaterialBuilder,
   map: asset.Texture,
@@ -321,6 +602,19 @@ pub fn with_color_map(
   StandardMaterialBuilder(..builder, map: option.Some(map))
 }
 
+/// Set the normal map for surface detail.
+///
+/// Normal maps add surface details like bumps and grooves without adding geometry.
+/// They affect how light interacts with the surface.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(normal) = asset.get_texture(cache, "brick_normal.jpg")
+///
+/// material.new()
+///   |> material.with_normal_map(normal)
+/// ```
 pub fn with_normal_map(
   builder: StandardMaterialBuilder,
   normal_map: asset.Texture,
@@ -328,6 +622,19 @@ pub fn with_normal_map(
   StandardMaterialBuilder(..builder, normal_map: option.Some(normal_map))
 }
 
+/// Set the ambient occlusion map for contact shadows.
+///
+/// AO maps darken areas where ambient light would be occluded, adding depth and realism
+/// to crevices and corners.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(ao) = asset.get_texture(cache, "brick_ao.jpg")
+///
+/// material.new()
+///   |> material.with_ambient_oclusion_map(ao)
+/// ```
 pub fn with_ambient_oclusion_map(
   builder: StandardMaterialBuilder,
   ambient_oclusion_map: asset.Texture,
@@ -338,6 +645,19 @@ pub fn with_ambient_oclusion_map(
   )
 }
 
+/// Set the roughness map for per-pixel roughness variation.
+///
+/// Allows different parts of the surface to have different roughness values,
+/// like scratches on polished metal or worn areas on wood.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(roughness) = asset.get_texture(cache, "metal_roughness.jpg")
+///
+/// material.new()
+///   |> material.with_roughness_map(roughness)
+/// ```
 pub fn with_roughness_map(
   builder: StandardMaterialBuilder,
   roughness_map: asset.Texture,
@@ -345,6 +665,19 @@ pub fn with_roughness_map(
   StandardMaterialBuilder(..builder, roughness_map: option.Some(roughness_map))
 }
 
+/// Set the metalness map for per-pixel metalness variation.
+///
+/// Useful for surfaces that are partially metallic, like painted metal with scratches
+/// revealing bare metal underneath.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(metalness) = asset.get_texture(cache, "metal_metalness.jpg")
+///
+/// material.new()
+///   |> material.with_metalness_map(metalness)
+/// ```
 pub fn with_metalness_map(
   builder: StandardMaterialBuilder,
   metalness_map: asset.Texture,
@@ -352,6 +685,19 @@ pub fn with_metalness_map(
   StandardMaterialBuilder(..builder, metalness_map: option.Some(metalness_map))
 }
 
+/// Enable or disable transparency.
+///
+/// When True, the material's opacity value will be used for alpha blending.
+/// Set to True when creating glass, water, or semi-transparent effects.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Glass material
+/// material.new()
+///   |> material.with_transparent(True)
+///   |> material.with_opacity(0.3)
+/// ```
 pub fn with_transparent(
   builder: StandardMaterialBuilder,
   transparent: Bool,
@@ -359,6 +705,20 @@ pub fn with_transparent(
   StandardMaterialBuilder(..builder, transparent: transparent)
 }
 
+/// Set the opacity value.
+///
+/// **Opacity**: 0.0 = fully transparent, 1.0 = fully opaque.
+/// Only takes effect when `with_transparent(True)` is set.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Semi-transparent glass
+/// material.new()
+///   |> material.with_color(0x88ccff)
+///   |> material.with_transparent(True)
+///   |> material.with_opacity(0.3)
+/// ```
 pub fn with_opacity(
   builder: StandardMaterialBuilder,
   opacity: Float,
@@ -366,6 +726,25 @@ pub fn with_opacity(
   StandardMaterialBuilder(..builder, opacity: opacity)
 }
 
+/// Build the final StandardMaterial from the builder.
+///
+/// Validates all parameters and returns a Result. Will fail if any values
+/// are out of valid ranges.
+///
+/// ## Example
+///
+/// ```gleam
+/// let result = material.new()
+///   |> material.with_color(0xff0000)
+///   |> material.with_metalness(0.8)
+///   |> material.with_roughness(0.3)
+///   |> material.build()
+///
+/// case result {
+///   Ok(material) -> // Use the material
+///   Error(material.OutOfBoundsColor(_)) -> // Handle error
+/// }
+/// ```
 pub fn build(
   builder: StandardMaterialBuilder,
 ) -> Result(Material, MaterialError) {

@@ -212,20 +212,6 @@ pub fn with_quaternion_rotation(
   Transform(..transform, rotation: quaternion)
 }
 
-/// Update the rotation of a transform (Euler angles in radians).
-///
-/// Alias for `with_euler_rotation` for backwards compatibility.
-///
-/// ## Example
-///
-/// ```gleam
-/// let rotated = transform.identity
-///   |> transform.with_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90° turn around Y axis
-/// ```
-pub fn with_rotation(transform: Transform, euler: vec3.Vec3(Float)) -> Transform {
-  with_euler_rotation(transform, euler)
-}
-
 /// Update the scale of a transform.
 ///
 /// ## Example

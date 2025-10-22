@@ -1,3 +1,99 @@
+//// Particle Emitter module - GPU-accelerated particle effects system.
+////
+//// Provides a declarative builder API for creating particle effects like fire, smoke,
+//// explosions, trails, and environmental effects. Particles are rendered efficiently
+//// using Three.js Points with automatic lifetime management.
+////
+//// ## Core Concepts
+////
+//// - **Particle Emitter**: Configuration for spawning particles continuously
+//// - **Builder Pattern**: Chainable functions with sensible defaults
+//// - **Validated Construction**: Result types catch invalid parameters
+//// - **GPU Rendering**: Efficient rendering using Three.js Points geometry
+//// - **Automatic Lifecycle**: Particles fade out and are recycled automatically
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/particle_emitter
+//// import tiramisu/scene
+//// import vec/vec3
+////
+//// // Fire effect
+//// let assert Ok(fire) =
+////   particle_emitter.new()
+////   |> particle_emitter.rate(100.0)             // 100 particles/sec
+////   |> particle_emitter.lifetime(2.0)           // 2 second lifetime
+////   |> particle_emitter.velocity(vec3.Vec3(0.0, 5.0, 0.0))  // Upward
+////   |> particle_emitter.velocity_variance(vec3.Vec3(2.0, 1.0, 2.0))
+////   |> particle_emitter.color(0xffff00)         // Yellow
+////   |> particle_emitter.fade_to(0xff0000)       // Fade to red
+////   |> particle_emitter.size(0.3)
+////   |> particle_emitter.gravity(-0.5)           // Rise (negative gravity)
+////   |> particle_emitter.build()
+////
+//// scene.ParticleEmitter(
+////   id: "campfire",
+////   emitter: fire,
+////   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
+//// )
+//// ```
+////
+//// ## Particle Parameters
+////
+//// - **rate**: Particles spawned per second (must be > 0)
+//// - **lifetime**: How long each particle lives in seconds (must be > 0)
+//// - **velocity**: Base velocity vector for new particles
+//// - **velocity_variance**: Random variance added per axis (creates spread)
+//// - **size**: Base particle size (must be > 0)
+//// - **size_variance**: Random size variance (must be >= 0)
+//// - **color**: Start color as hex (0x000000 to 0xffffff)
+//// - **color_end**: Optional end color for fade effect
+//// - **gravity_scale**: Gravity multiplier (1.0 = normal, 0.0 = no gravity, negative = rise)
+//// - **max_particles**: Maximum simultaneous particles (must be > 0)
+////
+//// ## Effect Examples
+////
+//// ### Smoke Trail
+//// ```gleam
+//// particle_emitter.new()
+//// |> particle_emitter.rate(30.0)
+//// |> particle_emitter.lifetime(3.0)
+//// |> particle_emitter.velocity(vec3.Vec3(0.0, 2.0, 0.0))
+//// |> particle_emitter.velocity_variance(vec3.Vec3(0.5, 0.5, 0.5))
+//// |> particle_emitter.color(0x888888)
+//// |> particle_emitter.fade_to(0x000000)
+//// |> particle_emitter.size(0.5)
+//// |> particle_emitter.gravity(0.0)  // No gravity
+//// |> particle_emitter.build()
+//// ```
+////
+//// ### Explosion
+//// ```gleam
+//// particle_emitter.new()
+//// |> particle_emitter.rate(500.0)  // Burst!
+//// |> particle_emitter.lifetime(1.0)
+//// |> particle_emitter.velocity(vec3.Vec3(0.0, 0.0, 0.0))
+//// |> particle_emitter.velocity_variance(vec3.Vec3(10.0, 10.0, 10.0))  // Radial
+//// |> particle_emitter.color(0xffa500)
+//// |> particle_emitter.fade_to(0x000000)
+//// |> particle_emitter.gravity(1.0)
+//// |> particle_emitter.build()
+//// ```
+////
+//// ### Sparkles
+//// ```gleam
+//// particle_emitter.new()
+//// |> particle_emitter.rate(50.0)
+//// |> particle_emitter.lifetime(0.5)
+//// |> particle_emitter.velocity(vec3.Vec3(0.0, 1.0, 0.0))
+//// |> particle_emitter.velocity_variance(vec3.Vec3(2.0, 2.0, 2.0))
+//// |> particle_emitter.color(0xffff00)
+//// |> particle_emitter.size(0.1)
+//// |> particle_emitter.gravity(0.5)
+//// |> particle_emitter.build()
+//// ```
+
 import gleam/bool
 import gleam/float
 import gleam/option.{type Option}

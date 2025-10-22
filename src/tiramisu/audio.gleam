@@ -1,3 +1,78 @@
+//// Audio module - spatial and global audio playback with Web Audio API.
+////
+//// Provides type-safe audio playback configuration using the Web Audio API.
+//// Supports both global (2D) and positional (3D) audio with volume groups,
+//// fade transitions, and playback control.
+////
+//// ## Core Concepts
+////
+//// - **Global Audio**: 2D audio with constant volume regardless of listener position
+//// - **Positional Audio**: 3D audio with distance-based volume falloff
+//// - **Audio Groups**: Categorize sounds (SFX, Music, Voice, Ambient) for group volume control
+//// - **Builder Pattern**: Chainable functions for configuring audio playback
+//// - **Fade Transitions**: Smooth fade in/out when changing playback state
+//// - **Playback Control**: Play, pause, stop, loop, and adjust playback rate
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/audio
+//// import tiramisu/scene
+//// import tiramisu/asset
+////
+//// // Global audio (background music)
+//// let music_config =
+////   audio.playing()
+////   |> audio.with_loop(True)
+////   |> audio.with_volume(0.5)
+////   |> audio.with_group(audio.Music)
+////   |> audio.with_fade(1000)  // 1 second fade in
+////
+//// scene.Audio(
+////   id: "bg-music",
+////   audio: audio.global(music_buffer, music_config),
+////   transform: transform.identity,
+//// )
+////
+//// // Positional audio (footsteps)
+//// let sfx_config =
+////   audio.playing()
+////   |> audio.with_group(audio.SFX)
+////   |> audio.with_on_end(fn() { io.println("Step complete!") })
+////
+//// scene.Audio(
+////   id: "footstep",
+////   audio:
+////     audio.positional(footstep_buffer, sfx_config)
+////     |> audio.with_ref_distance(2.0)
+////     |> audio.with_rolloff_factor(1.5)
+////     |> audio.with_max_distance(50.0),
+////   transform: transform.at(position: player_position),
+//// )
+//// ```
+////
+//// ## Audio Groups
+////
+//// Audio groups allow batch volume control for categories of sounds:
+////
+//// - `SFX` - Sound effects (footsteps, gunshots, UI sounds)
+//// - `Music` - Background music and themes
+//// - `Voice` - Dialogue and voice lines
+//// - `Ambient` - Environmental sounds (wind, rain, crowd noise)
+//// - `Custom(name)` - User-defined groups
+////
+//// Set group volumes using the debug module or custom controls.
+////
+//// ## Positional Audio
+////
+//// Positional audio uses distance-based volume falloff:
+////
+//// - `ref_distance`: Distance where volume starts decreasing (default: 1.0)
+//// - `rolloff_factor`: How quickly volume decreases with distance (default: 1.0)
+//// - `max_distance`: Maximum distance where audio can be heard (default: 10000.0)
+////
+//// Position is determined by the Audio scene node's transform.
+
 import gleam/option
 
 // --- Public Types ---

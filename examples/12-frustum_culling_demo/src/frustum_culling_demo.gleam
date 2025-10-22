@@ -104,7 +104,7 @@ fn update(
       #(
         Model(
           show_performance: show_performance,
-          time: model.time +. ctx.delta_time,
+          time: model.time +. ctx.delta_time /. 1000.0,
         ),
         effect.tick(Tick),
         option.None,
@@ -118,7 +118,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
     |> result.map(fn(cam) {
       cam
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         camera: _,
         transform: transform.at(position: vec3.Vec3(0.0, 20.0, 80.0)),
@@ -129,7 +129,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       |> list.wrap
     })
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
@@ -137,7 +137,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -173,7 +173,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       // Slight rotation animation
       let rotation = model.time *. 0.5
 
-      scene.Mesh(
+      scene.mesh(
         id: Cube(i),
         geometry: {
           let assert Ok(geometry) =
@@ -190,14 +190,18 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           material
         },
         transform: transform.at(position: vec3.Vec3(orbit_x, fy, orbit_z))
-        |> transform.with_rotation(vec3.Vec3(rotation, rotation *. 0.7, rotation *. 0.3)),
+          |> transform.with_euler_rotation(vec3.Vec3(
+            rotation,
+            rotation *. 0.7,
+            rotation *. 0.3,
+          )),
         physics: option.None,
       )
     })
 
   // Add a ground plane for reference
   let ground =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(geometry) = geometry.plane(width: 200.0, height: 200.0)
@@ -214,7 +218,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       // Rotate 90° to make horizontal
       transform: transform.at(position: vec3.Vec3(0.0, -50.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
     |> list.wrap

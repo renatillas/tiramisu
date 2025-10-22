@@ -130,7 +130,7 @@ fn update(
 }
 
 // Render the scene
-fn view(model: Model) -> List(scene.SceneNode) {
+fn view(model: Model) -> List(scene.Node) {
   // Create camera
   let assert Ok(cam) = camera.perspective(
     field_of_view: 75.0,
@@ -138,7 +138,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     far: 1000.0,
   )
 
-  let camera_node = scene.Camera(
+  let camera_node = scene.camera(
     id: "main",
     camera: cam,
     transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
@@ -161,15 +161,13 @@ fn view(model: Model) -> List(scene.SceneNode) {
     |> material.with_roughness(0.5)
     |> material.build()
 
-  let cube = scene.Mesh(
+  let cube = scene.mesh(
     id: "cube",
     geometry: cube_geometry,
     material: cube_material,
-    transform: transform.Transform(
-      position: vec3.Vec3(0.0, 0.0, 0.0),
-      rotation: vec3.Vec3(model.rotation, model.rotation, 0.0),
-      scale: vec3.Vec3(1.0, 1.0, 1.0),
-    ),
+    transform: transform.identity
+      |> transform.with_position(vec3.Vec3(0.0, 0.0, 0.0))
+      |> transform.with_euler_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
     physics: option.None,
   )
 
@@ -179,7 +177,7 @@ fn view(model: Model) -> List(scene.SceneNode) {
     color: 0xffffff,
   )
 
-  let ambient = scene.Light(
+  let ambient = scene.light(
     id: "ambient",
     light: ambient_light,
     transform: transform.identity,
@@ -190,14 +188,10 @@ fn view(model: Model) -> List(scene.SceneNode) {
     color: 0xffffff,
   )
 
-  let directional = scene.Light(
+  let directional = scene.light(
     id: "sun",
     light: directional_light,
-    transform: transform.Transform(
-      position: vec3.Vec3(5.0, 5.0, 5.0),
-      rotation: vec3.Vec3(0.0, 0.0, 0.0),
-      scale: vec3.Vec3(1.0, 1.0, 1.0),
-    ),
+    transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
   )
 
   [camera_node, cube, ambient, directional]
@@ -233,17 +227,20 @@ The `Context` type provides timing, input, and canvas dimension information:
 ```gleam
 pub type Context {
   Context(
-    delta_time: Float,      // Time since last frame (seconds)
+    delta_time: Float,      // Time since last frame in seconds (e.g., 0.016 for 60 FPS)
     input: InputState,      // Keyboard, mouse, touch state
     canvas_width: Float,    // Current canvas width in pixels
     canvas_height: Float,   // Current canvas height in pixels
+    ...
   )
 }
 ```
 
+**Delta Time**: Always use `delta_time` for movement and animations to ensure frame-rate independence. For example, if you want an object to move at 5 units per second, multiply `5.0 *. ctx.delta_time` each frame.
+
 #### 2. Effects
 
-Effects are side effects that return messages:
+Effects are side effects that may return messages:
 
 ```gleam
 effect.tick(Tick)                    // Run on every frame
@@ -254,32 +251,26 @@ effect.none()                         // No effects
 
 #### 3. Scene Nodes
 
-Your `view` function returns a list of `SceneNode`:
+Your `view` function returns a list of `scene.Node(id)` created by using the scene functions.
 
-```gleam
-pub type SceneNode {
-  Camera(...)       // Camera (one must be active: True)
-  Mesh(...)         // 3D object with geometry and material
-  Light(...)        // Light source
-  Group(...)        // Container for child nodes
-  Sprite(...)       // 2D sprite (billboarded quad)
-  InstancedMesh(...)  // Many identical objects (efficient)
-  LOD(...)          // Level-of-detail system
-}
-```
 
 #### 4. Transforms
 
-Every scene node has a transform (position, rotation, scale):
+Every scene node has a transform (position, rotation, scale). The Transform type is opaque, so you use builder functions:
 
 ```gleam
-transform.Transform(
-  position: vec3.Vec3(x, y, z),
-  rotation: vec3.Vec3(rx, ry, rz),  // Radians
-  scale: vec3.Vec3(sx, sy, sz),
-)
+// Identity transform (origin, no rotation, scale 1)
+transform.identity
 
-// Or use the identity transform
-transform.identity  // Position (0,0,0), no rotation, scale (1,1,1)
+// Position only
+transform.at(position: vec3.Vec3(5.0, 0.0, -3.0))
+
+// Build with multiple properties
+transform.identity
+  |> transform.with_position(vec3.Vec3(5.0, 2.0, -3.0))
+  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90° on Y)
+  |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))  // 2x larger
 ```
+
+**Rotation:** Uses Euler angles in radians (π radians = 180°, π/2 = 90°)
 

@@ -49,7 +49,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
+      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
@@ -61,7 +61,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
 
   let camera =
     camera
-    |> scene.Camera(
+    |> scene.camera(
       id: "main_camera",
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
@@ -71,7 +71,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     )
     |> list.wrap
   let lights = [
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
@@ -79,7 +79,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: "directional",
       light: {
         let assert Ok(light) =
@@ -158,12 +158,16 @@ fn create_mesh(
   let assert Ok(material) =
     material.new() |> material.with_color(color) |> material.build
 
-  scene.Mesh(
+  scene.mesh(
     id: id,
     geometry: geometry,
     material: material,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0))
-        |> transform.with_rotation(vec3.Vec3(rotation *. 0.5, rotation, rotation *. 0.3)),
+      |> transform.with_euler_rotation(vec3.Vec3(
+        rotation *. 0.5,
+        rotation,
+        rotation *. 0.3,
+      )),
     physics: option.None,
   )
 }

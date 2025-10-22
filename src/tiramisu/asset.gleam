@@ -30,15 +30,21 @@ import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option
 import gleam/order
+import tiramisu/animation.{type AnimationClip}
 import tiramisu/audio.{type AudioBuffer}
-import tiramisu/object3d.{type AnimationClip, type Object3D}
 
 /// Opaque type for Three.js textures.
 ///
 /// Created via `asset.load_texture()` and used in materials.
 pub type Texture
 
-/// Texture filtering mode
+/// Opaque type for Three.js Object3D.
+///
+/// Represents a 3D object loaded from GLTF, FBX, or OBJ files.
+/// Can be used in scene nodes or cloned for multiple instances.
+pub type Object3D
+
+/// Texture filtering mode.
 ///
 /// Controls how textures are sampled when they're displayed at different sizes.
 pub type TextureFilter {
@@ -52,7 +58,7 @@ pub type TextureFilter {
 
 /// Opaque type for Three.js BufferGeometry.
 ///
-/// Created by loading 3D models with `asset.load_stl()` or `asset.load_model()`.
+/// Created by loading 3D models with `asset.load_stl()`.
 pub type BufferGeometry
 
 /// Opaque type for Three.js Font (for TextGeometry).
@@ -62,19 +68,39 @@ pub type BufferGeometry
 pub type Font
 
 // --- Public Types ---
-/// STL loading error
+
+/// Errors that can occur when loading individual assets.
 pub type LoadError {
+  /// General loading error with a message
   LoadError(String)
+  /// The provided URL was invalid or empty
   InvalidUrl(String)
+  /// The asset file could not be parsed
   ParseError(String)
 }
 
+/// Data loaded from a GLTF/GLB file.
+///
+/// Contains both the 3D scene and any embedded animations.
 pub type GLTFData {
-  GLTFData(scene: Object3D, animations: List(AnimationClip))
+  GLTFData(
+    /// The root scene object containing all meshes and materials
+    scene: Object3D,
+    /// List of animation clips found in the GLTF file
+    animations: List(AnimationClip),
+  )
 }
 
+/// Data loaded from an FBX file.
+///
+/// Contains both the 3D scene and any embedded animations.
 pub type FBXData {
-  FBXData(scene: Object3D, animations: List(AnimationClip))
+  FBXData(
+    /// The root scene object containing all meshes and materials
+    scene: Object3D,
+    /// List of animation clips found in the FBX file
+    animations: List(AnimationClip),
+  )
 }
 
 /// Types of asset that can be loaded
@@ -175,16 +201,28 @@ pub fn loaded_font(font: Font) -> LoadedAsset {
   LoadedFont(font)
 }
 
-/// Asset loading error
+/// Errors that can occur when working with the asset cache.
 pub type AssetError {
+  /// Failed to load an asset with a specific reason
   AssetLoadError(url: String, reason: String)
+  /// The requested asset was not found in the cache
   AssetNotFound(url: String)
+  /// The cached asset exists but is the wrong type (e.g., requesting a texture when a model is cached)
   InvalidAssetType(url: String)
 }
 
-/// Progress information for batch loading
+/// Progress information for batch loading.
+///
+/// Provided to the progress callback during `load_batch()`.
 pub type LoadProgress {
-  LoadProgress(loaded: Int, total: Int, current_url: String)
+  LoadProgress(
+    /// Number of assets successfully loaded so far
+    loaded: Int,
+    /// Total number of assets to load
+    total: Int,
+    /// URL of the asset currently being loaded
+    current_url: String,
+  )
 }
 
 /// LRU (Least Recently Used) entry with access timestamp
@@ -192,8 +230,12 @@ type CacheEntry {
   CacheEntry(asset: LoadedAsset, last_accessed: Int)
 }
 
-/// Asset cache configuration
+/// Asset cache configuration.
+///
+/// Controls the maximum number of assets that can be cached before
+/// the least recently used asset is evicted.
 pub type CacheConfig {
+  /// Maximum number of assets before LRU eviction occurs
   CacheConfig(max_size: Int, current_time: Int)
 }
 
@@ -204,7 +246,19 @@ pub opaque type AssetCache {
 
 // --- Cache Management ---
 
-/// Create a new empty asset cache with default max size (100 asset)
+/// Create a new empty asset cache with default max size.
+///
+/// The default maximum size is 100 assets. When this limit is exceeded,
+/// the least recently used asset is automatically evicted.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+///
+/// let cache = asset.new_cache()
+/// // Load and cache assets...
+/// ```
 pub fn new_cache() -> AssetCache {
   AssetCache(
     asset: dict.new(),
@@ -212,7 +266,19 @@ pub fn new_cache() -> AssetCache {
   )
 }
 
-/// Create a new empty asset cache with custom max size
+/// Create a new empty asset cache with a custom maximum size.
+///
+/// The `max_size` is the number of assets to cache before LRU eviction occurs.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Create a larger cache for games with many assets
+/// let cache = asset.new_cache_with_size(500)
+///
+/// // Or a smaller cache for memory-constrained environments
+/// let cache = asset.new_cache_with_size(20)
+/// ```
 pub fn new_cache_with_size(max_size: Int) -> AssetCache {
   AssetCache(
     asset: dict.new(),
@@ -220,17 +286,54 @@ pub fn new_cache_with_size(max_size: Int) -> AssetCache {
   )
 }
 
-/// Get the number of cached asset
+/// Get the number of assets currently in the cache.
+///
+/// ## Example
+///
+/// ```gleam
+/// let cache = asset.new_cache()
+/// // ... load some assets
+/// let count = asset.cache_size(cache)  // => 5
+/// ```
 pub fn cache_size(cache: AssetCache) -> Int {
   dict.size(cache.asset)
 }
 
-/// Check if an asset is cached
+/// Check if a specific asset is cached.
+///
+/// ## Example
+///
+/// ```gleam
+/// case asset.is_cached(cache, "textures/player.png") {
+///   True -> {
+///     // Asset is cached, get it immediately
+///     let assert Ok(texture) = asset.get_texture(cache, "textures/player.png")
+///     use_texture(texture)
+///   }
+///   False -> {
+///     // Need to load the asset first
+///     load_and_cache_texture("textures/player.png")
+///   }
+/// }
+/// ```
 pub fn is_cached(cache: AssetCache, url: String) -> Bool {
   dict.has_key(cache.asset, url)
 }
 
-/// Clear all cached asset
+/// Clear all cached assets.
+///
+/// This removes all assets from the cache but preserves the cache configuration.
+/// Useful for level transitions or when you need to free memory.
+///
+/// ## Example
+///
+/// ```gleam
+/// // When transitioning to a new level
+/// fn load_new_level(model: Model) {
+///   let cleared_cache = asset.clear_cache(model.assets)
+///   Model(..model, assets: cleared_cache)
+/// }
+/// ```
 pub fn clear_cache(cache: AssetCache) -> AssetCache {
   AssetCache(asset: dict.new(), config: cache.config)
 }
@@ -543,23 +646,6 @@ fn evict_lru(cache: AssetCache) -> AssetCache {
   }
 }
 
-// --- Resource Disposal ---
-
-/// Dispose of a texture and free GPU memory
-pub fn dispose_texture(texture: Texture) -> Nil {
-  dispose_texture_ffi(texture)
-}
-
-/// Dispose of a geometry and free GPU memory
-pub fn dispose_geometry(geometry: BufferGeometry) -> Nil {
-  dispose_geometry_ffi(geometry)
-}
-
-/// Dispose of an Object3D and all its resources (geometry, materials, textures, children)
-pub fn dispose_object3d(object: Object3D) -> Nil {
-  dispose_object3d_ffi(object)
-}
-
 // --- FFI Functions ---
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadAudio")
@@ -573,15 +659,6 @@ fn load_batch_ffi(
   asset: array.Array(AssetType),
   on_progress: fn(LoadProgress) -> Nil,
 ) -> Promise(BatchLoadResult)
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeTexture")
-fn dispose_texture_ffi(texture: Texture) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeGeometry")
-fn dispose_geometry_ffi(geometry: BufferGeometry) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeObject3D")
-fn dispose_object3d_ffi(object: Object3D) -> Nil
 
 /// Load an STL file from a URL using Promises
 pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError)) {

@@ -253,7 +253,7 @@ fn update(
         get_new_direction(ctx.input, model.input_bindings, model.direction)
 
       // Update move timer
-      let new_timer = model.move_timer +. ctx.delta_time
+      let new_timer = model.move_timer +. ctx.delta_time /. 1000.0
 
       // Validate direction change before moving
       let assert [#(_, head_pos), ..tail] = model.snake
@@ -482,7 +482,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     model.ate_food
   {
     Ok(audio_buffer), True ->
-      scene.Audio(
+      scene.audio(
         id: EatingSound,
         audio: audio.GlobalAudio(
           buffer: audio_buffer,
@@ -510,7 +510,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     model.game_over
   {
     Ok(audio_buffer), True -> [
-      scene.Audio(
+      scene.audio(
         id: GameOverSound,
         audio: audio.GlobalAudio(
           buffer: audio_buffer,
@@ -536,7 +536,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 60.0, near: 0.1, far: 1000.0)
 
   let camera_node =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 15.0, 15.0)),
@@ -547,7 +547,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     |> list.wrap
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -555,7 +555,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) =
@@ -576,7 +576,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         0 -> #(0x4ecdc4, get_head_rotation(model.direction))
         _ -> #(0x3aafa9, vec3.Vec3(0.0, 0.0, 0.0))
       }
-      scene.Mesh(
+      scene.mesh(
         id: Snake(segment_id),
         geometry: {
           let assert Ok(box) =
@@ -593,7 +593,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           material
         },
         transform: transform.at(position: world_pos)
-          |> transform.with_rotation(rotation),
+          |> transform.with_euler_rotation(rotation),
         physics: option.None,
       )
     })
@@ -606,7 +606,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         get_eye_positions(head_world, model.direction)
 
       [
-        scene.Mesh(
+        scene.mesh(
           id: LeftEye,
           geometry: {
             let assert Ok(sphere) =
@@ -627,7 +627,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           transform: transform.at(position: left_eye_pos),
           physics: option.None,
         ),
-        scene.Mesh(
+        scene.mesh(
           id: RightEye,
           geometry: {
             let assert Ok(sphere) =
@@ -656,7 +656,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   // Create food
   let food_world = position_to_world(model.food)
   let food_node =
-    scene.Mesh(
+    scene.mesh(
       id: Food,
       geometry: {
         let assert Ok(box) =
@@ -686,7 +686,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   }
 
   let ground_updated =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(plane) =
@@ -704,7 +704,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         material
       },
       transform: transform.at(position: vec3.Vec3(0.0, -0.5, 0.0))
-        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
     |> list.wrap

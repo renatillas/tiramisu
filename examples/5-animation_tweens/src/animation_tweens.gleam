@@ -36,7 +36,7 @@ fn init(
     animation.tween_vec3(
       vec3.Vec3(-5.0, 0.0, 0.0),
       vec3.Vec3(5.0, 0.0, 0.0),
-      2.0,
+      2000.0,
       animation.Linear,
     )
 
@@ -63,7 +63,7 @@ fn update(
             animation.tween_vec3(
               vec3.Vec3(-5.0, 0.0, 0.0),
               vec3.Vec3(5.0, 0.0, 0.0),
-              2.0,
+              2000.0,
               easing,
             ),
             next_easing,
@@ -118,7 +118,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     camera.perspective(field_of_view: 45.0, near: 0.1, far: 100.0)
 
   [
-    scene.Camera(
+    scene.camera(
       id: "main_camera",
       camera: camera,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
@@ -126,7 +126,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       active: True,
       viewport: option.None,
     ),
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
@@ -134,7 +134,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: "directional",
       light: {
         let assert Ok(light) =
@@ -143,7 +143,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "sphere",
       geometry: {
         let assert Ok(geom) =
@@ -160,7 +160,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       transform: transform.at(position: position),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "start",
       geometry: {
         let assert Ok(geom) = geometry.box(width: 0.5, height: 0.5, depth: 0.5)
@@ -179,7 +179,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       transform: transform.at(position: vec3.Vec3(-5.0, 0.0, 0.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "end",
       geometry: {
         let assert Ok(geom) = geometry.box(width: 0.5, height: 0.5, depth: 0.5)

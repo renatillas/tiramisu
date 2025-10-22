@@ -98,7 +98,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
+      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
 
       // Request pointer lock on click or 'C' key (when not already locked)
       let should_request_lock = case model.pointer_locked {
@@ -127,7 +127,7 @@ fn update(
       }
 
       // Camera movement speed
-      let move_speed = 5.0 *. ctx.delta_time
+      let move_speed = 5.0 *. ctx.delta_time /. 1000.0
       let mouse_sensitivity = 0.003
 
       // Handle rotation input with mouse delta first
@@ -272,7 +272,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
 
   let camera = camera
   let camera =
-    scene.Camera(
+    scene.camera(
       id: "main_camera",
       camera:,
       transform: transform.at(position: model.camera_position),
@@ -281,7 +281,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       viewport: option.None,
     )
   let lights = [
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0x404040, intensity: 0.3)
@@ -289,7 +289,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: "directional",
       light: {
         let assert Ok(light) =
@@ -302,7 +302,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         10.0 *. maths.sin(model.rotation),
       )),
     ),
-    scene.Light(
+    scene.light(
       id: "point",
       light: {
         let assert Ok(light) =
@@ -311,7 +311,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.at(position: vec3.Vec3(-5.0, 3.0, 0.0)),
     ),
-    scene.Light(
+    scene.light(
       id: "hemisphere",
       light: {
         let assert Ok(light) =
@@ -475,44 +475,44 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     )
 
   let materials = [
-    scene.Mesh(
+    scene.mesh(
       id: "basic",
       geometry: box_geom,
       material: basic_mat,
       transform: transform.at(position: vec3.Vec3(-6.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "standard",
       geometry: box_geom,
       material: standard_material,
       transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "phong",
       geometry: box_geom,
       material: phong_mat,
       transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "lambert",
       geometry: box_geom,
       material: lambert_mat,
       transform: transform.at(position: vec3.Vec3(3.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "toon",
       geometry: box_geom,
       material: toon_mat,
       transform: transform.at(position: vec3.Vec3(6.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
   ]
@@ -550,12 +550,12 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
   }
 
   let ground = [
-    scene.Mesh(
+    scene.mesh(
       id: "ground",
       geometry: plane_geom,
       material: ground_material,
       transform: transform.at(position: vec3.Vec3(0.0, -2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     ),
   ]

@@ -77,7 +77,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera:,
       transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
@@ -87,7 +87,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -95,7 +95,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -108,7 +108,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
   // Ground plane (static physics body)
   let ground =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(geometry) =
@@ -138,7 +138,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
   // Falling cubes (dynamic physics bodies)
   let cube1 =
-    scene.Mesh(
+    scene.mesh(
       id: Cube1,
       geometry: {
         let assert Ok(geometry) =
@@ -167,7 +167,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let cube2 =
-    scene.Mesh(
+    scene.mesh(
       id: Cube2,
       geometry: {
         let assert Ok(geometry) =
@@ -194,7 +194,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let cube3 =
-    scene.Mesh(
+    scene.mesh(
       id: Cube3,
       geometry: {
         let assert Ok(geometry) =

@@ -6,7 +6,7 @@ A **scene graph** is a tree structure representing all objects in your game worl
 
 ### Scene Nodes
 
-Every object in your game is a `SceneNode`. Nodes can be:
+Every object in your game is a `scene.Node(id)`. Nodes can be:
 
 - **Mesh** - 3D object with geometry and material
 - **InstancedMesh** - Many identical objects (efficient!)
@@ -20,10 +20,10 @@ Every object in your game is a `SceneNode`. Nodes can be:
 
 ### The View Function
 
-Your `view()` function returns a `List(SceneNode)` every frame:
+Your `view()` function returns a `List(scene.Node(id))` every frame:
 
 ```gleam
-fn view(model: Model) -> List(SceneNode) {
+fn view(model: Model) -> List(scene.Node(id)) {
   [
     camera_node,
     player_mesh,
@@ -62,15 +62,11 @@ let assert Ok(cube_material) =
   |> material.with_roughness(0.5)
   |> material.build()
 
-scene.Mesh(
+scene.mesh(
   id: "cube",  // Unique identifier
   geometry: cube_geometry,
   material: cube_material,
-  transform: transform.Transform(
-    position: vec3.Vec3(0.0, 0.0, 0.0),
-    rotation: vec3.Vec3(0.0, 0.0, 0.0),
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  ),
+  transform: transform.identity,  // Position (0,0,0), no rotation, scale (1,1,1)
   physics: option.None,
 )
 ```
@@ -201,7 +197,7 @@ import tiramisu/light
 
 let assert Ok(ambient) = light.ambient(intensity: 0.5, color: 0xffffff)
 
-scene.Light(
+scene.light(
   id: "ambient",
   light: ambient,
   transform: transform.identity,
@@ -212,14 +208,10 @@ scene.Light(
 ```gleam
 let assert Ok(sun) = light.directional(intensity: 0.8, color: 0xffffff)
 
-scene.Light(
+scene.light(
   id: "sun",
   light: sun,
-  transform: transform.Transform(
-    position: vec3.Vec3(10.0, 10.0, 10.0),
-    rotation: vec3.Vec3(0.0, 0.0, 0.0),
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  ),
+  transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
 )
 ```
 
@@ -231,14 +223,10 @@ let assert Ok(lamp) = light.point(
   distance: 50.0,
 )
 
-scene.Light(
+scene.light(
   id: "lamp",
   light: lamp,
-  transform: transform.Transform(
-    position: vec3.Vec3(0.0, 5.0, 0.0),
-    rotation: vec3.Vec3(0.0, 0.0, 0.0),
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  ),
+  transform: transform.at(position: vec3.Vec3(0.0, 5.0, 0.0)),
 )
 ```
 
@@ -252,14 +240,11 @@ let assert Ok(spotlight) = light.spot(
   penumbra: 0.2,   // Soft edge
 )
 
-scene.Light(
+scene.light(
   id: "spotlight",
   light: spotlight,
-  transform: transform.Transform(
-    position: vec3.Vec3(0.0, 10.0, 0.0),
-    rotation: vec3.Vec3(-1.57, 0.0, 0.0),  // Point down
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  ),
+  transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
+    |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),  // Point down
 )
 ```
 
@@ -271,7 +256,7 @@ let assert Ok(hemi) = light.hemisphere(
   ground_color: 0x553311,
 )
 
-scene.Light(
+scene.light(
   id: "hemi",
   light: hemi,
   transform: transform.identity,
@@ -291,7 +276,7 @@ let assert Ok(cam) = camera.perspective(
   far: 1000.0,
 )
 
-scene.Camera(
+scene.camera(
   id: "main",
   camera: cam,
   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
@@ -312,7 +297,7 @@ let assert Ok(cam) = camera.orthographic(
   far: 1000.0,
 )
 
-scene.Camera(
+scene.camera(
   id: "2d_cam",
   camera: cam,
   transform: transform.identity,
@@ -326,7 +311,7 @@ scene.Camera(
 // Creates orthographic camera with automatic aspect ratio
 let cam = camera.camera_2d(width: 800, height: 600)
 
-scene.Camera(
+scene.camera(
   id: "2d",
   camera: cam,
   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),  // Distance from scene
@@ -351,7 +336,7 @@ let assert Ok(minimap_cam) = camera.perspective(
 
 [
   // Main camera (full screen)
-  scene.Camera(
+  scene.camera(
     id: "main",
     camera: main_cam,
     transform: transform.identity,
@@ -360,7 +345,7 @@ let assert Ok(minimap_cam) = camera.perspective(
     viewport: option.None,
   ),
   // Mini-map camera (top-right corner)
-  scene.Camera(
+  scene.camera(
     id: "minimap",
     camera: minimap_cam,
     transform: transform.at(position: vec3.Vec3(0.0, 100.0, 0.0)),
@@ -396,12 +381,12 @@ let assert Ok(healthbar_mat) = material.basic(
   map: option.None,
 )
 
-scene.Group(
+scene.group(
   id: "player",
   transform: player_transform,
   children: [
     // Body mesh
-    scene.Mesh(
+    scene.mesh(
       id: "player_body",
       geometry: body_geo,
       material: body_mat,
@@ -409,27 +394,20 @@ scene.Group(
       physics: option.None,
     ),
     // Weapon (attached to player)
-    scene.Mesh(
+    scene.mesh(
       id: "weapon",
       geometry: weapon_geo,
       material: weapon_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(0.5, 0.5, 0.0),  // Offset from player center
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(1.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.5, 0.5, 0.0)),  // Offset from player center
       physics: option.None,
     ),
     // Health bar (UI element)
-    scene.Mesh(
+    scene.mesh(
       id: "health_bar",
       geometry: healthbar_geo,
       material: healthbar_mat,
-      transform: transform.Transform(
-        position: vec3.Vec3(0.0, 1.5, 0.0),  // Above player
-        rotation: vec3.Vec3(0.0, 0.0, 0.0),
-        scale: vec3.Vec3(model.player_health /. 100.0, 1.0, 1.0),
-      ),
+      transform: transform.at(position: vec3.Vec3(0.0, 1.5, 0.0))  // Above player
+        |> transform.with_scale(vec3.Vec3(model.player_health /. 100.0, 1.0, 1.0)),
       physics: option.None,
     ),
   ],
@@ -444,7 +422,7 @@ scene.Group(
 
 ## Transforms
 
-Every node has a transform (position, rotation, scale):
+Every node has a transform (position, rotation, scale). The Transform type is opaque, so you use builder functions:
 
 ```gleam
 import tiramisu/transform
@@ -455,12 +433,16 @@ transform.identity
 // Position only
 transform.at(position: vec3.Vec3(10.0, 0.0, 5.0))
 
-// Full transform
-transform.Transform(
-  position: vec3.Vec3(5.0, 2.0, -3.0),
-  rotation: vec3.Vec3(0.0, 1.57, 0.0),  // Radians (90° on Y axis)
-  scale: vec3.Vec3(2.0, 2.0, 2.0),      // 2x larger
-)
+// Build with multiple properties
+transform.identity
+  |> transform.with_position(vec3.Vec3(5.0, 2.0, -3.0))
+  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90° on Y axis)
+  |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))  // 2x larger
+
+// Or start from a position and build on it
+transform.at(position: vec3.Vec3(5.0, 2.0, -3.0))
+  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))
+  |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))
 ```
 
 **Rotation:**
@@ -489,11 +471,9 @@ For rendering many identical objects efficiently:
 let transforms = list.range(0, 999)
   |> list.map(fn(i) {
     let fi = int.to_float(i)
-    transform.Transform(
-      position: vec3.Vec3(fi *. 2.0, 0.0, 0.0),
-      rotation: vec3.Vec3(0.0, fi *. 0.1, 0.0),
-      scale: vec3.Vec3(1.0, 1.0, 1.0),
-    )
+    transform.identity
+      |> transform.with_position(vec3.Vec3(fi *. 2.0, 0.0, 0.0))
+      |> transform.with_euler_rotation(vec3.Vec3(0.0, fi *. 0.1, 0.0))
   })
 
 let assert Ok(tree_geo) = geometry.cylinder(
@@ -508,7 +488,7 @@ let assert Ok(tree_mat) =
   |> material.with_color(0x8b4513)
   |> material.build()
 
-scene.InstancedMesh(
+scene.instanced_mesh(
   id: "trees",
   geometry: tree_geo,
   material: tree_mat,
@@ -527,9 +507,9 @@ Automatically switch detail based on distance:
 
 ```gleam
 // Assume these are loaded or created elsewhere
-let complex_geometry = ...  // 10,000 triangles
-let medium_geometry = ...   // 2,000 triangles
-let low_geometry = ...      // 500 triangles
+let complex_geometry = // 10,000 triangles
+let medium_geometry = // 2,000 triangles
+let low_geometry =  // 500 triangles
 
 let assert Ok(detailed_material) =
   material.new()
@@ -549,14 +529,14 @@ let assert Ok(billboard_mat) = material.basic(
   map: option.Some(building_texture),
 )
 
-scene.LOD(
+scene.lod(
   id: "building",
   transform: transform.at(position: vec3.Vec3(100.0, 0.0, 50.0)),
   levels: [
     // High detail (0-50 units)
     scene.lod_level(
       distance: 0.0,
-      node: scene.Mesh(
+      node: scene.mesh(
         id: "building_high",
         geometry: complex_geometry,
         material: detailed_material,
@@ -567,7 +547,7 @@ scene.LOD(
     // Medium detail (50-150 units)
     scene.lod_level(
       distance: 50.0,
-      node: scene.Mesh(
+      node: scene.mesh(
         id: "building_medium",
         geometry: medium_geometry,
         material: simple_material,
@@ -578,7 +558,7 @@ scene.LOD(
     // Low detail (150-500 units)
     scene.lod_level(
       distance: 150.0,
-      node: scene.Mesh(
+      node: scene.mesh(
         id: "building_low",
         geometry: low_geometry,
         material: simple_material,
@@ -589,7 +569,7 @@ scene.LOD(
     // Billboard (500+ units)
     scene.lod_level(
       distance: 500.0,
-      node: scene.Mesh(
+      node: scene.mesh(
         id: "building_billboard",
         geometry: billboard_geo,
         material: billboard_mat,
@@ -632,14 +612,14 @@ Tiramisu automatically detects changes between frames:
 **Transform changed:**
 ```gleam
 // Frame 1
-scene.Mesh(
+scene.mesh(
   id: "player",
   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
   ...
 )
 
 // Frame 2
-scene.Mesh(
+scene.mesh(
   id: "player",
   transform: transform.at(position: vec3.Vec3(1.0, 0.0, 0.0)),  // Moved!
   ...
@@ -664,10 +644,15 @@ If a node is **identical** between frames, no patch is generated:
 
 ```gleam
 // Both frames have identical mesh
-let static_mesh = scene.Mesh(
+let assert Ok(wall_geo) = geometry.box(width: 10.0, height: 5.0, depth: 1.0)
+let assert Ok(wall_mat) = material.new()
+  |> material.with_color(0x808080)
+  |> material.build()
+
+let static_mesh = scene.mesh(
   id: "wall",
-  geometry: scene.BoxGeometry(10.0, 5.0, 1.0),
-  material: scene.StandardMaterial(color: 0x808080, ...),
+  geometry: wall_geo,
+  material: wall_mat,
   transform: transform.identity,
   physics: option.None,
 )
@@ -719,97 +704,94 @@ Group(
 Group("player", children: [body, weapon, ui])
 ```
 
-### 3. Use InstancedMesh for Repeated Objects
+### 3. Use instanced_mesh() for Repeated Objects
 
 ```gleam
 // ❌ Bad: 100 separate meshes
 list.range(0, 99)
   |> list.map(fn(i) {
-    scene.Mesh(id: "coin_" <> int.to_string(i), ...)
+    scene.mesh(id: "coin_" <> int.to_string(i), ...)
   })
 
 // ✅ Good: 1 instanced mesh
-scene.InstancedMesh(id: "coins", instances: coin_transforms)
+scene.instanced_mesh(id: "coins", instances: coin_transforms)
 ```
 
-### 5. Minimize Material/Geometry Variety
+### 4. Minimize Material/Geometry Variety
 
 ```gleam
-// ❌ Bad: Different material for each
+// ❌ Bad: Different material for each enemy
 list.map(enemies, fn(e) {
-  scene.Mesh(material: scene.StandardMaterial(color: e.color, ...), ...)
+  let assert Ok(mat) = material.new()
+    |> material.with_color(e.color)
+    |> material.build()
+  scene.Mesh(id: e.id, geometry: enemy_geo, material: mat, ...)
 })
 
-// ✅ Good: Same material, use instances
-scene.InstancedMesh(
-  material: scene.StandardMaterial(color: 0xff0000, ...),
+// ✅ Good: Same material, use instanced mesh
+let assert Ok(enemy_mat) = material.new()
+  |> material.with_color(0xff0000)
+  |> material.build()
+
+scene.instanced_mesh(
+  id: "enemies",
+  geometry: enemy_geo,
+  material: enemy_mat,
   instances: enemy_transforms,
 )
 ```
 
 ## Debug Visualization
 
-Tiramisu provides debug nodes for visualization:
+Tiramisu provides debug helper functions for visualization:
 
 ```gleam
 import tiramisu/debug
 
 // Box (AABB)
-scene.DebugBox(
+debug.bounding_box(
   id: "collision_box",
   min: vec3.Vec3(-1.0, 0.0, -1.0),
   max: vec3.Vec3(1.0, 2.0, 1.0),
-  color: 0x00ff00,
+  color: debug.color_green,
 )
 
 // Sphere
-scene.DebugSphere(
+debug.sphere(
   id: "trigger_zone",
   center: vec3.Vec3(0.0, 0.0, 0.0),
   radius: 5.0,
-  color: 0xff0000,
+  color: debug.color_red,
 )
 
 // Line
-scene.DebugLine(
+debug.line(
   id: "raycast",
   from: vec3.Vec3(0.0, 1.0, 0.0),
   to: vec3.Vec3(0.0, 1.0, 10.0),
-  color: 0x0000ff,
+  color: debug.color_blue,
 )
 
 // Axes (X=red, Y=green, Z=blue)
-scene.DebugAxes(
+debug.axes(
   id: "world_origin",
   origin: vec3.Vec3(0.0, 0.0, 0.0),
   size: 5.0,
 )
 
 // Grid
-scene.DebugGrid(
+debug.grid(
   id: "ground_grid",
   size: 100.0,
   divisions: 10,
-  color: 0x444444,
+  color: debug.color_white,
 )
 
 // Point
-scene.DebugPoint(
+debug.point(
   id: "spawn_point",
   position: vec3.Vec3(10.0, 0.0, 5.0),
   size: 0.5,
-  color: 0xffff00,
+  color: debug.color_yellow,
 )
 ```
-
-## Summary
-
-**Key concepts:**
-- Scene graph is a tree of nodes
-- `view()` returns `List(SceneNode)` every frame
-- Tiramisu diffs and applies only changes
-- Use Groups for hierarchy
-- Use InstancedMesh for many identical objects
-- Use LOD for distant objects
-- Cache static scenes for performance
-

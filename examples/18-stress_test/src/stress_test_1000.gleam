@@ -113,8 +113,8 @@ fn update(
       // Update time and cached instances
       let #(new_time, new_cached_instances) = case new_animate {
         True -> #(
-          model.time +. ctx.delta_time,
-          compute_instances(model.time +. ctx.delta_time),
+          model.time +. ctx.delta_time /. 1000.0,
+          compute_instances(model.time +. ctx.delta_time /. 1000.0),
         )
         False -> {
           // When animation is OFF, freeze time and reuse cached instances
@@ -179,7 +179,11 @@ fn compute_instances(time: Float) -> List(transform.Transform) {
     let rotation = time +. base_rotation
 
     transform.at(position: vec3.Vec3(fx, fy, fz))
-        |> transform.with_rotation(vec3.Vec3(rotation *. 0.5, rotation, rotation *. 0.3))
+    |> transform.with_euler_rotation(vec3.Vec3(
+      rotation *. 0.5,
+      rotation,
+      rotation *. 0.3,
+    ))
   })
 }
 
@@ -189,7 +193,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera_node =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera:,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 500.0)),
@@ -199,7 +203,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
@@ -207,7 +211,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -223,7 +227,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let instances = model.cached_instances
 
   let instanced_cubes =
-    scene.InstancedMesh(
+    scene.instanced_mesh(
       id: CubesInstanced,
       geometry: {
         let assert Ok(geometry) =

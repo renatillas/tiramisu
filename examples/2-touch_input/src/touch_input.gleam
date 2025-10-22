@@ -196,7 +196,7 @@ fn create_camera() -> scene.Node(String) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: camera_fov, near: 0.1, far: 1000.0)
 
-  scene.Camera(
+  scene.camera(
     id: "main",
     camera: cam,
     transform: transform.identity,
@@ -213,8 +213,8 @@ fn create_lights() -> List(scene.Node(String)) {
     light.directional(color: 0xffffff, intensity: 0.8)
 
   [
-    scene.Light(id: "ambient", light: ambient, transform: transform.identity),
-    scene.Light(
+    scene.light(id: "ambient", light: ambient, transform: transform.identity),
+    scene.light(
       id: "directional",
       light: directional,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
@@ -231,12 +231,12 @@ fn create_main_cube(model: Model) -> List(scene.Node(String)) {
     |> material.build
 
   [
-    scene.Mesh(
+    scene.mesh(
       id: "cube",
       geometry: box,
       material: cube_material,
       transform: transform.at(position: model.cube_position)
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, 0.0, 0.0))
         |> transform.scale_uniform(model.cube_scale),
       physics: option.None,
     ),
@@ -275,7 +275,7 @@ fn create_touch_indicator(
       touch_indicator_depth,
     )
 
-  scene.Mesh(
+  scene.mesh(
     id: "touch-" <> int.to_string(touch.id),
     geometry: sphere,
     material: indicator_material,

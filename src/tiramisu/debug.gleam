@@ -1,3 +1,60 @@
+//// Debug visualization utilities for game development.
+////
+//// This module provides tools for visualizing game elements during development:
+//// - **Debug shapes**: Boxes, spheres, lines, rays, grids, axes, points
+//// - **Physics visualization**: Collider wireframes and shapes
+//// - **Performance monitoring**: FPS, frame time, draw calls, memory usage
+//// - **Color constants**: Common debug colors for quick visualization
+////
+//// ## Usage
+////
+//// Debug visualizations are added to your scene just like regular nodes:
+////
+//// ```gleam
+//// import tiramisu/debug
+//// import vec/vec3
+////
+//// pub fn view(model: Model) {
+////   [
+////     // Your game objects
+////     scene.Mesh(...),
+////
+////     // Debug visualizations
+////     debug.axes("axes", vec3.zero(), 5.0),
+////     debug.grid("grid", 20.0, 20, debug.color_white),
+////     debug.sphere("target", target_position, 0.5, debug.color_red),
+////   ]
+//// }
+//// ```
+////
+//// ## Performance Stats
+////
+//// Monitor your game's performance in the update loop:
+////
+//// ```gleam
+//// pub fn update(model: Model, msg: Msg, ctx: Context) {
+////   let stats = debug.get_performance_stats()
+////   io.println("FPS: " <> float.to_string(stats.fps))
+////   // ...
+//// }
+//// ```
+////
+//// ## Physics Debugging
+////
+//// Visualize physics colliders in your view function:
+////
+//// ```gleam
+//// pub fn view(model: Model, ctx: Context) {
+////   // Enable collider wireframes
+////   case ctx.physics_world, model.debug_mode {
+////     option.Some(physics_world), True ->
+////       debug.show_collider_wireframes(physics_world, True)
+////     _, _ -> Nil
+////   }
+////   // ... return scene nodes
+//// }
+//// ```
+
 import gleam/int
 import gleam/list
 import gleam_community/maths
@@ -7,33 +64,135 @@ import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
 import vec/vec3f
 
+// ============================================================================
+// BASIC DEBUG SHAPES
+// ============================================================================
+
+/// Create a debug wireframe box defined by minimum and maximum corners.
+///
+/// Useful for visualizing bounding boxes, collision volumes, or spatial regions.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `min`: Minimum corner position (x, y, z)
+/// - `max`: Maximum corner position (x, y, z)
+/// - `color`: Hex color code (e.g., `0xff0000` for red)
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Visualize a bounding box from (-1, -1, -1) to (1, 1, 1)
+/// debug.bounding_box(
+///   "bounds",
+///   vec3.Vec3(-1.0, -1.0, -1.0),
+///   vec3.Vec3(1.0, 1.0, 1.0),
+///   debug.color_cyan,
+/// )
+/// ```
 pub fn bounding_box(
   id: id,
   min: Vec3(Float),
   max: Vec3(Float),
   color: Int,
 ) -> scene.Node(id) {
-  scene.DebugBox(id, min, max, color)
+  scene.debug_box(id, min, max, color)
 }
 
+/// Create a debug wireframe sphere.
+///
+/// Useful for visualizing positions, ranges, trigger zones, or spherical collision shapes.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `center`: Center position of the sphere
+/// - `radius`: Radius of the sphere
+/// - `color`: Hex color code (e.g., `0x00ff00` for green)
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Visualize a pickup range around a player
+/// debug.sphere(
+///   "pickup-range",
+///   player_position,
+///   2.5,
+///   debug.color_yellow,
+/// )
+/// ```
 pub fn sphere(
   id: id,
   center: Vec3(Float),
   radius: Float,
   color: Int,
 ) -> scene.Node(id) {
-  scene.DebugSphere(id, center, radius, color)
+  scene.debug_sphere(id, center, radius, color)
 }
 
+/// Create a debug line between two points.
+///
+/// Useful for visualizing connections, trajectories, or directions.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `from`: Starting point of the line
+/// - `to`: Ending point of the line
+/// - `color`: Hex color code (e.g., `0xff00ff` for magenta)
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Draw a line from origin to target
+/// debug.line(
+///   "path-line",
+///   vec3.Vec3(0.0, 0.0, 0.0),
+///   target_position,
+///   debug.color_green,
+/// )
+/// ```
 pub fn line(
   id: id,
   from: Vec3(Float),
   to: Vec3(Float),
   color: Int,
 ) -> scene.Node(id) {
-  scene.DebugLine(id, from, to, color)
+  scene.debug_line(id, from, to, color)
 }
 
+/// Create a debug ray from an origin point in a direction.
+///
+/// Useful for visualizing raycasts, shooting directions, or look-at vectors.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `origin`: Starting point of the ray
+/// - `direction`: Direction vector (should be normalized for predictable length)
+/// - `length`: Length of the ray
+/// - `color`: Hex color code (e.g., `0xff0000` for red)
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Visualize a forward-facing ray
+/// debug.ray(
+///   "look-ray",
+///   camera_position,
+///   camera_forward,
+///   10.0,
+///   debug.color_blue,
+/// )
+/// ```
 pub fn ray(
   id: id,
   origin: Vec3(Float),
@@ -42,26 +201,110 @@ pub fn ray(
   color: Int,
 ) -> scene.Node(id) {
   let end = vec3f.add(origin, vec3f.scale(direction, length))
-  scene.DebugLine(id, origin, end, color)
+  scene.debug_line(id, origin, end, color)
 }
 
+/// Create coordinate axes visualization at a given position.
+///
+/// Displays X (red), Y (green), and Z (blue) axes to help visualize object orientation
+/// and world coordinates. This is particularly useful for understanding transformations
+/// and rotations.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `origin`: Position where the axes should be centered
+/// - `size`: Length of each axis line
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Show world axes at origin
+/// debug.axes("world-axes", vec3.zero(), 5.0)
+///
+/// // Show object-local axes
+/// debug.axes("player-axes", player_position, 2.0)
+/// ```
 pub fn axes(id: id, origin: Vec3(Float), size: Float) -> scene.Node(id) {
-  scene.DebugAxes(id, origin, size)
+  scene.debug_axes(id, origin, size)
 }
 
+/// Create a grid on the ground plane (XZ plane).
+///
+/// Useful for visualizing the ground, spatial reference, or movement areas.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `size`: Total size of the grid (e.g., 20.0 creates a 20×20 grid)
+/// - `divisions`: Number of grid divisions (higher = more lines)
+/// - `color`: Hex color code for all grid lines
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+///
+/// // Create a 20×20 grid with 20 divisions
+/// debug.grid("ground-grid", 20.0, 20, debug.color_white)
+/// ```
 pub fn grid(id: id, size: Float, divisions: Int, color: Int) -> scene.Node(id) {
-  scene.DebugGrid(id, size, divisions, color)
+  scene.debug_grid(id, size, divisions, color)
 }
 
+/// Create a debug point marker at a position.
+///
+/// Useful for marking specific coordinates, waypoints, or spawn points.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `position`: World position of the point
+/// - `size`: Size of the point marker
+/// - `color`: Hex color code (e.g., `0xffa500` for orange)
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+///
+/// // Mark spawn points
+/// debug.point("spawn-1", spawn_pos_1, 0.3, debug.color_green)
+/// debug.point("spawn-2", spawn_pos_2, 0.3, debug.color_green)
+/// ```
 pub fn point(
   id: id,
   position: Vec3(Float),
   size: Float,
   color: Int,
 ) -> scene.Node(id) {
-  scene.DebugPoint(id, position, size, color)
+  scene.debug_point(id, position, size, color)
 }
 
+/// Create a debug bounding box from a transform.
+///
+/// Convenient helper that extracts position and scale from a transform to create
+/// a bounding box visualization. Useful for visualizing object bounds in world space.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for this debug node
+/// - `t`: Transform containing position and scale information
+/// - `color`: Hex color code for the box wireframe
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import tiramisu/transform
+/// import vec/vec3
+///
+/// let cube_transform = transform.new()
+///   |> transform.with_position(vec3.Vec3(0.0, 2.0, 0.0))
+///   |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))
+///
+/// // Visualize the cube's bounds
+/// debug.box_from_transform("cube-bounds", cube_transform, debug.color_orange)
+/// ```
 pub fn box_from_transform(
   id: id,
   t: transform.Transform,
@@ -81,7 +324,39 @@ pub fn box_from_transform(
   bounding_box(id, min, max, color)
 }
 
-/// Create multiple lines forming a path through points
+/// Create multiple lines forming a path through points.
+///
+/// Useful for visualizing paths, trajectories, AI navigation routes, or animation curves.
+/// Connects consecutive points with lines.
+///
+/// ## Parameters
+/// - `id`: Function that generates unique IDs for each line segment (receives index)
+/// - `points`: List of positions to connect
+/// - `color`: Hex color code for all path lines
+///
+/// ## Returns
+/// A list of line nodes, one for each segment between consecutive points.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// let waypoints = [
+///   vec3.Vec3(0.0, 0.0, 0.0),
+///   vec3.Vec3(5.0, 2.0, 0.0),
+///   vec3.Vec3(10.0, 0.0, 5.0),
+///   vec3.Vec3(15.0, 3.0, 10.0),
+/// ]
+///
+/// // Visualize a patrol path
+/// debug.path(
+///   fn(i) { "patrol-segment-" <> int.to_string(i) },
+///   waypoints,
+///   debug.color_yellow,
+/// )
+/// ```
 pub fn path(
   id: fn(Int) -> id,
   points: List(Vec3(Float)),
@@ -106,6 +381,34 @@ fn create_path_lines(
   }
 }
 
+/// Create a 3D cross (three perpendicular lines) at a position.
+///
+/// Useful for marking points in 3D space with a distinctive visual marker that's
+/// visible from all angles, unlike a simple point.
+///
+/// ## Parameters
+/// - `id`: Unique identifier for all three lines (they share the same ID)
+/// - `position`: Center position of the cross
+/// - `size`: Total length of each line (extends size/2 in each direction)
+/// - `color`: Hex color code for all three lines
+///
+/// ## Returns
+/// A list of three line nodes (X, Y, and Z aligned).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import vec/vec3
+///
+/// // Mark a target position with a visible cross
+/// debug.cross(
+///   "target-marker",
+///   target_position,
+///   1.0,
+///   debug.color_red,
+/// )
+/// ```
 pub fn cross(
   id: id,
   position: Vec3(Float),
@@ -135,6 +438,20 @@ pub fn cross(
   ]
 }
 
+// ============================================================================
+// PERFORMANCE MONITORING
+// ============================================================================
+
+/// Performance statistics collected from the game engine.
+///
+/// Contains real-time performance metrics useful for optimization and debugging.
+///
+/// ## Fields
+/// - `fps`: Current frames per second (smoothed average)
+/// - `frame_time`: Time in milliseconds to render the last frame
+/// - `draw_calls`: Number of draw calls in the last frame (lower is better)
+/// - `triangles`: Total number of triangles rendered in the last frame
+/// - `memory_mb`: Estimated GPU memory usage in megabytes
 pub type PerformanceStats {
   PerformanceStats(
     fps: Float,
@@ -145,6 +462,36 @@ pub type PerformanceStats {
   )
 }
 
+/// Get current performance statistics from the renderer.
+///
+/// Returns real-time performance metrics that can be used for optimization,
+/// profiling, or displaying debug information to the user.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/debug
+/// import gleam/io
+/// import gleam/float
+///
+/// pub fn update(model: Model, msg: Msg, ctx: Context) {
+///   let stats = debug.get_performance_stats()
+///
+///   // Log performance issues
+///   case stats.fps <. 30.0 {
+///     True -> io.println("Warning: Low FPS!")
+///     False -> Nil
+///   }
+///
+///   // Track draw calls for optimization
+///   case stats.draw_calls > 100 {
+///     True -> io.println("Too many draw calls: " <> int.to_string(stats.draw_calls))
+///     False -> Nil
+///   }
+///
+///   // ... rest of update logic
+/// }
+/// ```
 @external(javascript, "../tiramisu.ffi.mjs", "getPerformanceStats")
 pub fn get_performance_stats() -> PerformanceStats
 
@@ -155,24 +502,38 @@ fn show_colliders_ffi(
   enabled: Bool,
 ) -> Nil
 
+// ============================================================================
+// COLOR CONSTANTS
+// ============================================================================
+
+/// Red color (0xff0000) - Commonly used for errors, warnings, or X-axis visualization.
 pub const color_red = 0xff0000
 
+/// Green color (0x00ff00) - Commonly used for success, active states, or Y-axis visualization.
 pub const color_green = 0x00ff00
 
+/// Blue color (0x0000ff) - Commonly used for information, water, or Z-axis visualization.
 pub const color_blue = 0x0000ff
 
+/// Yellow color (0xffff00) - Commonly used for caution, highlights, or important markers.
 pub const color_yellow = 0xffff00
 
+/// Cyan color (0x00ffff) - Commonly used for secondary information or water/ice elements.
 pub const color_cyan = 0x00ffff
 
+/// Magenta color (0xff00ff) - Commonly used for special markers or UI highlights.
 pub const color_magenta = 0xff00ff
 
+/// White color (0xffffff) - Commonly used for grids, general outlines, or default markers.
 pub const color_white = 0xffffff
 
+/// Black color (0x000000) - Rarely used for debug visualization (not visible on dark backgrounds).
 pub const color_black = 0x000000
 
+/// Orange color (0xffa500) - Commonly used for alerts, spawn points, or intermediate states.
 pub const color_orange = 0xffa500
 
+/// Purple color (0x800080) - Commonly used for special objects, power-ups, or tertiary markers.
 pub const color_purple = 0x800080
 
 // ============================================================================
@@ -315,7 +676,7 @@ fn collider_box(
   let world_corners = list.map(corners, transform_point(_, transform))
 
   // Create wireframe lines for the box
-  scene.Group(id:, transform: transform.identity, children: [
+  scene.group(id:, transform: transform.identity, children: [
     // Bottom face
     line(id, list_at(world_corners, 0), list_at(world_corners, 1), color),
     line(id, list_at(world_corners, 1), list_at(world_corners, 2), color),
@@ -380,7 +741,7 @@ fn collider_capsule(
       line(id, start, end, color)
     })
 
-  scene.Group(id:, transform: transform.identity, children:)
+  scene.group(id:, transform: transform.identity, children:)
 }
 
 /// Generate wireframe lines for a capsule in local space
@@ -500,7 +861,7 @@ fn collider_cylinder(
       line(id, start, end, color)
     })
 
-  scene.Group(id:, transform: transform.identity, children:)
+  scene.group(id:, transform: transform.identity, children:)
 }
 
 /// Generate wireframe lines for a cylinder in local space

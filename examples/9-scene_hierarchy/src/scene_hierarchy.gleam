@@ -56,7 +56,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
+      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
       #(
         Model(rotation: new_rotation, show_planets: True),
         effect.tick(Tick),
@@ -71,7 +71,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         camera: _,
         active: True,
@@ -83,7 +83,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     })
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Point,
       light: {
         let assert Ok(light) =
@@ -96,7 +96,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
   // Solar system: sun with orbiting planets in groups
   let sun = [
-    scene.Mesh(
+    scene.mesh(
       id: Sun,
       geometry: {
         let assert Ok(geometry) =
@@ -114,7 +114,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         material
       },
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
     ),
   ]
@@ -123,12 +123,16 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
   let planet_system = case model.show_planets {
     True -> [
       // Planet 1 group (rotates around sun)
-      scene.Group(
+      scene.group(
         id: Planet1Orbit,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 0.5, 0.0)),
+          |> transform.with_euler_rotation(vec3.Vec3(
+            0.0,
+            model.rotation *. 0.5,
+            0.0,
+          )),
         children: [
-          scene.Mesh(
+          scene.mesh(
             id: Planet1,
             geometry: {
               let assert Ok(geometry) =
@@ -147,16 +151,24 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
               material
             },
             transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 2.0, 0.0)),
+              |> transform.with_euler_rotation(vec3.Vec3(
+                0.0,
+                model.rotation *. 2.0,
+                0.0,
+              )),
             physics: option.None,
           ),
           // Moon orbiting planet1
-          scene.Group(
+          scene.group(
             id: Moon1Orbit,
             transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 2.0, 0.0)),
+              |> transform.with_euler_rotation(vec3.Vec3(
+                0.0,
+                model.rotation *. 2.0,
+                0.0,
+              )),
             children: [
-              scene.Mesh(
+              scene.mesh(
                 id: Moon1,
                 geometry: {
                   let assert Ok(geometry) =
@@ -182,12 +194,16 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         ],
       ),
       // Planet 2 group (rotates around sun)
-      scene.Group(
+      scene.group(
         id: Planet2Orbit,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation *. 0.3, 0.0)),
+          |> transform.with_euler_rotation(vec3.Vec3(
+            0.0,
+            model.rotation *. 0.3,
+            0.0,
+          )),
         children: [
-          scene.Mesh(
+          scene.mesh(
             id: Planet2,
             geometry: {
               let assert Ok(geometry) =
@@ -206,7 +222,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
               material
             },
             transform: transform.at(position: vec3.Vec3(7.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+              |> transform.with_euler_rotation(vec3.Vec3(
+                0.0,
+                model.rotation,
+                0.0,
+              )),
             physics: option.None,
           ),
         ],

@@ -7,126 +7,113 @@ pub fn main() {
   gleeunit.main()
 }
 
-// AABB Tests
-
-pub fn aabb_creation_test() {
-  let bounds =
-    spatial.aabb(
-      min: vec3.Vec3(-1.0, -1.0, -1.0),
-      max: vec3.Vec3(1.0, 1.0, 1.0),
-    )
-
-  assert bounds.min == vec3.Vec3(-1.0, -1.0, -1.0)
-  assert bounds.max == vec3.Vec3(1.0, 1.0, 1.0)
-}
-
-pub fn aabb_from_center_test() {
-  let center = vec3.Vec3(0.0, 0.0, 0.0)
-  let half_extents = vec3.Vec3(1.0, 1.0, 1.0)
-  let bounds = spatial.aabb_from_center(center, half_extents)
-
-  assert bounds.min == vec3.Vec3(-1.0, -1.0, -1.0)
-  assert bounds.max == vec3.Vec3(1.0, 1.0, 1.0)
-}
-
 pub fn aabb_contains_point_inside_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let point = vec3.Vec3(0.0, 0.0, 0.0)
 
-  let assert True = spatial.aabb_contains_point(bounds, point)
+  let assert True = spatial.collider_contains_point(bounds, point)
 }
 
 pub fn aabb_contains_point_outside_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let point = vec3.Vec3(2.0, 0.0, 0.0)
 
-  let assert False = spatial.aabb_contains_point(bounds, point)
+  let assert False = spatial.collider_contains_point(bounds, point)
 }
 
 pub fn aabb_contains_point_on_boundary_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let point = vec3.Vec3(1.0, 1.0, 1.0)
 
-  let assert True = spatial.aabb_contains_point(bounds, point)
+  let assert True = spatial.collider_contains_point(bounds, point)
 }
 
 pub fn aabb_intersects_overlapping_test() {
   let a =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let b =
-    spatial.aabb(min: vec3.Vec3(0.0, 0.0, 0.0), max: vec3.Vec3(2.0, 2.0, 2.0))
+    spatial.collider_box(
+      min: vec3.Vec3(0.0, 0.0, 0.0),
+      max: vec3.Vec3(2.0, 2.0, 2.0),
+    )
 
-  let assert True = spatial.aabb_intersects(a, b)
+  let assert True = spatial.collider_intersects(a, b)
 }
 
 pub fn aabb_intersects_non_overlapping_test() {
   let a =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let b =
-    spatial.aabb(min: vec3.Vec3(2.0, 2.0, 2.0), max: vec3.Vec3(4.0, 4.0, 4.0))
+    spatial.collider_box(
+      min: vec3.Vec3(2.0, 2.0, 2.0),
+      max: vec3.Vec3(4.0, 4.0, 4.0),
+    )
 
-  let assert False = spatial.aabb_intersects(a, b)
+  let assert False = spatial.collider_intersects(a, b)
 }
 
 pub fn aabb_intersects_touching_test() {
   let a =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-1.0, -1.0, -1.0),
       max: vec3.Vec3(1.0, 1.0, 1.0),
     )
   let b =
-    spatial.aabb(min: vec3.Vec3(1.0, 1.0, 1.0), max: vec3.Vec3(3.0, 3.0, 3.0))
+    spatial.collider_box(
+      min: vec3.Vec3(1.0, 1.0, 1.0),
+      max: vec3.Vec3(3.0, 3.0, 3.0),
+    )
 
-  let assert True = spatial.aabb_intersects(a, b)
+  let assert True = spatial.collider_intersects(a, b)
 }
 
 pub fn aabb_center_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-2.0, -4.0, -6.0),
       max: vec3.Vec3(2.0, 4.0, 6.0),
     )
-  let center = spatial.aabb_center(bounds)
+  let center = spatial.collider_center(bounds)
 
   assert center == vec3.Vec3(0.0, 0.0, 0.0)
 }
 
 pub fn aabb_center_offset_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(0.0, 0.0, 0.0),
       max: vec3.Vec3(10.0, 20.0, 30.0),
     )
-  let center = spatial.aabb_center(bounds)
+  let center = spatial.collider_center(bounds)
 
   assert center == vec3.Vec3(5.0, 10.0, 15.0)
 }
 
 pub fn aabb_size_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-2.0, -4.0, -6.0),
       max: vec3.Vec3(2.0, 4.0, 6.0),
     )
-  let size = spatial.aabb_size(bounds)
+  let size = spatial.collider_size(bounds)
 
   assert size == vec3.Vec3(4.0, 8.0, 12.0)
 }
@@ -135,7 +122,7 @@ pub fn aabb_size_test() {
 
 pub fn octree_new_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -147,7 +134,7 @@ pub fn octree_new_test() {
 
 pub fn octree_insert_single_item_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -162,7 +149,7 @@ pub fn octree_insert_single_item_test() {
 
 pub fn octree_insert_multiple_items_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -180,7 +167,7 @@ pub fn octree_insert_multiple_items_test() {
 
 pub fn octree_insert_out_of_bounds_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -196,7 +183,7 @@ pub fn octree_insert_out_of_bounds_test() {
 
 pub fn octree_subdivides_at_capacity_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -215,7 +202,7 @@ pub fn octree_subdivides_at_capacity_test() {
 
 pub fn octree_query_all_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -232,7 +219,7 @@ pub fn octree_query_all_test() {
 
 pub fn octree_query_region_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-100.0, -100.0, -100.0),
       max: vec3.Vec3(100.0, 100.0, 100.0),
     )
@@ -247,7 +234,7 @@ pub fn octree_query_region_test() {
 
   // Query small region around origin
   let query_bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
@@ -259,7 +246,7 @@ pub fn octree_query_region_test() {
 
 pub fn octree_query_radius_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-100.0, -100.0, -100.0),
       max: vec3.Vec3(100.0, 100.0, 100.0),
     )
@@ -282,7 +269,7 @@ pub fn octree_query_radius_test() {
 
 pub fn octree_query_radius_exact_boundary_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-100.0, -100.0, -100.0),
       max: vec3.Vec3(100.0, 100.0, 100.0),
     )
@@ -303,14 +290,14 @@ pub fn octree_query_radius_exact_boundary_test() {
 
 pub fn octree_empty_query_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )
   let tree = spatial.octree_new(bounds, 4)
 
   let query_bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-5.0, -5.0, -5.0),
       max: vec3.Vec3(5.0, 5.0, 5.0),
     )
@@ -321,7 +308,7 @@ pub fn octree_empty_query_test() {
 
 pub fn octree_count_empty_test() {
   let bounds =
-    spatial.aabb(
+    spatial.collider_box(
       min: vec3.Vec3(-10.0, -10.0, -10.0),
       max: vec3.Vec3(10.0, 10.0, 10.0),
     )

@@ -90,7 +90,7 @@ fn update(
   case msg {
     Tick -> {
       // Animate rotation
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
 
       // Animate a moving point in a circle
       let time = new_rotation *. 2.0
@@ -182,7 +182,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let camera =
     camera
-    |> scene.Camera(
+    |> scene.camera(
       id: MainCamera,
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
@@ -192,7 +192,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     )
     |> list.wrap
   let lights = [
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
@@ -200,7 +200,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) =
@@ -213,7 +213,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
   // Some example objects to debug
   let objects = [
-    scene.Mesh(
+    scene.mesh(
       id: Cube1,
       geometry: {
         let assert Ok(geometry) =
@@ -230,10 +230,14 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         material
       },
       transform: transform.at(position: vec3.Vec3(-4.0, 1.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          model.rotation,
+          model.rotation,
+          0.0,
+        )),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: Sphere1,
       geometry: {
         let assert Ok(geometry) =

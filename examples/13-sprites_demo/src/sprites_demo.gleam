@@ -92,7 +92,7 @@ fn update(
   case msg {
     NoOp -> #(model, effect.none(), option.None)
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
       #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
@@ -113,7 +113,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
         active: True,
@@ -125,7 +125,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     })
 
   let lights =
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.5)
@@ -146,7 +146,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             let x = 3.0 *. maths.cos(model.rotation)
             let y = 3.0 *. maths.sin(model.rotation)
 
-            scene.Mesh(
+            scene.mesh(
               id: Sprite1,
               geometry: {
                 let assert Ok(geometry) =
@@ -172,7 +172,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           |> result.map(fn(tex) {
             let x = 3.0 *. maths.cos(0.0 -. model.rotation)
             let y = 3.0 *. maths.sin(0.0 -. model.rotation)
-            scene.Mesh(
+            scene.mesh(
               id: Sprite2,
               geometry: {
                 let assert Ok(geometry) =
@@ -196,7 +196,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         // Emoji 3 - center, spinning
         dict.get(model.textures, "emoji3")
           |> result.map(fn(tex) {
-            scene.Mesh(
+            scene.mesh(
               id: Sprite3,
               geometry: {
                 let assert Ok(geometry) =
@@ -214,7 +214,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                 material
               },
               transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.rotation *. 2.0)),
+                |> transform.with_euler_rotation(vec3.Vec3(
+                  0.0,
+                  0.0,
+                  model.rotation *. 2.0,
+                )),
               physics: option.None,
             )
           }),
@@ -222,7 +226,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         dict.get(model.textures, "emoji4")
           |> result.map(fn(tex) {
             let y = maths.sin(model.rotation *. 2.0) *. 2.0
-            scene.Mesh(
+            scene.mesh(
               id: Sprite4,
               geometry: {
                 let assert Ok(geometry) =

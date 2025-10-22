@@ -68,8 +68,8 @@ fn update(
         input.is_key_pressed(ctx.input, input.KeyD),
         input.is_key_pressed(ctx.input, input.KeyA)
       {
-        True, False -> move_speed *. ctx.delta_time
-        False, True -> 0.0 -. move_speed *. ctx.delta_time
+        True, False -> move_speed *. ctx.delta_time /. 1000.0
+        False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
         _, _ -> 0.0
       }
 
@@ -77,8 +77,8 @@ fn update(
         input.is_key_pressed(ctx.input, input.KeyW),
         input.is_key_pressed(ctx.input, input.KeyS)
       {
-        True, False -> move_speed *. ctx.delta_time
-        False, True -> 0.0 -. move_speed *. ctx.delta_time
+        True, False -> move_speed *. ctx.delta_time /. 1000.0
+        False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
         _, _ -> 0.0
       }
 
@@ -129,7 +129,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   [
-    scene.Camera(
+    scene.camera(
       id: "main_camera",
       camera: cam,
       transform: transform.identity,
@@ -137,7 +137,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       look_at: option.None,
       active: True,
     ),
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
@@ -145,7 +145,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: "directional",
       light: {
         let assert Ok(light) =
@@ -154,7 +154,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "cube",
       geometry: {
         let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
@@ -168,7 +168,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         material
       },
       transform: transform.at(position: model.position)
-        |> transform.with_rotation(model.rotation)
+        |> transform.with_euler_rotation(model.rotation)
         |> transform.scale_uniform(model.scale),
       physics: option.None,
     ),

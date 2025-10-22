@@ -72,9 +72,9 @@ fn update(
         list.map(model.cubes, fn(cube) {
           let new_pos =
             vec3.Vec3(
-              cube.position.x +. cube.velocity.x *. ctx.delta_time,
-              cube.position.y +. cube.velocity.y *. ctx.delta_time,
-              cube.position.z +. cube.velocity.z *. ctx.delta_time,
+              cube.position.x +. cube.velocity.x *. ctx.delta_time /. 1000.0,
+              cube.position.y +. cube.velocity.y *. ctx.delta_time /. 1000.0,
+              cube.position.z +. cube.velocity.z *. ctx.delta_time /. 1000.0,
             )
           Cube(..cube, position: new_pos)
         })
@@ -135,7 +135,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     geometry.box(width: 1.0, height: 1.0, depth: 1.0)
 
   let camera_node =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
@@ -146,7 +146,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     |> list.wrap
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(intensity: 0.6, color: 0xffffff)
@@ -154,7 +154,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) =
@@ -170,7 +170,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       let assert Ok(cube_material) =
         material.new() |> material.with_color(cube.color) |> material.build
 
-      scene.Mesh(
+      scene.mesh(
         id: CubeId(cube.id),
         geometry: box_geometry,
         material: cube_material,

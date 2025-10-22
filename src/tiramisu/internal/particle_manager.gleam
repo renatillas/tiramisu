@@ -186,20 +186,27 @@ fn init_particle(emitter: ParticleEmitter, transform: Transform) -> Particle {
 // ============================================================================
 
 /// Update all particles in the system
+///
+/// **Note**: delta_time should be in milliseconds (e.g., 16.0 for 60 FPS).
+/// The function converts it to seconds internally for physics calculations.
 pub fn update_particles(
   state: ParticleSystemState,
   delta_time: Float,
 ) -> ParticleSystemState {
+  // Convert delta_time from milliseconds to seconds for physics calculations
+  // (spawn rates, lifetimes, velocities are all specified in seconds)
+  let delta_seconds = delta_time /. 1000.0
+
   case state.active {
     False -> state
     True -> {
       // Spawn new particles if needed
-      let state = handle_spawning(state, delta_time)
+      let state = handle_spawning(state, delta_seconds)
 
       // Update existing particles
       let gravity_scale = particle_emitter.get_gravity_scale(state.emitter)
       let updated_particles =
-        update_particle_list(state.particles, delta_time, gravity_scale)
+        update_particle_list(state.particles, delta_seconds, gravity_scale)
 
       // Remove dead particles
       let alive_particles = remove_dead_particles(updated_particles)

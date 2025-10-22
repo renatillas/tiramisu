@@ -1,6 +1,5 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
-import * as RENDERER from './tiramisu/internal/renderer.mjs';
 import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
 import * as INPUT from './tiramisu/input.mjs';
@@ -138,6 +137,18 @@ export class InputManager {
       connected: false,
     };
 
+    /**
+     * Store canvas reference for cleanup
+     * @type {HTMLCanvasElement | null}
+     */
+    this.canvas = null;
+
+    /**
+     * Store all listener functions for removal
+     * @type {Object}
+     */
+    this.listeners = {};
+
     // Initialize event listeners
     this._initEventListeners(canvas);
   }
@@ -148,36 +159,43 @@ export class InputManager {
    * @param {HTMLCanvasElement} canvas - The canvas element to attach listeners to
    */
   _initEventListeners(canvas) {
-    // Keyboard
-    window.addEventListener('keydown', (e) => {
+    // Store canvas reference for cleanup
+    this.canvas = canvas;
+
+    // Keyboard listeners
+    this.listeners.keydown = (e) => {
       if (!this.keyboard.pressed.has(e.code)) {
         this.keyboard.justPressed.add(e.code);
       }
       this.keyboard.pressed.add(e.code);
-    });
+    };
+    window.addEventListener('keydown', this.listeners.keydown);
 
-    window.addEventListener('keyup', (e) => {
+    this.listeners.keyup = (e) => {
       this.keyboard.pressed.delete(e.code);
       this.keyboard.justReleased.add(e.code);
-    });
+    };
+    window.addEventListener('keyup', this.listeners.keyup);
 
-    // Gamepad connections
-    window.addEventListener('gamepadconnected', () => {
+    // Gamepad connection listeners
+    this.listeners.gamepadconnected = () => {
       this.gamepad.connected = true;
-    });
+    };
+    window.addEventListener('gamepadconnected', this.listeners.gamepadconnected);
 
-    window.addEventListener('gamepaddisconnected', () => {
+    this.listeners.gamepaddisconnected = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       this.gamepad.connected = Array.from(gamepads).some(gp => gp && gp.connected);
-    });
+    };
+    window.addEventListener('gamepaddisconnected', this.listeners.gamepaddisconnected);
 
-    // Mouse
-    canvas.addEventListener('mousemove', (e) => {
+    // Mouse listeners
+    this.listeners.mousemove = (e) => {
       // When pointer lock is active, use movementX/Y directly
       // Otherwise, calculate delta from position change
       const isPointerLocked = document.pointerLockElement === canvas ||
-                             document.webkitPointerLockElement === canvas ||
-                             document.mozPointerLockElement === canvas;
+        document.webkitPointerLockElement === canvas ||
+        document.mozPointerLockElement === canvas;
 
       if (isPointerLocked) {
         // Use movement deltas directly from pointer lock API
@@ -191,9 +209,10 @@ export class InputManager {
         this.mouse.deltaX = this.mouse.x - this.mouse.lastX;
         this.mouse.deltaY = this.mouse.y - this.mouse.lastY;
       }
-    });
+    };
+    canvas.addEventListener('mousemove', this.listeners.mousemove);
 
-    canvas.addEventListener('mousedown', (e) => {
+    this.listeners.mousedown = (e) => {
       if (e.button === 0) {
         if (!this.mouse.leftButton.pressed) this.mouse.leftButton.justPressed = true;
         this.mouse.leftButton.pressed = true;
@@ -204,9 +223,10 @@ export class InputManager {
         if (!this.mouse.rightButton.pressed) this.mouse.rightButton.justPressed = true;
         this.mouse.rightButton.pressed = true;
       }
-    });
+    };
+    canvas.addEventListener('mousedown', this.listeners.mousedown);
 
-    canvas.addEventListener('mouseup', (e) => {
+    this.listeners.mouseup = (e) => {
       if (e.button === 0) {
         this.mouse.leftButton.pressed = false;
         this.mouse.leftButton.justReleased = true;
@@ -217,18 +237,21 @@ export class InputManager {
         this.mouse.rightButton.pressed = false;
         this.mouse.rightButton.justReleased = true;
       }
-    });
+    };
+    canvas.addEventListener('mouseup', this.listeners.mouseup);
 
-    canvas.addEventListener('contextmenu', (e) => {
+    this.listeners.contextmenu = (e) => {
       e.preventDefault();
-    });
+    };
+    canvas.addEventListener('contextmenu', this.listeners.contextmenu);
 
-    canvas.addEventListener('wheel', (e) => {
+    this.listeners.wheel = (e) => {
       this.mouse.wheelDelta = e.deltaY;
-    });
+    };
+    canvas.addEventListener('wheel', this.listeners.wheel);
 
-    // Touch
-    canvas.addEventListener('touchstart', (e) => {
+    // Touch listeners
+    this.listeners.touchstart = (e) => {
       e.preventDefault();
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -238,9 +261,10 @@ export class InputManager {
         this.touch.active.set(touch.identifier, { x, y });
         this.touch.justStarted.set(touch.identifier, { x, y });
       }
-    });
+    };
+    canvas.addEventListener('touchstart', this.listeners.touchstart);
 
-    canvas.addEventListener('touchmove', (e) => {
+    this.listeners.touchmove = (e) => {
       e.preventDefault();
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -249,9 +273,10 @@ export class InputManager {
         const y = Math.max(0, Math.min(rect.height, touch.clientY - rect.top));
         this.touch.active.set(touch.identifier, { x, y });
       }
-    });
+    };
+    canvas.addEventListener('touchmove', this.listeners.touchmove);
 
-    canvas.addEventListener('touchend', (e) => {
+    this.listeners.touchend = (e) => {
       e.preventDefault();
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -261,16 +286,18 @@ export class InputManager {
           this.touch.active.delete(touch.identifier);
         }
       }
-    });
+    };
+    canvas.addEventListener('touchend', this.listeners.touchend);
 
-    canvas.addEventListener('touchcancel', (e) => {
+    this.listeners.touchcancel = (e) => {
       e.preventDefault();
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         this.touch.active.delete(touch.identifier);
         this.touch.justEnded.delete(touch.identifier);
       }
-    });
+    };
+    canvas.addEventListener('touchcancel', this.listeners.touchcancel);
   }
 
   /**
@@ -410,8 +437,56 @@ export class InputManager {
    * @returns {void}
    */
   destroy() {
-    // Event listeners are added to window/canvas, would need references to remove
-    // For now, this is a placeholder for future cleanup logic
+    if (!this.canvas || !this.listeners) {
+      return;
+    }
+
+    // Remove window listeners (keyboard, gamepad)
+    if (this.listeners.keydown) {
+      window.removeEventListener('keydown', this.listeners.keydown);
+    }
+    if (this.listeners.keyup) {
+      window.removeEventListener('keyup', this.listeners.keyup);
+    }
+    if (this.listeners.gamepadconnected) {
+      window.removeEventListener('gamepadconnected', this.listeners.gamepadconnected);
+    }
+    if (this.listeners.gamepaddisconnected) {
+      window.removeEventListener('gamepaddisconnected', this.listeners.gamepaddisconnected);
+    }
+
+    // Remove canvas listeners (mouse, touch)
+    if (this.listeners.mousemove) {
+      this.canvas.removeEventListener('mousemove', this.listeners.mousemove);
+    }
+    if (this.listeners.mousedown) {
+      this.canvas.removeEventListener('mousedown', this.listeners.mousedown);
+    }
+    if (this.listeners.mouseup) {
+      this.canvas.removeEventListener('mouseup', this.listeners.mouseup);
+    }
+    if (this.listeners.contextmenu) {
+      this.canvas.removeEventListener('contextmenu', this.listeners.contextmenu);
+    }
+    if (this.listeners.wheel) {
+      this.canvas.removeEventListener('wheel', this.listeners.wheel);
+    }
+    if (this.listeners.touchstart) {
+      this.canvas.removeEventListener('touchstart', this.listeners.touchstart);
+    }
+    if (this.listeners.touchmove) {
+      this.canvas.removeEventListener('touchmove', this.listeners.touchmove);
+    }
+    if (this.listeners.touchend) {
+      this.canvas.removeEventListener('touchend', this.listeners.touchend);
+    }
+    if (this.listeners.touchcancel) {
+      this.canvas.removeEventListener('touchcancel', this.listeners.touchcancel);
+    }
+
+    // Clear references
+    this.listeners = {};
+    this.canvas = null;
   }
 }
 
@@ -446,11 +521,25 @@ export function inputManagerDestroy(manager) {
 
 /**
  * Create a new InputManager instance (wrapper for Gleam FFI)
+ * Uses singleton pattern to prevent multiple instances and listener leaks
  * @param {HTMLCanvasElement} canvas - The canvas element to attach input listeners to
- * @returns {InputManager} New InputManager instance
+ * @returns {InputManager} InputManager instance (singleton)
  */
 export function createInputManager(canvas) {
-  return new InputManager(canvas);
+  // Destroy existing instance if it exists
+  if (typeof window !== 'undefined' && window.__tiramisu && window.__tiramisu.inputManager) {
+    window.__tiramisu.inputManager.destroy();
+    window.__tiramisu.inputManager = null;
+  }
+
+  // Create new instance and store as singleton
+  const manager = new InputManager(canvas);
+
+  if (typeof window !== 'undefined' && window.__tiramisu) {
+    window.__tiramisu.inputManager = manager;
+  }
+
+  return manager;
 }
 
 // AudioManager has been migrated to Gleam (see tiramisu/internal/audio_manager.gleam)
@@ -1288,7 +1377,9 @@ if (typeof window !== 'undefined' && !window.__tiramisu) {
   window.__tiramisu = {
     initialized: {
       resizeListener: false,
-    }
+    },
+    // Singleton instances
+    inputManager: null,
   };
 }
 
@@ -1774,8 +1865,8 @@ export function startLoop(
   let messageQueue = [];
 
   // Extract renderer and scene from RendererState
-  const renderer = RENDERER.get_renderer(currentRendererState);
-  const scene = RENDERER.get_scene(currentRendererState);
+  const renderer = SCENE.get_renderer(currentRendererState);
+  const scene = SCENE.get_scene(currentRendererState);
 
   // Dispatch function for effects
   const dispatch = (msg) => {
@@ -1798,37 +1889,51 @@ export function startLoop(
   // Run initial effect
   runEffect(effect, dispatch);
 
-  // Setup AudioContext resume on first user interaction
+  createInputManager(renderer.domElement)
+
+  // Setup AudioContext resume on first user interaction (guarded to prevent duplicates)
   // Browsers require user interaction before playing audio
-  let audioContextResumed = false;
-  const resumeAudioContext = async () => {
-    if (!audioContextResumed) {
-      audioContextResumed = true;
-
-      // Let Gleam audio manager handle everything (resume context + play pending audio)
-      currentRendererState = RENDERER.resume_audio_context(currentRendererState);
-
-      // Remove event listeners after first interaction
-      document.removeEventListener('click', resumeAudioContext);
-      document.removeEventListener('touchstart', resumeAudioContext);
-      document.removeEventListener('keydown', resumeAudioContext);
+  if (typeof window !== 'undefined' && window.__tiramisu) {
+    // Initialize flag if not present
+    if (window.__tiramisu.audioContextSetup === undefined) {
+      window.__tiramisu.audioContextSetup = false;
     }
-  };
 
-  // Listen for first user interaction
-  document.addEventListener('click', resumeAudioContext);
-  document.addEventListener('touchstart', resumeAudioContext);
-  document.addEventListener('keydown', resumeAudioContext);
+    // Only setup listeners once across all hot reloads
+    if (!window.__tiramisu.audioContextSetup) {
+      window.__tiramisu.audioContextSetup = true;
+
+      const resumeAudioContext = async () => {
+        // Let Gleam audio manager handle everything (resume context + play pending audio)
+        currentRendererState = SCENE.resume_audio_context(currentRendererState);
+
+        // Remove event listeners after first interaction
+        document.removeEventListener('click', resumeAudioContext);
+        document.removeEventListener('touchstart', resumeAudioContext);
+        document.removeEventListener('keydown', resumeAudioContext);
+
+        // Reset flag so future startLoop calls can set it up again if needed
+        if (window.__tiramisu) {
+          window.__tiramisu.audioContextSetup = false;
+        }
+      };
+
+      // Listen for first user interaction
+      document.addEventListener('click', resumeAudioContext);
+      document.addEventListener('touchstart', resumeAudioContext);
+      document.addEventListener('keydown', resumeAudioContext);
+    }
+  }
 
   let lastTime = performance.now();
 
   function gameLoop() {
     const currentTime = performance.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+    const deltaTime = currentTime - lastTime
     lastTime = currentTime;
 
     // Capture input state snapshot
-    const inputState = context.input_manager.captureState();
+    const inputState = window.__tiramisu.inputManager.captureState();
 
     // Get canvas dimensions (use CSS display size for coordinate conversion)
     // Touch/mouse coordinates are in CSS pixels, so we need CSS dimensions
@@ -1859,7 +1964,7 @@ export function startLoop(
           physics_world: newPhysicsWorld,
         };
         // Update renderer state with new physics world
-        currentRendererState = RENDERER.set_physics_world(currentRendererState, newPhysicsWorld);
+        currentRendererState = SCENE.set_physics_world(currentRendererState, newPhysicsWorld);
       }
 
       runEffect(newEffect, dispatch);
@@ -1873,10 +1978,10 @@ export function startLoop(
     if (currentNodes !== newNodes) {
       // Diff and patch using Gleam renderer
       const patches = SCENE.diff(currentNodes, newNodes);
-      currentRendererState = RENDERER.apply_patches(currentRendererState, patches);
+      currentRendererState = SCENE.apply_patches(currentRendererState, patches);
 
       // Extract updated physics world from renderer (it may have new bodies)
-      const updatedPhysicsWorld = RENDERER.get_physics_world(currentRendererState);
+      const updatedPhysicsWorld = SCENE.get_physics_world(currentRendererState);
       if (updatedPhysicsWorld) {
         newContext = {
           ...newContext,
@@ -1893,14 +1998,14 @@ export function startLoop(
     // Sync physics body transforms to Three.js objects
     const physicsWorldOption = newContext.physics_world;
     if (physicsWorldOption && physicsWorldOption[0]) {
-      RENDERER.sync_physics_transforms(currentRendererState);
+      SCENE.sync_physics_transforms(currentRendererState);
     }
 
     // Update animation mixers
-    RENDERER.update_mixers(currentRendererState, deltaTime);
+    SCENE.update_mixers(currentRendererState, deltaTime);
 
     // Update particle systems (returns updated renderer state)
-    currentRendererState = RENDERER.update_particle_systems(currentRendererState, deltaTime);
+    currentRendererState = SCENE.update_particle_systems(currentRendererState, deltaTime);
 
     // Update physics debug visualization (pass scene from renderer state)
     debugManager.update(scene);
@@ -1920,7 +2025,7 @@ export function startLoop(
     }
 
     // Render viewport cameras (picture-in-picture)
-    const viewportCamerasList = RENDERER.get_cameras_with_viewports(currentRendererState);
+    const viewportCamerasList = SCENE.get_cameras_with_viewports(currentRendererState);
     const viewportCameras = viewportCamerasList.toArray(); // Convert Gleam list to JS array
     if (viewportCameras.length > 0) {
       renderer.setScissorTest(true);
@@ -1941,7 +2046,7 @@ export function startLoop(
     performanceManager.setRenderStats(renderer.info);
 
     // Clear per-frame input state
-    context.input_manager.clearFrameState();
+    window.__tiramisu.inputManager.clearFrameState();
 
     // Update closure context for next frame (preserve updated physics world)
     context = newContext;

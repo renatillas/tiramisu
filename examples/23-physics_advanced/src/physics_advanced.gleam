@@ -127,7 +127,7 @@ fn update(
 ) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(Ids))) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 2.0
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.002
 
       // Get physics world from context (DON'T step yet - do it after queueing commands)
       let assert option.Some(physics_world) = ctx.physics_world
@@ -350,7 +350,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   // Ground (Fixed body, collision layer 0)
   let ground =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: large_box_geo,
       material: ground_mat,
@@ -370,7 +370,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
   // Player (Dynamic body with axis locks, collision layer 1)
   // Locked to Z plane for 2D-style movement
   let player =
-    scene.Mesh(
+    scene.mesh(
       id: Player,
       geometry: box_geo,
       material: player_mat,
@@ -396,7 +396,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   // Cube1 - Falls and bounces (Dynamic, collision layer 2)
   let cube1 =
-    scene.Mesh(
+    scene.mesh(
       id: Cube,
       geometry: box_geo,
       material: cube1_mat,
@@ -421,7 +421,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   let new_cubes =
     list.map(list.range(model.cubes, model.cubes + 10), fn(index) {
-      scene.Mesh(
+      scene.mesh(
         id: NewCube(index),
         geometry: box_geo,
         material: cube1_mat,
@@ -447,7 +447,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   // Cube2 - Spinning cube with torque
   let spinning_cube =
-    scene.Mesh(
+    scene.mesh(
       id: SpinningCube,
       geometry: box_geo,
       material: cube2_mat,
@@ -482,7 +482,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   // Sphere - Different collider shape
   let sphere =
-    scene.Mesh(
+    scene.mesh(
       id: Ball,
       geometry: sphere_geo,
       material: sphere_mat,
@@ -507,7 +507,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
 
   // Walls (Fixed bodies)
   let wall_left =
-    scene.Mesh(
+    scene.mesh(
       id: WallLeft,
       geometry: wall_geo,
       material: wall_mat,
@@ -524,7 +524,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
     )
 
   let wall_right =
-    scene.Mesh(
+    scene.mesh(
       id: WallRight,
       geometry: wall_geo,
       material: wall_mat,
@@ -541,7 +541,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
     )
 
   [
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 8.0, 15.0)),
@@ -556,12 +556,12 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
     sphere,
     wall_left,
     wall_right,
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: ambient_light,
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: SunLight,
       light: directional_light,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),

@@ -151,7 +151,7 @@ fn update(
   case msg {
     Tick -> {
       // Auto rotation
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
 
       // Check for key presses (trigger only once per press)
       let #(new_model, key_effects) = handle_input(model, ctx.input)
@@ -605,7 +605,7 @@ fn view(
     light.directional(intensity: 0.8, color: 0xffffff)
 
   [
-    scene.Camera(
+    scene.camera(
       id: "main",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
@@ -613,19 +613,19 @@ fn view(
       active: True,
       viewport: option.None,
     ),
-    scene.Light(id: "ambient", light: ambient, transform: transform.identity),
-    scene.Light(
+    scene.light(id: "ambient", light: ambient, transform: transform.identity),
+    scene.light(
       id: "sun",
       light: directional,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Animated cube
-    scene.Mesh(
+    scene.mesh(
       id: "cube",
       geometry: cube_geometry,
       material: cube_material,
       transform: transform.identity
-        |> transform.with_rotation(vec3.Vec3(
+        |> transform.with_euler_rotation(vec3.Vec3(
           x: model.rotation,
           y: model.rotation *. 1.3,
           z: 0.0,
@@ -638,7 +638,7 @@ fn view(
       physics: option.None,
     ),
     // Background plane
-    scene.Mesh(
+    scene.mesh(
       id: "plane",
       geometry: plane_geometry,
       material: plane_material,

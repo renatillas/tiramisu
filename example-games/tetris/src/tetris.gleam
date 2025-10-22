@@ -193,7 +193,7 @@ pub fn update(
       }
 
       // Accumulate drop timer
-      let updated_drop_timer = model.drop_timer +. ctx.delta_time
+      let updated_drop_timer = model.drop_timer +. ctx.delta_time /. 1000.0
       let drop_interval = game.drop_interval(new_state.level)
 
       // Auto-drop if timer reached
@@ -216,8 +216,8 @@ pub fn update(
       }
 
       // Update cooldown timers
-      let updated_move_time = new_move_time +. ctx.delta_time
-      let updated_rotate_time = new_rotate_time +. ctx.delta_time
+      let updated_move_time = new_move_time +. ctx.delta_time /. 1000.0
+      let updated_rotate_time = new_rotate_time +. ctx.delta_time /. 1000.0
 
       let updated_model =
         Model(
@@ -255,7 +255,7 @@ pub fn view(
     option.Some(cache), True ->
       case asset.get_audio(cache, "wav/Select-1-(Saw).wav") {
         Ok(buffer) -> [
-          scene.Audio(
+          scene.audio(
             id: MoveSfx,
             audio: audio.GlobalAudio(
               buffer:,
@@ -269,7 +269,7 @@ pub fn view(
   }
   // Camera
   let camera_node =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: model.camera,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
@@ -280,7 +280,7 @@ pub fn view(
 
   // Lights
   let ambient_light =
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -290,7 +290,7 @@ pub fn view(
     )
 
   let directional_light =
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.8)
@@ -343,7 +343,7 @@ fn create_block(
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
-  scene.Mesh(
+  scene.mesh(
     id: CurrentBlock(index),
     geometry: geometry,
     material: material,
@@ -364,7 +364,7 @@ fn create_locked_block(pos: position.Position, index: Int) -> scene.Node(Id) {
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
-  scene.Mesh(
+  scene.mesh(
     id: LockedBlock(index),
     geometry: geometry,
     material: material,
@@ -386,7 +386,7 @@ fn create_grid_outline() -> scene.Node(Id) {
     |> material.with_color(0x333333)
     |> material.build()
 
-  scene.Mesh(
+  scene.mesh(
     id: GridOutLine,
     geometry: geometry,
     material: material,

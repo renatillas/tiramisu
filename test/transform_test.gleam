@@ -21,9 +21,9 @@ pub fn at_test() {
   assert transform.scale(t) == vec3.Vec3(1.0, 1.0, 1.0)
 }
 
-pub fn with_rotation_test() {
+pub fn with_euler_rotation_test() {
   let rot = vec3.Vec3(1.0, 2.0, 3.0)
-  let t = transform.with_rotation(transform.identity, rot)
+  let t = transform.with_euler_rotation(transform.identity, rot)
 
   assert transform.position(t) == vec3.Vec3(0.0, 0.0, 0.0)
   // Compare quaternions instead of Euler angles to avoid representation ambiguity
@@ -70,7 +70,7 @@ pub fn set_position_test() {
 
 pub fn set_rotation_test() {
   let rot = vec3.Vec3(0.5, 1.0, 1.5)
-  let t = transform.with_rotation(transform.identity, rot)
+  let t = transform.with_euler_rotation(transform.identity, rot)
 
   assert vec3f.loosely_equals(transform.rotation(t), rot, tolerating: 0.01)
 }
@@ -126,7 +126,7 @@ pub fn builder_pattern_test() {
   let t =
     transform.identity
     |> transform.with_position(vec3.Vec3(10.0, 20.0, 30.0))
-    |> transform.with_rotation(vec3.Vec3(0.5, 1.0, 1.5))
+    |> transform.with_euler_rotation(vec3.Vec3(0.5, 1.0, 1.5))
     |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))
 
   assert transform.position(t) == vec3.Vec3(10.0, 20.0, 30.0)
@@ -142,7 +142,7 @@ pub fn chaining_test() {
   let t =
     transform.at(vec3.Vec3(1.0, 2.0, 3.0))
     |> transform.translate(by: vec3.Vec3(5.0, 5.0, 5.0))
-    |> transform.with_rotation(vec3.Vec3(0.1, 0.2, 0.3))
+    |> transform.with_euler_rotation(vec3.Vec3(0.1, 0.2, 0.3))
     |> transform.scale_by(vec3.Vec3(2.0, 2.0, 2.0))
 
   // Position should be summed

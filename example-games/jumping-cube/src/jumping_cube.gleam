@@ -82,7 +82,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let cam =
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 3.0, 8.0)),
@@ -92,7 +92,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -100,7 +100,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) =
@@ -113,7 +113,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
   // Ground plane (static physics body)
   let ground =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(box) = geometry.box(20.0, 0.2, 20.0)
@@ -149,7 +149,7 @@ fn view(_model: Nil, context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 }
 
 fn create_sphere(id: Id, color: Int) -> scene.Node(Id) {
-  scene.Mesh(
+  scene.mesh(
     id: id,
     geometry: {
       let assert Ok(sphere) = geometry.sphere(1.0, 30, 30)

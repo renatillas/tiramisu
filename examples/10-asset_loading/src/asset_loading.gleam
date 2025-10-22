@@ -91,7 +91,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
       #(
         Model(rotation: new_rotation, load_state: model.load_state),
         effect.tick(Tick),
@@ -132,7 +132,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         camera: _,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
@@ -144,7 +144,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     })
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.6)
@@ -152,7 +152,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -167,7 +167,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     Loading(_, _, _) -> {
       // Show a spinning cube while loading
       let loading_cube =
-        scene.Mesh(
+        scene.mesh(
           id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
@@ -182,7 +182,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation *. 1.5, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(
+              model.rotation,
+              model.rotation *. 1.5,
+              0.0,
+            )),
           physics: option.None,
         )
         |> list.wrap
@@ -199,7 +203,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       {
         Ok(audio_buffer) -> {
           [
-            scene.Audio(
+            scene.audio(
               id: BeepSound,
               audio: audio.global(
                 audio_buffer,
@@ -223,7 +227,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       {
         Ok(metal_color), Ok(metal_normal) -> {
           [
-            scene.Mesh(
+            scene.mesh(
               id: Cube1,
               geometry: {
                 let assert Ok(geometry) =
@@ -242,14 +246,18 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                 material
               },
               transform: transform.at(position: vec3.Vec3(-3.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, 0.0, 0.0)),
+                |> transform.with_euler_rotation(vec3.Vec3(
+                  model.rotation,
+                  0.0,
+                  0.0,
+                )),
               physics: option.None,
             ),
           ]
         }
         _, _ -> {
           [
-            scene.Mesh(
+            scene.mesh(
               id: Cube1,
               geometry: {
                 let assert Ok(geometry) =
@@ -264,7 +272,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
                 material
               },
               transform: transform.at(position: vec3.Vec3(-3.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, 0.0, 0.0)),
+                |> transform.with_euler_rotation(vec3.Vec3(
+                  model.rotation,
+                  0.0,
+                  0.0,
+                )),
               physics: option.None,
             ),
           ]

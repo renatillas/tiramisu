@@ -1,5 +1,22 @@
 # Changelog
 
+## v4.0.0 - 2025-10-22
+
+### Fixed
+- **Fixed GLTF animation playback speed**: Three.js AnimationMixer now correctly receives delta time in seconds (converted from milliseconds in `updateMixer`)
+- **Fixed animation state machine blend durations**: State machine now converts delta_time from milliseconds to seconds internally, allowing blend_duration to remain in seconds as documented (e.g., 0.3 for 300ms blend)
+- **Fixed particle system physics and spawning**: Particle system now converts delta_time from milliseconds to seconds internally for correct spawn rates, lifetimes, gravity, and velocity calculations
+- Fixed documentation to clarify that `Context.delta_time` is in **milliseconds**, not seconds (e.g., 16.0 for 60 FPS)
+- Fixed animation speed in multiple examples that were using incorrect multipliers after delta_time changed to milliseconds:
+  - Example 14 (gltf_animated_model): Added clarifying comment
+  - Example 15 (character_controller): Changed multiplier from 0.3 to 0.0003
+  - Example 19 (ui_overlay): Fixed rotation and movement speed calculations
+  - Example 20 (not-bread): Changed multiplier from 0.5 to 0.0005
+  - Example 22 (audio_demo): Changed multiplier from 0.5 to 0.0005
+  - Example 23 (physics_advanced): Changed multiplier from 2.0 to 0.002
+  - Example 24 (effects_showcase): Changed multiplier from 0.5 to 0.0005
+  - Example 25 (text_geometry): Changed multiplier from 0.3 to 0.0003
+
 ## v3.1.2 - 2025-10-22
 
 - Fix ordering of applied physics commands, as they were reversed before.

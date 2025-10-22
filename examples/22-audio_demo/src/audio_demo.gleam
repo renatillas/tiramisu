@@ -142,7 +142,7 @@ fn update(
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
 
       // Keep a maximum of 10 recent SFX instances to prevent unbounded growth
       // Since the audio is short (0.139s), keeping 10 instances is plenty
@@ -349,7 +349,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   // Build scene nodes based on loaded assets
   let music_nodes = case model.music_buffer {
     option.Some(buffer) -> [
-      scene.Mesh(
+      scene.mesh(
         id: MusicCube,
         geometry: cube_geo,
         material: music_mat,
@@ -357,10 +357,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         physics: option.None,
       ),
       // Audio node - state is declarative!
-      scene.Audio(id: MusicBg, audio: audio.global(buffer, music_config)),
+      scene.audio(id: MusicBg, audio: audio.global(buffer, music_config)),
     ]
     option.None -> [
-      scene.Mesh(
+      scene.mesh(
         id: MusicCube,
         geometry: cube_geo,
         material: music_mat,
@@ -385,7 +385,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           |> audio.with_state(state)
           |> audio.with_no_fade()
 
-        scene.Audio(id: SfxBeep(id), audio: audio.global(buffer, sfx_config))
+        scene.audio(id: SfxBeep(id), audio: audio.global(buffer, sfx_config))
       })
     }
     option.None -> []
@@ -393,7 +393,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
 
   let sfx_nodes =
     [
-      scene.Mesh(
+      scene.mesh(
         id: SfxCube,
         geometry: cube_geo,
         material: sfx_mat,
@@ -404,7 +404,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     |> list.append(sfx_audio_nodes)
 
   [
-    scene.Camera(
+    scene.camera(
       id: Main,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
@@ -413,7 +413,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       viewport: option.None,
     ),
     // Music cube (left) - state determines if it plays
-    scene.Group(
+    scene.group(
       id: MusicGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(-3.0, 0.0, 0.0))
@@ -421,7 +421,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       children: music_nodes,
     ),
     // SFX cube (right) - one-shot sounds
-    scene.Group(
+    scene.group(
       id: SfxGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(3.0, 0.0, 0.0))
@@ -429,12 +429,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       children: sfx_nodes,
     ),
     // Lights
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: ambient_light,
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Sun,
       light: directional_light,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),

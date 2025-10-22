@@ -1,3 +1,68 @@
+//// Geometry module - validated 3D shapes and primitives.
+////
+//// Provides validated constructors for geometric primitives used in 3D rendering.
+//// All geometry functions return `Result` to catch invalid parameters at construction time.
+////
+//// ## Core Concepts
+////
+//// - **Validation**: Geometry constructors validate dimensions (positive sizes, valid segment counts)
+//// - **Primitives**: Built-in shapes like boxes, spheres, planes, cylinders, toruses
+//// - **Custom Geometry**: Support for loading external geometry via asset system
+//// - **Text Geometry**: 3D text rendering with loaded fonts
+////
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/geometry
+//// import tiramisu/scene
+//// import tiramisu/material
+////
+//// // Create validated geometries
+//// let assert Ok(cube) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+//// let assert Ok(ball) = geometry.sphere(radius: 0.5, width_segments: 32, height_segments: 16)
+//// let assert Ok(ground) = geometry.plane(width: 100.0, height: 100.0)
+////
+//// // Use in scene
+//// scene.Mesh(
+////   id: "player",
+////   geometry: cube,
+////   material: my_material,
+////   transform: transform.identity,
+////   physics: option.None,
+//// )
+//// ```
+////
+//// ## Available Primitives
+////
+//// - **box**: Rectangular cuboid (e.g., walls, buildings, crates)
+//// - **sphere**: Perfect sphere (e.g., balls, planets, bubbles)
+//// - **plane**: Flat 2D rectangle (e.g., ground, walls, billboards)
+//// - **circle**: Flat circle (e.g., coins, targets, platforms)
+//// - **cylinder**: Cylinder with configurable top/bottom radius (e.g., pillars, trees, pipes)
+//// - **cone**: Cone shape (e.g., traffic cones, party hats)
+//// - **capsule**: Cylinder with rounded caps (e.g., character colliders)
+//// - **torus**: Donut shape (e.g., rings, hoops)
+//// - **tetrahedron**: 4-sided polyhedron (e.g., low-poly crystals)
+//// - **icosahedron**: 20-sided polyhedron (e.g., smooth low-poly spheres, dice)
+//// - **text**: 3D extruded text with beveling (e.g., logos, titles, signs)
+////
+//// ## Validation
+////
+//// All geometry constructors validate their parameters:
+////
+//// ```gleam
+//// // Valid
+//// let assert Ok(cube) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+////
+//// // Invalid - negative dimensions
+//// let assert Error(geometry.NonPositiveWidth(-1.0)) =
+////   geometry.box(width: -1.0, height: 1.0, depth: 1.0)
+////
+//// // Invalid - too few segments
+//// let assert Error(geometry.LessThanThreeSegmentCountWidth(2)) =
+////   geometry.sphere(radius: 1.0, width_segments: 2, height_segments: 16)
+//// ```
+
 import gleam/bool
 import tiramisu/asset
 

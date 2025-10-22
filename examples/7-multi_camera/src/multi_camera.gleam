@@ -168,7 +168,7 @@ fn update(
       }
 
       // Update rotation for orbiting camera
-      let new_rotation = model.rotation +. ctx.delta_time
+      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
 
       #(
         Model(
@@ -200,7 +200,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
 
   let camera_topdown =
-    scene.Camera(
+    scene.camera(
       id: CameraTopdown,
       camera: cam_topdown,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
@@ -214,7 +214,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
 
   let camera_side =
-    scene.Camera(
+    scene.camera(
       id: CameraSide,
       camera: cam_side,
       transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
@@ -228,7 +228,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
 
   let camera_firstperson =
-    scene.Camera(
+    scene.camera(
       id: CameraFirstperson,
       camera: cam_firstperson,
       transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
@@ -246,7 +246,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 65.0, near: 0.1, far: 200.0)
 
   let camera_orbiting =
-    scene.Camera(
+    scene.camera(
       id: CameraOrbiting,
       camera: cam_orbiting,
       transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
@@ -259,18 +259,18 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 50.0, near: 0.1, far: 200.0)
 
   let camera_overlay =
-    scene.Camera(
+    scene.camera(
       id: CameraOverlay,
       camera: cam_overlay,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: False,
-      viewport: option.Some(#(1280 - 250 - 30, 30, 250, 250)),
+      viewport: option.Some(scene.ViewPort(1280 - 250 - 30, 30, 250, 250)),
     )
 
   // Lights
   let lights = [
-    scene.Light(
+    scene.light(
       id: AmbientLight,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
@@ -278,7 +278,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: DirectionalLight,
       light: {
         let assert Ok(light) =
@@ -293,7 +293,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
   // Central rotating cube
   let rotating_cube =
-    scene.Mesh(
+    scene.mesh(
       id: RotatingCube,
       geometry: {
         let assert Ok(geometry) =
@@ -308,13 +308,17 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         material
       },
       transform: transform.at(position: vec3.Vec3(0.0, 6.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation *. 0.7, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          model.rotation,
+          model.rotation *. 0.7,
+          0.0,
+        )),
       physics: option.None,
     )
 
   // Ground plane
   let ground =
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(geometry) = geometry.plane(width: 100.0, height: 100.0)
@@ -329,7 +333,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       // -90 degrees to make it horizontal
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
 
@@ -343,7 +347,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       let x = maths.cos(angle) *. radius
       let z = maths.sin(angle) *. radius
 
-      scene.Mesh(
+      scene.mesh(
         id: Sphere(i),
         geometry: {
           let assert Ok(geometry) =
@@ -366,7 +370,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
   // Tall pillars at corners
   let pillars = [
-    scene.Mesh(
+    scene.mesh(
       id: Pillar(1),
       geometry: {
         let assert Ok(geometry) =
@@ -388,7 +392,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(25.0, 6.0, 25.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: Pillar(2),
       geometry: {
         let assert Ok(geometry) =
@@ -410,7 +414,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(-25.0, 6.0, 25.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: Pillar(3),
       geometry: {
         let assert Ok(geometry) =
@@ -432,7 +436,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(25.0, 6.0, -25.0)),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: Pillar(4),
       geometry: {
         let assert Ok(geometry) =
@@ -458,7 +462,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
 
   // Grid for reference
   let grid =
-    scene.DebugGrid(id: Grid, size: 100.0, divisions: 20, color: 0x444466)
+    scene.debug_grid(id: Grid, size: 100.0, divisions: 20, color: 0x444466)
 
   // Combine all cameras and scene objects
   list.flatten([

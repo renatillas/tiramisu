@@ -83,7 +83,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.5
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
       #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
@@ -102,7 +102,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         camera: _,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
@@ -114,7 +114,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     })
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
@@ -122,7 +122,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -137,7 +137,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     Loading -> {
       // Show a spinning cube while loading
       let loading_cube =
-        scene.Mesh(
+        scene.mesh(
           id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
@@ -156,7 +156,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(
+              model.rotation,
+              model.rotation,
+              0.0,
+            )),
           physics: option.None,
         )
         |> list.wrap
@@ -166,7 +170,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     Failed -> {
       // Show a red cube to indicate error
       let error_cube =
-        scene.Mesh(
+        scene.mesh(
           id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
@@ -183,7 +187,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
         |> list.wrap
@@ -193,8 +197,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     Loaded(geom) -> {
       // Show the loaded STL model
       let model_node =
-        scene.Group(id: StlGroup, transform: transform.identity, children: [
-          scene.Mesh(
+        scene.group(id: StlGroup, transform: transform.identity, children: [
+          scene.mesh(
             id: Standard,
             geometry: {
               let assert Ok(geometry) =
@@ -211,10 +215,14 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
               material
             },
             transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+              |> transform.with_euler_rotation(vec3.Vec3(
+                0.0,
+                model.rotation,
+                0.0,
+              )),
             physics: option.None,
           ),
-          scene.Mesh(
+          scene.mesh(
             id: StlModel,
             geometry: geometry.custom_geometry(geom),
             material: {
@@ -227,7 +235,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
               material
             },
             transform: transform.at(position: vec3f.zero)
-              |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0))
+              |> transform.with_euler_rotation(vec3.Vec3(
+                0.0,
+                model.rotation,
+                0.0,
+              ))
               |> transform.with_scale(vec3.Vec3(0.1, 0.1, 0.1)),
             physics: option.None,
           ),

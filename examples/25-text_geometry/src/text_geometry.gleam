@@ -67,7 +67,7 @@ fn update(
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.3
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0003
       #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
@@ -93,7 +93,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
 
   let camera =
     camera
-    |> scene.Camera(
+    |> scene.camera(
       id: "main_camera",
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
@@ -104,7 +104,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     |> list.wrap
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -112,7 +112,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: "directional",
       light: {
         let assert Ok(light) =
@@ -185,12 +185,12 @@ fn create_3d_text(
     |> material.with_roughness(0.3)
     |> material.build
 
-  scene.Mesh(
+  scene.mesh(
     id: "text_" <> text,
     geometry: text_geom,
     material: mat,
     transform: transform.at(position: vec3.Vec3(x -. 3.5, y, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
     physics: option.None,
   )
 }
@@ -221,12 +221,12 @@ fn create_flat_text(
   let assert Ok(mat) =
     material.new() |> material.with_color(color) |> material.build
 
-  scene.Mesh(
+  scene.mesh(
     id: "text_flat_" <> text,
     geometry: text_geom,
     material: mat,
     transform: transform.at(position: vec3.Vec3(x -. 2.5, y, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, rotation, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
     physics: option.None,
   )
 }

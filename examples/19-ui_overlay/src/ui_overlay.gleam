@@ -288,8 +288,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
       case model.paused {
         True -> #(model, game_effect.tick(Tick), option.None)
         False -> {
-          // Update rotation
-          let new_rotation = model.rotation +. ctx.delta_time
+          // Update rotation (delta_time is in milliseconds)
+          let new_rotation = model.rotation +. ctx.delta_time *. 0.001
 
           // Handle WASD movement
           let move_speed = 3.0
@@ -297,8 +297,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
             input.is_key_pressed(ctx.input, input.KeyD),
             input.is_key_pressed(ctx.input, input.KeyA)
           {
-            True, False -> move_speed *. ctx.delta_time
-            False, True -> 0.0 -. move_speed *. ctx.delta_time
+            True, False -> move_speed *. ctx.delta_time /. 1000.0
+            False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
             _, _ -> 0.0
           }
 
@@ -306,8 +306,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
             input.is_key_pressed(ctx.input, input.KeyW),
             input.is_key_pressed(ctx.input, input.KeyS)
           {
-            True, False -> move_speed *. ctx.delta_time
-            False, True -> 0.0 -. move_speed *. ctx.delta_time
+            True, False -> move_speed *. ctx.delta_time /. 1000.0
+            False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
             _, _ -> 0.0
           }
 
@@ -361,7 +361,7 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
 fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
   [
     // Camera
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: {
         let assert Ok(cam) =
@@ -374,7 +374,7 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
       viewport: None,
     ),
     // Lights
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -382,7 +382,7 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -392,7 +392,7 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Rotating cube
-    scene.Mesh(
+    scene.mesh(
       id: Cube,
       geometry: {
         let assert Ok(geometry) =
@@ -408,7 +408,7 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
       },
       transform: transform.identity
         |> transform.with_position(model.position)
-        |> transform.with_rotation(vec3.Vec3(
+        |> transform.with_euler_rotation(vec3.Vec3(
           model.rotation,
           model.rotation *. 0.7,
           0.0,

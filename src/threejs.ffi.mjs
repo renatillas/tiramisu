@@ -126,18 +126,21 @@ export function createRenderer(options) {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-    // Add resize listener for fullscreen mode
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio || 1);
+    // Add resize listener for fullscreen mode (only once using global guard)
+    if (typeof window !== 'undefined' && window.__tiramisu && !window.__tiramisu.initialized.resizeListener) {
+      window.__tiramisu.initialized.resizeListener = true;
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-      // Update active camera aspect ratio if it exists
-      const camera = getActiveCamera();
-      if (camera && camera.isPerspectiveCamera) {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-      }
-    });
+        // Update active camera aspect ratio if it exists
+        const camera = getActiveCamera();
+        if (camera && camera.isPerspectiveCamera) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+        }
+      });
+    }
   }
 
   return renderer;
@@ -1137,10 +1140,11 @@ export function clipAction(mixer, clip) {
 /**
  * Update animation mixer
  * @param {THREE.AnimationMixer} mixer
- * @param {number} deltaTime
+ * @param {number} deltaTime - in milliseconds
  */
 export function updateMixer(mixer, deltaTime) {
-  mixer.update(deltaTime);
+  // Three.js AnimationMixer.update() expects time in seconds
+  mixer.update(deltaTime / 1000.0);
 }
 
 /**

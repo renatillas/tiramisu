@@ -1,5 +1,5 @@
 name = "tiramisu"
-version = "3.1.2"
+version = "4.0.0"
 target = "javascript"
 description = "A 3D game framework for building performant web games in Gleam"
 licences = ["MIT"]
@@ -9,7 +9,7 @@ repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 pages = [
     { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
     { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
-    { title = "Spatial Partitioning guide", path = "spatial_partitioning_guide.html", source = "./docs/spatial-partitioning-guide.md" },
+    { title = "Physics guide", path = "physics.html", source = "./docs/physics-guide.md" },
 ]
 
 

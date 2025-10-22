@@ -13,12 +13,12 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option}
+import tiramisu/asset
 import tiramisu/internal/id
-import tiramisu/object3d
 
 /// Opaque type wrapping any Three.js object
 pub opaque type ThreeObject {
-  ThreeObject(object: object3d.Object3D)
+  ThreeObject(object: asset.Object3D)
 }
 
 /// Opaque type wrapping a Three.js AnimationMixer
@@ -259,7 +259,7 @@ pub fn clear(_cache: CacheState) -> CacheState {
 
 /// Unwrap a ThreeObject to access the underlying Dynamic value
 @internal
-pub fn unwrap_object(object: ThreeObject) -> object3d.Object3D {
+pub fn unwrap_object(object: ThreeObject) -> asset.Object3D {
   object.object
 }
 
@@ -283,7 +283,7 @@ pub fn unwrap_particle_system(system: ParticleSystem) -> Dynamic {
 
 /// Wrap a Dynamic value as a ThreeObject
 @internal
-pub fn wrap_object(object: object3d.Object3D) -> ThreeObject {
+pub fn wrap_object(object: asset.Object3D) -> ThreeObject {
   ThreeObject(object: object)
 }
 

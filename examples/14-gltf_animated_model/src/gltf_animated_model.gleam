@@ -9,6 +9,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import tiramisu
+import tiramisu/animation
 import tiramisu/asset
 import tiramisu/background
 import tiramisu/camera
@@ -17,7 +18,6 @@ import tiramisu/geometry
 import tiramisu/input
 import tiramisu/light
 import tiramisu/material
-import tiramisu/object3d
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -41,7 +41,7 @@ pub type Model {
   Model(
     rotation: Float,
     load_state: LoadState,
-    current_animation: option.Option(object3d.AnimationClip),
+    current_animation: option.Option(animation.AnimationClip),
     animation_speed: Float,
   )
 }
@@ -104,7 +104,8 @@ fn update(
           ])
         False -> effect.tick(Tick)
       }
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.3
+      // Rotate at 0.3 radians per second (ctx.delta_time is in milliseconds)
+      let new_rotation = model.rotation +. ctx.delta_time *. 0.0003
       #(Model(..model, rotation: new_rotation), effects, option.None)
     }
 
@@ -123,7 +124,7 @@ fn update(
           io.println("Available animations:")
           list.index_map(clips, fn(clip, idx) {
             io.println(
-              "  [" <> int.to_string(idx) <> "] " <> object3d.clip_name(clip),
+              "  [" <> int.to_string(idx) <> "] " <> animation.clip_name(clip),
             )
           })
           Nil
@@ -181,7 +182,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
       camera
-      |> scene.Camera(
+      |> scene.camera(
         id: MainCamera,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
         look_at: option.None,
@@ -193,7 +194,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     })
 
   let lights = [
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
@@ -201,7 +202,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -216,7 +217,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     Loading -> {
       // Show a spinning cube while loading
       let loading_cube =
-        scene.Mesh(
+        scene.mesh(
           id: LoadingCube,
           geometry: {
             let assert Ok(geometry) =
@@ -235,7 +236,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(
+              model.rotation,
+              model.rotation,
+              0.0,
+            )),
           physics: option.None,
         )
         |> list.wrap
@@ -245,7 +250,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     Failed(_error_msg) -> {
       // Show a red cube to indicate error
       let error_cube =
-        scene.Mesh(
+        scene.mesh(
           id: ErrorCube,
           geometry: {
             let assert Ok(geometry) =
@@ -262,7 +267,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             material
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
         |> list.wrap
@@ -275,28 +280,28 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         list.filter(gltf_model.animations, keeping: fn(clip) {
           case model.current_animation {
             option.Some(current) ->
-              object3d.clip_name(clip) == object3d.clip_name(current)
+              animation.clip_name(clip) == animation.clip_name(current)
             option.None -> True
           }
         })
         |> list.first
       {
         Ok(clip) ->
-          option.Some(object3d.SingleAnimation(
-            object3d.new_animation(clip)
-            |> object3d.set_loop(object3d.LoopRepeat)
-            |> object3d.set_speed(model.animation_speed),
+          option.Some(animation.SingleAnimation(
+            animation.new_animation(clip)
+            |> animation.set_loop(animation.LoopRepeat)
+            |> animation.set_speed(model.animation_speed),
           ))
         Error(_) -> option.None
       }
 
       // Show the loaded GLTF model with animation
       let model_node =
-        scene.Model3D(
+        scene.model_3d(
           id: GltfModel,
           object: gltf_model.scene,
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
         )

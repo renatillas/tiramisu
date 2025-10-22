@@ -1,10 +1,65 @@
-//// Physics module using Rapier physics engine
+//// Physics simulation using the Rapier physics engine.
 ////
-//// Provides declarative physics simulation following the same immutable,
-//// diff/patch pattern as the rest of Tiramisu.
+//// Provides declarative 3D physics with rigid bodies, colliders, forces, and collision detection.
+//// Physics follows the same immutable patterns as the rest of Tiramisu - you declare rigid bodies
+//// alongside scene nodes, and the physics world updates automatically.
 ////
-//// Physics bodies are declared alongside scene nodes, and the physics world
-//// is managed as part of the game's Model state.
+//// ## Quick Example
+////
+//// ```gleam
+//// import tiramisu/physics
+//// import tiramisu/scene
+//// import tiramisu/transform
+//// import vec/vec3
+//// import gleam/option
+////
+//// type Model {
+////   Model(physics_world: physics.PhysicsWorld(String))
+//// }
+////
+//// // Initialize physics world in init()
+//// fn init(ctx) {
+////   let world = physics.new_world(physics.WorldConfig(
+////     gravity: vec3.Vec3(0.0, -9.81, 0.0),  // Earth gravity
+////   ))
+////   #(Model(physics_world: world), effect.none(), option.Some(world))
+//// }
+////
+//// // Create a physics body with the builder pattern
+//// let ball_physics = physics.new_rigid_body(physics.Dynamic)
+////   |> physics.with_collider(physics.Sphere(
+////     offset: transform.identity,
+////     radius: 1.0,
+////   ))
+////   |> physics.with_mass(5.0)
+////   |> physics.with_restitution(0.7)  // Bouncy!
+////   |> physics.build()
+////
+//// // Attach to scene node
+//// scene.Mesh(
+////   id: "ball",
+////   geometry: sphere_geo,
+////   material: ball_mat,
+////   transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
+////   physics: option.Some(ball_physics),
+//// )
+//// ```
+////
+//// ## Physics Body Types
+////
+//// - **Dynamic**: Affected by forces, gravity, and collisions (balls, characters, physics objects)
+//// - **Kinematic**: Moved programmatically, not affected by forces (moving platforms, doors)
+//// - **Fixed**: Static, immovable objects (walls, floors, terrain)
+////
+//// ## Collider Shapes
+////
+//// - **Box**: Rectangular box with width/height/depth
+//// - **Sphere**: Simple sphere with radius (fastest)
+//// - **Capsule**: Cylinder with rounded caps (great for characters)
+//// - **Cylinder**: Straight cylinder
+////
+//// All colliders support an offset transform for positioning relative to the object's center.
+////
 
 import gleam/dict.{type Dict}
 import gleam/int
@@ -190,7 +245,37 @@ pub type CollisionEvent {
 
 // --- Constructor Functions ---
 
-/// Create a new physics world (call this in your init function)
+/// Create a new physics world.
+///
+/// Call this in your `init()` function and store the world in your Model.
+/// Return it as the third element of the init triple so Tiramisu can manage it.
+///
+/// **Gravity**: Typical Earth gravity is `Vec3(0.0, -9.81, 0.0)`.
+/// Use `Vec3(0.0, 0.0, 0.0)` for zero-gravity space games.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/physics
+/// import vec/vec3
+/// import gleam/option
+///
+/// type Model {
+///   Model(physics_world: physics.PhysicsWorld(String))
+/// }
+///
+/// fn init(ctx) {
+///   let world = physics.new_world(physics.WorldConfig(
+///     gravity: vec3.Vec3(0.0, -9.81, 0.0),  // Earth gravity
+///   ))
+///
+///   #(
+///     Model(physics_world: world),
+///     effect.none(),
+///     option.Some(world),  // Return world for Tiramisu to manage
+///   )
+/// }
+/// ```
 pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
   // Initialize the Rapier world via physics_manager
   // Convert config to Dynamic for physics_manager
@@ -223,15 +308,41 @@ pub opaque type RigidBodyBuilder(a) {
   )
 }
 
-/// Create a new rigid body builder
+/// Create a new rigid body builder.
+///
+/// Start here to build a physics body using the fluent builder pattern.
+/// You must call `with_collider()` before `build()`.
+///
+/// **Body Types:**
+/// - `Dynamic`: Moves and responds to forces (balls, characters, props)
+/// - `Kinematic`: Programmatically controlled, doesn't respond to forces (elevators, doors)
+/// - `Fixed`: Static, immovable (walls, floors, terrain)
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let body = physics.new_rigid_body(physics.Dynamic)
-///   |> physics.body_collider(physics.Box(2.0, 2.0, 2.0))
-///   |> physics.body_mass(5.0)
-///   |> physics.build_body()
+/// import tiramisu/physics
+/// import tiramisu/transform
+///
+/// // Dynamic ball
+/// let ball = physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Sphere(
+///     offset: transform.identity,
+///     radius: 1.0,
+///   ))
+///   |> physics.with_mass(5.0)
+///   |> physics.with_restitution(0.8)
+///   |> physics.build()
+///
+/// // Static ground
+/// let ground = physics.new_rigid_body(physics.Fixed)
+///   |> physics.with_collider(physics.Box(
+///     offset: transform.identity,
+///     width: 50.0,
+///     height: 1.0,
+///     depth: 50.0,
+///   ))
+///   |> physics.build()
 /// ```
 pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
   RigidBodyBuilder(
@@ -255,7 +366,22 @@ pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
   )
 }
 
-/// Set the collider shape for the rigid body
+/// Set the collider shape (required).
+///
+/// **Shapes:** Box, Sphere, Capsule, Cylinder
+/// **Offset**: Position relative to object center (usually `transform.identity`)
+///
+/// ## Example
+///
+/// ```gleam
+/// // Character capsule (best for characters)
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Capsule(
+///     offset: transform.identity,
+///     half_height: 0.9,  // Total height = 1.8
+///     radius: 0.3,
+///   ))
+/// ```
 pub fn with_collider(
   builder: RigidBodyBuilder(_),
   collider: ColliderShape,
@@ -263,7 +389,17 @@ pub fn with_collider(
   RigidBodyBuilder(..builder, collider: option.Some(collider))
 }
 
-/// Set the mass for the rigid body
+/// Set the mass in kilograms (for Dynamic bodies).
+///
+/// **Mass** affects how forces and collisions influence the body.
+/// Default: Calculated from volume and density if not specified.
+///
+/// ## Example
+///
+/// ```gleam
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_mass(70.0)  // Average human = 70kg
+/// ```
 pub fn with_mass(
   builder: RigidBodyBuilder(_),
   mass: Float,
@@ -271,7 +407,22 @@ pub fn with_mass(
   RigidBodyBuilder(..builder, mass: option.Some(mass))
 }
 
-/// Set the restitution (bounciness) for the rigid body
+/// Set restitution (bounciness).
+///
+/// **Restitution**: 0.0 = no bounce, 1.0 = perfect bounce (energy conserved)
+/// Default: 0.3
+///
+/// ## Example
+///
+/// ```gleam
+/// // Bouncy ball
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_restitution(0.9)  // Very bouncy
+///
+/// // Non-bouncy box
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_restitution(0.1)  // Barely bounces
+/// ```
 pub fn with_restitution(
   builder: RigidBodyBuilder(_),
   restitution: Float,
@@ -279,7 +430,22 @@ pub fn with_restitution(
   RigidBodyBuilder(..builder, restitution: restitution)
 }
 
-/// Set the friction for the rigid body
+/// Set friction coefficient.
+///
+/// **Friction**: 0.0 = ice (no friction), 1.0+ = very grippy
+/// Default: 0.5
+///
+/// ## Example
+///
+/// ```gleam
+/// // Slippery ice
+/// physics.new_rigid_body(physics.Fixed)
+///   |> physics.with_friction(0.05)
+///
+/// // Grippy rubber
+/// physics.new_rigid_body(physics.Fixed)
+///   |> physics.with_friction(0.9)
+/// ```
 pub fn with_friction(
   builder: RigidBodyBuilder(_),
   friction: Float,
@@ -287,7 +453,18 @@ pub fn with_friction(
   RigidBodyBuilder(..builder, friction: friction)
 }
 
-/// Set the linear damping for the rigid body
+/// Set linear damping (air resistance for translation).
+///
+/// **Damping**: 0.0 = no resistance, higher = more drag
+/// Useful for simulating air/water resistance. Default: 0.0
+///
+/// ## Example
+///
+/// ```gleam
+/// // Underwater physics
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_linear_damping(2.0)  // Heavy water resistance
+/// ```
 pub fn with_linear_damping(
   builder: RigidBodyBuilder(_),
   damping: Float,
@@ -295,7 +472,10 @@ pub fn with_linear_damping(
   RigidBodyBuilder(..builder, linear_damping: damping)
 }
 
-/// Set the angular damping for the rigid body
+/// Set angular damping (air resistance for rotation).
+///
+/// **Damping**: 0.0 = no resistance, higher = more drag
+/// Prevents bodies from spinning forever. Default: 0.0
 pub fn with_angular_damping(
   builder: RigidBodyBuilder(_),
   damping: Float,
@@ -303,7 +483,19 @@ pub fn with_angular_damping(
   RigidBodyBuilder(..builder, angular_damping: damping)
 }
 
-/// Enable continuous collision detection for the rigid body
+/// Enable Continuous Collision Detection (CCD).
+///
+/// CCD prevents fast-moving objects from tunneling through thin obstacles.
+/// Use for bullets, fast-moving balls, or high-velocity objects.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Bullet that shouldn't pass through walls
+/// physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Sphere(transform.identity, 0.1))
+///   |> physics.with_body_ccd_enabled()
+/// ```
 pub fn with_body_ccd_enabled(
   builder: RigidBodyBuilder(_),
 ) -> RigidBodyBuilder(_) {
@@ -402,9 +594,18 @@ pub type WithCollider
 
 pub type WithoutCollider
 
-/// Build the final rigid body from the builder
+/// Build the final rigid body from the builder.
 ///
-/// Returns an error if no collider was set.
+/// This function is type-safe - you cannot call it without first calling `with_collider()`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let body = physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Sphere(transform.identity, 1.0))
+///   |> physics.with_mass(5.0)
+///   |> physics.build()  // Returns RigidBody ready to use
+/// ```
 pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
   let assert option.Some(collider) = builder.collider
   RigidBody(
@@ -546,15 +747,6 @@ pub fn get_transform(
   let translation = get_body_translation_ffi(rapier_body)
   let rotation_quat = get_body_rotation_ffi(rapier_body)
 
-  // Convert quaternion to Euler angles (done in FFI)
-  let euler =
-    quat_to_euler_ffi(
-      rotation_quat.x,
-      rotation_quat.y,
-      rotation_quat.z,
-      rotation_quat.w,
-    )
-
   Ok(
     transform.identity
     |> transform.with_position(vec3.Vec3(
@@ -562,7 +754,7 @@ pub fn get_transform(
       translation.y,
       translation.z,
     ))
-    |> transform.with_rotation(euler),
+    |> transform.with_quaternion_rotation(rotation_quat),
   )
 }
 
@@ -964,11 +1156,6 @@ fn get_body_translation_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
 
 @external(javascript, "../rapier.ffi.mjs", "getBodyRotation")
 fn get_body_rotation_ffi(body: RapierRigidBody) -> Quaternion
-
-// Quaternion/Euler conversion is now done in Gleam in transform.gleam
-// We still use the FFI version here for get_transform as it's already in Rapier
-@external(javascript, "../rapier.ffi.mjs", "quaternionToEuler")
-fn quat_to_euler_ffi(x: Float, y: Float, z: Float, w: Float) -> vec3.Vec3(Float)
 
 // Raycasting FFI using Rapier
 type RapierRay

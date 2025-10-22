@@ -85,7 +85,7 @@ let load_effect =
 ### Using Custom Geometry
 
 ```gleam
-scene.Mesh(
+scene.mesh(
   id: "stl_model",
   geometry: scene.CustomGeometry(loaded_geometry),
   material: scene.StandardMaterial(

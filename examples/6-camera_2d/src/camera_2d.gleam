@@ -53,13 +53,14 @@ fn update(
 
 fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
   // Use actual canvas dimensions for proper aspect ratio on all devices
-  let cam = camera.camera_2d(
-    width: float.round(ctx.canvas_width),
-    height: float.round(ctx.canvas_height),
-  )
+  let cam =
+    camera.camera_2d(
+      width: float.round(ctx.canvas_width),
+      height: float.round(ctx.canvas_height),
+    )
 
   [
-    scene.Camera(
+    scene.camera(
       id: "camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
@@ -67,7 +68,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
       look_at: option.None,
       viewport: option.None,
     ),
-    scene.Light(
+    scene.light(
       id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
@@ -76,7 +77,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
       transform: transform.identity,
     ),
     // Center square
-    scene.Mesh(
+    scene.mesh(
       id: "center",
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 50.0, height: 50.0)
@@ -96,7 +97,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
       physics: option.None,
     ),
     // Grid of squares in 2D space
-    scene.Mesh(
+    scene.mesh(
       id: "top-left",
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
@@ -113,10 +114,14 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
         mat
       },
       transform: transform.at(position: vec3.Vec3(-150.0, 150.0, -1.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          0.0,
+          0.0,
+          model.time /. 1000.0,
+        )),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "top-right",
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
@@ -133,10 +138,14 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
         mat
       },
       transform: transform.at(position: vec3.Vec3(150.0, 150.0, -1.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          0.0,
+          0.0,
+          model.time /. 1000.0,
+        )),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "bottom-left",
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
@@ -153,10 +162,14 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
         mat
       },
       transform: transform.at(position: vec3.Vec3(-150.0, -150.0, -1.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          0.0,
+          0.0,
+          model.time /. 1000.0,
+        )),
       physics: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: "bottom-right",
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
@@ -173,7 +186,11 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
         mat
       },
       transform: transform.at(position: vec3.Vec3(150.0, -150.0, -1.0))
-        |> transform.with_rotation(vec3.Vec3(0.0, 0.0, model.time)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          0.0,
+          0.0,
+          model.time /. 1000.0,
+        )),
       physics: option.None,
     ),
   ]

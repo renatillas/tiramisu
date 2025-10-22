@@ -105,7 +105,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   [
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: camera,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
@@ -113,7 +113,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: True,
       viewport: option.None,
     ),
-    scene.Light(
+    scene.light(
       id: Ambient,
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
@@ -121,7 +121,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     ),
-    scene.Light(
+    scene.light(
       id: Directional,
       light: {
         let assert Ok(light) =
@@ -131,7 +131,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
     ),
     // Fire particles (red-orange with upward velocity)
-    scene.Particles(
+    scene.particles(
       id: Fire,
       emitter: {
         let assert Ok(emitter) =
@@ -153,7 +153,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: model.fire_active,
     ),
     // Sparkles (golden with slow upward drift)
-    scene.Particles(
+    scene.particles(
       id: Sparkles,
       emitter: {
         let assert Ok(emitter) =
@@ -174,7 +174,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: model.sparkles_active,
     ),
     // Explosion (fast radial burst)
-    scene.Particles(
+    scene.particles(
       id: Explosion,
       emitter: {
         let assert Ok(emitter) =
@@ -196,7 +196,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: model.explosion_active,
     ),
     // Smoke (gray with slow upward drift and spread)
-    scene.Particles(
+    scene.particles(
       id: Smoke,
       emitter: {
         let assert Ok(emitter) =
@@ -218,7 +218,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: model.smoke_active,
     ),
     // Ground plane for reference
-    scene.Mesh(
+    scene.mesh(
       id: Ground,
       geometry: {
         let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
@@ -234,7 +234,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         mat
       },
       transform: transform.at(position: vec3.Vec3(0.0, -0.1, 0.0))
-        |> transform.with_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
       physics: option.None,
     ),
   ]
