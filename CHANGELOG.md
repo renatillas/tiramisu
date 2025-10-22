@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.1.2 - 2025-10-22
+
+- Fix ordering of applied physics commands, as they were reversed before.
+
 ## v3.1.1 - 2025-10-21
 
 - Fix camera issue with look_at being cached and not using the updated look_at each frame.

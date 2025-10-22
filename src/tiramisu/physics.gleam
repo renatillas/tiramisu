@@ -471,8 +471,11 @@ fn apply_command(
 /// This should be called in your update function each frame
 /// Returns updated world with new transforms for all bodies
 pub fn step(world: PhysicsWorld(id)) -> PhysicsWorld(id) {
-  // Apply all pending commands
-  list.each(world.pending_commands, fn(command) {
+  // Apply all pending commands in the correct order
+  // Commands are prepended to the list, so we need to reverse before applying
+  world.pending_commands
+  |> list.reverse
+  |> list.each(fn(command) {
     let _ = apply_command(command, world.rapier_bodies)
     Nil
   })
