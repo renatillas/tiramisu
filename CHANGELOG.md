@@ -2,6 +2,64 @@
 
 ## v4.0.0 - 2025-10-22
 
+### Added
+- **Comprehensive API documentation**: Added extensive module-level and function-level documentation with examples for:
+  - `scene` module - Scene node system with constructor functions, node types, and usage patterns
+  - `animation` module - Tweening and model animation system
+  - `physics` module - Rigid body dynamics, colliders, forces, and collision detection
+  - `material` module - PBR materials, builder pattern, texture mapping examples
+  - `light` module - Lighting types, shadow configuration, typical setups
+  - `debug` module - Debug visualization utilities and performance monitoring
+  - `state_machine` module - Type-safe animation state machines with context
+  - `particle_emitter` module - GPU-accelerated particle effects with builder API
+  - `audio` module - Spatial and global audio with Web Audio API
+  - `asset` module - Asset loading, caching, and batch loading
+  - `spatial` module - Spatial partitioning and collision detection
+- **Scene node constructor functions**: Scene nodes now use opaque types with explicit constructor functions:
+  - `scene.mesh()` - Create mesh nodes
+  - `scene.instanced_mesh()` - Create instanced mesh nodes
+  - `scene.group()` - Create group nodes
+  - `scene.light()` - Create light nodes
+  - `scene.camera()` - Create camera nodes
+  - `scene.lod()` - Create LOD nodes
+  - `scene.model3d()` - Create 3D model nodes
+  - `scene.instanced_model()` - Create instanced model nodes
+  - `scene.audio()` - Create audio nodes
+  - `scene.particles()` - Create particle emitter nodes
+  - `scene.debug_*()` - Create debug visualization nodes
+- **Enhanced Collider API**: Spatial module now uses a unified `Collider` type supporting both boxes and spheres:
+  - `spatial.collider_box()` - Create box collider from min/max points
+  - `spatial.collider_box_from_center()` - Create box from center and half-extents
+  - `spatial.collider_sphere()` - Create sphere collider from center and radius
+  - `spatial.collider_contains_point()` - Point-in-collider test (works for both box and sphere)
+  - `spatial.collider_intersects()` - Collider intersection test (box-box, sphere-sphere, box-sphere)
+  - Box-sphere collision detection for heterogeneous spatial queries
+- **Documentation guide**: Added `docs/physics-guide.md` with comprehensive physics system documentation
+
+### Changed
+- **Scene module refactoring**: Moved renderer logic from `tiramisu/internal/renderer.gleam` into `tiramisu/scene.gleam` for better organization (removed 1926 lines, added rendering functions directly to scene module)
+- **Scene.Node type is now opaque**: Must use constructor functions instead of direct constructors (e.g., `scene.mesh()` instead of `scene.Mesh()`)
+- **Spatial API redesign**: Renamed `AABB` type to `Collider` and updated all related functions:
+  - `spatial.aabb()` → `spatial.collider_box()`
+  - `spatial.aabb_from_center()` → `spatial.collider_box_from_center()`
+  - `spatial.aabb_contains_point()` → `spatial.collider_contains_point()`
+  - `spatial.aabb_intersects()` → `spatial.collider_intersects()`
+  - `spatial.aabb_center()` → `spatial.collider_center()`
+  - Octree API updated to use new collider types: `octree_new()`, `octree_insert()`, `octree_query_radius()`, etc.
+- **Type reorganization**:
+  - Moved `Object3D` type from `tiramisu/object3d` module to `tiramisu/asset` module
+  - Moved `AnimationClip` type from `tiramisu/object3d` module to `tiramisu/animation` module
+  - Moved `AnimationPlayback` type to `tiramisu/animation` module
+- **Context type simplified**: Removed `input_manager` field from `Context` type (internal implementation detail)
+- **Main module streamlined**: Simplified `tiramisu.gleam` by removing example code and focusing on core API surface
+- **Documentation improvements**: Updated scene graph and getting started guides, removed spatial partitioning guide (content integrated into API docs)
+
+### Removed
+- The `tiramisu/internal/renderer.gleam` module (logic moved to `tiramisu/scene.gleam`)
+- The `tiramisu/internal/input_manager.gleam` module (no longer needed)
+- The `docs/spatial-partitioning-guide.md` file (integrated into module documentation)
+- The `examples/README.md` file (examples are self-documenting with inline comments)
+
 ### Fixed
 - **Fixed GLTF animation playback speed**: Three.js AnimationMixer now correctly receives delta time in seconds (converted from milliseconds in `updateMixer`)
 - **Fixed animation state machine blend durations**: State machine now converts delta_time from milliseconds to seconds internally, allowing blend_duration to remain in seconds as documented (e.g., 0.3 for 300ms blend)

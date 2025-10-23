@@ -88,7 +88,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
   let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
 
   [
-    scene.Camera(
+    scene.camera(
       id: MainCamera,
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
@@ -96,7 +96,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
       active: True,
       viewport: option.None,
     ),
-    scene.Mesh(
+    scene.mesh(
       id: Cube,
       geometry: cube_geo,
       material: cube_mat,
@@ -104,7 +104,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
         |> transform.rotate_y(model.rotation),
       physics: option.None,
     ),
-    scene.Light(
+    scene.light(
       id: Sun,
       light: sun,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
