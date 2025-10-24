@@ -158,11 +158,23 @@ export function createRenderer(options) {
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-        // Update active camera aspect ratio if it exists
+        // Update active camera if it exists
         const camera = getActiveCamera();
-        if (camera && camera.isPerspectiveCamera) {
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
+        if (camera) {
+          if (camera.isPerspectiveCamera) {
+            // Update perspective camera aspect ratio
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+          } else if (camera.isOrthographicCamera) {
+            // Update orthographic camera frustum
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.left = -width / 2;
+            camera.right = width / 2;
+            camera.top = height / 2;
+            camera.bottom = -height / 2;
+            camera.updateProjectionMatrix();
+          }
         }
       });
     }

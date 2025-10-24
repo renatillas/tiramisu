@@ -1,5 +1,13 @@
 # Changelog
 
+## v4.0.2 - 2025-10-24
+
+### Fixed
+- **Orthographic camera resize handling**: Fixed window resize listener to properly update orthographic cameras
+  - Resize event now updates orthographic camera frustum (left, right, top, bottom) based on new window dimensions
+  - Previously only perspective cameras were updated on resize, causing 2D games to stretch when window was resized
+  - `camera_2d()` cameras now maintain correct aspect ratio and scale across all window sizes
+
 ## v4.0.1 - 2025-10-24
 
 ### Fixed
