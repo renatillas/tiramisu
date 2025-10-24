@@ -37,30 +37,55 @@ export function identity(value) {
 // ============================================================================
 
 /**
+ * WeakMap to assign stable numeric IDs to constructor functions.
+ * This avoids relying on constructor.name which can be minified in production.
+ */
+const constructorIds = new WeakMap();
+let nextConstructorId = 0;
+
+/**
+ * Get a stable numeric ID for a constructor function.
+ * Uses WeakMap to cache IDs so the same constructor always gets the same ID.
+ *
+ * @param {Function} constructor - The constructor function
+ * @returns {number} A stable numeric ID for this constructor
+ */
+function getConstructorId(constructor) {
+  if (!constructorIds.has(constructor)) {
+    constructorIds.set(constructor, nextConstructorId++);
+  }
+  return constructorIds.get(constructor);
+}
+
+/**
  * Serialize a Gleam ID to a stable string representation
  *
  * This function converts any Gleam custom type instance into a unique string
- * that can be used as a Map/Dict key. It combines the type constructor name
- * with JSON-serialized properties to ensure uniqueness even for types with
- * no fields (e.g., Player vs Enemy).
+ * that can be used as a Map/Dict key. It uses a stable numeric constructor ID
+ * combined with JSON-serialized properties to ensure uniqueness even for types
+ * with no fields (e.g., Player vs Enemy).
+ *
+ * This approach avoids relying on constructor.name which can be minified in
+ * production builds, making the serialization stable across different build
+ * configurations.
  *
  * @param {any} id - Any Gleam custom type instance
  * @returns {string} - Stable string representation
  *
  * @example
  * // In Gleam: type GameId { Player(Int) | Enemy(Int) }
- * serializeId(Player(1))  // Returns "Player:{\"0\":1}"
- * serializeId(Enemy(1))   // Returns "Enemy:{\"0\":1}"
+ * serializeId(Player(1))  // Returns "0:{\"0\":1}"  (if Player constructor gets ID 0)
+ * serializeId(Enemy(1))   // Returns "1:{\"0\":1}"  (if Enemy constructor gets ID 1)
  */
 export function serializeId(id) {
-  // Get constructor name (Gleam custom types compile to JavaScript classes)
-  const typeName = id.constructor.name;
+  // Get stable numeric ID for the constructor (doesn't rely on minifiable name)
+  const constructorId = getConstructorId(id.constructor);
 
   // Serialize the object's properties
   const props = JSON.stringify(id);
 
   // Combine both for a unique key
-  return `${typeName}:${props}`;
+  return `${constructorId}:${props}`;
 }
 
 // ============================================================================

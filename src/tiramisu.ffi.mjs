@@ -4,6 +4,7 @@ import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
 import * as INPUT from './tiramisu/input.mjs';
 import { getActiveCamera, setSceneBackgroundColor, setSceneBackgroundTexture, setSceneBackgroundCubeTexture, loadTexture, loadEquirectangularTexture, loadCubeTexture } from './threejs.ffi.mjs';
+import { Background$isColor, Background$isTexture, Background$isEquirectangularTexture, Background$isCubeTexture, Background$Color$0, Background$Texture$0, Background$EquirectangularTexture$0, Background$CubeTexture$0 } from './tiramisu/background.mjs';
 
 // ============================================================================
 // MANAGER CLASSES - Encapsulate mutable state
@@ -551,65 +552,57 @@ export function createInputManager(canvas) {
 
 /**
  * Set background on Three.js scene based on Gleam Background type
+ * Uses Gleam-generated variant checking functions to safely inspect the type
+ * without relying on constructor names (which may be minified in production).
+ *
  * @param {THREE.Scene} scene - Three.js scene object
  * @param {Object} background - Gleam Background ADT (Color, Texture, EquirectangularTexture, or CubeTexture)
  */
 export async function setBackground(scene, background) {
-  const bgType = background.constructor.name;
-
-  switch (bgType) {
-    case 'Color': {
-      // Background.Color(Int) - hex color
-      const color = background[0];
-      setSceneBackgroundColor(scene, color);
-      break;
-    }
-    case 'Texture': {
-      // Background.Texture(String) - texture URL
-      const url = background[0];
-      try {
-        const texture = await loadTexture(url);
-        setSceneBackgroundTexture(scene, texture);
-      } catch (error) {
-        console.error('[Tiramisu] Failed to load background texture:', error);
-        // Fallback to black color
-        setSceneBackgroundColor(scene, 0x000000);
-      }
-      break;
-    }
-    case 'EquirectangularTexture': {
-      // Background.EquirectangularTexture(String) - spherical 360° texture URL
-      const url = background[0];
-      try {
-        const texture = await loadEquirectangularTexture(url);
-        console.log(texture)
-        setSceneBackgroundTexture(scene, texture);
-      } catch (error) {
-        console.error('[Tiramisu] Failed to load equirectangular texture:', error);
-        // Fallback to black color
-        setSceneBackgroundColor(scene, 0x000000);
-      }
-      break;
-    }
-    case 'CubeTexture': {
-      // Background.CubeTexture(List(String)) - 6 face URLs
-      const urlsList = background[0];
-      // Convert Gleam list to JavaScript array
-      const urls = urlsList.toArray();
-      try {
-        const cubeTexture = await loadCubeTexture(urls);
-        setSceneBackgroundCubeTexture(scene, cubeTexture);
-      } catch (error) {
-        console.error('[Tiramisu] Failed to load cube texture:', error);
-        // Fallback to black color
-        setSceneBackgroundColor(scene, 0x000000);
-      }
-      break;
-    }
-    default:
-      console.warn('[Tiramisu] Unknown background type:', bgType);
+  if (Background$isColor(background)) {
+    // Background.Color(Int) - hex color
+    const color = Background$Color$0(background);
+    setSceneBackgroundColor(scene, color);
+  } else if (Background$isTexture(background)) {
+    // Background.Texture(String) - texture URL
+    const url = Background$Texture$0(background);
+    try {
+      const texture = await loadTexture(url);
+      setSceneBackgroundTexture(scene, texture);
+    } catch (error) {
+      console.error('[Tiramisu] Failed to load background texture:', error);
       // Fallback to black color
       setSceneBackgroundColor(scene, 0x000000);
+    }
+  } else if (Background$isEquirectangularTexture(background)) {
+    // Background.EquirectangularTexture(String) - spherical 360° texture URL
+    const url = Background$EquirectangularTexture$0(background);
+    try {
+      const texture = await loadEquirectangularTexture(url);
+      console.log(texture)
+      setSceneBackgroundTexture(scene, texture);
+    } catch (error) {
+      console.error('[Tiramisu] Failed to load equirectangular texture:', error);
+      // Fallback to black color
+      setSceneBackgroundColor(scene, 0x000000);
+    }
+  } else if (Background$isCubeTexture(background)) {
+    // Background.CubeTexture(List(String)) - 6 face URLs
+    const urlsList = Background$CubeTexture$0(background);
+    // Convert Gleam list to JavaScript array
+    const urls = urlsList.toArray();
+    try {
+      const cubeTexture = await loadCubeTexture(urls);
+      setSceneBackgroundCubeTexture(scene, cubeTexture);
+    } catch (error) {
+      console.error('[Tiramisu] Failed to load cube texture:', error);
+      // Fallback to black color
+      setSceneBackgroundColor(scene, 0x000000);
+    }
+  } else {
+    console.warn('[Tiramisu] Unknown background type');
+    // Fallback to black color
+    setSceneBackgroundColor(scene, 0x000000);
   }
 }
 
@@ -618,6 +611,13 @@ export async function setBackground(scene, background) {
 // ============================================================================
 
 import * as ASSETS_GLEAM from './tiramisu/asset.mjs';
+import {
+  AssetType$isModelAsset, AssetType$isTextureAsset, AssetType$isAudioAsset,
+  AssetType$isSTLAsset, AssetType$isFBXAsset, AssetType$isFontAsset, AssetType$isOBJAsset,
+  AssetType$ModelAsset$url, AssetType$TextureAsset$url, AssetType$AudioAsset$url,
+  AssetType$STLAsset$url, AssetType$FBXAsset$url, AssetType$FBXAsset$texture_path,
+  AssetType$FontAsset$url, AssetType$OBJAsset$obj_url, AssetType$OBJAsset$mtl_url
+} from './tiramisu/asset.mjs';
 import * as DICT from '../gleam_stdlib/gleam/dict.mjs';
 
 /**
@@ -777,58 +777,64 @@ function getAssetUrl(asset) {
 
 /**
  * Load an asset based on its type
+ * Uses Gleam-generated variant checking functions to safely inspect the type
+ * without relying on constructor names (which may be minified in production).
+ *
  * Note: This routing logic is duplicated from asset.gleam for performance
  * (avoids FFI round-trips during batch loading)
  */
 async function loadAssetByType(asset) {
-  const url = asset.url;
-
-  // Check asset type by constructor name or type field
-  const typeName = asset.constructor.name;
-
-  if (typeName === 'ModelAsset') {
+  if (AssetType$isModelAsset(asset)) {
     // Load GLTF model using safe wrapper
+    const url = AssetType$ModelAsset$url(asset);
     return loadGLTFSafe(url).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_model(result[0]));
       }
       return result;
     });
-  } else if (typeName === 'TextureAsset') {
+  } else if (AssetType$isTextureAsset(asset)) {
     // Load texture using safe wrapper
+    const url = AssetType$TextureAsset$url(asset);
     return loadTextureSafe(url).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_texture(result[0]));
       }
       return result;
     });
-  } else if (typeName === 'AudioAsset') {
+  } else if (AssetType$isAudioAsset(asset)) {
     // Load audio using standalone loader
+    const url = AssetType$AudioAsset$url(asset);
     return loadAudio(url).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_audio(result[0]));
       }
       return result;
     });
-  } else if (typeName === 'STLAsset') {
+  } else if (AssetType$isSTLAsset(asset)) {
     // Load STL using safe wrapper
+    const url = AssetType$STLAsset$url(asset);
     return loadSTLSafe(url).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_stl(result[0]));
       }
       return result;
     });
-  } else if (typeName === 'FBXAsset') {
+  } else if (AssetType$isFBXAsset(asset)) {
     // Load FBX using safe wrapper - extract texture_path from asset
-    const texturePath = asset.texture_path && asset.texture_path[0] ? asset.texture_path[0] : '';
+    const url = AssetType$FBXAsset$url(asset);
+    const texturePathOption = AssetType$FBXAsset$texture_path(asset);
+    // Extract value from Option(String) - Gleam Option is represented as {[0]: value} for Some(value) or null for None
+    const texturePath = texturePathOption && texturePathOption[0] ? texturePathOption[0] : '';
     return loadFBXSafe(url, texturePath).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_fbx(result[0]));
       }
       return result;
     });
-  } else if (typeName === 'FontAsset') {
+  } else if (AssetType$isFontAsset(asset)) {
     // Load font using safe wrapper
+    const url = AssetType$FontAsset$url(asset);
     return loadFontSafe(url).then(result => {
       if (result.isOk()) {
         return new GLEAM.Ok(ASSETS_GLEAM.loaded_font(result[0]));
@@ -836,7 +842,7 @@ async function loadAssetByType(asset) {
       return result;
     });
   } else {
-    return Promise.resolve(new GLEAM.Error(`Unknown asset type: ${typeName}`));
+    return Promise.resolve(new GLEAM.Error('Unknown asset type'));
   }
 }
 

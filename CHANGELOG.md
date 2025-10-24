@@ -1,5 +1,14 @@
 # Changelog
 
+## v4.0.1 - 2025-10-24
+
+### Fixed
+- **Production build compatibility**: Fixed constructor name encoding issues that could cause failures in minified builds
+  - Background type checking now uses Gleam-generated `Background$is*` functions instead of `constructor.name`
+  - Asset type checking now uses Gleam-generated `AssetType$is*` functions instead of `constructor.name`
+  - ID serialization now uses WeakMap-based stable constructor IDs instead of `constructor.name`
+  - All FFI code is now immune to JavaScript minification and build optimization
+
 ## v4.0.0 - 2025-10-22
 
 ### Added
