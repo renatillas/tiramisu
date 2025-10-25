@@ -2203,30 +2203,172 @@ export function dispatchToGame(msg) {
 // ============================================================================
 
 /**
+ * Timer manager to handle pausing/resuming timers when page visibility changes
+ * This prevents timer callbacks from accumulating when the user tabs out
+ */
+class TimerManager {
+  constructor() {
+    /** @type {Map<number, {type: 'timeout'|'interval', callback: Function, delay: number, remaining: number, lastPause: number, timerId: number|null}>} */
+    this.timers = new Map();
+    this.nextId = 1;
+    this.isPaused = false;
+
+    // Listen for page visibility changes
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.pauseAll();
+        } else {
+          this.resumeAll();
+        }
+      });
+    }
+  }
+
+  /**
+   * Create a managed timeout
+   * @param {Function} callback - Callback to execute after delay
+   * @param {number} delay - Delay in milliseconds
+   * @returns {number} Timer ID
+   */
+  setTimeout(callback, delay) {
+    const id = this.nextId++;
+    const timerId = setTimeout(() => {
+      callback();
+      this.timers.delete(id);
+    }, delay);
+
+    this.timers.set(id, {
+      type: 'timeout',
+      callback,
+      delay,
+      remaining: delay,
+      lastPause: 0,
+      timerId,
+    });
+
+    return id;
+  }
+
+  /**
+   * Create a managed interval
+   * @param {Function} callback - Callback to execute on each interval
+   * @param {number} delay - Interval duration in milliseconds
+   * @returns {number} Timer ID
+   */
+  setInterval(callback, delay) {
+    const id = this.nextId++;
+    const timerId = setInterval(callback, delay);
+
+    this.timers.set(id, {
+      type: 'interval',
+      callback,
+      delay,
+      remaining: delay,
+      lastPause: 0,
+      timerId,
+    });
+
+    return id;
+  }
+
+  /**
+   * Clear a managed timer
+   * @param {number} id - Timer ID
+   */
+  clearTimer(id) {
+    const timer = this.timers.get(id);
+    if (timer) {
+      if (timer.timerId !== null) {
+        if (timer.type === 'timeout') {
+          clearTimeout(timer.timerId);
+        } else {
+          clearInterval(timer.timerId);
+        }
+      }
+      this.timers.delete(id);
+    }
+  }
+
+  /**
+   * Pause all active timers
+   */
+  pauseAll() {
+    if (this.isPaused) return;
+    this.isPaused = true;
+
+    const now = performance.now();
+    for (const [id, timer] of this.timers.entries()) {
+      if (timer.timerId !== null) {
+        // Clear the native timer
+        if (timer.type === 'timeout') {
+          clearTimeout(timer.timerId);
+          // Calculate remaining time for timeouts
+          timer.remaining = timer.remaining - (now - (timer.lastPause || now));
+        } else {
+          clearInterval(timer.timerId);
+        }
+        timer.timerId = null;
+        timer.lastPause = now;
+      }
+    }
+  }
+
+  /**
+   * Resume all paused timers
+   */
+  resumeAll() {
+    if (!this.isPaused) return;
+    this.isPaused = false;
+
+    const now = performance.now();
+    for (const [id, timer] of this.timers.entries()) {
+      if (timer.timerId === null) {
+        if (timer.type === 'timeout') {
+          // Resume timeout with remaining time
+          const remaining = Math.max(0, timer.remaining);
+          timer.timerId = setTimeout(() => {
+            timer.callback();
+            this.timers.delete(id);
+          }, remaining);
+          timer.lastPause = now;
+        } else {
+          // Resume interval
+          timer.timerId = setInterval(timer.callback, timer.delay);
+        }
+      }
+    }
+  }
+}
+
+// Global timer manager instance
+const timerManager = new TimerManager();
+
+/**
  * Delay execution by a specified duration
  * @param {number} milliseconds - Delay in milliseconds
  * @param {Function} callback - Callback to execute after delay
  */
 export function delay(milliseconds, callback) {
-  setTimeout(callback, milliseconds);
+  timerManager.setTimeout(callback, milliseconds);
 }
 
 /**
  * Create a recurring interval (returns interval ID)
  * @param {number} milliseconds - Interval duration in milliseconds
  * @param {Function} callback - Callback to execute on each interval
- * @returns {number} JavaScript interval ID (to be stored by caller)
+ * @returns {number} Timer ID (managed by TimerManager)
  */
 export function interval(milliseconds, callback) {
-  return setInterval(callback, milliseconds);
+  return timerManager.setInterval(callback, milliseconds);
 }
 
 /**
- * Cancel a recurring interval by its JavaScript ID
- * @param {number} intervalId - JavaScript interval ID (from setInterval)
+ * Cancel a recurring interval by its ID
+ * @param {number} intervalId - Timer ID (from interval function)
  */
 export function cancelInterval(intervalId) {
-  clearInterval(intervalId);
+  timerManager.clearTimer(intervalId);
 }
 
 // Easing functions for tweening

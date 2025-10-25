@@ -1,5 +1,10 @@
 # Changelog
 
+## v4.0.3 - 2025-10-24
+
+### Fixed
+- Fixed a bug where effect.interval and effect.delay were running even if the application was paused.
+
 ## v4.0.2 - 2025-10-24
 
 ### Fixed
