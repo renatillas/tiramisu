@@ -62,6 +62,8 @@ import tiramisu/material
 import tiramisu/particle_emitter
 import tiramisu/physics
 import tiramisu/transform
+import paint
+import paint/encode as paint_encode
 import vec/vec3.{type Vec3}
 
 /// Level of Detail (LOD) configuration.
@@ -144,6 +146,19 @@ pub opaque type Node(id) {
     emitter: particle_emitter.ParticleEmitter,
     transform: transform.Transform,
     active: Bool,
+  )
+  // UI overlay nodes
+  CSS2DLabel(id: id, html: String, transform: transform.Transform)
+  CSS3DLabel(id: id, html: String, transform: transform.Transform)
+  // 3D Sprites (Canvas drawings rendered to texture with depth occlusion)
+  Sprite(
+    id: id,
+    encoded_picture: String,
+    texture_width: Int,
+    texture_height: Int,
+    width: Float,
+    height: Float,
+    transform: transform.Transform,
   )
   // Debug visualization nodes
   DebugBox(id: id, min: Vec3(Float), max: Vec3(Float), color: Int)
@@ -621,6 +636,146 @@ pub fn particles(
   Particles(id:, emitter:, transform:, active:)
 }
 
+/// Create a CSS2D label that follows a 3D position in screen space.
+///
+/// CSS2D labels are HTML elements that follow 3D objects but always face the camera.
+/// Perfect for health bars, nameplates, tooltips, or interactive UI elements.
+///
+/// **HTML**: Raw HTML string. Use Lustre's `element.to_string()` for type-safe HTML.
+/// **Position**: Offset from parent object (or world position if top-level node).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/scene
+/// import vec/vec3
+/// import lustre/element/html
+/// import lustre/element
+/// import lustre/attribute
+///
+/// // Option 1: Using Lustre (recommended)
+/// let hp_element = html.div([attribute.class("bg-red-500 text-white px-4 py-2")], [
+///   html.text("HP: 100")
+/// ])
+/// scene.css2d_label(
+///   id: "player-hp",
+///   html: element.to_string(hp_element),
+///   position: vec3.Vec3(0.0, 2.0, 0.0),
+/// )
+///
+/// // Option 2: Raw HTML string
+/// scene.css2d_label(
+///   id: "player-name",
+///   html: "<div class='text-white font-bold'>Player</div>",
+///   position: vec3.Vec3(0.0, 2.5, 0.0),
+/// )
+/// ```
+pub fn css2d_label(
+  id id: id,
+  html html: String,
+  transform transform: transform.Transform,
+) {
+  CSS2DLabel(id:, html:, transform:)
+}
+
+/// Create a CSS3D label that respects 3D depth and occlusion.
+///
+/// CSS3D labels are HTML elements that live "in" 3D space with full transformations.
+/// Unlike CSS2D labels (always on top), CSS3D labels hide behind objects and can
+/// rotate in 3D. Great for immersive UI elements.
+///
+/// **HTML**: Raw HTML string. Use Lustre's `element.to_string()` for type-safe HTML.
+/// **Position**: Offset from parent object (or world position if top-level node).
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/scene
+/// import vec/vec3
+///
+/// // Label that hides behind objects
+/// scene.css3d_label(
+///   id: "3d-sign",
+///   html: "<div class='text-white text-2xl'>→ Exit</div>",
+///   position: vec3.Vec3(0.0, 2.0, 0.0),
+/// )
+/// ```
+pub fn css3d_label(
+  id id: id,
+  html html: String,
+  transform transform: transform.Transform,
+) {
+  CSS3DLabel(id:, html:, transform:)
+}
+
+/// Create a 3D sprite with canvas drawing rendered to a texture.
+///
+/// Sprites are Three.js planes with paint.Picture drawings rendered to canvas textures.
+/// Unlike CSS2D/CSS3D, they are true 3D meshes that respect depth testing (hide behind objects).
+///
+/// Uses the `paint` library for canvas drawing operations.
+///
+/// **Picture**: A paint.Picture created using paint's drawing API
+/// **Texture Width/Height**: Canvas texture resolution in pixels (higher = sharper but more memory)
+/// **Width/Height**: World space size of the sprite plane
+/// **Transform**: Position, rotation, scale
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/scene
+/// import tiramisu/transform
+/// import vec/vec3
+/// import paint as p
+///
+/// // Create health bar using paint
+/// let health_bar = p.combine([
+///   // Background
+///   p.rectangle(256.0, 64.0)
+///     |> p.fill(p.colour_rgb(0, 0, 0)),
+///   // Health bar
+///   p.rectangle(192.0, 20.0)
+///     |> p.translate_xy(10.0, 22.0)
+///     |> p.fill(p.colour_rgb(255, 0, 0)),
+///   // Text
+///   p.text("HP: 75/100", 14.0)
+///     |> p.translate_xy(10.0, 50.0)
+///     |> p.fill(p.colour_rgb(255, 255, 255)),
+/// ])
+///
+/// scene.sprite(
+///   id: "health",
+///   picture: health_bar,
+///   texture_width: 256,
+///   texture_height: 64,
+///   width: 2.0,
+///   height: 0.5,
+///   transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0)),
+/// )
+/// ```
+pub fn sprite(
+  id id: id,
+  picture picture: paint.Picture,
+  texture_width texture_width: Int,
+  texture_height texture_height: Int,
+  width width: Float,
+  height height: Float,
+  transform transform: transform.Transform,
+) {
+  // Encode picture to string for efficient comparison and storage
+  let encoded_picture = paint_encode.to_string(picture)
+
+  Sprite(
+    id:,
+    encoded_picture:,
+    texture_width:,
+    texture_height:,
+    width:,
+    height:,
+    transform:,
+  )
+}
+
 /// Create a debug wireframe box visualization.
 ///
 /// Useful for visualizing collision bounds, trigger zones, or spatial regions.
@@ -819,6 +974,17 @@ pub type Patch(id) {
   SetActiveCamera(id: id)
   UpdateParticleEmitter(id: id, emitter: particle_emitter.ParticleEmitter)
   UpdateParticleActive(id: id, active: Bool)
+  UpdateCSS2DLabel(id: id, html: String, transform: transform.Transform)
+  UpdateCSS3DLabel(id: id, html: String, transform: transform.Transform)
+  UpdateSprite(
+    id: id,
+    encoded_picture: String,
+    texture_width: Int,
+    texture_height: Int,
+    width: Float,
+    height: Float,
+    transform: transform.Transform,
+  )
 }
 
 type NodeWithParent(id) {
@@ -1153,6 +1319,64 @@ fn compare_nodes_detailed(
         curr_trans,
         curr_active,
       )
+
+    CSS2DLabel(_, prev_html, prev_transform),
+      CSS2DLabel(_, curr_html, curr_transform)
+    ->
+      case prev_html != curr_html || prev_transform != curr_transform {
+        True -> [UpdateCSS2DLabel(id, curr_html, curr_transform)]
+        False -> []
+      }
+
+    CSS3DLabel(_, prev_html, prev_transform),
+      CSS3DLabel(_, curr_html, curr_transform)
+    ->
+      case prev_html != curr_html || prev_transform != curr_transform {
+        True -> [UpdateCSS3DLabel(id, curr_html, curr_transform)]
+        False -> []
+      }
+
+    Sprite(
+        _,
+        prev_encoded_picture,
+        prev_tw,
+        prev_th,
+        prev_w,
+        prev_h,
+        prev_transform,
+      ),
+      Sprite(
+        _,
+        curr_encoded_picture,
+        curr_tw,
+        curr_th,
+        curr_w,
+        curr_h,
+        curr_transform,
+      )
+    ->
+      case
+        prev_encoded_picture != curr_encoded_picture
+        || prev_tw != curr_tw
+        || prev_th != curr_th
+        || prev_w != curr_w
+        || prev_h != curr_h
+        || prev_transform != curr_transform
+      {
+        True ->
+          [
+            UpdateSprite(
+              id,
+              curr_encoded_picture,
+              curr_tw,
+              curr_th,
+              curr_w,
+              curr_h,
+              curr_transform,
+            ),
+          ]
+        False -> []
+      }
 
     _, _ -> []
   }
@@ -1804,6 +2028,23 @@ pub fn apply_patch(
 
     UpdateParticleActive(id: id, active: active) ->
       handle_update_particle_active(state, id, active)
+
+    UpdateCSS2DLabel(id: id, html: html, transform: trans) ->
+      handle_update_css2d_label(state, id, html, trans)
+
+    UpdateCSS3DLabel(id: id, html: html, transform: trans) ->
+      handle_update_css3d_label(state, id, html, trans)
+
+    UpdateSprite(
+      id: id,
+      encoded_picture: encoded_picture,
+      texture_width: tw,
+      texture_height: th,
+      width: w,
+      height: h,
+      transform: trans,
+    ) ->
+      handle_update_sprite(state, id, encoded_picture, tw, th, w, h, trans)
   }
 }
 
@@ -1932,6 +2173,23 @@ fn handle_add_node(
 
     Particles(id: _, emitter: emitter, transform: transform, active: active) ->
       handle_add_particles(state, id, emitter, transform, active, parent_id)
+
+    CSS2DLabel(id: _, html: html, transform: trans) ->
+      handle_add_css2d_label(state, id, html, trans, parent_id)
+
+    CSS3DLabel(id: _, html: html, transform: trans) ->
+      handle_add_css3d_label(state, id, html, trans, parent_id)
+
+    Sprite(
+      id: _,
+      encoded_picture: encoded_picture,
+      texture_width: tw,
+      texture_height: th,
+      width: w,
+      height: h,
+      transform: trans,
+    ) ->
+      handle_add_sprite(state, id, encoded_picture, tw, th, w, h, trans, parent_id)
   }
 }
 
@@ -2952,6 +3210,129 @@ fn handle_update_particle_active(
   }
 }
 
+fn handle_add_css2d_label(
+  state: RendererState(id),
+  id: id,
+  html: String,
+  trans: transform.Transform,
+  parent_id: Option(id),
+) -> RendererState(id) {
+  let css2d_obj = create_css2d_object_ffi(html)
+  apply_transform_ffi(css2d_obj, trans)
+  let three_obj = object_cache.wrap_object(css2d_obj)
+  add_to_scene_or_parent(state, three_obj, parent_id)
+
+  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  RendererState(..state, cache: new_cache)
+}
+
+fn handle_update_css2d_label(
+  state: RendererState(id),
+  id: id,
+  html: String,
+  trans: transform.Transform,
+) -> RendererState(id) {
+  case object_cache.get_object(state.cache, id) {
+    option.Some(obj) -> {
+      let obj_3d = object_cache.unwrap_object(obj)
+      update_css2d_object_html_ffi(obj_3d, html)
+      apply_transform_ffi(obj_3d, trans)
+      state
+    }
+    option.None -> state
+  }
+}
+
+fn handle_add_css3d_label(
+  state: RendererState(id),
+  id: id,
+  html: String,
+  trans: transform.Transform,
+  parent_id: Option(id),
+) -> RendererState(id) {
+  let css3d_obj = create_css3d_object_ffi(html)
+  apply_transform_ffi(css3d_obj, trans)
+  let three_obj = object_cache.wrap_object(css3d_obj)
+  add_to_scene_or_parent(state, three_obj, parent_id)
+
+  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  RendererState(..state, cache: new_cache)
+}
+
+fn handle_update_css3d_label(
+  state: RendererState(id),
+  id: id,
+  html: String,
+  trans: transform.Transform,
+) -> RendererState(id) {
+  case object_cache.get_object(state.cache, id) {
+    option.Some(obj) -> {
+      let obj_3d = object_cache.unwrap_object(obj)
+      update_css3d_object_html_ffi(obj_3d, html)
+      apply_transform_ffi(obj_3d, trans)
+      state
+    }
+    option.None -> state
+  }
+}
+
+fn handle_add_sprite(
+  state: RendererState(id),
+  id: id,
+  encoded_picture: String,
+  texture_width: Int,
+  texture_height: Int,
+  width: Float,
+  height: Float,
+  trans: transform.Transform,
+  parent_id: Option(id),
+) -> RendererState(id) {
+  // Picture is already encoded, use it directly
+  let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
+
+  // Create plane mesh with the texture
+  let sprite_mesh = create_sprite_plane_ffi(texture, width, height)
+
+  // Apply transform
+  apply_transform_ffi(sprite_mesh, trans)
+
+  let three_obj = object_cache.wrap_object(sprite_mesh)
+  add_to_scene_or_parent(state, three_obj, parent_id)
+
+  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  RendererState(..state, cache: new_cache)
+}
+
+fn handle_update_sprite(
+  state: RendererState(id),
+  id: id,
+  encoded_picture: String,
+  texture_width: Int,
+  texture_height: Int,
+  width: Float,
+  height: Float,
+  trans: transform.Transform,
+) -> RendererState(id) {
+  case object_cache.get_object(state.cache, id) {
+    option.Some(obj) -> {
+      let obj_3d = object_cache.unwrap_object(obj)
+
+      // Picture is already encoded, use it directly
+      let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
+      update_sprite_texture_ffi(obj_3d, texture)
+
+      // Update size
+      update_sprite_size_ffi(obj_3d, width, height)
+
+      // Update transform
+      apply_transform_ffi(obj_3d, trans)
+
+      state
+    }
+    option.None -> state
+  }
+}
+
 fn setup_animation(
   cache: CacheState,
   id: id,
@@ -3158,3 +3539,47 @@ pub fn get_cameras_with_viewports(
     #(object_cache.unwrap_object(camera_obj), viewport)
   })
 }
+
+// ============================================================================
+// CSS2D FFI DECLARATIONS
+// ============================================================================
+
+@external(javascript, "../threejs.ffi.mjs", "createCSS2DObject")
+fn create_css2d_object_ffi(html: String) -> asset.Object3D
+
+@external(javascript, "../threejs.ffi.mjs", "updateCSS2DObjectHTML")
+fn update_css2d_object_html_ffi(object: asset.Object3D, html: String) -> Nil
+
+@external(javascript, "../threejs.ffi.mjs", "createCSS3DObject")
+fn create_css3d_object_ffi(html: String) -> asset.Object3D
+
+@external(javascript, "../threejs.ffi.mjs", "updateCSS3DObjectHTML")
+fn update_css3d_object_html_ffi(object: asset.Object3D, html: String) -> Nil
+
+// ============================================================================
+// SPRITE FFI DECLARATIONS
+// ============================================================================
+
+@external(javascript, "../threejs.ffi.mjs", "createCanvasTextureFromPicture")
+fn create_canvas_texture_from_picture_ffi(
+  encoded_picture: String,
+  width: Int,
+  height: Int,
+) -> asset.Texture
+
+@external(javascript, "../threejs.ffi.mjs", "createSpritePlane")
+fn create_sprite_plane_ffi(
+  texture: asset.Texture,
+  width: Float,
+  height: Float,
+) -> asset.Object3D
+
+@external(javascript, "../threejs.ffi.mjs", "updateSpriteTexture")
+fn update_sprite_texture_ffi(object: asset.Object3D, texture: asset.Texture) -> Nil
+
+@external(javascript, "../threejs.ffi.mjs", "updateSpriteSize")
+fn update_sprite_size_ffi(
+  object: asset.Object3D,
+  width: Float,
+  height: Float,
+) -> Nil

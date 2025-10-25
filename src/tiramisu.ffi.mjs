@@ -1,5 +1,7 @@
 // Immutable game loop with effect system
 import * as THREE from 'three';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
 import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
 import * as INPUT from './tiramisu/input.mjs';
@@ -1874,6 +1876,37 @@ export function startLoop(
   const renderer = SCENE.get_renderer(currentRendererState);
   const scene = SCENE.get_scene(currentRendererState);
 
+  // Initialize CSS2DRenderer for UI overlays
+  const css2dRenderer = new CSS2DRenderer();
+  const canvas = renderer.domElement;
+  const canvasWidth = canvas.clientWidth || window.innerWidth;
+  const canvasHeight = canvas.clientHeight || window.innerHeight;
+  css2dRenderer.setSize(canvasWidth, canvasHeight);
+  css2dRenderer.domElement.style.position = 'absolute';
+  css2dRenderer.domElement.style.top = '0';
+  css2dRenderer.domElement.style.left = '0';
+  css2dRenderer.domElement.style.pointerEvents = 'none';
+
+  if (canvas.parentElement) {
+    canvas.parentElement.appendChild(css2dRenderer.domElement);
+  } else {
+    document.body.appendChild(css2dRenderer.domElement);
+  }
+
+  // Initialize CSS3DRenderer for 3D UI elements
+  const css3dRenderer = new CSS3DRenderer();
+  css3dRenderer.setSize(canvasWidth, canvasHeight);
+  css3dRenderer.domElement.style.position = 'absolute';
+  css3dRenderer.domElement.style.top = '0';
+  css3dRenderer.domElement.style.left = '0';
+  css3dRenderer.domElement.style.pointerEvents = 'none';
+
+  if (canvas.parentElement) {
+    canvas.parentElement.appendChild(css3dRenderer.domElement);
+  } else {
+    document.body.appendChild(css3dRenderer.domElement);
+  }
+
   // Dispatch function for effects
   const dispatch = (msg) => {
     messageQueue.push(msg);
@@ -2045,6 +2078,16 @@ export function startLoop(
         renderer.render(scene, camera);
       }
       renderer.setScissorTest(false);
+    }
+
+    // Render CSS2D UI overlays
+    if (activeCamera) {
+      css2dRenderer.render(scene, activeCamera);
+    }
+
+    // Render CSS3D UI elements
+    if (activeCamera) {
+      css3dRenderer.render(scene, activeCamera);
     }
 
     // Update performance stats

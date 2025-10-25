@@ -21,6 +21,7 @@ vec = ">= 3.0.1 and < 4.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 structures = ">= 1.0.0 and < 2.0.0"
 plinth = ">= 0.7.2 and < 1.0.0"
+paint = "== 0.4.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

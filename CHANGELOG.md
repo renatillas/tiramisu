@@ -1,5 +1,25 @@
 # Changelog
 
+
+## v4.1.0 - 2025-10-25
+
+### Added
+- **3D Sprite Labels with Canvas Rendering**: New sprite system for depth-aware labels that properly occlude behind 3D objects
+  - `scene.sprite()` - Create canvas-based sprites with `paint.Picture` for drawing custom graphics
+  - Sprites use canvas 2D rendering via the `paint` library for flexible visual customization
+  - True 3D depth testing - sprites hide behind other objects in the scene
+  - Perfect for health bars, damage numbers, interactive labels, and UI elements in 3D space
+  - Example: `examples/26-css2d_labels` demonstrates sprite usage alongside CSS2D labels
+- **CSS2D and CSS3D Label Support**: HTML-based overlay labels for UI elements
+  - `scene.css2d_label()` - Create screen-space HTML labels that always render on top
+  - `scene.css3d_label()` - Create 3D-positioned HTML labels (no depth occlusion with WebGL)
+  - Full HTML/CSS support with Tailwind styling
+  - Useful for UI overlays, tooltips, and text that should never be occluded
+- **Paint Library Integration**: Added `paint` (v0.4.0) dependency for canvas-based drawing
+  - Functional canvas 2D API for creating Pictures
+  - Combines shapes, text, fills, strokes with composition
+  - Pictures are rendered to canvas textures for sprite display
+
 ## v4.0.3 - 2025-10-24
 
 ### Fixed

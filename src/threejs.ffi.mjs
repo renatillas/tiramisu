@@ -13,6 +13,7 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { Quaternion } from './tiramisu/transform.mjs';
@@ -1821,12 +1822,159 @@ export function renderCSS2D(renderer, scene, camera) {
 }
 
 /**
- * Create CSS2DObject
- * @param {HTMLElement} element
+ * Create CSS2DObject from HTML string
+ * @param {string} html - HTML string to render
  * @returns {CSS2DObject}
  */
-export function createCSS2DObject(element) {
+export function createCSS2DObject(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const element = div.children.length === 1 ? div.children[0] : div;
   return new CSS2DObject(element);
+}
+
+/**
+ * Set CSS2DObject position
+ * @param {THREE.Object3D} object
+ * @param {Vec3} position
+ */
+export function setCSS2DObjectPosition(object, position) {
+  object.position.set(position.x, position.y, position.z);
+}
+
+/**
+ * Update CSS2DObject HTML content
+ * @param {THREE.Object3D} object
+ * @param {string} html
+ */
+export function updateCSS2DObjectHTML(object, html) {
+  // Store in userData since we're not using real CSS2DObject
+  if (object.userData) {
+    object.userData.css2dHtml = html;
+  }
+}
+
+/**
+ * Create CSS3DObject from HTML string
+ * @param {string} html - HTML string to render
+ * @returns {CSS3DObject}
+ */
+export function createCSS3DObject(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const element = div.children.length === 1 ? div.children[0] : div;
+  return new CSS3DObject(element);
+}
+
+/**
+ * Set CSS3DObject position
+ * @param {THREE.Object3D} object
+ * @param {Vec3} position
+ */
+export function setCSS3DObjectPosition(object, position) {
+  object.position.set(position.x, position.y, position.z);
+}
+
+/**
+ * Update CSS3DObject HTML content
+ * @param {THREE.Object3D} object
+ * @param {string} html
+ */
+export function updateCSS3DObjectHTML(object, html) {
+  // Store in userData since we're not using real CSS3DObject
+  if (object.userData) {
+    object.userData.css3dHtml = html;
+  }
+}
+
+// ============================================================================
+// SPRITE LABELS (Canvas Drawing with paint)
+// ============================================================================
+
+/**
+ * Create a canvas texture from a paint.Picture (encoded as string)
+ * Uses the paint library's global rendering function set up by define_web_component()
+ * @param {string} encodedPicture - Encoded paint.Picture string (from paint/encode.to_string)
+ * @param {number} width - Canvas width in pixels
+ * @param {number} height - Canvas height in pixels
+ * @returns {THREE.CanvasTexture}
+ */
+export function createCanvasTextureFromPicture(encodedPicture, width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  // Clear canvas with transparent background
+  ctx.clearRect(0, 0, width, height);
+
+  // Use paint's global rendering function
+  // This is set up by paint's define_web_component() call
+  const display = window.PAINT_STATE?.["display_on_rendering_context_with_default_drawing_state"];
+
+  if (!display) {
+    console.error('Paint library not initialized. Make sure to call canvas.define_web_component() before rendering sprites.');
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  try {
+    display(encodedPicture, ctx);
+  } catch (error) {
+    console.error('Failed to render paint.Picture:', error);
+  }
+
+  // Create texture
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+/**
+ * Create a plane mesh with texture for sprite
+ * @param {THREE.Texture} texture
+ * @param {number} width - World space width
+ * @param {number} height - World space height
+ * @returns {THREE.Mesh}
+ */
+export function createSpritePlane(texture, width, height) {
+  const geometry = new THREE.PlaneGeometry(width, height);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  return mesh;
+}
+
+/**
+ * Update sprite texture
+ * @param {THREE.Object3D} object
+ * @param {THREE.Texture} texture
+ */
+export function updateSpriteTexture(object, texture) {
+  if (object.material && object.material.map) {
+    object.material.map.dispose();
+    object.material.map = texture;
+    object.material.needsUpdate = true;
+  }
+}
+
+/**
+ * Update sprite plane size
+ * @param {THREE.Object3D} object
+ * @param {number} width
+ * @param {number} height
+ */
+export function updateSpriteSize(object, width, height) {
+  if (object.geometry) {
+    object.geometry.dispose();
+    object.geometry = new THREE.PlaneGeometry(width, height);
+  }
 }
 
 // ============================================================================
