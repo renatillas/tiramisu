@@ -46,6 +46,8 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/order
 import gleam/set
+import paint
+import paint/encode as paint_encode
 import tiramisu/animation.{type AnimationPlayback}
 import tiramisu/asset
 import tiramisu/audio
@@ -64,8 +66,6 @@ import tiramisu/physics
 import tiramisu/spritesheet
 import tiramisu/texture
 import tiramisu/transform
-import paint
-import paint/encode as paint_encode
 import vec/vec3.{type Vec3}
 
 /// Level of Detail (LOD) configuration.
@@ -1455,14 +1455,14 @@ fn compare_nodes_detailed(
       }
 
     Canvas(
-        _,
-        prev_encoded_picture,
-        prev_tw,
-        prev_th,
-        prev_w,
-        prev_h,
-        prev_transform,
-      ),
+      _,
+      prev_encoded_picture,
+      prev_tw,
+      prev_th,
+      prev_w,
+      prev_h,
+      prev_transform,
+    ),
       Canvas(
         _,
         curr_encoded_picture,
@@ -1481,31 +1481,30 @@ fn compare_nodes_detailed(
         || prev_h != curr_h
         || prev_transform != curr_transform
       {
-        True ->
-          [
-            UpdateCanvas(
-              id,
-              curr_encoded_picture,
-              curr_tw,
-              curr_th,
-              curr_w,
-              curr_h,
-              curr_transform,
-            ),
-          ]
+        True -> [
+          UpdateCanvas(
+            id,
+            curr_encoded_picture,
+            curr_tw,
+            curr_th,
+            curr_w,
+            curr_h,
+            curr_transform,
+          ),
+        ]
         False -> []
       }
 
     AnimatedSprite(
-        _,
-        prev_sheet,
-        prev_anim,
-        prev_state,
-        prev_w,
-        prev_h,
-        prev_transform,
-        prev_pixel_art,
-      ),
+      _,
+      prev_sheet,
+      prev_anim,
+      prev_state,
+      prev_w,
+      prev_h,
+      prev_transform,
+      prev_pixel_art,
+    ),
       AnimatedSprite(
         _,
         curr_sheet,
@@ -1526,19 +1525,18 @@ fn compare_nodes_detailed(
         || prev_transform != curr_transform
         || prev_pixel_art != curr_pixel_art
       {
-        True ->
-          [
-            UpdateAnimatedSprite(
-              id,
-              curr_sheet,
-              curr_anim,
-              curr_state,
-              curr_w,
-              curr_h,
-              curr_transform,
-              curr_pixel_art,
-            ),
-          ]
+        True -> [
+          UpdateAnimatedSprite(
+            id,
+            curr_sheet,
+            curr_anim,
+            curr_state,
+            curr_w,
+            curr_h,
+            curr_transform,
+            curr_pixel_art,
+          ),
+        ]
         False -> []
       }
 
@@ -2207,8 +2205,7 @@ pub fn apply_patch(
       width: w,
       height: h,
       transform: trans,
-    ) ->
-      handle_update_canvas(state, id, encoded_picture, tw, th, w, h, trans)
+    ) -> handle_update_canvas(state, id, encoded_picture, tw, th, w, h, trans)
 
     UpdateAnimatedSprite(
       id: id,
@@ -2375,7 +2372,17 @@ fn handle_add_node(
       height: h,
       transform: trans,
     ) ->
-      handle_add_canvas(state, id, encoded_picture, tw, th, w, h, trans, parent_id)
+      handle_add_canvas(
+        state,
+        id,
+        encoded_picture,
+        tw,
+        th,
+        w,
+        h,
+        trans,
+        parent_id,
+      )
 
     AnimatedSprite(
       id: _,
@@ -3497,7 +3504,12 @@ fn handle_add_canvas(
   parent_id: Option(id),
 ) -> RendererState(id) {
   // Picture is already encoded, use it directly
-  let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
+  let texture =
+    create_canvas_texture_from_picture_ffi(
+      encoded_picture,
+      texture_width,
+      texture_height,
+    )
 
   // Create plane mesh with the texture
   let canvas_mesh = create_canvas_plane_ffi(texture, width, height)
@@ -3527,7 +3539,12 @@ fn handle_update_canvas(
       let obj_3d = object_cache.unwrap_object(obj)
 
       // Picture is already encoded, use it directly
-      let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
+      let texture =
+        create_canvas_texture_from_picture_ffi(
+          encoded_picture,
+          texture_width,
+          texture_height,
+        )
       update_canvas_texture_ffi(obj_3d, texture)
 
       // Update size
@@ -3620,7 +3637,10 @@ fn handle_update_animated_sprite(
       case pixel_art {
         True ->
           sprite_texture
-          |> texture.set_filter_mode(texture.NearestFilter, texture.NearestFilter)
+          |> texture.set_filter_mode(
+            texture.NearestFilter,
+            texture.NearestFilter,
+          )
         False -> sprite_texture
       }
 
@@ -3887,7 +3907,10 @@ fn create_canvas_plane_ffi(
 ) -> asset.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "updateCanvasTexture")
-fn update_canvas_texture_ffi(object: asset.Object3D, texture: asset.Texture) -> Nil
+fn update_canvas_texture_ffi(
+  object: asset.Object3D,
+  texture: asset.Texture,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "updateCanvasSize")
 fn update_canvas_size_ffi(

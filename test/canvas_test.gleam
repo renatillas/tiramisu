@@ -241,25 +241,27 @@ pub fn canvas_encoding_consistency_test() {
   let picture1 = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
   let picture2 = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let canvas1 = scene.canvas(
-    id: Canvas1,
-    picture: picture1,
-    texture_width: 256,
-    texture_height: 64,
-    width: 2.0,
-    height: 0.5,
-    transform: transform.identity,
-  )
+  let canvas1 =
+    scene.canvas(
+      id: Canvas1,
+      picture: picture1,
+      texture_width: 256,
+      texture_height: 64,
+      width: 2.0,
+      height: 0.5,
+      transform: transform.identity,
+    )
 
-  let canvas2 = scene.canvas(
-    id: Canvas1,
-    picture: picture2,
-    texture_width: 256,
-    texture_height: 64,
-    width: 2.0,
-    height: 0.5,
-    transform: transform.identity,
-  )
+  let canvas2 =
+    scene.canvas(
+      id: Canvas1,
+      picture: picture2,
+      texture_width: 256,
+      texture_height: 64,
+      width: 2.0,
+      height: 0.5,
+      transform: transform.identity,
+    )
 
   // If encoding is consistent, diff should produce no patches
   let patches = scene.diff([canvas1], [canvas2])

@@ -58,11 +58,13 @@ pub fn update_advances_frame_after_duration_test() {
   let state = spritesheet.initial_state("walk")
 
   // Update with time less than frame duration
-  let state = spritesheet.update(state: state, animation: anim, delta_time: 0.05)
+  let state =
+    spritesheet.update(state: state, animation: anim, delta_time: 0.05)
   let assert 0 = spritesheet.current_frame_index(state)
 
   // Update with remaining time to complete frame duration
-  let state = spritesheet.update(state: state, animation: anim, delta_time: 0.05)
+  let state =
+    spritesheet.update(state: state, animation: anim, delta_time: 0.05)
   let assert 1 = spritesheet.current_frame_index(state)
 }
 
@@ -232,7 +234,6 @@ pub fn current_frame_returns_correct_sprite_frame_test() {
   // Frame index 2 should return sprite frame 7
   let assert Ok(7) = spritesheet.current_frame(state, anim)
 }
-
 // Frame offset and repeat calculation tests are skipped because they require
 // a Spritesheet instance, which requires a Texture (FFI type).
 // The mathematical logic for these functions is straightforward and can be
