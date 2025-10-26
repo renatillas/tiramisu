@@ -18,7 +18,7 @@ pub fn main() {
 // ============================================================================
 
 pub fn animation_creates_valid_animation_test() {
-  let frames = iv.from_list([0, 1, 2, 3])
+  let frames = [0, 1, 2, 3]
 
   let anim =
     spritesheet.animation(
@@ -46,7 +46,7 @@ pub fn initial_state_creates_valid_state_test() {
 }
 
 pub fn update_advances_frame_after_duration_test() {
-  let frames = iv.from_list([0, 1, 2, 3])
+  let frames = [0, 1, 2, 3]
   let anim =
     spritesheet.animation(
       name: "walk",
@@ -69,7 +69,7 @@ pub fn update_advances_frame_after_duration_test() {
 }
 
 pub fn update_loops_with_repeat_mode_test() {
-  let frames = iv.from_list([0, 1, 2])
+  let frames = [0, 1, 2]
   let anim =
     spritesheet.animation(
       name: "spin",
@@ -90,7 +90,7 @@ pub fn update_loops_with_repeat_mode_test() {
 }
 
 pub fn update_stops_with_once_mode_test() {
-  let frames = iv.from_list([0, 1, 2])
+  let frames = [0, 1, 2]
   let anim =
     spritesheet.animation(
       name: "jump",
@@ -113,7 +113,7 @@ pub fn update_stops_with_once_mode_test() {
 }
 
 pub fn update_ping_pongs_with_ping_pong_mode_test() {
-  let frames = iv.from_list([0, 1, 2])
+  let frames = [0, 1, 2]
   let anim =
     spritesheet.animation(
       name: "idle",
@@ -167,7 +167,7 @@ pub fn pause_stops_animation_test() {
 }
 
 pub fn stop_resets_to_first_frame_test() {
-  let frames = iv.from_list([0, 1, 2])
+  let frames = [0, 1, 2]
   let anim =
     spritesheet.animation(
       name: "walk",
@@ -188,7 +188,7 @@ pub fn stop_resets_to_first_frame_test() {
 }
 
 pub fn change_animation_resets_state_test() {
-  let frames = iv.from_list([0, 1, 2])
+  let frames = [0, 1, 2]
   let anim =
     spritesheet.animation(
       name: "walk",
@@ -214,7 +214,7 @@ pub fn change_animation_resets_state_test() {
 // ============================================================================
 
 pub fn current_frame_returns_correct_sprite_frame_test() {
-  let frames = iv.from_list([5, 6, 7, 8])
+  let frames = [5, 6, 7, 8]
   let anim =
     spritesheet.animation(
       name: "attack",
