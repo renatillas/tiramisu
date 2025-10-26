@@ -1,5 +1,5 @@
 name = "tiramisu"
-version = "4.0.3"
+version = "4.1.0"
 target = "javascript"
 description = "A 3D game framework for building performant web games in Gleam"
 licences = ["MIT"]
