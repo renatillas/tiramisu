@@ -4,8 +4,25 @@
 ## v4.1.0 - 2025-10-25
 
 ### Added
+- **Spritesheet Animation System**: Complete texture-based sprite animation support
+  - `spritesheet.from_grid()` - Create spritesheets from grid-based texture atlases
+  - `spritesheet.animation()` - Define animation sequences with frame indices and timing
+  - Three loop modes: `Once`, `Repeat`, and `PingPong` for different animation behaviors
+  - `scene.animated_sprite()` - Scene node for displaying animated sprites
+  - Frame-by-frame animation with delta time updates for frame-rate independence
+  - Animation state control: play, pause, stop, and change animations dynamically
+  - Pixel art support with `NearestFilter` for crisp, non-blurred sprites
+  - Independent animation per sprite instance (automatic texture cloning)
+  - Floating-point precision handling with `float.loosely_equals` for reliable frame timing
+  - Example: `examples/27-spritesheet_animation` demonstrates three independently animating coins
+- **Texture Manipulation API**: New utilities for advanced texture control
+  - `texture.clone()` - Clone textures for independent manipulation
+  - `texture.set_offset()` - Control UV offset for texture positioning
+  - `texture.set_repeat()` - Control UV repeat/scaling
+  - `texture.set_wrap_mode()` - Set texture wrapping behavior (Repeat, Clamp, MirroredRepeat)
+  - `texture.set_filter_mode()` - Set texture filtering (Nearest for pixel art, Linear for smooth)
 - **3D Sprite Labels with Canvas Rendering**: New sprite system for depth-aware labels that properly occlude behind 3D objects
-  - `scene.sprite()` - Create canvas-based sprites with `paint.Picture` for drawing custom graphics
+  - `scene.canvas()` - Create canvas-based sprites with `paint.Picture` for drawing custom graphics (renamed from `scene.sprite()`)
   - Sprites use canvas 2D rendering via the `paint` library for flexible visual customization
   - True 3D depth testing - sprites hide behind other objects in the scene
   - Perfect for health bars, damage numbers, interactive labels, and UI elements in 3D space

@@ -1313,6 +1313,102 @@ export function disposeTexture(texture) {
   texture.dispose();
 }
 
+/**
+ * Clone texture for independent animation
+ * @param {THREE.Texture} texture
+ * @returns {THREE.Texture}
+ */
+export function cloneTexture(texture) {
+  return texture.clone();
+}
+
+/**
+ * Set texture offset (UV coordinates)
+ * @param {THREE.Texture} texture
+ * @param {number} x - Horizontal offset (0.0 to 1.0)
+ * @param {number} y - Vertical offset (0.0 to 1.0)
+ */
+export function setTextureOffset(texture, x, y) {
+  texture.offset.set(x, y);
+  texture.needsUpdate = true;
+}
+
+/**
+ * Set texture repeat (UV scaling)
+ * @param {THREE.Texture} texture
+ * @param {number} x - Horizontal repeat (fraction to show)
+ * @param {number} y - Vertical repeat (fraction to show)
+ */
+export function setTextureRepeat(texture, x, y) {
+  texture.repeat.set(x, y);
+  texture.needsUpdate = true;
+}
+
+/**
+ * Set texture wrapping mode
+ * @param {THREE.Texture} texture
+ * @param {number} wrapS - Horizontal wrap mode (THREE.RepeatWrapping, THREE.ClampToEdgeWrapping, THREE.MirroredRepeatWrapping)
+ * @param {number} wrapT - Vertical wrap mode
+ */
+export function setTextureWrapMode(texture, wrapS, wrapT) {
+  texture.wrapS = wrapS;
+  texture.wrapT = wrapT;
+  texture.needsUpdate = true;
+}
+
+/**
+ * Set texture filtering mode
+ * @param {THREE.Texture} texture
+ * @param {number} minFilter - Minification filter (THREE.NearestFilter, THREE.LinearFilter)
+ * @param {number} magFilter - Magnification filter
+ */
+export function setTextureFilterMode(texture, minFilter, magFilter) {
+  texture.minFilter = minFilter;
+  texture.magFilter = magFilter;
+  texture.generateMipmaps = (minFilter === THREE.LinearFilter);
+  texture.needsUpdate = true;
+}
+
+/**
+ * Get THREE.RepeatWrapping constant
+ * @returns {number}
+ */
+export function getRepeatWrapping() {
+  return THREE.RepeatWrapping;
+}
+
+/**
+ * Get THREE.ClampToEdgeWrapping constant
+ * @returns {number}
+ */
+export function getClampToEdgeWrapping() {
+  return THREE.ClampToEdgeWrapping;
+}
+
+/**
+ * Get THREE.MirroredRepeatWrapping constant
+ * @returns {number}
+ */
+export function getMirroredRepeatWrapping() {
+  return THREE.MirroredRepeatWrapping;
+}
+
+/**
+ * Get THREE.NearestFilter constant (for pixel art)
+ * @returns {number}
+ */
+export function getNearestFilter() {
+  return THREE.NearestFilter;
+}
+
+/**
+ * Get THREE.LinearFilter constant (for smooth textures)
+ * @returns {number}
+ */
+export function getLinearFilter() {
+  return THREE.LinearFilter;
+}
+
 // ============================================================================
 // MODEL LOADERS
 // ============================================================================

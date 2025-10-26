@@ -13,6 +13,7 @@ packages = [
   { name = "gleamy_bench", version = "0.6.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleamy_bench", source = "hex", outer_checksum = "DEF68E4B097A56781282F0F9D48371A0ABBCDDCF89CAD05B28C3BEDD6B2E8DF3" },
   { name = "gleeunit", version = "1.6.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "FDC68A8C492B1E9B429249062CD9BAC9B5538C6FBF584817205D0998C42E1DAC" },
   { name = "houdini", version = "1.2.0", build_tools = ["gleam"], requirements = [], otp_app = "houdini", source = "hex", outer_checksum = "5DB1053F1AF828049C2B206D4403C18970ABEF5C18671CA3C2D2ED0DD64F6385" },
+  { name = "iv", version = "1.3.2", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_yielder"], otp_app = "iv", source = "hex", outer_checksum = "1FE22E047705BE69EA366E3A2E73C2E1310CBCB27DDE767DE17AE3FA86499947" },
   { name = "lustre", version = "5.3.5", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_json", "gleam_otp", "gleam_stdlib", "houdini"], otp_app = "lustre", source = "hex", outer_checksum = "5CBB5DD2849D8316A2101792FC35AEB58CE4B151451044A9C2A2A70A2F7FCEB8" },
   { name = "paint", version = "0.4.0", build_tools = ["gleam"], requirements = ["gleam_community_colour", "gleam_json", "gleam_stdlib"], otp_app = "paint", source = "hex", outer_checksum = "F63DAD4ECA7EC0DD2F9B965BE9D6BC667AC364006D790D13A36710F5AF43EA02" },
   { name = "plinth", version = "0.7.2", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_json", "gleam_stdlib"], otp_app = "plinth", source = "hex", outer_checksum = "3D70AF096A6F46DC71023C28B16BCCC6D7FAB9A467711426DAEB05902022B08F" },
@@ -26,6 +27,7 @@ gleam_javascript = { version = ">= 1.0.0 and < 2.0.0" }
 gleam_stdlib = { version = ">= 0.64.0 and < 2.0.0" }
 gleamy_bench = { version = ">= 0.6.0 and < 1.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
+iv = { version = ">= 1.3.2 and < 2.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }
 paint = { version = "== 0.4.0" }
 plinth = { version = ">= 0.7.2 and < 1.0.0" }

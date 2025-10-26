@@ -61,6 +61,8 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/particle_emitter
 import tiramisu/physics
+import tiramisu/spritesheet
+import tiramisu/texture
 import tiramisu/transform
 import paint
 import paint/encode as paint_encode
@@ -159,6 +161,17 @@ pub opaque type Node(id) {
     width: Float,
     height: Float,
     transform: transform.Transform,
+  )
+  // Animated sprite with spritesheet
+  AnimatedSprite(
+    id: id,
+    spritesheet: spritesheet.Spritesheet,
+    animation: spritesheet.Animation,
+    state: spritesheet.AnimationState,
+    width: Float,
+    height: Float,
+    transform: transform.Transform,
+    pixel_art: Bool,
   )
   // Debug visualization nodes
   DebugBox(id: id, min: Vec3(Float), max: Vec3(Float), color: Int)
@@ -776,6 +789,101 @@ pub fn canvas(
   )
 }
 
+/// Create an animated sprite node with spritesheet animation.
+///
+/// Animated sprites display a textured plane that cycles through frames
+/// from a spritesheet. The animation state is managed in your model and
+/// updated each frame.
+///
+/// ## Parameters
+///
+/// - `id`: Unique identifier for this sprite
+/// - `spritesheet`: The spritesheet definition
+/// - `animation`: The animation sequence to play
+/// - `state`: Current animation state (from your model)
+/// - `width`: World space width of the sprite plane
+/// - `height`: World space height of the sprite plane
+/// - `transform`: Position, rotation, and scale
+/// - `pixel_art`: If True, uses nearest-neighbor filtering for crisp pixels
+///
+/// ## Example
+///
+/// ```gleam
+/// import iv
+/// import tiramisu/scene
+/// import tiramisu/spritesheet
+///
+/// // In your init()
+/// let assert Ok(sheet) = spritesheet.from_grid(
+///   texture: player_texture,
+///   columns: 8,
+///   rows: 1,
+/// )
+///
+/// let walk_anim = spritesheet.animation(
+///   name: "walk",
+///   frames: iv.from_list([0, 1, 2, 3, 4, 5, 6, 7]),
+///   frame_duration: 0.1,
+///   loop: spritesheet.Repeat,
+/// )
+///
+/// let model = Model(
+///   player_state: spritesheet.initial_state("walk"),
+///   // ...
+/// )
+///
+/// // In your update()
+/// fn update(model, msg, ctx) {
+///   case msg {
+///     Tick -> {
+///       let new_state = spritesheet.update(
+///         state: model.player_state,
+///         animation: walk_anim,
+///         delta_time: ctx.delta_time,
+///       )
+///       Model(..model, player_state: new_state)
+///     }
+///   }
+/// }
+///
+/// // In your view()
+/// fn view(model, _ctx) {
+///   [
+///     scene.animated_sprite(
+///       id: Player,
+///       spritesheet: sheet,
+///       animation: walk_anim,
+///       state: model.player_state,
+///       width: 2.0,
+///       height: 2.0,
+///       transform: transform.at(vec3.Vec3(0.0, 0.0, 0.0)),
+///       pixel_art: True,
+///     ),
+///   ]
+/// }
+/// ```
+pub fn animated_sprite(
+  id id: id,
+  spritesheet spritesheet: spritesheet.Spritesheet,
+  animation animation: spritesheet.Animation,
+  state state: spritesheet.AnimationState,
+  width width: Float,
+  height height: Float,
+  transform transform: transform.Transform,
+  pixel_art pixel_art: Bool,
+) -> Node(id) {
+  AnimatedSprite(
+    id:,
+    spritesheet:,
+    animation:,
+    state:,
+    width:,
+    height:,
+    transform:,
+    pixel_art:,
+  )
+}
+
 /// Create a debug wireframe box visualization.
 ///
 /// Useful for visualizing collision bounds, trigger zones, or spatial regions.
@@ -984,6 +1092,16 @@ pub type Patch(id) {
     width: Float,
     height: Float,
     transform: transform.Transform,
+  )
+  UpdateAnimatedSprite(
+    id: id,
+    spritesheet: spritesheet.Spritesheet,
+    animation: spritesheet.Animation,
+    state: spritesheet.AnimationState,
+    width: Float,
+    height: Float,
+    transform: transform.Transform,
+    pixel_art: Bool,
   )
 }
 
@@ -1373,6 +1491,52 @@ fn compare_nodes_detailed(
               curr_w,
               curr_h,
               curr_transform,
+            ),
+          ]
+        False -> []
+      }
+
+    AnimatedSprite(
+        _,
+        prev_sheet,
+        prev_anim,
+        prev_state,
+        prev_w,
+        prev_h,
+        prev_transform,
+        prev_pixel_art,
+      ),
+      AnimatedSprite(
+        _,
+        curr_sheet,
+        curr_anim,
+        curr_state,
+        curr_w,
+        curr_h,
+        curr_transform,
+        curr_pixel_art,
+      )
+    ->
+      case
+        prev_sheet != curr_sheet
+        || prev_anim != curr_anim
+        || prev_state != curr_state
+        || prev_w != curr_w
+        || prev_h != curr_h
+        || prev_transform != curr_transform
+        || prev_pixel_art != curr_pixel_art
+      {
+        True ->
+          [
+            UpdateAnimatedSprite(
+              id,
+              curr_sheet,
+              curr_anim,
+              curr_state,
+              curr_w,
+              curr_h,
+              curr_transform,
+              curr_pixel_art,
             ),
           ]
         False -> []
@@ -2045,6 +2209,28 @@ pub fn apply_patch(
       transform: trans,
     ) ->
       handle_update_canvas(state, id, encoded_picture, tw, th, w, h, trans)
+
+    UpdateAnimatedSprite(
+      id: id,
+      spritesheet: sheet,
+      animation: anim,
+      state: anim_state,
+      width: w,
+      height: h,
+      transform: trans,
+      pixel_art: pixel_art,
+    ) ->
+      handle_update_animated_sprite(
+        state,
+        id,
+        sheet,
+        anim,
+        anim_state,
+        w,
+        h,
+        trans,
+        pixel_art,
+      )
   }
 }
 
@@ -2190,6 +2376,29 @@ fn handle_add_node(
       transform: trans,
     ) ->
       handle_add_canvas(state, id, encoded_picture, tw, th, w, h, trans, parent_id)
+
+    AnimatedSprite(
+      id: _,
+      spritesheet: sheet,
+      animation: anim,
+      state: anim_state,
+      width: w,
+      height: h,
+      transform: trans,
+      pixel_art: pixel_art,
+    ) ->
+      handle_add_animated_sprite(
+        state,
+        id,
+        sheet,
+        anim,
+        anim_state,
+        w,
+        h,
+        trans,
+        pixel_art,
+        parent_id,
+      )
   }
 }
 
@@ -3320,6 +3529,109 @@ fn handle_update_canvas(
       // Picture is already encoded, use it directly
       let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
       update_canvas_texture_ffi(obj_3d, texture)
+
+      // Update size
+      update_canvas_size_ffi(obj_3d, width, height)
+
+      // Update transform
+      apply_transform_ffi(obj_3d, trans)
+
+      state
+    }
+    option.None -> state
+  }
+}
+
+fn handle_add_animated_sprite(
+  state: RendererState(id),
+  id: id,
+  sheet: spritesheet.Spritesheet,
+  anim: spritesheet.Animation,
+  anim_state: spritesheet.AnimationState,
+  width: Float,
+  height: Float,
+  trans: transform.Transform,
+  pixel_art: Bool,
+  parent_id: Option(id),
+) -> RendererState(id) {
+  // Get the base texture and clone it for independent animation
+  let base_texture = spritesheet.texture(sheet)
+  let sprite_texture = texture.clone(base_texture)
+
+  // Setup texture for spritesheet animation
+  let #(repeat_x, repeat_y) = spritesheet.frame_repeat(sheet)
+  sprite_texture
+  |> texture.set_repeat(repeat_x, repeat_y)
+  |> texture.set_wrap_mode(texture.RepeatWrapping, texture.RepeatWrapping)
+
+  // Apply pixel art filtering if requested
+  case pixel_art {
+    True ->
+      sprite_texture
+      |> texture.set_filter_mode(texture.NearestFilter, texture.NearestFilter)
+    False -> sprite_texture
+  }
+
+  // Get current frame and apply offset
+  let assert Ok(frame) = spritesheet.current_frame(anim_state, anim)
+  let #(offset_x, offset_y) = spritesheet.frame_offset(sheet, frame)
+  sprite_texture
+  |> texture.set_offset(offset_x, offset_y)
+
+  // Create plane mesh with the animated texture
+  let sprite_mesh = create_canvas_plane_ffi(sprite_texture, width, height)
+
+  // Apply transform
+  apply_transform_ffi(sprite_mesh, trans)
+
+  let three_obj = object_cache.wrap_object(sprite_mesh)
+  add_to_scene_or_parent(state, three_obj, parent_id)
+
+  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  RendererState(..state, cache: new_cache)
+}
+
+fn handle_update_animated_sprite(
+  state: RendererState(id),
+  id: id,
+  sheet: spritesheet.Spritesheet,
+  anim: spritesheet.Animation,
+  anim_state: spritesheet.AnimationState,
+  width: Float,
+  height: Float,
+  trans: transform.Transform,
+  pixel_art: Bool,
+) -> RendererState(id) {
+  case object_cache.get_object(state.cache, id) {
+    option.Some(obj) -> {
+      let obj_3d = object_cache.unwrap_object(obj)
+
+      // Get the base texture and clone it for independent animation
+      let base_texture = spritesheet.texture(sheet)
+      let sprite_texture = texture.clone(base_texture)
+
+      // Setup texture for spritesheet animation
+      let #(repeat_x, repeat_y) = spritesheet.frame_repeat(sheet)
+      sprite_texture
+      |> texture.set_repeat(repeat_x, repeat_y)
+      |> texture.set_wrap_mode(texture.RepeatWrapping, texture.RepeatWrapping)
+
+      // Apply pixel art filtering if requested
+      case pixel_art {
+        True ->
+          sprite_texture
+          |> texture.set_filter_mode(texture.NearestFilter, texture.NearestFilter)
+        False -> sprite_texture
+      }
+
+      // Get current frame and apply offset
+      let assert Ok(frame) = spritesheet.current_frame(anim_state, anim)
+      let #(offset_x, offset_y) = spritesheet.frame_offset(sheet, frame)
+      sprite_texture
+      |> texture.set_offset(offset_x, offset_y)
+
+      // Update the mesh texture
+      update_canvas_texture_ffi(obj_3d, sprite_texture)
 
       // Update size
       update_canvas_size_ffi(obj_3d, width, height)
