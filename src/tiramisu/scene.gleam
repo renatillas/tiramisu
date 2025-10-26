@@ -150,8 +150,8 @@ pub opaque type Node(id) {
   // UI overlay nodes
   CSS2DLabel(id: id, html: String, transform: transform.Transform)
   CSS3DLabel(id: id, html: String, transform: transform.Transform)
-  // 3D Sprites (Canvas drawings rendered to texture with depth occlusion)
-  Sprite(
+  // Canvas drawings rendered to texture with depth occlusion
+  Canvas(
     id: id,
     encoded_picture: String,
     texture_width: Int,
@@ -708,16 +708,16 @@ pub fn css3d_label(
   CSS3DLabel(id:, html:, transform:)
 }
 
-/// Create a 3D sprite with canvas drawing rendered to a texture.
+/// Create a canvas node with a paint.Picture drawing rendered to a texture.
 ///
-/// Sprites are Three.js planes with paint.Picture drawings rendered to canvas textures.
+/// Canvas nodes are Three.js planes with paint.Picture drawings rendered to canvas textures.
 /// Unlike CSS2D/CSS3D, they are true 3D meshes that respect depth testing (hide behind objects).
 ///
 /// Uses the `paint` library for canvas drawing operations.
 ///
 /// **Picture**: A paint.Picture created using paint's drawing API
 /// **Texture Width/Height**: Canvas texture resolution in pixels (higher = sharper but more memory)
-/// **Width/Height**: World space size of the sprite plane
+/// **Width/Height**: World space size of the canvas plane
 /// **Transform**: Position, rotation, scale
 ///
 /// ## Example
@@ -743,7 +743,7 @@ pub fn css3d_label(
 ///     |> p.fill(p.colour_rgb(255, 255, 255)),
 /// ])
 ///
-/// scene.sprite(
+/// scene.canvas(
 ///   id: "health",
 ///   picture: health_bar,
 ///   texture_width: 256,
@@ -753,7 +753,7 @@ pub fn css3d_label(
 ///   transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0)),
 /// )
 /// ```
-pub fn sprite(
+pub fn canvas(
   id id: id,
   picture picture: paint.Picture,
   texture_width texture_width: Int,
@@ -765,7 +765,7 @@ pub fn sprite(
   // Encode picture to string for efficient comparison and storage
   let encoded_picture = paint_encode.to_string(picture)
 
-  Sprite(
+  Canvas(
     id:,
     encoded_picture:,
     texture_width:,
@@ -976,7 +976,7 @@ pub type Patch(id) {
   UpdateParticleActive(id: id, active: Bool)
   UpdateCSS2DLabel(id: id, html: String, transform: transform.Transform)
   UpdateCSS3DLabel(id: id, html: String, transform: transform.Transform)
-  UpdateSprite(
+  UpdateCanvas(
     id: id,
     encoded_picture: String,
     texture_width: Int,
@@ -1336,7 +1336,7 @@ fn compare_nodes_detailed(
         False -> []
       }
 
-    Sprite(
+    Canvas(
         _,
         prev_encoded_picture,
         prev_tw,
@@ -1345,7 +1345,7 @@ fn compare_nodes_detailed(
         prev_h,
         prev_transform,
       ),
-      Sprite(
+      Canvas(
         _,
         curr_encoded_picture,
         curr_tw,
@@ -1365,7 +1365,7 @@ fn compare_nodes_detailed(
       {
         True ->
           [
-            UpdateSprite(
+            UpdateCanvas(
               id,
               curr_encoded_picture,
               curr_tw,
@@ -2035,7 +2035,7 @@ pub fn apply_patch(
     UpdateCSS3DLabel(id: id, html: html, transform: trans) ->
       handle_update_css3d_label(state, id, html, trans)
 
-    UpdateSprite(
+    UpdateCanvas(
       id: id,
       encoded_picture: encoded_picture,
       texture_width: tw,
@@ -2044,7 +2044,7 @@ pub fn apply_patch(
       height: h,
       transform: trans,
     ) ->
-      handle_update_sprite(state, id, encoded_picture, tw, th, w, h, trans)
+      handle_update_canvas(state, id, encoded_picture, tw, th, w, h, trans)
   }
 }
 
@@ -2180,7 +2180,7 @@ fn handle_add_node(
     CSS3DLabel(id: _, html: html, transform: trans) ->
       handle_add_css3d_label(state, id, html, trans, parent_id)
 
-    Sprite(
+    Canvas(
       id: _,
       encoded_picture: encoded_picture,
       texture_width: tw,
@@ -2189,7 +2189,7 @@ fn handle_add_node(
       height: h,
       transform: trans,
     ) ->
-      handle_add_sprite(state, id, encoded_picture, tw, th, w, h, trans, parent_id)
+      handle_add_canvas(state, id, encoded_picture, tw, th, w, h, trans, parent_id)
   }
 }
 
@@ -3276,7 +3276,7 @@ fn handle_update_css3d_label(
   }
 }
 
-fn handle_add_sprite(
+fn handle_add_canvas(
   state: RendererState(id),
   id: id,
   encoded_picture: String,
@@ -3291,19 +3291,19 @@ fn handle_add_sprite(
   let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
 
   // Create plane mesh with the texture
-  let sprite_mesh = create_sprite_plane_ffi(texture, width, height)
+  let canvas_mesh = create_canvas_plane_ffi(texture, width, height)
 
   // Apply transform
-  apply_transform_ffi(sprite_mesh, trans)
+  apply_transform_ffi(canvas_mesh, trans)
 
-  let three_obj = object_cache.wrap_object(sprite_mesh)
+  let three_obj = object_cache.wrap_object(canvas_mesh)
   add_to_scene_or_parent(state, three_obj, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, three_obj)
   RendererState(..state, cache: new_cache)
 }
 
-fn handle_update_sprite(
+fn handle_update_canvas(
   state: RendererState(id),
   id: id,
   encoded_picture: String,
@@ -3319,10 +3319,10 @@ fn handle_update_sprite(
 
       // Picture is already encoded, use it directly
       let texture = create_canvas_texture_from_picture_ffi(encoded_picture, texture_width, texture_height)
-      update_sprite_texture_ffi(obj_3d, texture)
+      update_canvas_texture_ffi(obj_3d, texture)
 
       // Update size
-      update_sprite_size_ffi(obj_3d, width, height)
+      update_canvas_size_ffi(obj_3d, width, height)
 
       // Update transform
       apply_transform_ffi(obj_3d, trans)
@@ -3567,18 +3567,18 @@ fn create_canvas_texture_from_picture_ffi(
   height: Int,
 ) -> asset.Texture
 
-@external(javascript, "../threejs.ffi.mjs", "createSpritePlane")
-fn create_sprite_plane_ffi(
+@external(javascript, "../threejs.ffi.mjs", "createCanvasPlane")
+fn create_canvas_plane_ffi(
   texture: asset.Texture,
   width: Float,
   height: Float,
 ) -> asset.Object3D
 
-@external(javascript, "../threejs.ffi.mjs", "updateSpriteTexture")
-fn update_sprite_texture_ffi(object: asset.Object3D, texture: asset.Texture) -> Nil
+@external(javascript, "../threejs.ffi.mjs", "updateCanvasTexture")
+fn update_canvas_texture_ffi(object: asset.Object3D, texture: asset.Texture) -> Nil
 
-@external(javascript, "../threejs.ffi.mjs", "updateSpriteSize")
-fn update_sprite_size_ffi(
+@external(javascript, "../threejs.ffi.mjs", "updateCanvasSize")
+fn update_canvas_size_ffi(
   object: asset.Object3D,
   width: Float,
   height: Float,

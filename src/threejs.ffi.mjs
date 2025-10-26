@@ -1933,13 +1933,13 @@ export function createCanvasTextureFromPicture(encodedPicture, width, height) {
 }
 
 /**
- * Create a plane mesh with texture for sprite
+ * Create a plane mesh with texture for canvas drawing
  * @param {THREE.Texture} texture
  * @param {number} width - World space width
  * @param {number} height - World space height
  * @returns {THREE.Mesh}
  */
-export function createSpritePlane(texture, width, height) {
+export function createCanvasPlane(texture, width, height) {
   const geometry = new THREE.PlaneGeometry(width, height);
   const material = new THREE.MeshBasicMaterial({
     map: texture,
@@ -1952,11 +1952,11 @@ export function createSpritePlane(texture, width, height) {
 }
 
 /**
- * Update sprite texture
+ * Update canvas texture
  * @param {THREE.Object3D} object
  * @param {THREE.Texture} texture
  */
-export function updateSpriteTexture(object, texture) {
+export function updateCanvasTexture(object, texture) {
   if (object.material && object.material.map) {
     object.material.map.dispose();
     object.material.map = texture;
@@ -1965,12 +1965,12 @@ export function updateSpriteTexture(object, texture) {
 }
 
 /**
- * Update sprite plane size
+ * Update canvas plane size
  * @param {THREE.Object3D} object
  * @param {number} width
  * @param {number} height
  */
-export function updateSpriteSize(object, width, height) {
+export function updateCanvasSize(object, width, height) {
   if (object.geometry) {
     object.geometry.dispose();
     object.geometry = new THREE.PlaneGeometry(width, height);
