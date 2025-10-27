@@ -2698,7 +2698,6 @@ export function applyTextureToObject(object, texture, filterMode) {
       }
     }
   });
-  console.log(`[Tiramisu] Applied texture to ${count} materials with ${filterMode}`);
 }
 
 /**

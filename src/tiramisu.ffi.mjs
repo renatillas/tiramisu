@@ -581,7 +581,6 @@ export async function setBackground(scene, background) {
     const url = Background$EquirectangularTexture$0(background);
     try {
       const texture = await loadEquirectangularTexture(url);
-      console.log(texture)
       setSceneBackgroundTexture(scene, texture);
     } catch (error) {
       console.error('[Tiramisu] Failed to load equirectangular texture:', error);
@@ -636,7 +635,6 @@ export function loadAudio(url) {
       url,
       // Success
       (audioBuffer) => {
-        console.log(`[Tiramisu] Audio loaded: ${url}`);
         resolve(new GLEAM.Ok(audioBuffer));
       },
       // Progress (optional)
@@ -759,7 +757,6 @@ export async function loadBatch(assets, onProgress) {
       loadedAssetsDict = DICT.insert(loadedAssetsDict, url, asset);
     }
 
-    console.log(`[Tiramisu] Batch load complete: ${loadedResults.length}/${total} succeeded, ${errors.length} failed`);
 
     return BatchLoadResult(
       AssetCache(loadedAssetsDict),
@@ -959,7 +956,6 @@ function validateSTLFile(data) {
   const headerText = decoder.decode(data.slice(0, 80));
 
   if (headerText.toLowerCase().includes('solid')) {
-    console.log('[STL Loader] Detected ASCII STL format');
     return { format: 'ascii', valid: true };
   }
 
@@ -1169,8 +1165,6 @@ export async function loadFBXSafe(url, texturePath = '') {
         url,
         // Success
         async (fbx) => {
-          console.log('[FBX Loader] Loaded FBX:', url);
-          console.log('[FBX Loader] Using texture base path:', textureBasePath);
 
           // Try to fix missing textures by searching for them
           const textureLoader = new THREE.TextureLoader();
@@ -1192,10 +1186,6 @@ export async function loadFBXSafe(url, texturePath = '') {
             }
           });
 
-          if (texturesFixed > 0) {
-            console.log(`[FBX Loader] Fixed textures for ${texturesFixed} materials`);
-          }
-
           // Center the model at origin
           const box = new THREE.Box3().setFromObject(fbx);
           const center = box.getCenter(new THREE.Vector3());
@@ -1207,9 +1197,6 @@ export async function loadFBXSafe(url, texturePath = '') {
               child.position.sub(center);
             }
           });
-
-          console.log('[FBX Loader] Centered model at origin. Original center:', center);
-          console.log('[FBX Loader] Model size (width x height x depth):', size);
 
           // Convert animations array to Gleam list and create FBXData
           const animationsList = GLEAM.toList(fbx.animations || []);
@@ -1248,7 +1235,6 @@ function fixMaterialTextures(material, textureLoader, textureBasePath) {
 
   // Check if material has a map property but it's not loaded or is broken
   if (material.map && material.map.image === undefined) {
-    console.log('[FBX Loader] Material has broken map, attempting to fix:', material.name);
 
     // Try to extract texture name from the map's source or userData
     let textureName = null;
@@ -1263,14 +1249,12 @@ function fixMaterialTextures(material, textureLoader, textureBasePath) {
       // Remove any directory paths, just keep filename
       textureName = textureName.split('/').pop().split('\\').pop();
 
-      console.log('[FBX Loader] Attempting to load texture:', textureBasePath + textureName);
 
       try {
         const newTexture = textureLoader.load(textureBasePath + textureName);
         material.map = newTexture;
         material.needsUpdate = true;
         fixed = true;
-        console.log('[FBX Loader] Successfully loaded texture:', textureName);
       } catch (error) {
         console.warn('[FBX Loader] Failed to load texture:', textureName, error);
       }
@@ -1279,7 +1263,7 @@ function fixMaterialTextures(material, textureLoader, textureBasePath) {
 
   // Also check if there's no map at all - look in material name for hints
   if (!material.map && material.name) {
-    console.log('[FBX Loader] Material has no map:', material.name);
+    console.warn('[FBX Loader] Material has no map:', material.name);
     // Material name might give us a hint about which texture to use
     // This is very specific to the asset pack - you might need to adjust this
   }
@@ -1298,7 +1282,6 @@ function fixMaterialTextures(material, textureLoader, textureBasePath) {
 export function disposeTexture(texture) {
   if (texture && texture.dispose) {
     texture.dispose();
-    console.log('[Tiramisu] Texture disposed');
   }
 }
 
@@ -1309,7 +1292,6 @@ export function disposeTexture(texture) {
 export function disposeGeometry(geometry) {
   if (geometry && geometry.dispose) {
     geometry.dispose();
-    console.log('[Tiramisu] Geometry disposed');
   }
 }
 
@@ -1336,7 +1318,6 @@ export function disposeMaterial(material) {
 
     // Dispose of the material itself
     material.dispose();
-    console.log('[Tiramisu] Material disposed');
   }
 }
 
@@ -1368,7 +1349,6 @@ export function disposeObject3D(object) {
     }
   }
 
-  console.log('[Tiramisu] Object3D disposed');
 }
 
 // ============================================================================
@@ -1697,7 +1677,6 @@ export class DebugManager {
     this.currentPhysicsWorld = rapierWorld;
     this.enabled = true;
 
-    console.log('[Tiramisu Debug] Collider visualization enabled');
   }
 
   /**
@@ -1708,7 +1687,6 @@ export class DebugManager {
     this.enabled = false;
     this.currentPhysicsWorld = null;
 
-    console.log('[Tiramisu Debug] Collider visualization disabled');
   }
 
   /**
