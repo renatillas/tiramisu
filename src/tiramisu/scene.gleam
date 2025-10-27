@@ -172,6 +172,7 @@ pub opaque type Node(id) {
     height: Float,
     transform: transform.Transform,
     pixel_art: Bool,
+    physics: Option(physics.RigidBody),
   )
   // Debug visualization nodes
   DebugBox(id: id, min: Vec3(Float), max: Vec3(Float), color: Int)
@@ -871,6 +872,7 @@ pub fn animated_sprite(
   height height: Float,
   transform transform: transform.Transform,
   pixel_art pixel_art: Bool,
+  physics physics: Option(physics.RigidBody),
 ) -> Node(id) {
   AnimatedSprite(
     id:,
@@ -881,6 +883,7 @@ pub fn animated_sprite(
     height:,
     transform:,
     pixel_art:,
+    physics:,
   )
 }
 
@@ -1504,6 +1507,7 @@ fn compare_nodes_detailed(
       prev_h,
       prev_transform,
       prev_pixel_art,
+      prev_phys,
     ),
       AnimatedSprite(
         _,
@@ -1514,31 +1518,28 @@ fn compare_nodes_detailed(
         curr_h,
         curr_transform,
         curr_pixel_art,
+        curr_phys,
       )
     ->
-      case
-        prev_sheet != curr_sheet
-        || prev_anim != curr_anim
-        || prev_state != curr_state
-        || prev_w != curr_w
-        || prev_h != curr_h
-        || prev_transform != curr_transform
-        || prev_pixel_art != curr_pixel_art
-      {
-        True -> [
-          UpdateAnimatedSprite(
-            id,
-            curr_sheet,
-            curr_anim,
-            curr_state,
-            curr_w,
-            curr_h,
-            curr_transform,
-            curr_pixel_art,
-          ),
-        ]
-        False -> []
-      }
+      compare_animated_sprite_fields(
+        id,
+        prev_sheet,
+        prev_anim,
+        prev_state,
+        prev_w,
+        prev_h,
+        prev_transform,
+        prev_pixel_art,
+        prev_phys,
+        curr_sheet,
+        curr_anim,
+        curr_state,
+        curr_w,
+        curr_h,
+        curr_transform,
+        curr_pixel_art,
+        curr_phys,
+      )
 
     _, _ -> []
   }
@@ -1778,6 +1779,59 @@ fn compare_particle_fields(
   }
 
   patches
+}
+
+/// Compare AnimatedSprite fields using accumulator pattern
+fn compare_animated_sprite_fields(
+  id: id,
+  prev_sheet: spritesheet.Spritesheet,
+  prev_anim: spritesheet.Animation,
+  prev_state: spritesheet.AnimationState,
+  prev_w: Float,
+  prev_h: Float,
+  prev_transform: transform.Transform,
+  prev_pixel_art: Bool,
+  prev_phys: Option(physics.RigidBody),
+  curr_sheet: spritesheet.Spritesheet,
+  curr_anim: spritesheet.Animation,
+  curr_state: spritesheet.AnimationState,
+  curr_w: Float,
+  curr_h: Float,
+  curr_transform: transform.Transform,
+  curr_pixel_art: Bool,
+  curr_phys: Option(physics.RigidBody),
+) -> List(Patch(id)) {
+  let patches = []
+
+  let patches = case prev_phys != curr_phys {
+    True -> [UpdatePhysics(id, curr_phys), ..patches]
+    False -> patches
+  }
+
+  case
+    prev_sheet != curr_sheet
+    || prev_anim != curr_anim
+    || prev_state != curr_state
+    || prev_w != curr_w
+    || prev_h != curr_h
+    || prev_transform != curr_transform
+    || prev_pixel_art != curr_pixel_art
+  {
+    True -> [
+      UpdateAnimatedSprite(
+        id,
+        curr_sheet,
+        curr_anim,
+        curr_state,
+        curr_w,
+        curr_h,
+        curr_transform,
+        curr_pixel_art,
+      ),
+      ..patches
+    ]
+    False -> patches
+  }
 }
 
 @internal
@@ -2393,6 +2447,7 @@ fn handle_add_node(
       height: h,
       transform: trans,
       pixel_art: pixel_art,
+      physics: physics,
     ) ->
       handle_add_animated_sprite(
         state,
@@ -2404,6 +2459,7 @@ fn handle_add_node(
         h,
         trans,
         pixel_art,
+        physics,
         parent_id,
       )
   }
@@ -3569,6 +3625,7 @@ fn handle_add_animated_sprite(
   height: Float,
   trans: transform.Transform,
   pixel_art: Bool,
+  physics: Option(physics.RigidBody),
   parent_id: Option(id),
 ) -> RendererState(id) {
   // Get the base texture and clone it for independent animation
@@ -3605,7 +3662,16 @@ fn handle_add_animated_sprite(
   add_to_scene_or_parent(state, three_obj, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, three_obj)
-  RendererState(..state, cache: new_cache)
+
+  // Create physics body if specified - update physics world in state
+  let new_state = RendererState(..state, cache: new_cache)
+  case physics, new_state.physics_world {
+    option.Some(physics_config), option.Some(world) -> {
+      let new_world = physics.create_body(world, id, physics_config, trans)
+      RendererState(..new_state, physics_world: option.Some(new_world))
+    }
+    _, _ -> new_state
+  }
 }
 
 fn handle_update_animated_sprite(

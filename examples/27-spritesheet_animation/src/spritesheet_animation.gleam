@@ -239,6 +239,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           height: 2.0,
           transform: transform.at(position: vec3.Vec3(-3.0, 0.0, 0.0)),
           pixel_art: True,
+          physics: option.None,
         ),
         // Coin 2 - Center
         scene.animated_sprite(
@@ -250,6 +251,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           height: 2.0,
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
           pixel_art: True,
+          physics: option.None,
         ),
         // Coin 3 - Right
         scene.animated_sprite(
@@ -261,6 +263,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           height: 2.0,
           transform: transform.at(position: vec3.Vec3(3.0, 0.0, 0.0)),
           pixel_art: True,
+          physics: option.None,
         ),
       ]
 

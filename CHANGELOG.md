@@ -1,5 +1,19 @@
 # Changelog
 
+## v6.0.0 - 2025-10-28
+
+### Added
+- **Physics support for animated sprites**: `scene.AnimatedSprite` nodes now support physics simulation
+  - Added `physics` parameter to `scene.animated_sprite()` constructor
+  - Animated sprites can now have rigid body physics (Dynamic, Kinematic, Fixed)
+  - Physics bodies automatically sync with sprite transforms
+  - Works seamlessly with collision detection and the physics world
+
+### Changed
+- **BREAKING**: `scene.animated_sprite()` now requires a `physics` parameter
+  - Migration: Add `physics: option.None` to all existing `animated_sprite()` calls
+  - To enable physics, pass `option.Some(rigid_body)` instead
+
 ## v5.0.1 - 2025-10-27
 
 - Remove unnecessary logs from the runtime.
