@@ -1,5 +1,9 @@
 # Changelog
 
+## v5.0.1 - 2025-10-27
+
+- Remove unnecessary logs from the runtime.
+
 ## v5.0.0 - 2025-10-27
 
 - Now `transform.look_at` receives two transforms and a up vector, instead of 2 vectors
