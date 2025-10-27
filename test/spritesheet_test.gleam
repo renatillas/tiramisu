@@ -1,5 +1,4 @@
 import gleeunit
-import iv
 import tiramisu/spritesheet
 
 pub fn main() {
