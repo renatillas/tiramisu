@@ -24,6 +24,7 @@
 //// ```
 
 import gleam/float
+import gleam/option
 import gleam_community/maths
 import vec/vec3
 import vec/vec3f
@@ -358,68 +359,61 @@ pub fn compose(first: Transform, second: Transform) -> Transform {
 /// Multiply two quaternions (q1 * q2) using Three.js.
 ///
 /// Represents the combined rotation of applying q1 then q2.
-@external(javascript, "../threejs.ffi.mjs", "multiplyQuaternions")
-fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion
-
-/// Create a transform that looks at a target position from a source position.
-///
-/// Calculates the rotation needed to point from `from` towards `to`.
-/// Uses proper Euler angle conversion with atan2 for stable results, then
-/// converts to quaternion internally.
-///
-/// Returns rotation where:
-/// - **X rotation**: rotation around X axis (looking up/down)
-/// - **Y rotation**: rotation around Y axis (turning left/right)
-/// - **Z rotation**: rotation around Z axis (typically 0 for look-at)
+/// This is useful for combining rotations, such as applying a billboard
+/// rotation followed by a camera roll adjustment.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// let camera_pos = vec3.Vec3(0.0, 5.0, 10.0)
-/// let target_pos = vec3.Vec3(0.0, 0.0, 0.0)
-/// let look_transform = transform.look_at(from: camera_pos, to: target_pos)
+/// let rotation1 = transform.euler_to_quaternion(Vec3(0.0, 1.57, 0.0))
+/// let rotation2 = transform.euler_to_quaternion(Vec3(0.5, 0.0, 0.0))
+/// let combined = transform.multiply_quaternions(rotation1, rotation2)
+/// ```
+@external(javascript, "../threejs.ffi.mjs", "multiplyQuaternions")
+pub fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion
+
+/// Compute quaternion rotation to orient from one position toward another.
+/// Uses Three.js's Matrix4.lookAt for proper orthonormal basis construction,
+/// avoiding gimbal lock issues from Euler angle composition.
+@external(javascript, "../threejs.ffi.mjs", "quaternionLookAt")
+fn quaternion_look_at(
+  from: vec3.Vec3(Float),
+  to: vec3.Vec3(Float),
+  up: vec3.Vec3(Float),
+) -> Quaternion
+
+/// Build a quaternion from three orthonormal basis vectors.
+/// Uses Three.js's Matrix4.makeBasis for proper quaternion construction.
+@external(javascript, "../threejs.ffi.mjs", "quaternionFromBasis")
+pub fn quaternion_from_basis(
+  x_axis: vec3.Vec3(Float),
+  y_axis: vec3.Vec3(Float),
+  z_axis: vec3.Vec3(Float),
+) -> Quaternion
+
+/// Create a transform that looks at a target position from a source position.
+///
+/// Calculates the rotation needed to point from `from` towards `to`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let camera_pos = transform.at(vec3.Vec3(0.0, 5.0, 10.0))
+/// let target_pos = transform.at(vec3.Vec3(0.0, 0.0, 0.0))
+/// let look_transform = transform.look_at(from: camera_pos, to: target_pos, up: option.None)
 /// // Camera now faces the origin
 /// ```
 pub fn look_at(
-  from from: vec3.Vec3(Float),
-  to to: vec3.Vec3(Float),
+  from from: Transform,
+  to to: Transform,
+  up up: option.Option(vec3.Vec3(Float)),
 ) -> Transform {
-  // Calculate direction vector from source to target
-  let direction = vec3f.subtract(to, from)
-
-  // Handle degenerate case where from == to
-  let direction = case vec3f.length(direction) <. 0.0001 {
-    True -> vec3.Vec3(0.0, 0.0, 1.0)
-    // Default forward
-    False -> vec3f.normalize(direction)
-  }
-
-  // Calculate horizontal distance (projection on XZ plane)
-  let horizontal_distance =
-    float.square_root(direction.x *. direction.x +. direction.z *. direction.z)
-    |> fn(result) {
-      case result {
-        Ok(val) -> val
-        Error(_) -> 0.0
-      }
-    }
-
-  // Calculate rotation around X axis (looking up/down)
-  // atan2(y, horizontal_distance) gives angle from horizontal plane
-  let x_rotation = maths.atan2(direction.y, horizontal_distance)
-
-  // Calculate rotation around Y axis (looking left/right)
-  // atan2(x, z) gives angle from forward (Z) axis
-  let y_rotation = maths.atan2(direction.x, direction.z)
-
-  // Z rotation is typically 0 for standard look-at (no barrel roll)
-  let z_rotation = 0.0
-
   // Convert Euler angles to quaternion
-  let euler = vec3.Vec3(x_rotation, y_rotation, z_rotation)
-  let quat = euler_to_quaternion(euler)
+  let up = option.unwrap(up, vec3.Vec3(0.0, 1.0, 0.0))
+  let quat = quaternion_look_at(from.position, to.position, up)
 
-  Transform(position: from, rotation: quat, scale: vec3f.one)
+  // Preserve position and scale from the 'from' transform
+  Transform(position: from.position, rotation: quat, scale: from.scale)
 }
 
 // --- Convenience Methods for Relative Transforms ---

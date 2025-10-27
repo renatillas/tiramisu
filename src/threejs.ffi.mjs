@@ -2596,6 +2596,55 @@ export function multiplyQuaternions(q1, q2) {
   return new Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
 }
 
+/**
+ * Compute quaternion rotation to look from one position toward another
+ * Uses Three.js's Matrix4.lookAt for proper orthonormal basis construction
+ * @param {Vec3} from - Source position
+ * @param {Vec3} to - Target position
+ * @param {Vec3} up - Up vector (default: 0, 1, 0)
+ * @returns {Quaternion} Rotation quaternion to orient from toward to
+ */
+export function quaternionLookAt(from, to, up) {
+  const matrix = new THREE.Matrix4();
+  const upVec = up ? new THREE.Vector3(up.x, up.y, up.z) : new THREE.Vector3(0, 1, 0);
+
+  // lookAt creates a matrix that orients -Z toward the target
+  matrix.lookAt(
+    new THREE.Vector3(from.x, from.y, from.z),
+    new THREE.Vector3(to.x, to.y, to.z),
+    upVec
+  );
+
+  // Extract quaternion from the matrix
+  const quat = new THREE.Quaternion();
+  quat.setFromRotationMatrix(matrix);
+
+  return new Quaternion(quat.x, quat.y, quat.z, quat.w);
+}
+
+/**
+ * Build a quaternion from three orthonormal basis vectors
+ * @param {Vec3} xAxis - Right vector (+X axis)
+ * @param {Vec3} yAxis - Up vector (+Y axis)
+ * @param {Vec3} zAxis - Forward vector (+Z axis)
+ * @returns {Quaternion} Rotation quaternion representing this orientation
+ */
+export function quaternionFromBasis(xAxis, yAxis, zAxis) {
+  // Build a rotation matrix from the three basis vectors
+  const matrix = new THREE.Matrix4();
+  matrix.makeBasis(
+    new THREE.Vector3(xAxis.x, xAxis.y, xAxis.z),
+    new THREE.Vector3(yAxis.x, yAxis.y, yAxis.z),
+    new THREE.Vector3(zAxis.x, zAxis.y, zAxis.z)
+  );
+
+  // Extract quaternion from the matrix
+  const quat = new THREE.Quaternion();
+  quat.setFromRotationMatrix(matrix);
+
+  return new Quaternion(quat.x, quat.y, quat.z, quat.w);
+}
+
 // ============================================================================
 // OBJECT3D UTILITIES - Helper functions for working with loaded models
 // ============================================================================

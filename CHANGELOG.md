@@ -1,5 +1,11 @@
 # Changelog
 
+## v5.0.0 - 2025-10-27
+
+- Now `transform.look_at` receives two transforms and a up vector, instead of 2 vectors
+- Added `transform.multiply_quaternions` functions
+- Added `transform.quaternion_from_basis` functions
+
 
 ## v4.1.0 - 2025-10-25
 
