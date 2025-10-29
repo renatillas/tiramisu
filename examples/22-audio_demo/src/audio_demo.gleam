@@ -31,6 +31,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   Main
   MusicCube
   MusicBg
@@ -319,7 +320,7 @@ fn float_to_percentage(value: Float) -> String {
 
 // --- View ---
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -403,7 +404,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     ]
     |> list.append(sfx_audio_nodes)
 
-  [
+  scene.empty(id: Scene, transform: transform.identity, children: [
     scene.camera(
       id: Main,
       camera: cam,
@@ -411,9 +412,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     // Music cube (left) - state determines if it plays
-    scene.group(
+    scene.empty(
       id: MusicGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(-3.0, 0.0, 0.0))
@@ -421,7 +423,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       children: music_nodes,
     ),
     // SFX cube (right) - one-shot sounds
-    scene.group(
+    scene.empty(
       id: SfxGroup,
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(3.0, 0.0, 0.0))
@@ -439,5 +441,5 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       light: directional_light,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
-  ]
+  ])
 }

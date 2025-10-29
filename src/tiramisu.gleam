@@ -71,7 +71,7 @@ pub fn run(
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
   update update: fn(state, msg, Context(id)) ->
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
-  view view: fn(state, Context(id)) -> List(scene.Node(id)),
+  view view: fn(state, Context(id)) -> scene.Node(id),
 ) -> Nil {
   // Create renderer state (audio manager is initialized internally)
   let renderer_state =
@@ -127,12 +127,12 @@ pub fn run(
     option.None -> scene.set_physics_world(renderer_state, option.None)
   }
 
-  // Get initial scene nodes
-  let initial_nodes = view(initial_state, context_with_physics)
+  // Get initial scene root node
+  let initial_root = view(initial_state, context_with_physics)
 
   // Apply initial scene using renderer.gleam
   let renderer_state_after_init =
-    apply_initial_scene_gleam(renderer_state_with_physics, initial_nodes)
+    apply_initial_scene_gleam(renderer_state_with_physics, initial_root)
 
   // Extract updated physics world from renderer (it now has bodies created during patching)
   let updated_context = case
@@ -148,7 +148,7 @@ pub fn run(
   // Start game loop with updated context containing bodies
   start_loop(
     initial_state,
-    initial_nodes,
+    initial_root,
     initial_effect,
     updated_context,
     renderer_state_after_init,
@@ -162,10 +162,10 @@ pub fn run(
 /// Apply initial scene using renderer.gleam's patch system
 fn apply_initial_scene_gleam(
   renderer_state: scene.RendererState(id),
-  nodes: List(scene.Node(id)),
+  node: scene.Node(id),
 ) -> scene.RendererState(id) {
   // Use diff with empty previous scene to generate proper patches
-  let patches = scene.diff([], nodes)
+  let patches = scene.diff(option.None, option.Some(node))
   scene.apply_patches(renderer_state, patches)
 }
 
@@ -183,11 +183,11 @@ fn set_background(scene: scene.Scene, background: Background) -> Nil
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
   state: state,
-  prev_nodes: List(scene.Node(id)),
+  prev_node: scene.Node(id),
   effect: effect.Effect(msg),
   context: Context(id),
   renderer_state: scene.RendererState(id),
   update: fn(state, msg, Context(id)) ->
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
-  view: fn(state, Context(id)) -> List(scene.Node(id)),
+  view: fn(state, Context(id)) -> scene.Node(id),
 ) -> Nil

@@ -51,7 +51,7 @@ fn update(
   }
 }
 
-fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
+fn view(model: Model, ctx: tiramisu.Context(String)) -> scene.Node(String) {
   // Use actual canvas dimensions for proper aspect ratio on all devices
   let cam =
     camera.camera_2d(
@@ -59,7 +59,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
       height: float.round(ctx.canvas_height),
     )
 
-  [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
       id: "camera",
       camera: cam,
@@ -67,6 +67,7 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
       active: True,
       look_at: option.None,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.light(
       id: "ambient",
@@ -193,5 +194,5 @@ fn view(model: Model, ctx: tiramisu.Context(String)) -> List(scene.Node(String))
         )),
       physics: option.None,
     ),
-  ]
+  ])
 }

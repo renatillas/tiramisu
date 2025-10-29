@@ -1,6 +1,5 @@
 import gleam/float
 import gleam/javascript/promise
-import gleam/list
 import gleam/option
 import gleam_community/maths
 import tiramisu
@@ -252,7 +251,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, _) -> scene.Node(String) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -279,52 +278,54 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       active: True,
       look_at: option.Some(look_at_target),
       viewport: option.None,
+      postprocessing: option.None,
     )
-  let lights = [
-    scene.light(
-      id: "ambient",
-      light: {
-        let assert Ok(light) = light.ambient(color: 0x404040, intensity: 0.3)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: "directional",
-      light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 2.0)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(
-        10.0 *. maths.cos(model.rotation),
-        10.0,
-        10.0 *. maths.sin(model.rotation),
-      )),
-    ),
-    scene.light(
-      id: "point",
-      light: {
-        let assert Ok(light) =
-          light.point(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(-5.0, 3.0, 0.0)),
-    ),
-    scene.light(
-      id: "hemisphere",
-      light: {
-        let assert Ok(light) =
-          light.hemisphere(
-            sky_color: 0xffffff,
-            ground_color: 0xff0000,
-            intensity: 1.0,
-          )
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
-    ),
-  ]
+  let lights =
+    scene.empty(id: "lights", transform: transform.identity, children: [
+      scene.light(
+        id: "ambient",
+        light: {
+          let assert Ok(light) = light.ambient(color: 0x404040, intensity: 0.3)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: "directional",
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 2.0)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(
+          10.0 *. maths.cos(model.rotation),
+          10.0,
+          10.0 *. maths.sin(model.rotation),
+        )),
+      ),
+      scene.light(
+        id: "point",
+        light: {
+          let assert Ok(light) =
+            light.point(color: 0xff6b6b, intensity: 1.0, distance: 50.0)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(-5.0, 3.0, 0.0)),
+      ),
+      scene.light(
+        id: "hemisphere",
+        light: {
+          let assert Ok(light) =
+            light.hemisphere(
+              sky_color: 0xffffff,
+              ground_color: 0xff0000,
+              intensity: 1.0,
+            )
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
+      ),
+    ])
 
   let assert Ok(box_geom) =
     geometry.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
@@ -474,48 +475,49 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       ambient_oclusion_map: option.None,
     )
 
-  let materials = [
-    scene.mesh(
-      id: "basic",
-      geometry: box_geom,
-      material: basic_mat,
-      transform: transform.at(position: vec3.Vec3(-6.0, 2.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-      physics: option.None,
-    ),
-    scene.mesh(
-      id: "standard",
-      geometry: box_geom,
-      material: standard_material,
-      transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-      physics: option.None,
-    ),
-    scene.mesh(
-      id: "phong",
-      geometry: box_geom,
-      material: phong_mat,
-      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-      physics: option.None,
-    ),
-    scene.mesh(
-      id: "lambert",
-      geometry: box_geom,
-      material: lambert_mat,
-      transform: transform.at(position: vec3.Vec3(3.0, 2.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-      physics: option.None,
-    ),
-    scene.mesh(
-      id: "toon",
-      geometry: box_geom,
-      material: toon_mat,
-      transform: transform.at(position: vec3.Vec3(6.0, 2.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-      physics: option.None,
-    ),
-  ]
+  let spheres =
+    scene.empty(id: "spheres", transform: transform.identity, children: [
+      scene.mesh(
+        id: "basic",
+        geometry: box_geom,
+        material: basic_mat,
+        transform: transform.at(position: vec3.Vec3(-6.0, 2.0, 0.0))
+          |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "standard",
+        geometry: box_geom,
+        material: standard_material,
+        transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
+          |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "phong",
+        geometry: box_geom,
+        material: phong_mat,
+        transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0))
+          |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "lambert",
+        geometry: box_geom,
+        material: lambert_mat,
+        transform: transform.at(position: vec3.Vec3(3.0, 2.0, 0.0))
+          |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "toon",
+        geometry: box_geom,
+        material: toon_mat,
+        transform: transform.at(position: vec3.Vec3(6.0, 2.0, 0.0))
+          |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
+        physics: option.None,
+      ),
+    ])
 
   let assert Ok(plane_geom) = geometry.plane(width: 20.0, height: 20.0)
   let ground_material = case
@@ -549,7 +551,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     }
   }
 
-  let ground = [
+  let ground =
     scene.mesh(
       id: "ground",
       geometry: plane_geom,
@@ -557,8 +559,13 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       transform: transform.at(position: vec3.Vec3(0.0, -2.0, 0.0))
         |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
-    ),
-  ]
+    )
 
-  list.flatten([[camera], lights, materials, ground])
+  scene.empty(id: "scene", transform: transform.identity, children: [
+    camera,
+    lights,
+    camera,
+    spheres,
+    ground,
+  ])
 }

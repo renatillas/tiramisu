@@ -7,7 +7,6 @@
 /// - Pixel art filtering for crisp sprites
 import gleam/dict.{type Dict}
 import gleam/javascript/promise
-import gleam/list
 import gleam/option
 import tiramisu
 import tiramisu/asset
@@ -23,6 +22,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   AmbientLight
   Coin1
@@ -176,7 +176,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let camera = {
     let assert Ok(cam) =
       camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -187,10 +187,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       active: True,
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       viewport: option.None,
+      postprocessing: option.None,
     )
   }
 
-  let lights = [
+  let ambient =
     scene.light(
       id: AmbientLight,
       light: {
@@ -198,11 +199,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.identity,
-    ),
-  ]
+    )
 
   // Ground plane
-  let ground = [
+  let ground =
     scene.mesh(
       id: Ground,
       geometry: {
@@ -219,16 +219,23 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(0.0, -1.0, 0.0))
         |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
-    ),
-  ]
+    )
 
   case model.loading_complete {
-    False -> list.flatten([[camera], lights, ground])
+    False ->
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        ground,
+      ])
     True -> {
       let assert Ok(coin_sheet) = dict.get(model.spritesheets, "coin")
       let assert Ok(spin_anim) = dict.get(model.animations, "spin")
 
-      let sprites = [
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        ground,
         // Coin 1 - Left
         scene.animated_sprite(
           id: Coin1,
@@ -265,9 +272,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           pixel_art: True,
           physics: option.None,
         ),
-      ]
-
-      list.flatten([[camera], lights, ground, sprites])
+      ])
     }
   }
 }

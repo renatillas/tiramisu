@@ -19,6 +19,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -105,20 +106,20 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
-  let assert Ok(camera) =
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+  let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-    |> result.map(fn(camera) {
-      scene.camera(
-        id: MainCamera,
-        camera: camera,
-        transform: transform.at(position: vec3.Vec3(0.0, 1.0, 3.0)),
-        look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
-        active: True,
-        viewport: option.None,
-      )
-      |> list.wrap
-    })
+
+  let camera_node =
+    scene.camera(
+      id: MainCamera,
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 1.0, 3.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+      active: True,
+      viewport: option.None,
+      postprocessing: option.None,
+    )
 
   let lights = [
     scene.light(
@@ -140,10 +141,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     ),
   ]
 
-  case model.load_state {
+  let content_nodes = case model.load_state {
     Loading -> {
       // Show a spinning cube while loading
-      let loading_cube =
+      [
         scene.mesh(
           id: LoadingCube,
           geometry: {
@@ -167,14 +168,13 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
               0.0,
             )),
           physics: option.None,
-        )
-        |> list.wrap
-      list.flatten([camera, loading_cube, lights])
+        ),
+      ]
     }
 
     Failed(_error_msg) -> {
       // Show a red cube to indicate error
-      let error_cube =
+      [
         scene.mesh(
           id: ErrorCube,
           geometry: {
@@ -194,14 +194,13 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
-        )
-        |> list.wrap
-      list.flatten([camera, error_cube, lights])
+        ),
+      ]
     }
 
     Loaded(tiramisu_model) -> {
       // Show the loaded bread model
-      let model_node =
+      [
         scene.model_3d(
           id: Tiramisu,
           object: tiramisu_model,
@@ -209,9 +208,13 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: option.None,
           physics: option.None,
-        )
-
-      list.flatten([camera, [model_node], lights])
+        ),
+      ]
     }
   }
+
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera_node,
+    ..list.append(lights, content_nodes)
+  ])
 }

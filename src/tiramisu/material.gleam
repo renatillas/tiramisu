@@ -155,6 +155,8 @@ pub opaque type Material {
     roughness: Float,
     transparent: Bool,
     opacity: Float,
+    emissive: Int,
+    emissive_intensity: Float,
   )
   /// Shiny material with specular highlights (like plastic or ceramic).
   PhongMaterial(
@@ -196,6 +198,8 @@ pub type MaterialError {
   OutOfBoundsMetalness(Float)
   NonPositiveLinewidth(Float)
   NonPositiveShininess(Float)
+  OutOfBoundsEmissive(Int)
+  OutOfBoundsEmissiveIntensity(Float)
 }
 
 /// Create a validated basic (unlit) material.
@@ -250,6 +254,8 @@ pub fn standard(
   ambient_oclusion_map ambient_oclusion_map: option.Option(asset.Texture),
   roughness_map roughness_map: option.Option(asset.Texture),
   metalness_map metalness_map: option.Option(asset.Texture),
+  emissive emissive: Int,
+  emissive_intensity emissive_intensity: Float,
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -267,6 +273,14 @@ pub fn standard(
     opacity <. 0.0 || opacity >. 1.0,
     Error(OutOfBoundsOpacity(opacity)),
   )
+  use <- bool.guard(
+    emissive < 0x000000 || emissive > 0xffffff,
+    Error(OutOfBoundsEmissive(emissive)),
+  )
+  use <- bool.guard(
+    emissive_intensity <. 0.0,
+    Error(OutOfBoundsEmissiveIntensity(emissive_intensity)),
+  )
 
   Ok(StandardMaterial(
     color:,
@@ -279,6 +293,8 @@ pub fn standard(
     roughness_map:,
     metalness_map:,
     ambient_oclusion_map:,
+    emissive:,
+    emissive_intensity:,
   ))
 }
 
@@ -480,6 +496,8 @@ pub opaque type StandardMaterialBuilder {
     ambient_oclusion_map: Option(asset.Texture),
     roughness_map: Option(asset.Texture),
     metalness_map: Option(asset.Texture),
+    emissive: Int,
+    emissive_intensity: Float,
   )
 }
 
@@ -517,6 +535,8 @@ pub fn new() -> StandardMaterialBuilder {
     ambient_oclusion_map: option.None,
     roughness_map: option.None,
     metalness_map: option.None,
+    emissive: 0x000000,
+    emissive_intensity: 0.0,
   )
 }
 
@@ -726,6 +746,48 @@ pub fn with_opacity(
   StandardMaterialBuilder(..builder, opacity: opacity)
 }
 
+/// Set the emissive color (glow).
+///
+/// **Emissive**: Hex color from 0x000000 (no glow) to 0xFFFFFF (white glow).
+/// Objects with emissive colors appear to emit light and are perfect for bloom effects.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Glowing red cube
+/// material.new()
+///   |> material.with_color(0xff0000)
+///   |> material.with_emissive(0xff0000)
+///   |> material.with_emissive_intensity(0.5)
+/// ```
+pub fn with_emissive(
+  builder: StandardMaterialBuilder,
+  emissive: Int,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, emissive: emissive)
+}
+
+/// Set the emissive intensity.
+///
+/// **Emissive Intensity**: Multiplier for the emissive color brightness.
+/// 0.0 = no emission, higher values = brighter glow. Especially visible with bloom.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Bright glowing sphere
+/// material.new()
+///   |> material.with_color(0x00ff00)
+///   |> material.with_emissive(0x00ff00)
+///   |> material.with_emissive_intensity(1.0)
+/// ```
+pub fn with_emissive_intensity(
+  builder: StandardMaterialBuilder,
+  intensity: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, emissive_intensity: intensity)
+}
+
 /// Build the final StandardMaterial from the builder.
 ///
 /// Validates all parameters and returns a Result. Will fail if any values
@@ -759,6 +821,8 @@ pub fn build(
     ambient_oclusion_map: builder.ambient_oclusion_map,
     roughness_map: builder.roughness_map,
     metalness_map: builder.metalness_map,
+    emissive: builder.emissive,
+    emissive_intensity: builder.emissive_intensity,
   )
 }
 
@@ -781,6 +845,8 @@ pub fn create_material(material: Material) -> ThreeMaterial {
       roughness:,
       transparent:,
       opacity:,
+      emissive:,
+      emissive_intensity:,
     ) ->
       create_standard_material(
         color,
@@ -793,6 +859,8 @@ pub fn create_material(material: Material) -> ThreeMaterial {
         ambient_oclusion_map,
         roughness_map,
         metalness_map,
+        emissive,
+        emissive_intensity,
       )
     PhongMaterial(color:, map:, normal_map:, ambient_oclusion_map:, shininess:) ->
       create_phong_material(
@@ -832,6 +900,8 @@ fn create_standard_material(
   ao_map: Option(asset.Texture),
   roughness_map: Option(asset.Texture),
   metalness_map: Option(asset.Texture),
+  emissive: Int,
+  emissive_intensity: Float,
 ) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createPhongMaterial")

@@ -182,13 +182,17 @@ fn calculate_pinch_scale(touches: List(input.Touch), model: Model) -> Float {
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, _) -> scene.Node(String) {
   let camera_node = create_camera()
   let lights = create_lights()
   let main_cube = create_main_cube(model)
   let touch_indicators = create_touch_indicators(model)
 
-  list.flatten([[camera_node], lights, main_cube, touch_indicators])
+  scene.empty(
+    id: "scene",
+    transform: transform.identity,
+    children: list.flatten([[camera_node], lights, main_cube, touch_indicators]),
+  )
 }
 
 /// Create the main camera
@@ -203,6 +207,7 @@ fn create_camera() -> scene.Node(String) {
     active: True,
     look_at: option.None,
     viewport: option.None,
+    postprocessing: option.None,
   )
 }
 

@@ -1,10 +1,5 @@
-/// STL Loader Example
-///
-/// Demonstrates loading 3D models from STL files
 import gleam/javascript/promise
-import gleam/list
 import gleam/option
-import gleam/result
 import tiramisu
 import tiramisu/asset
 import tiramisu/background
@@ -19,6 +14,8 @@ import vec/vec3
 import vec/vec3f
 
 pub type Id {
+  Scene
+  Lights
   MainCamera
   Ambient
   Directional
@@ -97,41 +94,41 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
-  let assert Ok(camera) =
+fn view(model: Model, _) -> scene.Node(Id) {
+  let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-    |> result.map(fn(camera) {
-      camera
-      |> scene.camera(
-        id: MainCamera,
-        camera: _,
-        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
-        look_at: option.None,
-        active: True,
-        viewport: option.None,
-      )
-      |> list.wrap
-    })
 
-  let lights = [
-    scene.light(
-      id: Ambient,
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: Directional,
-      light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 10.5)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(5.0, 10.0, 70.5)),
-    ),
-  ]
+  let camera_node =
+    scene.camera(
+      id: MainCamera,
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
+      look_at: option.None,
+      active: True,
+      viewport: option.None,
+      postprocessing: option.None,
+    )
+
+  let lights =
+    scene.empty(id: Lights, transform: transform.identity, children: [
+      scene.light(
+        id: Ambient,
+        light: {
+          let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: Directional,
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 10.5)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(5.0, 10.0, 70.5)),
+      ),
+    ])
 
   case model.load_state {
     Loading -> {
@@ -163,8 +160,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             )),
           physics: option.None,
         )
-        |> list.wrap
-      list.flatten([camera, loading_cube, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera_node,
+        loading_cube,
+        lights,
+      ])
     }
 
     Failed -> {
@@ -190,14 +190,17 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
-        |> list.wrap
-      list.flatten([camera, error_cube, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera_node,
+        error_cube,
+        lights,
+      ])
     }
 
     Loaded(geom) -> {
       // Show the loaded STL model
       let model_node =
-        scene.group(id: StlGroup, transform: transform.identity, children: [
+        scene.empty(id: StlGroup, transform: transform.identity, children: [
           scene.mesh(
             id: Standard,
             geometry: {
@@ -244,9 +247,12 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             physics: option.None,
           ),
         ])
-        |> list.wrap
 
-      list.flatten([camera, model_node, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera_node,
+        model_node,
+        lights,
+      ])
     }
   }
 }

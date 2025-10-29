@@ -125,10 +125,10 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, _) -> scene.Node(String) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-  [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
       id: "main_camera",
       camera: cam,
@@ -136,6 +136,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       viewport: option.None,
       look_at: option.None,
       active: True,
+      postprocessing: option.None,
     ),
     scene.light(
       id: "ambient",
@@ -172,5 +173,5 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         |> transform.scale_uniform(model.scale),
       physics: option.None,
     ),
-  ]
+  ])
 }

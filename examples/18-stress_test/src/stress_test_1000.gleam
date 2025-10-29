@@ -17,6 +17,8 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
+  Lights
   MainCamera
   Ambient
   Directional
@@ -187,7 +189,7 @@ fn compute_instances(time: Float) -> List(transform.Transform) {
   })
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   // Camera setup
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -200,27 +202,29 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
 
-  let lights = [
-    scene.light(
-      id: Ambient,
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: Directional,
-      light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 0.5)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(50.0, 50.0, 50.0)),
-    ),
-  ]
+  let lights =
+    scene.empty(id: Lights, transform: transform.identity, children: [
+      scene.light(
+        id: Ambient,
+        light: {
+          let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.3)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: Directional,
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 0.5)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(50.0, 50.0, 50.0)),
+      ),
+    ])
 
   // Use cached instances - when animation is OFF, this is the same list reference
   // making scene diff fast-path (prev == curr) succeed
@@ -247,5 +251,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       instances: instances,
     )
 
-  list.flatten([[camera_node], lights, [instanced_cubes]])
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera_node,
+    lights,
+    instanced_cubes,
+  ])
 }

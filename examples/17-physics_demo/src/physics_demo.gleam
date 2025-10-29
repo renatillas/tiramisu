@@ -14,6 +14,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -71,7 +72,7 @@ fn update(
   }
 }
 
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert option.Some(physics_world) = ctx.physics_world
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -84,6 +85,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
 
   let lights = [
@@ -227,5 +229,12 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   }
 
   // Return scene
-  [camera, ground, cube1, cube2, cube3, ..lights]
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera,
+    ground,
+    cube1,
+    cube2,
+    cube3,
+    ..lights
+  ])
 }

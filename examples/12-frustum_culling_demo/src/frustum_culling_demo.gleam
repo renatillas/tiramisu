@@ -19,10 +19,13 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
   Cube(Int)
+  Lights
+  Cubes
   Ground
 }
 
@@ -113,7 +116,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
+fn view(model: Model, _) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
     |> result.map(fn(cam) {
@@ -125,28 +128,29 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         look_at: option.None,
         active: True,
         viewport: option.None,
+        postprocessing: option.None,
       )
-      |> list.wrap
     })
-  let lights = [
-    scene.light(
-      id: Ambient,
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: Directional,
-      light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 0.6)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(50.0, 50.0, 50.0)),
-    ),
-  ]
+  let lights =
+    scene.empty(id: Lights, transform: transform.identity, children: [
+      scene.light(
+        id: Ambient,
+        light: {
+          let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: Directional,
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 0.6)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(50.0, 50.0, 50.0)),
+      ),
+    ])
 
   // Create a large grid of cubes spread across 100x100 units
   // Grid: 10x10x10 = 1000 cubes
@@ -198,6 +202,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         physics: option.None,
       )
     })
+    |> scene.empty(id: Cubes, transform: transform.identity, children: _)
 
   // Add a ground plane for reference
   let ground =
@@ -221,7 +226,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
       physics: option.None,
     )
-    |> list.wrap
 
-  list.flatten([camera, lights, cubes, ground])
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera,
+    lights,
+    cubes,
+    ground,
+  ])
 }

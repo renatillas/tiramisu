@@ -7,7 +7,6 @@ import vec/vec3
 type TestId {
   Canvas1
   Canvas2
-  Root
 }
 
 /// Test that adding a canvas generates an AddNode patch
@@ -15,8 +14,8 @@ pub fn diff_add_canvas_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
   let prev = option.None
-  let next =
-    option.Some(scene.canvas(
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -24,7 +23,9 @@ pub fn diff_add_canvas_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -38,8 +39,8 @@ pub fn diff_add_canvas_test() {
 pub fn diff_remove_canvas_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -47,8 +48,10 @@ pub fn diff_remove_canvas_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next = option.None
+      children: [],
+    ),
+  ]
+  let next = []
 
   let patches = scene.diff(prev, next)
 
@@ -62,8 +65,8 @@ pub fn diff_remove_canvas_test() {
 pub fn diff_canvas_no_change_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -71,9 +74,11 @@ pub fn diff_canvas_no_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next =
-    option.Some(scene.canvas(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -81,7 +86,9 @@ pub fn diff_canvas_no_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -97,8 +104,8 @@ pub fn diff_canvas_picture_change_test() {
   let picture1 = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
   let picture2 = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(0, 255, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture1,
       texture_width: 256,
@@ -106,9 +113,11 @@ pub fn diff_canvas_picture_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next =
-    option.Some(scene.canvas(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture2,
       texture_width: 256,
@@ -116,7 +125,9 @@ pub fn diff_canvas_picture_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -130,8 +141,8 @@ pub fn diff_canvas_picture_change_test() {
 pub fn diff_canvas_dimensions_change_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -139,9 +150,11 @@ pub fn diff_canvas_dimensions_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next =
-    option.Some(scene.canvas(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 512,
@@ -149,7 +162,9 @@ pub fn diff_canvas_dimensions_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -163,8 +178,8 @@ pub fn diff_canvas_dimensions_change_test() {
 pub fn diff_canvas_size_change_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -172,9 +187,11 @@ pub fn diff_canvas_size_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next =
-    option.Some(scene.canvas(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -182,7 +199,9 @@ pub fn diff_canvas_size_change_test() {
       width: 4.0,
       height: 1.0,
       transform: transform.identity,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -196,8 +215,8 @@ pub fn diff_canvas_size_change_test() {
 pub fn diff_canvas_transform_change_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(scene.canvas(
+  let prev = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -205,9 +224,11 @@ pub fn diff_canvas_transform_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
-    ))
-  let next =
-    option.Some(scene.canvas(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
       id: Canvas1,
       picture: picture,
       texture_width: 256,
@@ -215,7 +236,9 @@ pub fn diff_canvas_transform_change_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.at(vec3.Vec3(5.0, 10.0, 0.0)),
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -239,6 +262,7 @@ pub fn canvas_encoding_consistency_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
+      children: [],
     )
 
   let canvas2 =
@@ -250,10 +274,11 @@ pub fn canvas_encoding_consistency_test() {
       width: 2.0,
       height: 0.5,
       transform: transform.identity,
+      children: [],
     )
 
   // If encoding is consistent, diff should produce no patches
-  let patches = scene.diff(option.Some(canvas1), option.Some(canvas2))
+  let patches = scene.diff([canvas1], [canvas2])
 
   case patches {
     [] -> Nil
@@ -266,43 +291,40 @@ pub fn canvas_encoding_consistency_test() {
 pub fn diff_multiple_canvas_test() {
   let picture = p.rectangle(256.0, 64.0) |> p.fill(p.colour_rgb(255, 0, 0))
 
-  let prev =
-    option.Some(
-      scene.empty(id: Root, transform: transform.identity, children: [
-        scene.canvas(
-          id: Canvas1,
-          picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
-          transform: transform.identity,
-        ),
-      ]),
-    )
-  let next =
-    option.Some(
-      scene.empty(id: Root, transform: transform.identity, children: [
-        scene.canvas(
-          id: Canvas1,
-          picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
-          transform: transform.identity,
-        ),
-        scene.canvas(
-          id: Canvas2,
-          picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
-          transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
-        ),
-      ]),
-    )
+  let prev = [
+    scene.canvas(
+      id: Canvas1,
+      picture: picture,
+      texture_width: 256,
+      texture_height: 64,
+      width: 2.0,
+      height: 0.5,
+      transform: transform.identity,
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.canvas(
+      id: Canvas1,
+      picture: picture,
+      texture_width: 256,
+      texture_height: 64,
+      width: 2.0,
+      height: 0.5,
+      transform: transform.identity,
+      children: [],
+    ),
+    scene.canvas(
+      id: Canvas2,
+      picture: picture,
+      texture_width: 256,
+      texture_height: 64,
+      width: 2.0,
+      height: 0.5,
+      transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 

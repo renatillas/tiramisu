@@ -13,8 +13,10 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option}
+import gleam/set.{type Set}
 import tiramisu/asset
 import tiramisu/internal/id
+import tiramisu/postprocessing
 
 /// Opaque type wrapping any Three.js object
 pub opaque type ThreeObject {
@@ -60,6 +62,10 @@ pub type CacheState {
     viewports: Dict(String, Viewport),
     /// Particle systems by node ID
     particles: Dict(String, ParticleSystem),
+    /// Camera postprocessing configurations by camera ID
+    camera_postprocessing: Dict(String, postprocessing.PostProcessing),
+    /// Set of camera IDs (to distinguish cameras from other objects)
+    cameras: Set(String),
   )
 }
 
@@ -75,6 +81,8 @@ pub fn init() -> CacheState {
     actions: dict.new(),
     viewports: dict.new(),
     particles: dict.new(),
+    camera_postprocessing: dict.new(),
+    cameras: set.new(),
   )
 }
 
@@ -198,6 +206,82 @@ pub fn get_cameras_with_viewports(
 }
 
 // ============================================================================
+// CAMERA POSTPROCESSING OPERATIONS
+// ============================================================================
+
+/// Set postprocessing configuration for a camera
+pub fn set_camera_postprocessing(
+  cache: CacheState,
+  id: id,
+  pp: postprocessing.PostProcessing,
+) -> CacheState {
+  let string_id = id.to_string(id)
+  CacheState(
+    ..cache,
+    camera_postprocessing: dict.insert(cache.camera_postprocessing, string_id, pp),
+  )
+}
+
+/// Get postprocessing configuration for a camera
+pub fn get_camera_postprocessing(
+  cache: CacheState,
+  id: id,
+) -> Option(postprocessing.PostProcessing) {
+  let string_id = id.to_string(id)
+  dict.get(cache.camera_postprocessing, string_id) |> option.from_result
+}
+
+/// Remove postprocessing configuration for a camera
+pub fn remove_camera_postprocessing(cache: CacheState, id: id) -> CacheState {
+  let string_id = id.to_string(id)
+  CacheState(
+    ..cache,
+    camera_postprocessing: dict.delete(cache.camera_postprocessing, string_id),
+  )
+}
+
+// ============================================================================
+// CAMERA TRACKING OPERATIONS
+// ============================================================================
+
+/// Add a camera ID to the cameras set
+pub fn add_camera(cache: CacheState, id: id) -> CacheState {
+  let string_id = id.to_string(id)
+  CacheState(..cache, cameras: set.insert(cache.cameras, string_id))
+}
+
+/// Remove a camera ID from the cameras set
+pub fn remove_camera(cache: CacheState, id: id) -> CacheState {
+  let string_id = id.to_string(id)
+  CacheState(..cache, cameras: set.delete(cache.cameras, string_id))
+}
+
+/// Get all cameras with their postprocessing configurations
+/// Returns list of tuples: (camera_id_string, camera_object, Option(viewport), Option(postprocessing))
+pub fn get_all_cameras_with_info(
+  cache: CacheState,
+) -> List(#(String, ThreeObject, Option(Viewport), Option(postprocessing.PostProcessing))) {
+  // Iterate over camera IDs and look up their info
+  set.to_list(cache.cameras)
+  |> list.filter_map(fn(camera_id) {
+    // Get camera object
+    case dict.get(cache.objects, camera_id) {
+      Ok(camera_obj) -> {
+        // Get viewport and postprocessing (both optional)
+        let viewport_opt =
+          dict.get(cache.viewports, camera_id) |> option.from_result
+        let pp_opt =
+          dict.get(cache.camera_postprocessing, camera_id)
+          |> option.from_result
+
+        Ok(#(camera_id, camera_obj, viewport_opt, pp_opt))
+      }
+      Error(_) -> Error(Nil)
+    }
+  })
+}
+
+// ============================================================================
 // PARTICLE SYSTEM OPERATIONS
 // ============================================================================
 
@@ -237,7 +321,7 @@ pub fn get_all_particle_systems(
 // CLEANUP OPERATIONS
 // ============================================================================
 
-/// Remove all cached data for a given ID (object, mixer, actions, viewport, particles)
+/// Remove all cached data for a given ID (object, mixer, actions, viewport, particles, camera, postprocessing)
 /// This is used when a node is removed from the scene
 pub fn remove_all(cache: CacheState, id: id) -> CacheState {
   cache
@@ -246,6 +330,8 @@ pub fn remove_all(cache: CacheState, id: id) -> CacheState {
   |> remove_actions(id)
   |> remove_viewport(id)
   |> remove_particle_system(id)
+  |> remove_camera(id)
+  |> remove_camera_postprocessing(id)
 }
 
 /// Clear all caches

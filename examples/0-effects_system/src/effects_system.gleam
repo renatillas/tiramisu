@@ -29,6 +29,7 @@ pub type Cube {
 }
 
 pub type Id {
+  Scene
   MainCamera
   AmbientLight
   DirectionalLight
@@ -127,7 +128,7 @@ fn list_at(list: List(a), index: Int) -> Result(a, Nil) {
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
+fn view(model: Model, _) -> scene.Node(Id) {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -142,8 +143,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
-    |> list.wrap
 
   let lights = [
     scene.light(
@@ -185,5 +186,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       )
     })
 
-  list.flatten([camera_node, lights, cubes])
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera_node,
+    ..list.append(lights, cubes)
+  ])
 }

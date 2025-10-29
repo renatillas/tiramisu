@@ -23,6 +23,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -177,7 +178,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -189,11 +190,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         active: True,
         viewport: option.None,
         camera: _,
+        postprocessing: option.None,
       )
-      |> list.wrap
     })
 
-  let lights = [
+  let ambient =
     scene.light(
       id: Ambient,
       light: {
@@ -201,7 +202,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.identity,
-    ),
+    )
+
+  let directional =
     scene.light(
       id: Directional,
       light: {
@@ -210,8 +213,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
-    ),
-  ]
+    )
 
   case model.load_state {
     Loading -> {
@@ -243,8 +245,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             )),
           physics: option.None,
         )
-        |> list.wrap
-      list.flatten([camera, loading_cube, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        loading_cube,
+      ])
     }
 
     Failed(_error_msg) -> {
@@ -270,8 +276,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
-        |> list.wrap
-      list.flatten([camera, error_cube, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        error_cube,
+      ])
     }
 
     Loaded(gltf_model) -> {
@@ -306,7 +316,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           physics: option.None,
         )
 
-      [model_node, ..lights]
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        model_node,
+      ])
     }
   }
 }

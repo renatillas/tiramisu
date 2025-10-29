@@ -655,7 +655,7 @@ export function createBasicMaterial(color, transparent, opacity, map) {
  * @param {THREE.Texture|null} metalnessMap
  * @returns {THREE.MeshStandardMaterial}
  */
-export function createStandardMaterial(color, metalness, roughness, transparent, opacity, map, normalMap, aoMap, roughnessMap, metalnessMap) {
+export function createStandardMaterial(color, metalness, roughness, transparent, opacity, map, normalMap, aoMap, roughnessMap, metalnessMap, emissive, emissiveIntensity) {
   const validMap = optionToNull(map);
   const validNormalMap = optionToNull(normalMap);
   const validAoMap = optionToNull(aoMap);
@@ -672,7 +672,9 @@ export function createStandardMaterial(color, metalness, roughness, transparent,
     normalMap: validNormalMap,
     aoMap: validAoMap,
     roughnessMap: validRoughnessMap,
-    metalnessMap: validMetalnessMap
+    metalnessMap: validMetalnessMap,
+    emissive,
+    emissiveIntensity
   });
 
   if (validNormalMap) {
@@ -2293,12 +2295,16 @@ export function addToScene(scene, object) {
 }
 
 /**
- * Remove object from scene
- * @param {THREE.Scene} scene
+ * Remove object from its parent (works for both scene root and nested parents)
+ * @param {THREE.Scene} scene - Not used anymore, kept for API compatibility
  * @param {THREE.Object3D} object
  */
 export function removeFromScene(scene, object) {
-  scene.remove(object);
+  // Use removeFromParent() instead of scene.remove() to handle nested hierarchies
+  // This works whether the object is a direct child of the scene or nested deeper
+  if (object && object.removeFromParent) {
+    object.removeFromParent();
+  }
 }
 
 /**
@@ -2740,4 +2746,353 @@ export function updateGroupInstancedMeshes(object, instances) {
       updateInstancedMeshTransforms(child, instances);
     }
   });
+}
+
+// ============================================================================
+// POST-PROCESSING
+// ============================================================================
+
+// Note: Post-processing imports are lazy-loaded to avoid import errors
+// if the addons are not available. The imports are done inside the functions.
+
+/**
+ * Create an EffectComposer for post-processing
+ * @param {THREE.WebGLRenderer} renderer
+ * @returns {Promise<any>} EffectComposer instance
+ */
+export async function createEffectComposer(renderer) {
+  const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js');
+  return new EffectComposer(renderer);
+}
+
+/**
+ * Add render pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {THREE.Scene} scene
+ * @param {THREE.Camera} camera
+ * @returns {Promise<void>}
+ */
+export async function addRenderPass(composer, scene, camera) {
+  const { RenderPass } = await import('three/addons/postprocessing/RenderPass.js');
+  const pass = new RenderPass(scene, camera);
+  composer.addPass(pass);
+}
+
+/**
+ * Add bloom pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} strength
+ * @param {number} threshold
+ * @param {number} radius
+ * @returns {Promise<void>}
+ */
+export async function addBloomPass(composer, strength, threshold, radius) {
+  const { UnrealBloomPass } = await import('three/addons/postprocessing/UnrealBloomPass.js');
+  const resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
+  const pass = new UnrealBloomPass(resolution, strength, radius, threshold);
+  composer.addPass(pass);
+}
+
+/**
+ * Add pixelation pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} pixelSize
+ * @param {number} normalEdgeStrength
+ * @param {number} depthEdgeStrength
+ * @returns {Promise<void>}
+ */
+export async function addPixelatePass(composer, pixelSize, normalEdgeStrength, depthEdgeStrength) {
+  const { ShaderPass } = await import('three/addons/postprocessing/ShaderPass.js');
+
+  const pixelShader = {
+    uniforms: {
+      'tDiffuse': { value: null },
+      'resolution': { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      'pixelSize': { value: pixelSize },
+      'normalEdgeStrength': { value: normalEdgeStrength },
+      'depthEdgeStrength': { value: depthEdgeStrength },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform vec2 resolution;
+      uniform float pixelSize;
+      uniform float normalEdgeStrength;
+      uniform float depthEdgeStrength;
+      varying vec2 vUv;
+
+      void main() {
+        vec2 dxy = pixelSize / resolution;
+        vec2 coord = dxy * floor(vUv / dxy);
+        vec4 color = texture2D(tDiffuse, coord);
+
+        // Simple edge detection if strength > 0
+        if (normalEdgeStrength > 0.0 || depthEdgeStrength > 0.0) {
+          vec4 edgeColor = vec4(0.0, 0.0, 0.0, 1.0);
+
+          // Sample neighbors
+          vec4 n = texture2D(tDiffuse, coord + vec2(0.0, dxy.y));
+          vec4 s = texture2D(tDiffuse, coord - vec2(0.0, dxy.y));
+          vec4 e = texture2D(tDiffuse, coord + vec2(dxy.x, 0.0));
+          vec4 w = texture2D(tDiffuse, coord - vec2(dxy.x, 0.0));
+
+          // Compute edge strength based on color difference
+          float edge = 0.0;
+          edge += length(color.rgb - n.rgb);
+          edge += length(color.rgb - s.rgb);
+          edge += length(color.rgb - e.rgb);
+          edge += length(color.rgb - w.rgb);
+          edge *= 0.25;
+
+          // Apply edge
+          float edgeStrength = max(normalEdgeStrength, depthEdgeStrength);
+          if (edge > 0.3 * edgeStrength) {
+            color = mix(color, edgeColor, min(edge * edgeStrength, 1.0));
+          }
+        }
+
+        gl_FragColor = color;
+      }
+    `
+  };
+
+  const pass = new ShaderPass(pixelShader);
+  composer.addPass(pass);
+
+  // Store reference for resize updates
+  if (!composer.userData) composer.userData = {};
+  if (!composer.userData.pixelatePasses) composer.userData.pixelatePasses = [];
+  composer.userData.pixelatePasses.push(pass);
+}
+
+/**
+ * Add film grain pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} noiseIntensity
+ * @param {number} scanlineIntensity
+ * @param {number} scanlineCount
+ * @param {boolean} grayscale
+ * @returns {Promise<void>}
+ */
+export async function addFilmPass(composer, noiseIntensity, scanlineIntensity, scanlineCount, grayscale) {
+  const { FilmPass } = await import('three/addons/postprocessing/FilmPass.js');
+  const pass = new FilmPass(noiseIntensity, scanlineIntensity, scanlineCount, grayscale);
+  composer.addPass(pass);
+}
+
+/**
+ * Add vignette pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} darkness
+ * @param {number} offset
+ * @returns {Promise<void>}
+ */
+export async function addVignettePass(composer, darkness, offset) {
+  const { ShaderPass } = await import('three/addons/postprocessing/ShaderPass.js');
+
+  const vignetteShader = {
+    uniforms: {
+      'tDiffuse': { value: null },
+      'offset': { value: offset },
+      'darkness': { value: darkness },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float offset;
+      uniform float darkness;
+      varying vec2 vUv;
+
+      void main() {
+        vec4 texel = texture2D(tDiffuse, vUv);
+        vec2 uv = (vUv - vec2(0.5)) * vec2(offset);
+        float vignette = 1.0 - dot(uv, uv);
+        texel.rgb *= mix(1.0, vignette, darkness);
+        gl_FragColor = texel;
+      }
+    `
+  };
+
+  const pass = new ShaderPass(vignetteShader);
+  composer.addPass(pass);
+}
+
+/**
+ * Add FXAA anti-aliasing pass to composer
+ * @param {any} composer - EffectComposer
+ * @returns {Promise<void>}
+ */
+export async function addFXAAPass(composer) {
+  const { ShaderPass } = await import('three/addons/postprocessing/ShaderPass.js');
+  const { FXAAShader } = await import('three/addons/shaders/FXAAShader.js');
+
+  const pass = new ShaderPass(FXAAShader);
+  const pixelRatio = window.devicePixelRatio || 1;
+  pass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+  pass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+  composer.addPass(pass);
+
+  // Store reference for resize updates
+  if (!composer.userData) composer.userData = {};
+  if (!composer.userData.fxaaPasses) composer.userData.fxaaPasses = [];
+  composer.userData.fxaaPasses.push(pass);
+}
+
+/**
+ * Add glitch pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} dtSize
+ * @returns {Promise<void>}
+ */
+export async function addGlitchPass(composer, dtSize) {
+  const { GlitchPass } = await import('three/addons/postprocessing/GlitchPass.js');
+  const pass = new GlitchPass(dtSize);
+  composer.addPass(pass);
+}
+
+/**
+ * Add color correction pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {number} brightness
+ * @param {number} contrast
+ * @param {number} saturation
+ * @returns {Promise<void>}
+ */
+export async function addColorCorrectionPass(composer, brightness, contrast, saturation) {
+  const { ShaderPass } = await import('three/addons/postprocessing/ShaderPass.js');
+
+  const colorCorrectionShader = {
+    uniforms: {
+      'tDiffuse': { value: null },
+      'brightness': { value: brightness },
+      'contrast': { value: contrast },
+      'saturation': { value: saturation },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float brightness;
+      uniform float contrast;
+      uniform float saturation;
+      varying vec2 vUv;
+
+      void main() {
+        vec4 color = texture2D(tDiffuse, vUv);
+
+        // Brightness
+        color.rgb += brightness;
+
+        // Contrast
+        color.rgb = (color.rgb - 0.5) * (1.0 + contrast) + 0.5;
+
+        // Saturation
+        float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+        color.rgb = mix(vec3(gray), color.rgb, 1.0 + saturation);
+
+        gl_FragColor = color;
+      }
+    `
+  };
+
+  const pass = new ShaderPass(colorCorrectionShader);
+  composer.addPass(pass);
+}
+
+/**
+ * Add custom shader pass to composer
+ * @param {any} composer - EffectComposer
+ * @param {string} vertexShader
+ * @param {string} fragmentShader
+ * @param {Array} uniforms - Array of {name, value} objects
+ * @returns {Promise<void>}
+ */
+export async function addCustomShaderPass(composer, vertexShader, fragmentShader, uniforms) {
+  const { ShaderPass } = await import('three/addons/postprocessing/ShaderPass.js');
+
+  // Convert Gleam uniform list to shader uniforms object
+  const shaderUniforms = {
+    'tDiffuse': { value: null }
+  };
+
+  for (const uniform of uniforms) {
+    const [name, value] = uniform;
+    // Value comes from Gleam's UniformValue type
+    if (value && typeof value === 'object') {
+      if ('FloatUniform' in value) {
+        shaderUniforms[name] = { value: value.FloatUniform[0] };
+      } else if ('IntUniform' in value) {
+        shaderUniforms[name] = { value: value.IntUniform[0] };
+      } else if ('Vec2Uniform' in value) {
+        shaderUniforms[name] = { value: new THREE.Vector2(value.Vec2Uniform[0], value.Vec2Uniform[1]) };
+      } else if ('Vec3Uniform' in value) {
+        shaderUniforms[name] = { value: new THREE.Vector3(value.Vec3Uniform[0], value.Vec3Uniform[1], value.Vec3Uniform[2]) };
+      } else if ('ColorUniform' in value) {
+        shaderUniforms[name] = { value: new THREE.Color(value.ColorUniform[0]) };
+      }
+    }
+  }
+
+  const shader = {
+    uniforms: shaderUniforms,
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader
+  };
+
+  const pass = new ShaderPass(shader);
+  composer.addPass(pass);
+}
+
+/**
+ * Render using effect composer
+ * @param {any} composer - EffectComposer
+ * @param {number} deltaTime - in milliseconds
+ */
+export function renderComposer(composer, deltaTime) {
+  composer.render(deltaTime / 1000.0);
+}
+
+/**
+ * Set composer size (called on resize)
+ * @param {any} composer - EffectComposer
+ * @param {number} width
+ * @param {number} height
+ */
+export function setComposerSize(composer, width, height) {
+  composer.setSize(width, height);
+
+  // Update resolution-dependent passes
+  const pixelRatio = window.devicePixelRatio || 1;
+
+  // Update FXAA passes
+  if (composer.userData && composer.userData.fxaaPasses) {
+    for (const pass of composer.userData.fxaaPasses) {
+      pass.material.uniforms['resolution'].value.x = 1 / (width * pixelRatio);
+      pass.material.uniforms['resolution'].value.y = 1 / (height * pixelRatio);
+    }
+  }
+
+  // Update pixelate passes
+  if (composer.userData && composer.userData.pixelatePasses) {
+    for (const pass of composer.userData.pixelatePasses) {
+      pass.uniforms['resolution'].value.set(width, height);
+    }
+  }
 }

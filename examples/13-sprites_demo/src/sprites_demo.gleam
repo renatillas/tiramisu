@@ -21,11 +21,10 @@ import vec/vec3
 
 pub type Id {
   MainCamera
+  Scene
   Ambient
-  Sprite1
-  Sprite2
-  Sprite3
-  Sprite4
+  Sprite(Int)
+  Sprites
 }
 
 pub type Model {
@@ -72,10 +71,7 @@ fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
         promise.map(asset.load_texture(url), fn(result) {
           case result {
             Ok(tex) -> TextureLoaded(name, tex)
-            Error(error) -> {
-              echo error
-              NoOp
-            }
+            Error(_) -> NoOp
           }
         }),
       )
@@ -98,7 +94,7 @@ fn update(
 
     TextureLoaded(name, tex) -> {
       let new_textures = dict.insert(model.textures, name, tex)
-      let loading_complete = echo dict.size(new_textures) >= 4
+      let loading_complete = dict.size(new_textures) >= 4
       #(
         Model(..model, textures: new_textures, loading_complete:),
         effect.none(),
@@ -108,7 +104,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
+fn view(model: Model, _) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -120,8 +116,8 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         look_at: option.None,
         viewport: option.None,
         camera: _,
+        postprocessing: option.None,
       )
-      |> list.wrap
     })
 
   let lights =
@@ -133,126 +129,132 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       },
       transform: transform.identity,
     )
-    |> list.wrap
 
   // Show loading text or sprites
   case model.loading_complete {
-    False -> list.flatten([camera, lights])
-    True -> {
-      let sprites = [
-        // Emoji 1 - rotating in circle
-        dict.get(model.textures, "emoji1")
-          |> result.map(fn(tex) {
-            let x = 3.0 *. maths.cos(model.rotation)
-            let y = 3.0 *. maths.sin(model.rotation)
-
-            scene.mesh(
-              id: Sprite1,
-              geometry: {
-                let assert Ok(geometry) =
-                  geometry.plane(width: 2.0, height: 2.0)
-                geometry
-              },
-              material: {
-                let assert Ok(material) =
-                  material.basic(
-                    color: 0xffffff,
-                    transparent: True,
-                    opacity: 1.0,
-                    map: option.Some(tex),
-                  )
-                material
-              },
-              transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
-              physics: option.None,
-            )
-          }),
-        // Emoji 2 - rotating opposite direction
-        dict.get(model.textures, "emoji2")
-          |> result.map(fn(tex) {
-            let x = 3.0 *. maths.cos(0.0 -. model.rotation)
-            let y = 3.0 *. maths.sin(0.0 -. model.rotation)
-            scene.mesh(
-              id: Sprite2,
-              geometry: {
-                let assert Ok(geometry) =
-                  geometry.plane(width: 2.0, height: 2.0)
-                geometry
-              },
-              material: {
-                let assert Ok(material) =
-                  material.basic(
-                    color: 0xffffff,
-                    transparent: True,
-                    opacity: 1.0,
-                    map: option.Some(tex),
-                  )
-                material
-              },
-              transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
-              physics: option.None,
-            )
-          }),
-        // Emoji 3 - center, spinning
-        dict.get(model.textures, "emoji3")
-          |> result.map(fn(tex) {
-            scene.mesh(
-              id: Sprite3,
-              geometry: {
-                let assert Ok(geometry) =
-                  geometry.plane(width: 1.5, height: 1.5)
-                geometry
-              },
-              material: {
-                let assert Ok(material) =
-                  material.basic(
-                    color: 0xffffff,
-                    transparent: True,
-                    opacity: 1.0,
-                    map: option.Some(tex),
-                  )
-                material
-              },
-              transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-                |> transform.with_euler_rotation(vec3.Vec3(
-                  0.0,
-                  0.0,
-                  model.rotation *. 2.0,
-                )),
-              physics: option.None,
-            )
-          }),
-        // Emoji 4 - bouncing
-        dict.get(model.textures, "emoji4")
-          |> result.map(fn(tex) {
-            let y = maths.sin(model.rotation *. 2.0) *. 2.0
-            scene.mesh(
-              id: Sprite4,
-              geometry: {
-                let assert Ok(geometry) =
-                  geometry.plane(width: 2.0, height: 2.0)
-                geometry
-              },
-              material: {
-                let assert Ok(material) =
-                  material.basic(
-                    color: 0xffffff,
-                    transparent: True,
-                    opacity: 1.0,
-                    map: option.Some(tex),
-                  )
-                material
-              },
-              transform: transform.at(position: vec3.Vec3(0.0, y +. 4.0, 0.0)),
-              physics: option.None,
-            )
-          }),
-      ]
-
-      list.flatten([
+    False ->
+      scene.empty(id: Scene, transform: transform.identity, children: [
         camera,
         lights,
-        result.values(sprites),
+      ])
+    True -> {
+      let sprites =
+        [
+          // Emoji 1 - rotating in circle
+          dict.get(model.textures, "emoji1")
+            |> result.map(fn(tex) {
+              let x = 3.0 *. maths.cos(model.rotation)
+              let y = 3.0 *. maths.sin(model.rotation)
+
+              scene.mesh(
+                id: Sprite(1),
+                geometry: {
+                  let assert Ok(geometry) =
+                    geometry.plane(width: 2.0, height: 2.0)
+                  geometry
+                },
+                material: {
+                  let assert Ok(material) =
+                    material.basic(
+                      color: 0xffffff,
+                      transparent: True,
+                      opacity: 1.0,
+                      map: option.Some(tex),
+                    )
+                  material
+                },
+                transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
+                physics: option.None,
+              )
+            }),
+          // Emoji 2 - rotating opposite direction
+          dict.get(model.textures, "emoji2")
+            |> result.map(fn(tex) {
+              let x = 3.0 *. maths.cos(0.0 -. model.rotation)
+              let y = 3.0 *. maths.sin(0.0 -. model.rotation)
+              scene.mesh(
+                id: Sprite(2),
+                geometry: {
+                  let assert Ok(geometry) =
+                    geometry.plane(width: 2.0, height: 2.0)
+                  geometry
+                },
+                material: {
+                  let assert Ok(material) =
+                    material.basic(
+                      color: 0xffffff,
+                      transparent: True,
+                      opacity: 1.0,
+                      map: option.Some(tex),
+                    )
+                  material
+                },
+                transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
+                physics: option.None,
+              )
+            }),
+          // Emoji 3 - center, spinning
+          dict.get(model.textures, "emoji3")
+            |> result.map(fn(tex) {
+              scene.mesh(
+                id: Sprite(3),
+                geometry: {
+                  let assert Ok(geometry) =
+                    geometry.plane(width: 1.5, height: 1.5)
+                  geometry
+                },
+                material: {
+                  let assert Ok(material) =
+                    material.basic(
+                      color: 0xffffff,
+                      transparent: True,
+                      opacity: 1.0,
+                      map: option.Some(tex),
+                    )
+                  material
+                },
+                transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+                  |> transform.with_euler_rotation(vec3.Vec3(
+                    0.0,
+                    0.0,
+                    model.rotation *. 2.0,
+                  )),
+                physics: option.None,
+              )
+            }),
+          // Emoji 4 - bouncing
+          dict.get(model.textures, "emoji4")
+            |> result.map(fn(tex) {
+              let y = maths.sin(model.rotation *. 2.0) *. 2.0
+              scene.mesh(
+                id: Sprite(4),
+                geometry: {
+                  let assert Ok(geometry) =
+                    geometry.plane(width: 2.0, height: 2.0)
+                  geometry
+                },
+                material: {
+                  let assert Ok(material) =
+                    material.basic(
+                      color: 0xffffff,
+                      transparent: True,
+                      opacity: 1.0,
+                      map: option.Some(tex),
+                    )
+                  material
+                },
+                transform: transform.at(position: vec3.Vec3(0.0, y +. 4.0, 0.0)),
+                physics: option.None,
+              )
+            }),
+        ]
+        |> result.values
+        |> scene.empty(id: Sprites, transform: transform.identity, children: _)
+
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        lights,
+        sprites,
       ])
     }
   }

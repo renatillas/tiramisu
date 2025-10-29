@@ -10,7 +10,6 @@ import vec/vec3
 type TestId {
   Cube1
   Light1
-  Root
 }
 
 pub fn diff_empty_to_single_node_test() {
@@ -18,14 +17,16 @@ pub fn diff_empty_to_single_node_test() {
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
 
   let prev = option.None
-  let next =
-    option.Some(scene.mesh(
+  let next = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -39,15 +40,17 @@ pub fn diff_single_node_to_empty_test() {
   let assert Ok(geom) = geometry.box(1.0, 1.0, 1.0)
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
 
-  let prev =
-    option.Some(scene.mesh(
+  let prev = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
-  let next = option.None
+      children: [],
+    ),
+  ]
+  let next = []
 
   let patches = scene.diff(prev, next)
 
@@ -61,22 +64,26 @@ pub fn diff_transform_change_test() {
   let assert Ok(geom) = geometry.box(1.0, 1.0, 1.0)
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
 
-  let prev =
-    option.Some(scene.mesh(
+  let prev = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
-  let next =
-    option.Some(scene.mesh(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
       physics: option.None,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -93,22 +100,26 @@ pub fn diff_material_change_test() {
   let assert Ok(mat1) = material.basic(0xff0000, False, 1.0, option.None)
   let assert Ok(mat2) = material.basic(0x00ff00, False, 1.0, option.None)
 
-  let prev =
-    option.Some(scene.mesh(
+  let prev = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat1,
       transform: transform.identity,
       physics: option.None,
-    ))
-  let next =
-    option.Some(scene.mesh(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat2,
       transform: transform.identity,
       physics: option.None,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -123,22 +134,26 @@ pub fn diff_geometry_change_test() {
   let assert Ok(geom2) = geometry.sphere(2.0, 32, 16)
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
 
-  let prev =
-    option.Some(scene.mesh(
+  let prev = [
+    scene.mesh(
       id: Cube1,
       geometry: geom1,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
-  let next =
-    option.Some(scene.mesh(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.mesh(
       id: Cube1,
       geometry: geom2,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -153,31 +168,27 @@ pub fn diff_multiple_changes_test() {
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
   let assert Ok(light_obj) = light.directional(1.0, 0xffffff)
 
-  let prev =
-    option.Some(
-      scene.empty(id: Root, transform: transform.identity, children: [
-        scene.mesh(
-          id: Cube1,
-          geometry: geom,
-          material: mat,
-          transform: transform.identity,
-          physics: option.None,
-        ),
-      ]),
-    )
-  let next =
-    option.Some(
-      scene.empty(id: Root, transform: transform.identity, children: [
-        scene.mesh(
-          id: Cube1,
-          geometry: geom,
-          material: mat,
-          transform: transform.at(vec3.Vec3(10.0, 0.0, 0.0)),
-          physics: option.None,
-        ),
-        scene.light(id: Light1, light: light_obj, transform: transform.identity),
-      ]),
-    )
+  let prev = [
+    scene.mesh(
+      id: Cube1,
+      geometry: geom,
+      material: mat,
+      transform: transform.identity,
+      physics: option.None,
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.mesh(
+      id: Cube1,
+      geometry: geom,
+      material: mat,
+      transform: transform.at(vec3.Vec3(10.0, 0.0, 0.0)),
+      physics: option.None,
+      children: [],
+    ),
+    scene.light(id: Light1, light: light_obj, transform: transform.identity, children: []),
+  ]
 
   let patches = scene.diff(prev, next)
 
@@ -192,22 +203,26 @@ pub fn diff_no_changes_test() {
   let assert Ok(geom) = geometry.box(1.0, 1.0, 1.0)
   let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
 
-  let prev =
-    option.Some(scene.mesh(
+  let prev = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
-  let next =
-    option.Some(scene.mesh(
+      children: [],
+    ),
+  ]
+  let next = [
+    scene.mesh(
       id: Cube1,
       geometry: geom,
       material: mat,
       transform: transform.identity,
       physics: option.None,
-    ))
+      children: [],
+    ),
+  ]
 
   let patches = scene.diff(prev, next)
 

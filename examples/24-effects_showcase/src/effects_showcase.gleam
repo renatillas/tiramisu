@@ -570,10 +570,7 @@ fn start_tween(
   #(updated_model, [tween_effect, ..effects])
 }
 
-fn view(
-  model: Model,
-  _ctx: tiramisu.Context(String),
-) -> List(scene.Node(String)) {
+fn view(model: Model, _ctx: tiramisu.Context(String)) -> scene.Node(String) {
   // Camera
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -604,7 +601,7 @@ fn view(
   let assert Ok(directional) =
     light.directional(intensity: 0.8, color: 0xffffff)
 
-  [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
       id: "main",
       camera: cam,
@@ -612,6 +609,7 @@ fn view(
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.light(id: "ambient", light: ambient, transform: transform.identity),
     scene.light(
@@ -645,7 +643,7 @@ fn view(
       transform: transform.at(position: vec3.Vec3(0.0, -2.0, -3.0)),
       physics: option.None,
     ),
-  ]
+  ])
 }
 
 fn easing_to_string(easing: effect.Easing) -> String {

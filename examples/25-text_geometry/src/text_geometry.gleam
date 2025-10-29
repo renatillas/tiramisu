@@ -7,7 +7,6 @@
 /// - Animating text rotation
 import gleam/io
 import gleam/javascript/promise
-import gleam/list
 import gleam/option
 import tiramisu
 import tiramisu/asset
@@ -73,11 +72,7 @@ fn update(
 
     FontLoaded(font) -> {
       io.println("Font loaded successfully!")
-      #(
-        Model(..model, font: option.Some(font)),
-        effect.tick(Tick),
-        option.None,
-      )
+      #(Model(..model, font: option.Some(font)), effect.tick(Tick), option.None)
     }
 
     FontLoadError(_err) -> {
@@ -87,12 +82,12 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
-  let assert Ok(camera) =
+fn view(model: Model, _) -> scene.Node(String) {
+  let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera =
-    camera
+    cam
     |> scene.camera(
       id: "main_camera",
       camera: _,
@@ -100,10 +95,10 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
-    |> list.wrap
 
-  let lights = [
+  let ambient =
     scene.light(
       id: "ambient",
       light: {
@@ -111,7 +106,9 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         light
       },
       transform: transform.identity,
-    ),
+    )
+
+  let directional =
     scene.light(
       id: "directional",
       light: {
@@ -120,23 +117,14 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
         light
       },
       transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
-    ),
-  ]
+    )
 
   // Create text meshes if font is loaded
   let text_meshes = case model.font {
     option.None -> []
     option.Some(font) -> [
       // 3D text with bevel (top)
-      create_3d_text(
-        "3D TEXT",
-        font,
-        0.0,
-        3.0,
-        model.rotation,
-        0x00d4ff,
-        True,
-      ),
+      create_3d_text("3D TEXT", font, 0.0, 3.0, model.rotation, 0x00d4ff, True),
       // 3D text without bevel (middle)
       create_3d_text(
         "TIRAMISU",
@@ -152,7 +140,12 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
     ]
   }
 
-  list.flatten([camera, lights, text_meshes])
+  scene.empty(id: "scene", transform: transform.identity, children: [
+    camera,
+    ambient,
+    directional,
+    ..text_meshes
+  ])
 }
 
 /// Create 3D text with depth and optional beveling
@@ -165,18 +158,19 @@ fn create_3d_text(
   color: Int,
   bevel: Bool,
 ) -> scene.Node(String) {
-  let assert Ok(text_geom) = geometry.text(
-    text: text,
-    font: font,
-    size: 1.0,
-    depth: 0.3,
-    curve_segments: 12,
-    bevel_enabled: bevel,
-    bevel_thickness: 0.05,
-    bevel_size: 0.02,
-    bevel_offset: 0.0,
-    bevel_segments: 5,
-  )
+  let assert Ok(text_geom) =
+    geometry.text(
+      text: text,
+      font: font,
+      size: 1.0,
+      depth: 0.3,
+      curve_segments: 12,
+      bevel_enabled: bevel,
+      bevel_thickness: 0.05,
+      bevel_size: 0.02,
+      bevel_offset: 0.0,
+      bevel_segments: 5,
+    )
 
   let assert Ok(mat) =
     material.new()
@@ -190,7 +184,7 @@ fn create_3d_text(
     geometry: text_geom,
     material: mat,
     transform: transform.at(position: vec3.Vec3(x -. 3.5, y, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
+      |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
     physics: option.None,
   )
 }
@@ -204,19 +198,20 @@ fn create_flat_text(
   rotation: Float,
   color: Int,
 ) -> scene.Node(String) {
-  let assert Ok(text_geom) = geometry.text(
-    text: text,
-    font: font,
-    size: 1.0,
-    depth: 0.0,
-    // Flat text
-    curve_segments: 8,
-    bevel_enabled: False,
-    bevel_thickness: 0.0,
-    bevel_size: 0.0,
-    bevel_offset: 0.0,
-    bevel_segments: 1,
-  )
+  let assert Ok(text_geom) =
+    geometry.text(
+      text: text,
+      font: font,
+      size: 1.0,
+      depth: 0.0,
+      // Flat text
+      curve_segments: 8,
+      bevel_enabled: False,
+      bevel_thickness: 0.0,
+      bevel_size: 0.0,
+      bevel_offset: 0.0,
+      bevel_segments: 1,
+    )
 
   let assert Ok(mat) =
     material.new() |> material.with_color(color) |> material.build
@@ -226,7 +221,7 @@ fn create_flat_text(
     geometry: text_geom,
     material: mat,
     transform: transform.at(position: vec3.Vec3(x -. 2.5, y, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
+      |> transform.with_euler_rotation(vec3.Vec3(0.0, rotation, 0.0)),
     physics: option.None,
   )
 }

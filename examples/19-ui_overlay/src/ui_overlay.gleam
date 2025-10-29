@@ -223,6 +223,7 @@ fn health_color(health: Float) -> String {
 // --- Tiramisu Game ---
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -358,8 +359,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
   }
 }
 
-fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
-  [
+fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+  scene.empty(id: Scene, transform: transform.identity, children: [
     // Camera
     scene.camera(
       id: MainCamera,
@@ -372,6 +373,7 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
       active: True,
       look_at: option.None,
       viewport: None,
+      postprocessing: option.None,
     ),
     // Lights
     scene.light(
@@ -415,5 +417,5 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) {
         )),
       physics: None,
     ),
-  ]
+  ])
 }

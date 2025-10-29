@@ -13,6 +13,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -99,12 +100,12 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   echo debug.get_performance_stats()
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  [
+  scene.empty(id: Scene, transform: transform.identity, children: [
     scene.camera(
       id: MainCamera,
       camera: camera,
@@ -112,6 +113,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.light(
       id: Ambient,
@@ -237,5 +239,5 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
       physics: option.None,
     ),
-  ]
+  ])
 }

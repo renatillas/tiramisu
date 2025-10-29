@@ -19,6 +19,7 @@ import vec/vec3
 
 pub type Id {
   MainCamera
+  Scene
   Sun
   Cube
   CubeGroup
@@ -97,8 +98,8 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Id)) {
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) {
-  [
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+  scene.empty(id: Scene, transform: transform.identity, children: [
     // Camera
     scene.camera(
       id: MainCamera,
@@ -111,6 +112,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) {
       active: True,
       look_at: None,
       viewport: None,
+      postprocessing: option.None,
     ),
     // Light
     scene.light(
@@ -123,7 +125,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) {
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Left Cube with CSS2D label (always on top)
-    scene.group(
+    scene.empty(
       id: CubeGroup,
       transform: transform.identity
         |> transform.with_position(vec3.Vec3(-2.0, 0.0, 0.0))
@@ -158,7 +160,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) {
       ],
     ),
     // Right Cube with Sprite label (depth-aware with occlusion)
-    scene.group(
+    scene.empty(
       id: CubeGroup2,
       transform: transform.identity
         |> transform.with_position(vec3.Vec3(2.0, 0.0, 0.0))
@@ -185,7 +187,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) {
           physics: None,
         ),
         // Sprite Label - hides behind objects with depth occlusion
-        scene.sprite(
+        scene.canvas(
           id: CubeLabel2,
           picture: sprite_label_picture(model.rotation, model.frame),
           texture_width: 256,
@@ -196,5 +198,5 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) {
         ),
       ],
     ),
-  ]
+  ])
 }

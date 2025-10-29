@@ -17,12 +17,14 @@ import tiramisu/geometry
 import tiramisu/input
 import tiramisu/light
 import tiramisu/material
+import tiramisu/postprocessing
 import tiramisu/scene
 import tiramisu/state_machine
 import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   Main
   Ambient
   Directional
@@ -215,7 +217,7 @@ fn create_state_machine(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -227,10 +229,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         active: True,
         transform: transform.at(position: vec3.Vec3(0.0, 1.5, 20.0)),
         viewport: option.None,
+        postprocessing: option.None,
       )
     })
 
-  let lights = [
+  let ambient =
     scene.light(
       id: Ambient,
       light: {
@@ -238,7 +241,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.identity,
-    ),
+    )
+
+  let directional =
     scene.light(
       id: Directional,
       light: {
@@ -247,8 +252,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
-    ),
-  ]
+    )
 
   case model.load_state {
     Loading -> {
@@ -262,7 +266,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             geometry
           },
           material: {
-            let assert Ok(scene) =
+            let assert Ok(mat) =
               material.phong(
                 0x4ecdc4,
                 30.0,
@@ -270,7 +274,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
                 option.None,
                 option.None,
               )
-            scene
+            mat
           },
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_euler_rotation(vec3.Vec3(
@@ -280,7 +284,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             )),
           physics: option.None,
         )
-      [loading_cube, ..lights]
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        loading_cube,
+      ])
     }
 
     Failed(_error_msg) -> {
@@ -306,7 +315,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
-      [error_cube, ..lights]
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        error_cube,
+      ])
     }
 
     Loaded(data, machine) -> {
@@ -330,7 +344,12 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
           physics: option.None,
         )
 
-      [camera, character, ..lights]
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera,
+        ambient,
+        directional,
+        character,
+      ])
     }
   }
 }

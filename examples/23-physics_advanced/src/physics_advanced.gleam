@@ -55,6 +55,7 @@ pub type Msg {
 }
 
 pub type Ids {
+  Scene
   Ground
   MainCamera
   WallRight
@@ -304,7 +305,7 @@ fn collision_event_to_string(event: physics.CollisionEvent) -> String {
 
 // --- View ---
 
-fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
+fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
   let assert option.Some(physics_world) = context.physics_world
 
   let assert Ok(cam) =
@@ -357,7 +358,12 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       transform: transform.at(position: vec3.Vec3(0.0, -0.25, 0.0)),
       physics: option.Some({
         physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(transform.identity, 20.0, 0.5, 20.0))
+        |> physics.with_collider(physics.Box(
+          transform.identity,
+          20.0,
+          0.5,
+          20.0,
+        ))
         |> physics.with_friction(1.0)
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,
@@ -431,7 +437,12 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
         },
         physics: option.Some({
           physics.new_rigid_body(physics.Dynamic)
-          |> physics.with_collider(physics.Box(transform.identity, 1.0, 1.0, 1.0))
+          |> physics.with_collider(physics.Box(
+            transform.identity,
+            1.0,
+            1.0,
+            1.0,
+          ))
           |> physics.with_mass(1.0)
           |> physics.with_restitution(0.7)
           |> physics.with_friction(0.3)
@@ -540,7 +551,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       ),
     )
 
-  [
+  scene.empty(id: Scene, transform: transform.identity, children: [
     scene.camera(
       id: MainCamera,
       camera: cam,
@@ -548,6 +559,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       look_at: option.Some(vec3.Vec3(0.0, 2.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     ground,
     player,
@@ -567,5 +579,5 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> List(scene.Node(Ids)) {
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 7.5)),
     ),
     ..new_cubes
-  ]
+  ])
 }

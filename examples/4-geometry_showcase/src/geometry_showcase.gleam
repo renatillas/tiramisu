@@ -5,7 +5,6 @@
 /// - Cylinder, Torus, Tetrahedron, Icosahedron
 ///
 /// Each geometry rotates slowly to show its shape
-import gleam/list
 import gleam/option
 import tiramisu
 import tiramisu/background
@@ -55,7 +54,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, _) -> scene.Node(String) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -68,27 +67,28 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
-    |> list.wrap
-  let lights = [
-    scene.light(
-      id: "ambient",
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
-        light
-      },
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: "directional",
-      light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 0.8)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
-    ),
-  ]
+  let lights =
+    scene.empty(id: "lights", transform: transform.identity, children: [
+      scene.light(
+        id: "ambient",
+        light: {
+          let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: "directional",
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 0.8)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(10.0, 10.0, 10.0)),
+      ),
+    ])
 
   // Grid layout: 3 rows x 3 columns
   let assert Ok(box_geom) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
@@ -115,36 +115,41 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
   let assert Ok(tetrahedron_geom) = geometry.tetrahedron(radius: 1.5, detail: 0)
   let assert Ok(icosahedron_geom) = geometry.icosahedron(radius: 1.3, detail: 0)
 
-  let geometries = [
-    // Row 1
-    create_mesh("box", box_geom, -8.0, 4.0, model.rotation, 0xff6b6b),
-    create_mesh("sphere", sphere_geom, 0.0, 4.0, model.rotation, 0x4ecdc4),
-    create_mesh("cone", cone_geom, 8.0, 4.0, model.rotation, 0xffe66d),
-    // Row 2
-    create_mesh("plane", plane_geom, -8.0, 0.0, model.rotation, 0x95e1d3),
-    create_mesh("circle", circle_geom, 0.0, 0.0, model.rotation, 0xf38181),
-    create_mesh("cylinder", cylinder_geom, 8.0, 0.0, model.rotation, 0xa8e6cf),
-    // Row 3
-    create_mesh("torus", torus_geom, -8.0, -4.0, model.rotation, 0xdcedc1),
-    create_mesh(
-      "tetrahedron",
-      tetrahedron_geom,
-      0.0,
-      -4.0,
-      model.rotation,
-      0xffd3b6,
-    ),
-    create_mesh(
-      "icosahedron",
-      icosahedron_geom,
-      8.0,
-      -4.0,
-      model.rotation,
-      0xffaaa5,
-    ),
-  ]
+  let geometries =
+    scene.empty(id: "geometries", transform: transform.identity, children: [
+      // Row 1
+      create_mesh("box", box_geom, -8.0, 4.0, model.rotation, 0xff6b6b),
+      create_mesh("sphere", sphere_geom, 0.0, 4.0, model.rotation, 0x4ecdc4),
+      create_mesh("cone", cone_geom, 8.0, 4.0, model.rotation, 0xffe66d),
+      // Row 2
+      create_mesh("plane", plane_geom, -8.0, 0.0, model.rotation, 0x95e1d3),
+      create_mesh("circle", circle_geom, 0.0, 0.0, model.rotation, 0xf38181),
+      create_mesh("cylinder", cylinder_geom, 8.0, 0.0, model.rotation, 0xa8e6cf),
+      // Row 3
+      create_mesh("torus", torus_geom, -8.0, -4.0, model.rotation, 0xdcedc1),
+      create_mesh(
+        "tetrahedron",
+        tetrahedron_geom,
+        0.0,
+        -4.0,
+        model.rotation,
+        0xffd3b6,
+      ),
+      create_mesh(
+        "icosahedron",
+        icosahedron_geom,
+        8.0,
+        -4.0,
+        model.rotation,
+        0xffaaa5,
+      ),
+    ])
 
-  list.flatten([camera, lights, geometries])
+  scene.empty(id: "scene", transform: transform.identity, children: [
+    lights,
+    camera,
+    geometries,
+  ])
 }
 
 fn create_mesh(

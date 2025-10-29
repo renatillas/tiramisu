@@ -2,9 +2,33 @@
 import * as THREE from 'three';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js';
+import { ClearPass } from 'three/addons/postprocessing/ClearPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
+import { Option$Some, Option$None, Some, None } from '../gleam_stdlib/gleam/option.mjs';
 import * as INPUT from './tiramisu/input.mjs';
+import * as POSTPROCESSING from './tiramisu/postprocessing.mjs';
+import {
+  Pass$isRenderPass,
+  Pass$isClearPass,
+  Pass$isOutputPass,
+  Pass$isBloomPass,
+  Pass$isPixelatePass,
+  Pass$isFilmPass,
+  Pass$isVignettePass,
+  Pass$isFXAAPass,
+  Pass$isGlitchPass,
+  Pass$isColorCorrectionPass,
+  Pass$isCustomShaderPass
+} from './tiramisu/postprocessing.mjs';
 import { getActiveCamera, setSceneBackgroundColor, setSceneBackgroundTexture, setSceneBackgroundCubeTexture, loadTexture, loadEquirectangularTexture, loadCubeTexture } from './threejs.ffi.mjs';
 import { Background$isColor, Background$isTexture, Background$isEquirectangularTexture, Background$isCubeTexture, Background$Color$0, Background$Texture$0, Background$EquirectangularTexture$0, Background$CubeTexture$0 } from './tiramisu/background.mjs';
 
@@ -1484,6 +1508,284 @@ export function createDebugPoint(position, size, color) {
   return sphere;
 }
 
+// ============================================================================
+// POST-PROCESSING - Scene-level postprocessing effects
+// ============================================================================
+
+/**
+ * Create an EffectComposer from a Gleam PostProcessing configuration
+ * @param {THREE.WebGLRenderer} renderer - The WebGL renderer
+ * @param {THREE.Scene} scene - The Three.js scene
+ * @param {THREE.Camera} camera - The camera to render from
+ * @param {Object} postProcessingConfig - Gleam PostProcessing object
+ * @returns {EffectComposer} Configured EffectComposer
+ */
+function createEffectComposer(renderer, scene, camera, postProcessingConfig) {
+  const composer = new EffectComposer(renderer);
+
+  // Add all user-defined passes in order
+  const passes = POSTPROCESSING.get_passes(postProcessingConfig);
+  const passesArray = passes.toArray();
+
+  for (const gleamPass of passesArray) {
+    const threePass = createPassFromGleam(gleamPass, renderer, scene, camera);
+    if (threePass) {
+      composer.addPass(threePass);
+    }
+  }
+
+  return composer;
+}
+
+/**
+ * Create a Three.js pass from a Gleam Pass type
+ * @param {Object} gleamPass - Gleam Pass object
+ * @param {THREE.WebGLRenderer} renderer - The WebGL renderer (for size info)
+ * @returns {Object|null} Three.js pass or null if unsupported
+ */
+function createPassFromGleam(gleamPass, renderer, scene, camera) {
+  // Check which pass type this is using Gleam's generated predicates
+
+  // Pipeline passes (RenderPass, ClearPass, OutputPass)
+  if (Pass$isRenderPass(gleamPass)) {
+    const renderPass = new RenderPass(scene, camera);
+    return renderPass;
+  }
+
+  if (Pass$isClearPass(gleamPass)) {
+    const colorOption = gleamPass.color;
+    let clearColor;
+
+    if (colorOption instanceof Some) {
+      // User provided a custom color
+      clearColor = new THREE.Color(colorOption[0]);
+    } else {
+      // Use scene background color
+      if (scene.background && scene.background.isColor) {
+        clearColor = scene.background;
+      } else {
+        // Fallback to black if no background
+        clearColor = new THREE.Color(0x000000);
+      }
+    }
+
+    const clearPass = new ClearPass(clearColor, 1.0);
+    return clearPass;
+  }
+
+  if (Pass$isOutputPass(gleamPass)) {
+    const outputPass = new OutputPass();
+    return outputPass;
+  }
+
+  // Effect passes
+  if (Pass$isBloomPass(gleamPass)) {
+      const strength = gleamPass.strength;
+      const threshold = gleamPass.threshold;
+      const radius = gleamPass.radius;
+
+      const size = renderer.getSize(new THREE.Vector2());
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(size.x, size.y),
+        strength,
+        radius,
+        threshold
+      );
+      return bloomPass;
+  }
+
+  if (Pass$isPixelatePass(gleamPass)) {
+      // Pixelation effect using custom shader
+      const pixelSize = gleamPass.pixel_size;
+      const normalEdgeStrength = gleamPass.normal_edge_strength;
+      const depthEdgeStrength = gleamPass.depth_edge_strength;
+
+      const size = renderer.getSize(new THREE.Vector2());
+      const pixelateShader = {
+        uniforms: {
+          'tDiffuse': { value: null },
+          'resolution': { value: new THREE.Vector2(size.x, size.y) },
+          'pixelSize': { value: pixelSize },
+          'normalEdgeStrength': { value: normalEdgeStrength },
+          'depthEdgeStrength': { value: depthEdgeStrength }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform vec2 resolution;
+          uniform float pixelSize;
+          varying vec2 vUv;
+
+          void main() {
+            vec2 dxy = pixelSize / resolution;
+            vec2 coord = dxy * floor(vUv / dxy);
+            gl_FragColor = texture2D(tDiffuse, coord);
+          }
+        `
+      };
+
+      return new ShaderPass(pixelateShader);
+  }
+
+  if (Pass$isFilmPass(gleamPass)) {
+      const noiseIntensity = gleamPass.noise_intensity;
+      const grayscale = gleamPass.grayscale;
+      // Note: scanlineIntensity and scanlineCount were removed from FilmPass in newer Three.js versions
+      // The parameters are kept in the Gleam API for backward compatibility but ignored here
+
+      const filmPass = new FilmPass(noiseIntensity, grayscale);
+      return filmPass;
+  }
+
+  if (Pass$isVignettePass(gleamPass)) {
+      const darkness = gleamPass.darkness;
+      const offset = gleamPass.offset;
+
+      const vignetteShader = {
+        uniforms: {
+          'tDiffuse': { value: null },
+          'darkness': { value: darkness },
+          'offset': { value: offset }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float darkness;
+          uniform float offset;
+          varying vec2 vUv;
+
+          void main() {
+            vec4 texel = texture2D(tDiffuse, vUv);
+            vec2 uv = (vUv - 0.5) * 2.0;
+            float dist = length(uv);
+            float vignette = smoothstep(offset, offset - darkness, dist);
+            texel.rgb *= vignette;
+            gl_FragColor = texel;
+          }
+        `
+      };
+
+      return new ShaderPass(vignetteShader);
+  }
+
+  if (Pass$isFXAAPass(gleamPass)) {
+      const size = renderer.getSize(new THREE.Vector2());
+      const fxaaPass = new ShaderPass(FXAAShader);
+      fxaaPass.material.uniforms['resolution'].value.x = 1 / size.x;
+      fxaaPass.material.uniforms['resolution'].value.y = 1 / size.y;
+      return fxaaPass;
+  }
+
+  if (Pass$isGlitchPass(gleamPass)) {
+      const dtSize = gleamPass.dt_size;
+      const glitchPass = new GlitchPass(dtSize);
+      return glitchPass;
+  }
+
+  if (Pass$isColorCorrectionPass(gleamPass)) {
+      const brightness = gleamPass.brightness;
+      const contrast = gleamPass.contrast;
+      const saturation = gleamPass.saturation;
+
+      const colorCorrectionShader = {
+        uniforms: {
+          'tDiffuse': { value: null },
+          'brightness': { value: brightness },
+          'contrast': { value: contrast },
+          'saturation': { value: saturation }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float brightness;
+          uniform float contrast;
+          uniform float saturation;
+          varying vec2 vUv;
+
+          void main() {
+            vec4 texel = texture2D(tDiffuse, vUv);
+
+            // Brightness
+            texel.rgb += brightness;
+
+            // Contrast
+            texel.rgb = (texel.rgb - 0.5) * (1.0 + contrast) + 0.5;
+
+            // Saturation
+            float gray = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+            texel.rgb = mix(vec3(gray), texel.rgb, 1.0 + saturation);
+
+            gl_FragColor = texel;
+          }
+        `
+      };
+
+      return new ShaderPass(colorCorrectionShader);
+  }
+
+  if (Pass$isCustomShaderPass(gleamPass)) {
+      const vertexShader = gleamPass.vertex_shader;
+      const fragmentShader = gleamPass.fragment_shader;
+      const uniforms = gleamPass.uniforms;
+
+      // Convert Gleam uniforms to Three.js format
+      const threeUniforms = { 'tDiffuse': { value: null } };
+      const uniformsArray = uniforms.toArray();
+
+      for (const [name, value] of uniformsArray) {
+        const uniformVariant = value[0];
+
+        switch (uniformVariant) {
+          case 'FloatUniform':
+            threeUniforms[name] = { value: value[1] };
+            break;
+          case 'IntUniform':
+            threeUniforms[name] = { value: value[1] };
+            break;
+          case 'Vec2Uniform':
+            threeUniforms[name] = { value: new THREE.Vector2(value[1], value[2]) };
+            break;
+          case 'Vec3Uniform':
+            threeUniforms[name] = { value: new THREE.Vector3(value[1], value[2], value[3]) };
+            break;
+          case 'ColorUniform':
+            threeUniforms[name] = { value: new THREE.Color(value[1]) };
+            break;
+        }
+      }
+
+      const customShader = {
+        uniforms: threeUniforms,
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader
+      };
+
+      return new ShaderPass(customShader);
+  }
+
+  // Unknown pass type
+  console.warn('[Postprocessing] Unknown pass type:', gleamPass);
+  return null;
+}
+
 // --- Performance Monitoring ---
 
 /**
@@ -1838,7 +2140,7 @@ export function appendToDom(canvas) {
  */
 export function startLoop(
   state,
-  prevNodes,
+  prevNode,
   effect,
   context,
   rendererState,
@@ -1846,9 +2148,13 @@ export function startLoop(
   view,
 ) {
   let currentState = state;
-  let currentNodes = prevNodes;
+  let currentNode = prevNode;
   let currentRendererState = rendererState;
   let messageQueue = [];
+
+  // Per-camera postprocessing composers (created on demand, reused across frames)
+  // Map: cameraId (string) -> { composer: EffectComposer, config: PostProcessing }
+  const composersByCamera = new Map();
 
   // Extract renderer and scene from RendererState
   const renderer = SCENE.get_renderer(currentRendererState);
@@ -1944,6 +2250,86 @@ export function startLoop(
 
   let lastTime = performance.now();
 
+  /**
+   * Serialize a postprocessing configuration to a JSON string for comparison
+   * @param {Object} config - PostProcessing configuration from Gleam
+   * @returns {string} JSON representation
+   */
+  function serializePostprocessingConfig(config) {
+    if (!config) return 'null';
+
+    // Get passes from Gleam List and convert to JS array
+    const passesGleam = POSTPROCESSING.get_passes(config);
+    const passes = Array.from(passesGleam);
+
+    // Serialize to JSON for structural comparison
+    return JSON.stringify(passes);
+  }
+
+  /**
+   * Get or create an EffectComposer for a camera
+   * Automatically detects config changes and recreates composer if needed
+   * @param {string} cameraId - Camera ID string
+   * @param {Object} postProcessingConfig - Gleam PostProcessing configuration
+   * @param {THREE.Camera} camera - Three.js camera object
+   * @param {Object|null} viewport - Viewport configuration or null
+   * @returns {EffectComposer}
+   */
+  function getOrCreateComposer(cameraId, postProcessingConfig, camera, viewport) {
+    // Serialize IMMEDIATELY before any comparison to capture current state
+    // (Gleam may reuse/mutate objects for performance)
+    const currentConfigJson = serializePostprocessingConfig(postProcessingConfig);
+
+    const cached = composersByCamera.get(cameraId);
+
+    // Check if we need to recreate the composer
+    let needsRecreate = false;
+
+    if (!cached) {
+      needsRecreate = true;
+    } else {
+      // Compare serialized configs using string equality
+      if (cached.configJson !== currentConfigJson) {
+        // Config changed - dispose old composer and recreate
+        needsRecreate = true;
+        cached.composer.dispose();
+      }
+    }
+
+    if (needsRecreate) {
+      // Create new composer for this camera
+      const composer = createEffectComposer(renderer, scene, camera, postProcessingConfig);
+
+      // Set composer size based on viewport or canvas
+      if (viewport) {
+        composer.setSize(viewport.width, viewport.height);
+      } else {
+        const canvas = renderer.domElement;
+        composer.setSize(canvas.clientWidth, canvas.clientHeight);
+      }
+
+      // Store composer with serialized config for future comparison
+      // Use the SAME serialized string we just computed
+      composersByCamera.set(cameraId, { composer, configJson: currentConfigJson });
+
+      return composer;
+    }
+
+    return cached.composer;
+  }
+
+  /**
+   * Dispose a composer for a camera
+   * @param {string} cameraId - Camera ID string
+   */
+  function disposeComposer(cameraId) {
+    const cached = composersByCamera.get(cameraId);
+    if (cached) {
+      cached.composer.dispose();
+      composersByCamera.delete(cameraId);
+    }
+  }
+
   function gameLoop() {
     const currentTime = performance.now();
     const deltaTime = currentTime - lastTime
@@ -1987,14 +2373,23 @@ export function startLoop(
       runEffect(newEffect, dispatch);
     }
 
-    // Generate new scene nodes - pass context to view
-    const newNodes = view(currentState, newContext);
+    // Generate new scene root node - pass context to view
+    const newNode = view(currentState, newContext);
+
+    // Validate node is not null/undefined
+    if (!newNode) {
+      console.error('[Tiramisu] view() returned undefined/null node');
+      return;
+    }
 
     // Dirty flagging optimization: skip diff if scene hasn't changed (referential equality)
-    // This is extremely fast for static scenes where view() returns the same list reference
-    if (currentNodes !== newNodes) {
-      // Diff and patch using Gleam renderer
-      const patches = SCENE.diff(currentNodes, newNodes);
+    // This is extremely fast for static scenes where view() returns the same node reference
+    if (currentNode !== newNode) {
+      // Diff and patch using Gleam renderer - use proper Gleam Option constructors
+      const prevNode = currentNode ? Option$Some(currentNode) : Option$None();
+      const currNode = Option$Some(newNode);
+
+      const patches = SCENE.diff(prevNode, currNode);
       currentRendererState = SCENE.apply_patches(currentRendererState, patches);
 
       // Extract updated physics world from renderer (it may have new bodies)
@@ -2006,7 +2401,7 @@ export function startLoop(
         };
       }
 
-      currentNodes = newNodes;
+      currentNode = newNode;
     }
     // else: Scene unchanged, skip diff entirely (massive speedup for static/paused scenes)
 
@@ -2027,45 +2422,125 @@ export function startLoop(
     // Update physics debug visualization (pass scene from renderer state)
     debugManager.update(scene);
 
-    // Clear the entire canvas first
-    renderer.setScissorTest(false);
-    renderer.clear();
+    // Get all cameras with their viewport and postprocessing info
+    const cameraInfoList = SCENE.get_all_cameras_with_info(currentRendererState);
+    const allCameras = cameraInfoList.toArray(); // Convert Gleam list to JS array
 
-    // Render main camera (active camera without viewport)
-    const activeCamera = getActiveCamera();
-    if (activeCamera) {
-      renderer.setScissorTest(false);
-      renderer.setViewport(0, 0, canvasWidth, canvasHeight);
-      renderer.render(scene, activeCamera);
-    } else {
-      console.warn('[Game] No active camera found. Add a Camera scene node with active=True.');
+    // Split cameras into main (no viewport) and viewport cameras
+    const mainCameras = allCameras.filter(entry => {
+      const viewportOption = entry[2];
+      return !(viewportOption instanceof Some);
+    });
+
+    const viewportCameras = allCameras.filter(entry => {
+      const viewportOption = entry[2];
+      return viewportOption instanceof Some;
+    });
+
+    // Track active camera IDs for composer lifecycle management
+    const activeCameraIds = new Set();
+
+    // Check if any camera has postprocessing
+    const hasAnyCameraWithPostprocessing = allCameras.some(entry => {
+      const ppOption = entry[3];
+      return ppOption instanceof Some;
+    });
+
+    if (!hasAnyCameraWithPostprocessing) {
+      // Manual clear when no postprocessing
+      renderer.clear();
     }
 
-    // Render viewport cameras (picture-in-picture)
-    const viewportCamerasList = SCENE.get_cameras_with_viewports(currentRendererState);
-    const viewportCameras = viewportCamerasList.toArray(); // Convert Gleam list to JS array
+    // 1. Render the active main camera (fullscreen, no viewport)
+    const activeCamera = getActiveCamera();
+    if (activeCamera && mainCameras.length > 0) {
+      // Find the active camera info
+      const activeCameraInfo = mainCameras.find(entry => entry[1] === activeCamera);
+
+      if (activeCameraInfo) {
+        const cameraId = activeCameraInfo[0];
+        const camera = activeCameraInfo[1];
+        const postprocessingOption = activeCameraInfo[3];
+
+        activeCameraIds.add(cameraId);
+
+        // Fullscreen rendering
+        renderer.setViewport(0, 0, canvasWidth, canvasHeight);
+        renderer.setScissorTest(false);
+
+        // Render with or without postprocessing
+        if (postprocessingOption instanceof Some) {
+          // Camera has postprocessing - use composer
+          const postprocessingConfig = postprocessingOption[0];
+          const composer = getOrCreateComposer(cameraId, postprocessingConfig, camera, null);
+          composer.setSize(canvasWidth, canvasHeight);
+          composer.render(deltaTime / 1000); // Convert ms to seconds
+        } else {
+          // No postprocessing - direct render
+          const previousAutoClear = renderer.autoClear;
+          renderer.autoClear = false;
+          renderer.render(scene, camera);
+          renderer.autoClear = previousAutoClear;
+        }
+      }
+    } else if (mainCameras.length === 0 && viewportCameras.length === 0) {
+      console.warn('[Game] No cameras found. Add a Camera scene node.');
+    }
+
+    // 2. Render all viewport cameras (picture-in-picture / split-screen)
     if (viewportCameras.length > 0) {
       renderer.setScissorTest(true);
       for (const entry of viewportCameras) {
-        // Entry is a tuple [camera, viewport]
-        const camera = entry[0];
-        const viewport = entry[1];
-        // viewport is a Viewport object {x, y, width, height}
+        const cameraId = entry[0];
+        const camera = entry[1];
+        const viewportOption = entry[2];
+        const postprocessingOption = entry[3];
+
+        activeCameraIds.add(cameraId);
+
+        const viewport = viewportOption[0]; // Viewport {x, y, width, height}
+
+        // Set viewport and scissor
         renderer.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
         renderer.setScissor(viewport.x, viewport.y, viewport.width, viewport.height);
-        renderer.render(scene, camera);
+
+        // Check if we have postprocessing for this camera
+        if (postprocessingOption instanceof Some) {
+          // Get or create composer for this camera with viewport size
+          const composer = getOrCreateComposer(cameraId, postprocessingOption[0], camera, viewport);
+
+          // Render with postprocessing
+          const previousAutoClear = renderer.autoClear;
+          renderer.autoClear = false;
+          composer.render(deltaTime / 1000); // Convert ms to seconds
+          renderer.autoClear = previousAutoClear;
+        } else {
+          // Direct render without postprocessing
+          const previousAutoClear = renderer.autoClear;
+          renderer.autoClear = false;
+          renderer.render(scene, camera);
+          renderer.autoClear = previousAutoClear;
+        }
       }
       renderer.setScissorTest(false);
     }
 
-    // Render CSS2D UI overlays
-    if (activeCamera) {
-      css2dRenderer.render(scene, activeCamera);
+    // Dispose composers for cameras that no longer exist
+    for (const cameraId of composersByCamera.keys()) {
+      if (!activeCameraIds.has(cameraId)) {
+        disposeComposer(cameraId);
+      }
     }
 
-    // Render CSS3D UI elements
-    if (activeCamera) {
-      css3dRenderer.render(scene, activeCamera);
+    // Render CSS2D UI overlays (use the first camera or active camera)
+    const activeCameraForCSS = getActiveCamera();
+    if (activeCameraForCSS) {
+      css2dRenderer.render(scene, activeCameraForCSS);
+    }
+
+    // Render CSS3D UI elements (use the first camera or active camera)
+    if (activeCameraForCSS) {
+      css3dRenderer.render(scene, activeCameraForCSS);
     }
 
     // Update performance stats

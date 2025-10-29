@@ -63,6 +63,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/particle_emitter
 import tiramisu/physics
+import tiramisu/postprocessing
 import tiramisu/spritesheet
 import tiramisu/texture
 import tiramisu/transform
@@ -105,32 +106,53 @@ pub fn lod_level(distance distance: Float, node node: Node(id)) -> LODLevel(id) 
 }
 
 pub opaque type Node(id) {
+  /// Empty node for organization, pivot points, and grouping without visual representation.
+  /// Replaces the old Group type with clearer intent.
+  Empty(
+    id: id,
+    children: List(Node(id)),
+    transform: transform.Transform,
+  )
   Mesh(
     id: id,
+    children: List(Node(id)),
+    transform: transform.Transform,
     geometry: geometry.Geometry,
     material: material.Material,
-    transform: transform.Transform,
     physics: Option(physics.RigidBody),
   )
   InstancedMesh(
     id: id,
+    children: List(Node(id)),
     geometry: geometry.Geometry,
     material: material.Material,
     instances: List(transform.Transform),
   )
-  Group(id: id, transform: transform.Transform, children: List(Node(id)))
-  Light(id: id, light: light.Light, transform: transform.Transform)
+  Light(
+    id: id,
+    children: List(Node(id)),
+    transform: transform.Transform,
+    light: light.Light,
+  )
   Camera(
     id: id,
+    children: List(Node(id)),
     camera: camera.Camera,
     transform: transform.Transform,
     look_at: Option(vec3.Vec3(Float)),
     active: Bool,
     viewport: Option(#(Int, Int, Int, Int)),
+    postprocessing: Option(postprocessing.PostProcessing),
   )
-  LOD(id: id, levels: List(LODLevel(id)), transform: transform.Transform)
+  LOD(
+    id: id,
+    children: List(Node(id)),
+    levels: List(LODLevel(id)),
+    transform: transform.Transform,
+  )
   Model3D(
     id: id,
+    children: List(Node(id)),
     object: asset.Object3D,
     transform: transform.Transform,
     animation: Option(AnimationPlayback),
@@ -138,23 +160,40 @@ pub opaque type Node(id) {
   )
   InstancedModel(
     id: id,
+    children: List(Node(id)),
     object: asset.Object3D,
     instances: List(transform.Transform),
     physics: Option(physics.RigidBody),
   )
-  Audio(id: id, audio: audio.Audio)
+  Audio(
+    id: id,
+    children: List(Node(id)),
+    audio: audio.Audio,
+  )
   Particles(
     id: id,
+    children: List(Node(id)),
     emitter: particle_emitter.ParticleEmitter,
     transform: transform.Transform,
     active: Bool,
   )
   // UI overlay nodes
-  CSS2DLabel(id: id, html: String, transform: transform.Transform)
-  CSS3DLabel(id: id, html: String, transform: transform.Transform)
+  CSS2DLabel(
+    id: id,
+    children: List(Node(id)),
+    html: String,
+    transform: transform.Transform,
+  )
+  CSS3DLabel(
+    id: id,
+    children: List(Node(id)),
+    html: String,
+    transform: transform.Transform,
+  )
   // Canvas drawings rendered to texture with depth occlusion
   Canvas(
     id: id,
+    children: List(Node(id)),
     encoded_picture: String,
     texture_width: Int,
     texture_height: Int,
@@ -165,6 +204,7 @@ pub opaque type Node(id) {
   // Animated sprite with spritesheet
   AnimatedSprite(
     id: id,
+    children: List(Node(id)),
     spritesheet: spritesheet.Spritesheet,
     animation: spritesheet.Animation,
     state: spritesheet.AnimationState,
@@ -175,12 +215,47 @@ pub opaque type Node(id) {
     physics: Option(physics.RigidBody),
   )
   // Debug visualization nodes
-  DebugBox(id: id, min: Vec3(Float), max: Vec3(Float), color: Int)
-  DebugSphere(id: id, center: Vec3(Float), radius: Float, color: Int)
-  DebugLine(id: id, from: Vec3(Float), to: Vec3(Float), color: Int)
-  DebugAxes(id: id, origin: Vec3(Float), size: Float)
-  DebugGrid(id: id, size: Float, divisions: Int, color: Int)
-  DebugPoint(id: id, position: Vec3(Float), size: Float, color: Int)
+  DebugBox(
+    id: id,
+    children: List(Node(id)),
+    min: Vec3(Float),
+    max: Vec3(Float),
+    color: Int,
+  )
+  DebugSphere(
+    id: id,
+    children: List(Node(id)),
+    center: Vec3(Float),
+    radius: Float,
+    color: Int,
+  )
+  DebugLine(
+    id: id,
+    children: List(Node(id)),
+    from: Vec3(Float),
+    to: Vec3(Float),
+    color: Int,
+  )
+  DebugAxes(
+    id: id,
+    children: List(Node(id)),
+    origin: Vec3(Float),
+    size: Float,
+  )
+  DebugGrid(
+    id: id,
+    children: List(Node(id)),
+    size: Float,
+    divisions: Int,
+    color: Int,
+  )
+  DebugPoint(
+    id: id,
+    children: List(Node(id)),
+    position: Vec3(Float),
+    size: Float,
+    color: Int,
+  )
 }
 
 /// Create a mesh scene node.
@@ -206,12 +281,13 @@ pub opaque type Node(id) {
 ///   |> material.with_color(0xff0000)
 ///   |> material.build()
 ///
-/// scene.Mesh(
+/// scene.mesh(
 ///   id: "player",
 ///   geometry: cube_geo,
 ///   material: red_mat,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 1.0, 0.0)),
 ///   physics: option.None,
+///   children: [],
 /// )
 /// ```
 pub fn mesh(
@@ -221,7 +297,14 @@ pub fn mesh(
   transform transform: transform.Transform,
   physics physics: Option(physics.RigidBody),
 ) -> Node(id) {
-  Mesh(id:, geometry:, material:, transform:, physics:)
+  Mesh(
+    id:,
+    children: [],
+    transform:,
+    geometry:,
+    material:,
+    physics:,
+  )
 }
 
 /// Create an instanced mesh for rendering many identical objects efficiently.
@@ -270,51 +353,46 @@ pub fn instanced_mesh(
   geometry geometry: geometry.Geometry,
   material material: material.Material,
   instances instances: List(transform.Transform),
-) {
-  InstancedMesh(id:, geometry:, material:, instances:)
+) -> Node(id) {
+  InstancedMesh(
+    id:,
+    geometry:,
+    material:,
+    instances:,
+    children: [],
+  )
 }
 
-/// Create a group node for scene hierarchy.
+/// Create an empty node for organization, pivot points, or grouping.
 ///
-/// Groups allow you to organize nodes in a parent-child hierarchy. The group's transform
-/// is applied to all children, making it easy to move/rotate/scale multiple objects together.
+/// Empty nodes don't render anything but are useful for organizing your scene hierarchy,
+/// creating pivot points for rotation/animation, or grouping related objects.
+///
+/// This replaces the old `group` function with clearer intent.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import tiramisu/scene
 /// import tiramisu/transform
-/// import vec/vec3
 ///
-/// // Solar system: sun with orbiting planets
-/// scene.Group(
-///   id: "solar-system",
-///   transform: transform.identity,
+/// // Group car parts together
+/// scene.empty(
+///   id: "car",
+///   transform: car_transform,
 ///   children: [
-///     scene.Mesh(...),  // Sun at center
-///     scene.Group(
-///       id: "earth-orbit",
-///       transform: transform.at(position: vec3.Vec3(10.0, 0.0, 0.0))
-///         |> transform.rotate_y(model.earth_angle),
-///       children: [
-///         scene.Mesh(...),  // Earth
-///         scene.Group(
-///           id: "moon-orbit",
-///           transform: transform.at(position: vec3.Vec3(2.0, 0.0, 0.0))
-///             |> transform.rotate_y(model.moon_angle),
-///           children: [scene.Mesh(...)],  // Moon
-///         ),
-///       ],
-///     ),
+///     scene.mesh(id: "body", ..., children: []),
+///     scene.mesh(id: "wheel-fl", ..., children: []),
+///     scene.mesh(id: "wheel-fr", ..., children: []),
 ///   ],
 /// )
 /// ```
-pub fn group(
+pub fn empty(
   id id: id,
   transform transform: transform.Transform,
   children children: List(Node(id)),
-) {
-  Group(id:, transform:, children:)
+) -> Node(id) {
+  Empty(id:, children:, transform:)
 }
 
 /// Create a light scene node.
@@ -334,7 +412,7 @@ pub fn group(
 /// let assert Ok(sun) = light.directional(intensity: 1.2, color: 0xffffff)
 ///   |> light.with_shadows(True)
 ///
-/// scene.Light(
+/// scene.light(
 ///   id: "sun",
 ///   light: sun,
 ///   transform: transform.identity
@@ -345,8 +423,8 @@ pub fn light(
   id id: id,
   light light: light.Light,
   transform transform: transform.Transform,
-) {
-  Light(id: id, light:, transform:)
+) -> Node(id) {
+  Light(id:, children: [], transform:, light:)
 }
 
 /// Viewport configuration for split-screen or picture-in-picture rendering.
@@ -386,7 +464,7 @@ pub type ViewPort {
 /// // Main perspective camera
 /// let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 ///
-/// scene.Camera(
+/// scene.camera(
 ///   id: "main-camera",
 ///   camera: cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
@@ -400,7 +478,7 @@ pub type ViewPort {
 ///   left: -20.0, right: 20.0, top: 20.0, bottom: -20.0, near: 0.1, far: 100.0
 /// )
 ///
-/// scene.Camera(
+/// scene.camera(
 ///   id: "minimap",
 ///   camera: minimap_cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 50.0, 0.0))
@@ -417,9 +495,11 @@ pub fn camera(
   look_at look_at: Option(vec3.Vec3(Float)),
   active active: Bool,
   viewport viewport: Option(ViewPort),
-) {
+  postprocessing postprocessing: Option(postprocessing.PostProcessing),
+) -> Node(id) {
   Camera(
-    id: id,
+    id:,
+    children: [],
     camera:,
     transform:,
     look_at:,
@@ -427,6 +507,7 @@ pub fn camera(
     viewport: option.map(viewport, fn(viewport) {
       #(viewport.x, viewport.y, viewport.width, viewport.height)
     }),
+    postprocessing:,
   )
 }
 
@@ -449,7 +530,7 @@ pub fn camera(
 /// // High detail mesh (shown up close)
 /// let assert Ok(high_geo) = geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 32)
 /// let assert Ok(mat) = material.new() |> material.with_color(0x00ff00) |> material.build()
-/// let high_detail = scene.Mesh(
+/// let high_detail = scene.mesh(
 ///   id: "tree-high",
 ///   geometry: high_geo,
 ///   material: mat,
@@ -459,7 +540,7 @@ pub fn camera(
 ///
 /// // Low detail mesh (shown far away)
 /// let assert Ok(low_geo) = geometry.sphere(radius: 1.0, width_segments: 8, height_segments: 8)
-/// let low_detail = scene.Mesh(
+/// let low_detail = scene.mesh(
 ///   id: "tree-low",
 ///   geometry: low_geo,
 ///   material: mat,
@@ -467,7 +548,7 @@ pub fn camera(
 ///   physics: option.None,
 /// )
 ///
-/// scene.LOD(
+/// scene.lod(
 ///   id: "optimized-tree",
 ///   levels: [
 ///     scene.lod_level(distance: 0.0, node: high_detail),   // 0-50 units away
@@ -480,8 +561,8 @@ pub fn lod(
   id id: id,
   levels levels: List(LODLevel(id)),
   transform transform: transform.Transform,
-) {
-  LOD(id:, levels:, transform:)
+) -> Node(id) {
+  LOD(id:, levels:, transform:, children: [])
 }
 
 /// Create a 3D model node from a loaded asset (GLTF, FBX, OBJ).
@@ -528,8 +609,15 @@ pub fn model_3d(
   transform transform: transform.Transform,
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
-) {
-  Model3D(id:, object:, transform:, animation:, physics:)
+) -> Node(id) {
+  Model3D(
+    id:,
+    object:,
+    transform:,
+    animation:,
+    physics:,
+    children: [],
+  )
 }
 
 /// Create instanced 3D models for rendering many copies of a loaded asset.
@@ -560,7 +648,7 @@ pub fn model_3d(
 ///     transform.at(position: vec3.Vec3(x, 0.0, z))
 ///   })
 ///
-/// scene.InstancedModel(
+/// scene.instanced_model(
 ///   id: "rock-field",
 ///   object: rock_data.scene,
 ///   instances: rock_positions,
@@ -572,8 +660,14 @@ pub fn instanced_model(
   object object: asset.Object3D,
   instances instances: List(transform.Transform),
   physics physics: Option(physics.RigidBody),
-) {
-  InstancedModel(id:, object:, instances:, physics:)
+) -> Node(id) {
+  InstancedModel(
+    id:,
+    object:,
+    instances:,
+    physics:,
+    children: [],
+  )
 }
 
 /// Create an audio scene node.
@@ -594,7 +688,7 @@ pub fn instanced_model(
 ///   |> audio.with_volume(0.5)
 ///   |> audio.with_autoplay(True)
 ///
-/// scene.Audio(id: "bgm", audio: background_music)
+/// scene.audio(id: "bgm", audio: background_music, children: [])
 ///
 /// // Sound effect (from pre-loaded buffer)
 /// let assert Ok(jump_buffer) = asset.get_audio(cache, "sounds/jump.mp3")
@@ -602,10 +696,10 @@ pub fn instanced_model(
 ///   |> audio.with_source(audio.Buffer(jump_buffer))
 ///   |> audio.with_volume(0.8)
 ///
-/// scene.Audio(id: "jump-sfx", audio: jump_sound)
+/// scene.audio(id: "jump-sfx", audio: jump_sound, children: [])
 /// ```
-pub fn audio(id id: id, audio audio: audio.Audio) {
-  Audio(id:, audio:)
+pub fn audio(id id: id, audio audio: audio.Audio) -> Node(id) {
+  Audio(id:, audio:, children: [])
 }
 
 /// Create a particle emitter scene node.
@@ -634,7 +728,7 @@ pub fn audio(id id: id, audio audio: audio.Audio) {
 ///   |> particles.with_color(0xff4500, 0xff0000)  // Orange to red
 ///   |> particles.with_opacity(1.0, 0.0)  // Fade out
 ///
-/// scene.Particles(
+/// scene.particles(
 ///   id: "campfire",
 ///   emitter: fire_emitter,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
@@ -646,8 +740,14 @@ pub fn particles(
   emitter emitter: particle_emitter.ParticleEmitter,
   transform transform: transform.Transform,
   active active: Bool,
-) {
-  Particles(id:, emitter:, transform:, active:)
+) -> Node(id) {
+  Particles(
+    id:,
+    emitter:,
+    transform:,
+    active:,
+    children: [],
+  )
 }
 
 /// Create a CSS2D label that follows a 3D position in screen space.
@@ -681,15 +781,15 @@ pub fn particles(
 /// scene.css2d_label(
 ///   id: "player-name",
 ///   html: "<div class='text-white font-bold'>Player</div>",
-///   position: vec3.Vec3(0.0, 2.5, 0.0),
+///   transform: vec3.Vec3(0.0, 2.5, 0.0),
 /// )
 /// ```
 pub fn css2d_label(
   id id: id,
   html html: String,
   transform transform: transform.Transform,
-) {
-  CSS2DLabel(id:, html:, transform:)
+) -> Node(id) {
+  CSS2DLabel(id:, html:, transform:, children: [])
 }
 
 /// Create a CSS3D label that respects 3D depth and occlusion.
@@ -711,15 +811,15 @@ pub fn css2d_label(
 /// scene.css3d_label(
 ///   id: "3d-sign",
 ///   html: "<div class='text-white text-2xl'>→ Exit</div>",
-///   position: vec3.Vec3(0.0, 2.0, 0.0),
+///   transform: vec3.Vec3(0.0, 2.0, 0.0),
 /// )
 /// ```
 pub fn css3d_label(
   id id: id,
   html html: String,
   transform transform: transform.Transform,
-) {
-  CSS3DLabel(id:, html:, transform:)
+) -> Node(id) {
+  CSS3DLabel(id:, html:, transform:, children: [])
 }
 
 /// Create a canvas node with a paint.Picture drawing rendered to a texture.
@@ -775,7 +875,7 @@ pub fn canvas(
   width width: Float,
   height height: Float,
   transform transform: transform.Transform,
-) {
+) -> Node(id) {
   // Encode picture to string for efficient comparison and storage
   let encoded_picture = paint_encode.to_string(picture)
 
@@ -787,6 +887,7 @@ pub fn canvas(
     width:,
     height:,
     transform:,
+    children: [],
   )
 }
 
@@ -859,6 +960,7 @@ pub fn canvas(
 ///       height: 2.0,
 ///       transform: transform.at(vec3.Vec3(0.0, 0.0, 0.0)),
 ///       pixel_art: True,
+///       physics: option.None,
 ///     ),
 ///   ]
 /// }
@@ -884,6 +986,7 @@ pub fn animated_sprite(
     transform:,
     pixel_art:,
     physics:,
+    children: [],
   )
 }
 
@@ -910,8 +1013,8 @@ pub fn debug_box(
   min min: Vec3(Float),
   max max: Vec3(Float),
   color color: Int,
-) {
-  DebugBox(id:, min:, max:, color:)
+) -> Node(id) {
+  DebugBox(id:, min:, max:, color:, children: [])
 }
 
 /// Create a debug wireframe sphere visualization.
@@ -931,6 +1034,7 @@ pub fn debug_box(
 ///   center: player_position,
 ///   radius: 5.0,  // 5 unit attack radius
 ///   color: 0xff0000,  // Red wireframe
+///   children: [],
 /// )
 /// ```
 pub fn debug_sphere(
@@ -938,8 +1042,14 @@ pub fn debug_sphere(
   center center: Vec3(Float),
   radius radius: Float,
   color color: Int,
-) {
-  DebugSphere(id:, center:, radius:, color:)
+) -> Node(id) {
+  DebugSphere(
+    id:,
+    center:,
+    radius:,
+    color:,
+    children: [],
+  )
 }
 
 /// Create a debug line segment visualization.
@@ -958,6 +1068,7 @@ pub fn debug_sphere(
 ///   from: player_position,
 ///   to: target_position,
 ///   color: 0xffff00,  // Yellow line
+///   children: [],
 /// )
 /// ```
 pub fn debug_line(
@@ -965,8 +1076,8 @@ pub fn debug_line(
   from from: Vec3(Float),
   to to: Vec3(Float),
   color color: Int,
-) {
-  DebugLine(id:, from:, to:, color:)
+) -> Node(id) {
+  DebugLine(id:, from:, to:, color:, children: [])
 }
 
 /// Create a debug coordinate axes visualization.
@@ -994,8 +1105,12 @@ pub fn debug_line(
 ///   size: 2.0,
 /// )
 /// ```
-pub fn debug_axes(id id: id, origin origin: Vec3(Float), size size: Float) {
-  DebugAxes(id:, origin:, size:)
+pub fn debug_axes(
+  id id: id,
+  origin origin: Vec3(Float),
+  size size: Float,
+) -> Node(id) {
+  DebugAxes(id:, origin:, size:, children: [])
 }
 
 /// Create a debug ground grid visualization.
@@ -1023,8 +1138,14 @@ pub fn debug_grid(
   size size: Float,
   divisions divisions: Int,
   color color: Int,
-) {
-  DebugGrid(id:, size:, divisions:, color:)
+) -> Node(id) {
+  DebugGrid(
+    id:,
+    size:,
+    divisions:,
+    color:,
+    children: [],
+  )
 }
 
 /// Create a debug point visualization.
@@ -1060,10 +1181,76 @@ pub fn debug_point(
   position position: Vec3(Float),
   size size: Float,
   color color: Int,
-) {
-  DebugPoint(id:, position:, size:, color:)
+) -> Node(id) {
+  DebugPoint(
+    id:,
+    position:,
+    size:,
+    color:,
+    children: [],
+  )
 }
 
+pub fn with_children(node: Node(id), children children: List(Node(id))) {
+  case node {
+    AnimatedSprite(..) -> AnimatedSprite(..node, children:)
+    Audio(..) -> Audio(..node, children:)
+    CSS2DLabel(..) -> CSS2DLabel(..node, children:)
+    CSS3DLabel(..) -> CSS3DLabel(..node, children:)
+    Camera(..) -> Camera(..node, children:)
+    Canvas(..) -> Canvas(..node, children:)
+    DebugAxes(..) -> DebugAxes(..node, children:)
+    DebugBox(..) -> DebugBox(..node, children:)
+    DebugGrid(..) -> DebugGrid(..node, children:)
+    DebugLine(..) -> DebugLine(..node, children:)
+    DebugPoint(..) -> DebugPoint(..node, children:)
+    DebugSphere(..) -> DebugSphere(..node, children:)
+    Empty(..) -> Empty(..node, children:)
+    InstancedMesh(..) -> InstancedMesh(..node, children:)
+    InstancedModel(..) -> InstancedModel(..node, children:)
+    LOD(..) -> LOD(..node, children:)
+    Light(..) -> Light(..node, children:)
+    Mesh(..) -> Mesh(..node, children:)
+    Model3D(..) -> Model3D(..node, children:)
+    Particles(..) -> Particles(..node, children:)
+  }
+}
+
+/// Apply post-processing effects to a node and its children.
+///
+/// Post-processing effects are applied to the entire subtree starting from this node.
+/// Effects are rendered in the order they are added to the pipeline.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/scene
+/// import tiramisu/postprocessing as pp
+/// import gleam/option
+///
+/// // Apply bloom effect to a mesh
+/// scene.mesh(
+///   id: "glowing-cube",
+///   geometry: cube_geo,
+///   material: emissive_mat,
+///   transform: transform.identity,
+///   physics: option.None,
+/// )
+/// |> scene.with_postprocessing(
+///   pp.new()
+///   |> pp.add_pass(pp.bloom(strength: 1.5, threshold: 0.85, radius: 0.4))
+/// )
+///
+/// // Apply multiple effects to a group
+/// scene.empty(id: "scene-root", transform: transform.identity, children: [])
+/// |> scene.with_children([camera, light, player])
+/// |> scene.with_postprocessing(
+///   pp.new()
+///   |> pp.add_pass(pp.bloom(strength: 0.8, threshold: 0.9, radius: 0.3))
+///   |> pp.add_pass(pp.vignette(darkness: 0.8, offset: 1.0))
+///   |> pp.add_pass(pp.fxaa())
+/// )
+/// ```
 @internal
 pub type Patch(id) {
   AddNode(id: id, node: Node(id), parent_id: Option(id))
@@ -1083,6 +1270,10 @@ pub type Patch(id) {
     look_at: Option(vec3.Vec3(Float)),
   )
   SetActiveCamera(id: id)
+  UpdateCameraPostprocessing(
+    id: id,
+    postprocessing: Option(postprocessing.PostProcessing),
+  )
   UpdateParticleEmitter(id: id, emitter: particle_emitter.ParticleEmitter)
   UpdateParticleActive(id: id, active: Bool)
   UpdateCSS2DLabel(id: id, html: String, transform: transform.Transform)
@@ -1122,22 +1313,30 @@ fn flatten_scene_helper(
   acc: dict.Dict(id, NodeWithParent(id)),
 ) -> dict.Dict(id, NodeWithParent(id)) {
   list.fold(nodes, acc, fn(acc, node) {
-    let acc = dict.insert(acc, node.id, NodeWithParent(node, parent_id))
-    case node {
-      Group(_, _, children) ->
-        flatten_scene_helper(children, option.Some(node.id), acc)
-      _ -> acc
-    }
+    let node_id = node.id
+    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id))
+    let children = node.children
+    flatten_scene_helper(children, option.Some(node_id), acc)
   })
 }
 
 @internal
 pub fn diff(
-  previous: List(Node(id)),
-  current: List(Node(id)),
+  previous: Option(Node(id)),
+  current: Option(Node(id)),
 ) -> List(Patch(id)) {
-  let prev_dict = flatten_scene(previous)
-  let curr_dict = flatten_scene(current)
+  // Convert optional nodes to lists for flatten_scene
+  let prev_list = case previous {
+    option.Some(node) -> [node]
+    option.None -> []
+  }
+  let curr_list = case current {
+    option.Some(node) -> [node]
+    option.None -> []
+  }
+
+  let prev_dict = flatten_scene(prev_list)
+  let curr_dict = flatten_scene(curr_list)
 
   // Early exit: if both scenes are empty, no patches needed
   let prev_size = dict.size(prev_dict)
@@ -1341,116 +1540,260 @@ fn compare_nodes_detailed(
   curr: Node(id),
 ) -> List(Patch(id)) {
   case prev, curr {
-    Mesh(_, prev_geom, prev_mat, prev_trans, prev_phys),
-      Mesh(_, curr_geom, curr_mat, curr_trans, curr_phys)
+    Mesh(
+      id: _,
+      children: _,
+      transform: previous_transform,
+      geometry: previous_geometry,
+      material: previous_material,
+      physics: previous_physics,
+    ),
+      Mesh(
+        id: _,
+        children: _,
+        transform: current_transform,
+        geometry: current_geometry,
+        material: current_material,
+        physics: current_physics,
+      )
     ->
       compare_mesh_fields(
         id,
-        prev_geom,
-        prev_mat,
-        prev_trans,
-        prev_phys,
-        curr_geom,
-        curr_mat,
-        curr_trans,
-        curr_phys,
+        previous_geometry:,
+        previous_material:,
+        previous_transform:,
+        previous_physics:,
+        current_geometry:,
+        current_material:,
+        current_transform:,
+        current_physics:,
       )
 
-    InstancedMesh(_, prev_geom, prev_mat, prev_instances),
-      InstancedMesh(_, curr_geom, curr_mat, curr_instances)
+    InstancedMesh(
+      id: _,
+      children: _,
+      geometry: previous_geometry,
+      material: previous_material,
+      instances: previous_instances,
+    ),
+      InstancedMesh(
+        id: _,
+        children: _,
+        geometry: current_geometry,
+        material: current_material,
+        instances: current_instances,
+      )
     ->
       compare_instanced_mesh_fields(
         id,
-        prev_geom,
-        prev_mat,
-        prev_instances,
-        curr_geom,
-        curr_mat,
-        curr_instances,
+        previous_geometry:,
+        previous_material:,
+        previous_instances:,
+        current_geometry:,
+        current_material:,
+        current_instances:,
       )
 
-    Light(_, prev_light, prev_trans), Light(_, curr_light, curr_trans) ->
-      compare_light_fields(id, prev_light, prev_trans, curr_light, curr_trans)
+    Light(
+      id: _,
+      children: _,
+      transform: previous_transform,
+      light: previous_light,
+    ),
+      Light(
+        id: _,
+        children: _,
+        transform: current_transform,
+        light: current_light,
+      )
+    ->
+      compare_light_fields(
+        id,
+        previous_light:,
+        previous_transform:,
+        current_light:,
+        current_transform:,
+      )
 
-    Group(_, prev_trans, _), Group(_, curr_trans, _) ->
-      case prev_trans != curr_trans {
-        True -> [UpdateTransform(id, curr_trans)]
+    Empty(id: _, children: _, transform: prev_transform),
+      Empty(id: _, children: _, transform: curr_transform)
+    ->
+      case prev_transform != curr_transform {
+        True -> [UpdateTransform(id, curr_transform)]
         False -> []
       }
 
-    Camera(_, prev_cam, prev_trans, prev_look_at, prev_active, prev_viewport),
-      Camera(_, curr_cam, curr_trans, curr_look_at, curr_active, curr_viewport)
+    Camera(
+      id: _,
+      children: _,
+      camera: previous_camera,
+      transform: previous_transform,
+      look_at: previous_look_at,
+      active: previous_active,
+      viewport: previous_viewport,
+      postprocessing: previous_postprocessing,
+    ),
+      Camera(
+        id: _,
+        children: _,
+        camera: current_camera,
+        transform: current_transform,
+        look_at: current_look_at,
+        active: current_active,
+        viewport: current_viewport,
+        postprocessing: current_postprocessing,
+      )
     ->
       compare_camera_fields(
         id,
-        prev_cam,
-        prev_trans,
-        prev_look_at,
-        prev_active,
-        prev_viewport,
-        curr_cam,
-        curr_trans,
-        curr_look_at,
-        curr_active,
-        curr_viewport,
+        previous_camera:,
+        previous_transform:,
+        previous_look_at:,
+        previous_active:,
+        previous_viewport:,
+        previous_postprocessing:,
+        current_camera:,
+        current_transform:,
+        current_look_at:,
+        current_active:,
+        current_viewport:,
+        current_postprocessing:,
       )
 
-    LOD(_, prev_levels, prev_trans), LOD(_, curr_levels, curr_trans) ->
-      compare_lod_fields(id, prev_levels, prev_trans, curr_levels, curr_trans)
+    LOD(
+      id: _,
+      children: _,
+      levels: previous_levels,
+      transform: previous_transform,
+    ),
+      LOD(
+        id: _,
+        children: _,
+        levels: current_levels,
+        transform: current_transform,
+      )
+    ->
+      compare_lod_fields(
+        id,
+        previous_levels:,
+        previous_transform:,
+        current_levels:,
+        current_transform:,
+      )
 
-    Model3D(_, _, prev_trans, prev_anim, prev_phys),
-      Model3D(_, _, curr_trans, curr_anim, curr_phys)
+    Model3D(
+      id: _,
+      children: _,
+      object: _,
+      transform: previous_transform,
+      animation: previous_animation,
+      physics: previous_physics,
+    ),
+      Model3D(
+        id: _,
+        children: _,
+        object: _,
+        transform: current_transform,
+        animation: current_animation,
+        physics: current_physics,
+      )
     ->
       compare_model3d_fields(
         id,
-        prev_trans,
-        prev_anim,
-        prev_phys,
-        curr_trans,
-        curr_anim,
-        curr_phys,
+        previous_transform:,
+        previous_animation:,
+        previous_physics:,
+        current_transform:,
+        current_animation:,
+        current_physics:,
       )
 
-    InstancedModel(_, _, prev_instances, prev_phys),
-      InstancedModel(_, _, curr_instances, curr_phys)
+    InstancedModel(
+      id: _,
+      children: _,
+      object: _,
+      instances: previous_instances,
+      physics: previous_physics,
+    ),
+      InstancedModel(
+        id: _,
+        children: _,
+        object: _,
+        instances: current_instances,
+        physics: current_physics,
+      )
     ->
       compare_instanced_model_fields(
-        id,
-        prev_instances,
-        prev_phys,
-        curr_instances,
-        curr_phys,
+        id:,
+        previous_instances:,
+        previous_physics:,
+        current_instances:,
+        current_physics:,
       )
 
-    Audio(_, prev_audio), Audio(_, curr_audio) ->
+    Audio(id: _, children: _, audio: prev_audio),
+      Audio(id: _, children: _, audio: curr_audio)
+    ->
       case prev_audio != curr_audio {
         True -> [UpdateAudio(id, curr_audio)]
         False -> []
       }
 
-    Particles(_, prev_emitter, prev_trans, prev_active),
-      Particles(_, curr_emitter, curr_trans, curr_active)
+    Particles(
+      id: _,
+      children: _,
+      emitter: previous_emitter,
+      transform: previous_transform,
+      active: previous_active,
+    ),
+      Particles(
+        id: _,
+        children: _,
+        emitter: current_emitter,
+        transform: current_transform,
+        active: current_active,
+      )
     ->
       compare_particle_fields(
-        id,
-        prev_emitter,
-        prev_trans,
-        prev_active,
-        curr_emitter,
-        curr_trans,
-        curr_active,
+        id:,
+        previous_emitter:,
+        previous_transform:,
+        previous_active:,
+        current_emitter:,
+        current_transform:,
+        current_active:,
       )
 
-    CSS2DLabel(_, prev_html, prev_transform),
-      CSS2DLabel(_, curr_html, curr_transform)
+    CSS2DLabel(
+      id: _,
+      children: _,
+      html: previous_html,
+      transform: prev_transform,
+    ),
+      CSS2DLabel(
+        id: _,
+        children: _,
+        html: curr_html,
+        transform: curr_transform,
+      )
     ->
-      case prev_html != curr_html || prev_transform != curr_transform {
+      case previous_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS2DLabel(id, curr_html, curr_transform)]
         False -> []
       }
 
-    CSS3DLabel(_, prev_html, prev_transform),
-      CSS3DLabel(_, curr_html, curr_transform)
+    CSS3DLabel(
+      id: _,
+      children: _,
+      html: prev_html,
+      transform: prev_transform,
+    ),
+      CSS3DLabel(
+        id: _,
+        children: _,
+        html: curr_html,
+        transform: curr_transform,
+      )
     ->
       case prev_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS3DLabel(id, curr_html, curr_transform)]
@@ -1458,22 +1801,24 @@ fn compare_nodes_detailed(
       }
 
     Canvas(
-      _,
-      prev_encoded_picture,
-      prev_tw,
-      prev_th,
-      prev_w,
-      prev_h,
-      prev_transform,
+      id: _,
+      children: _,
+      encoded_picture: prev_encoded_picture,
+      texture_width: prev_tw,
+      texture_height: prev_th,
+      width: prev_w,
+      height: prev_h,
+      transform: prev_transform,
     ),
       Canvas(
-        _,
-        curr_encoded_picture,
-        curr_tw,
-        curr_th,
-        curr_w,
-        curr_h,
-        curr_transform,
+        id: _,
+        children: _,
+        encoded_picture: curr_encoded_picture,
+        texture_width: curr_tw,
+        texture_height: curr_th,
+        width: curr_w,
+        height: curr_h,
+        transform: curr_transform,
       )
     ->
       case
@@ -1499,46 +1844,48 @@ fn compare_nodes_detailed(
       }
 
     AnimatedSprite(
-      _,
-      prev_sheet,
-      prev_anim,
-      prev_state,
-      prev_w,
-      prev_h,
-      prev_transform,
-      prev_pixel_art,
-      prev_phys,
+      id: _,
+      children: _,
+      spritesheet: previous_spritesheet,
+      animation: previous_animation,
+      state: previous_state,
+      width: previous_width,
+      height: previous_height,
+      transform: previous_transform,
+      pixel_art: previous_pixel_art,
+      physics: previous_physics,
     ),
       AnimatedSprite(
-        _,
-        curr_sheet,
-        curr_anim,
-        curr_state,
-        curr_w,
-        curr_h,
-        curr_transform,
-        curr_pixel_art,
-        curr_phys,
+        id: _,
+        children: _,
+        spritesheet: current_spritesheet,
+        animation: current_animation,
+        state: current_state,
+        width: current_width,
+        height: current_height,
+        transform: current_transform,
+        pixel_art: current_pixel_art,
+        physics: current_physics,
       )
     ->
       compare_animated_sprite_fields(
-        id,
-        prev_sheet,
-        prev_anim,
-        prev_state,
-        prev_w,
-        prev_h,
-        prev_transform,
-        prev_pixel_art,
-        prev_phys,
-        curr_sheet,
-        curr_anim,
-        curr_state,
-        curr_w,
-        curr_h,
-        curr_transform,
-        curr_pixel_art,
-        curr_phys,
+        id:,
+        previous_spritesheet:,
+        previous_animation:,
+        previous_state:,
+        previous_width:,
+        previous_height:,
+        previous_transform:,
+        previous_pixel_art:,
+        previous_physics:,
+        current_spritesheet:,
+        current_animation:,
+        current_state:,
+        current_width:,
+        current_height:,
+        current_transform:,
+        current_pixel_art:,
+        current_physics:,
       )
 
     _, _ -> []
@@ -1548,14 +1895,14 @@ fn compare_nodes_detailed(
 /// Compare Mesh fields using accumulator pattern (no empty list allocations)
 fn compare_mesh_fields(
   id: id,
-  prev_geom: geometry.Geometry,
-  prev_mat: material.Material,
-  prev_trans: transform.Transform,
-  prev_phys: Option(physics.RigidBody),
-  curr_geom: geometry.Geometry,
-  curr_mat: material.Material,
-  curr_trans: transform.Transform,
-  curr_phys: Option(physics.RigidBody),
+  previous_geometry prev_geom: geometry.Geometry,
+  previous_material prev_mat: material.Material,
+  previous_transform prev_trans: transform.Transform,
+  previous_physics prev_phys: Option(physics.RigidBody),
+  current_geometry curr_geom: geometry.Geometry,
+  current_material curr_mat: material.Material,
+  current_transform curr_trans: transform.Transform,
+  current_physics curr_phys: Option(physics.RigidBody),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1585,12 +1932,12 @@ fn compare_mesh_fields(
 /// Compare InstancedMesh fields using accumulator pattern
 fn compare_instanced_mesh_fields(
   id: id,
-  prev_geom: geometry.Geometry,
-  prev_mat: material.Material,
-  prev_instances: List(transform.Transform),
-  curr_geom: geometry.Geometry,
-  curr_mat: material.Material,
-  curr_instances: List(transform.Transform),
+  previous_geometry prev_geom: geometry.Geometry,
+  previous_material prev_mat: material.Material,
+  previous_instances prev_instances: List(transform.Transform),
+  current_geometry curr_geom: geometry.Geometry,
+  current_material curr_mat: material.Material,
+  current_instances curr_instances: List(transform.Transform),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1615,10 +1962,10 @@ fn compare_instanced_mesh_fields(
 /// Compare Light fields using accumulator pattern
 fn compare_light_fields(
   id: id,
-  prev_light: light.Light,
-  prev_trans: transform.Transform,
-  curr_light: light.Light,
-  curr_trans: transform.Transform,
+  previous_light prev_light: light.Light,
+  previous_transform prev_trans: transform.Transform,
+  current_light curr_light: light.Light,
+  current_transform curr_trans: transform.Transform,
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1638,10 +1985,10 @@ fn compare_light_fields(
 /// Compare LOD fields using accumulator pattern
 fn compare_lod_fields(
   id: id,
-  prev_levels: List(LODLevel(id)),
-  prev_trans: transform.Transform,
-  curr_levels: List(LODLevel(id)),
-  curr_trans: transform.Transform,
+  previous_levels prev_levels: List(LODLevel(id)),
+  previous_transform prev_trans: transform.Transform,
+  current_levels curr_levels: List(LODLevel(id)),
+  current_transform curr_trans: transform.Transform,
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1661,16 +2008,18 @@ fn compare_lod_fields(
 /// Compare Camera fields using accumulator pattern
 fn compare_camera_fields(
   id: id,
-  prev_cam: camera.Camera,
-  prev_trans: transform.Transform,
-  prev_look_at: Option(vec3.Vec3(Float)),
-  prev_active: Bool,
-  prev_viewport: Option(#(Int, Int, Int, Int)),
-  curr_cam: camera.Camera,
-  curr_trans: transform.Transform,
-  curr_look_at: Option(vec3.Vec3(Float)),
-  curr_active: Bool,
-  curr_viewport: Option(#(Int, Int, Int, Int)),
+  previous_camera prev_cam: camera.Camera,
+  previous_transform prev_trans: transform.Transform,
+  previous_look_at prev_look_at: Option(vec3.Vec3(Float)),
+  previous_active prev_active: Bool,
+  previous_viewport prev_viewport: Option(#(Int, Int, Int, Int)),
+  previous_postprocessing prev_pp: Option(postprocessing.PostProcessing),
+  current_camera curr_cam: camera.Camera,
+  current_transform curr_trans: transform.Transform,
+  current_look_at curr_look_at: Option(vec3.Vec3(Float)),
+  current_active curr_active: Bool,
+  current_viewport curr_viewport: Option(#(Int, Int, Int, Int)),
+  current_postprocessing curr_pp: Option(postprocessing.PostProcessing),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1689,6 +2038,12 @@ fn compare_camera_fields(
     False -> patches
   }
 
+  // If postprocessing changed, emit UpdateCameraPostprocessing patch
+  let patches = case prev_pp != curr_pp {
+    True -> [UpdateCameraPostprocessing(id, curr_pp), ..patches]
+    False -> patches
+  }
+
   // If active state changed, emit SetActiveCamera patch
   let patches = case prev_active, curr_active {
     False, True -> [SetActiveCamera(id), ..patches]
@@ -1701,12 +2056,12 @@ fn compare_camera_fields(
 /// Compare Model3D fields using accumulator pattern
 fn compare_model3d_fields(
   id: id,
-  prev_trans: transform.Transform,
-  prev_anim: Option(AnimationPlayback),
-  prev_phys: Option(physics.RigidBody),
-  curr_trans: transform.Transform,
-  curr_anim: Option(AnimationPlayback),
-  curr_phys: Option(physics.RigidBody),
+  previous_transform prev_trans: transform.Transform,
+  previous_animation prev_anim: Option(AnimationPlayback),
+  previous_physics prev_phys: Option(physics.RigidBody),
+  current_transform curr_trans: transform.Transform,
+  current_animation curr_anim: Option(AnimationPlayback),
+  current_physics curr_phys: Option(physics.RigidBody),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -1730,21 +2085,21 @@ fn compare_model3d_fields(
 
 /// Compare InstancedModel fields using accumulator pattern
 fn compare_instanced_model_fields(
-  id: id,
-  prev_instances: List(transform.Transform),
-  prev_phys: Option(physics.RigidBody),
-  curr_instances: List(transform.Transform),
-  curr_phys: Option(physics.RigidBody),
+  id id: id,
+  previous_instances previous_instances: List(transform.Transform),
+  previous_physics previous_physics: Option(physics.RigidBody),
+  current_instances current_instances: List(transform.Transform),
+  current_physics current_physics: Option(physics.RigidBody),
 ) -> List(Patch(id)) {
   let patches = []
 
-  let patches = case prev_instances != curr_instances {
-    True -> [UpdateInstances(id, curr_instances), ..patches]
+  let patches = case previous_instances != current_instances {
+    True -> [UpdateInstances(id, current_instances), ..patches]
     False -> patches
   }
 
-  let patches = case prev_phys != curr_phys {
-    True -> [UpdatePhysics(id, curr_phys), ..patches]
+  let patches = case previous_physics != current_physics {
+    True -> [UpdatePhysics(id, current_physics), ..patches]
     False -> patches
   }
 
@@ -1753,28 +2108,28 @@ fn compare_instanced_model_fields(
 
 /// Compare Particles fields using accumulator pattern
 fn compare_particle_fields(
-  id: id,
-  prev_emitter: particle_emitter.ParticleEmitter,
-  prev_trans: transform.Transform,
-  prev_active: Bool,
-  curr_emitter: particle_emitter.ParticleEmitter,
-  curr_trans: transform.Transform,
-  curr_active: Bool,
+  id id: id,
+  previous_emitter previous_emitter: particle_emitter.ParticleEmitter,
+  previous_transform previous_transform: transform.Transform,
+  previous_active previous_active: Bool,
+  current_emitter current_emitter: particle_emitter.ParticleEmitter,
+  current_transform current_transform: transform.Transform,
+  current_active current_active: Bool,
 ) -> List(Patch(id)) {
   let patches = []
 
-  let patches = case prev_trans != curr_trans {
-    True -> [UpdateTransform(id, curr_trans), ..patches]
+  let patches = case previous_transform != current_transform {
+    True -> [UpdateTransform(id, current_transform), ..patches]
     False -> patches
   }
 
-  let patches = case prev_emitter != curr_emitter {
-    True -> [UpdateParticleEmitter(id, curr_emitter), ..patches]
+  let patches = case previous_emitter != current_emitter {
+    True -> [UpdateParticleEmitter(id, current_emitter), ..patches]
     False -> patches
   }
 
-  let patches = case prev_active != curr_active {
-    True -> [UpdateParticleActive(id, curr_active), ..patches]
+  let patches = case previous_active != current_active {
+    True -> [UpdateParticleActive(id, current_active), ..patches]
     False -> patches
   }
 
@@ -1783,50 +2138,50 @@ fn compare_particle_fields(
 
 /// Compare AnimatedSprite fields using accumulator pattern
 fn compare_animated_sprite_fields(
-  id: id,
-  prev_sheet: spritesheet.Spritesheet,
-  prev_anim: spritesheet.Animation,
-  prev_state: spritesheet.AnimationState,
-  prev_w: Float,
-  prev_h: Float,
-  prev_transform: transform.Transform,
-  prev_pixel_art: Bool,
-  prev_phys: Option(physics.RigidBody),
-  curr_sheet: spritesheet.Spritesheet,
-  curr_anim: spritesheet.Animation,
-  curr_state: spritesheet.AnimationState,
-  curr_w: Float,
-  curr_h: Float,
-  curr_transform: transform.Transform,
-  curr_pixel_art: Bool,
-  curr_phys: Option(physics.RigidBody),
+  id id: id,
+  previous_spritesheet previous_spritesheet: spritesheet.Spritesheet,
+  previous_animation previous_animation: spritesheet.Animation,
+  previous_state previous_state: spritesheet.AnimationState,
+  previous_width previous_width: Float,
+  previous_height previous_height: Float,
+  previous_transform previous_transform: transform.Transform,
+  previous_pixel_art previous_pixel_art: Bool,
+  previous_physics previous_physics: Option(physics.RigidBody),
+  current_spritesheet current_spritesheet: spritesheet.Spritesheet,
+  current_animation current_animation: spritesheet.Animation,
+  current_state current_state: spritesheet.AnimationState,
+  current_width current_width: Float,
+  current_height current_height: Float,
+  current_transform current_transform: transform.Transform,
+  current_pixel_art current_pixel_art: Bool,
+  current_physics current_physics: Option(physics.RigidBody),
 ) -> List(Patch(id)) {
   let patches = []
 
-  let patches = case prev_phys != curr_phys {
-    True -> [UpdatePhysics(id, curr_phys), ..patches]
+  let patches = case previous_physics != current_physics {
+    True -> [UpdatePhysics(id, current_physics), ..patches]
     False -> patches
   }
 
   case
-    prev_sheet != curr_sheet
-    || prev_anim != curr_anim
-    || prev_state != curr_state
-    || prev_w != curr_w
-    || prev_h != curr_h
-    || prev_transform != curr_transform
-    || prev_pixel_art != curr_pixel_art
+    previous_spritesheet != current_spritesheet
+    || previous_animation != current_animation
+    || previous_state != current_state
+    || previous_width != current_width
+    || previous_height != current_height
+    || previous_transform != current_transform
+    || previous_pixel_art != current_pixel_art
   {
     True -> [
       UpdateAnimatedSprite(
         id,
-        curr_sheet,
-        curr_anim,
-        curr_state,
-        curr_w,
-        curr_h,
-        curr_transform,
-        curr_pixel_art,
+        current_spritesheet,
+        current_animation,
+        current_state,
+        current_width,
+        current_height,
+        current_transform,
+        current_pixel_art,
       ),
       ..patches
     ]
@@ -2138,6 +2493,9 @@ fn dispose_geometry_ffi(geometry: asset.Object3D) -> Nil
 @external(javascript, "../tiramisu.ffi.mjs", "disposeMaterial")
 fn dispose_material_ffi(material: asset.Object3D) -> Nil
 
+@external(javascript, "../tiramisu.ffi.mjs", "disposeObject3D")
+fn dispose_object_3d_ffi(object: asset.Object3D) -> Nil
+
 @internal
 pub fn create(options: RendererOptions) -> RendererState(id) {
   let renderer = create_renderer_ffi(options)
@@ -2239,6 +2597,9 @@ pub fn apply_patch(
 
     SetActiveCamera(id: id) -> handle_set_active_camera(state, id)
 
+    UpdateCameraPostprocessing(id: id, postprocessing: pp) ->
+      handle_update_camera_postprocessing(state, id, pp)
+
     UpdateParticleEmitter(id: id, emitter: emitter) ->
       handle_update_particle_emitter(state, id, emitter)
 
@@ -2298,9 +2659,10 @@ fn handle_add_node(
   case node {
     Mesh(
       id: _,
+      children: _,
+      transform: transform,
       geometry: geometry,
       material: material,
-      transform: transform,
       physics: physics,
     ) ->
       handle_add_mesh(
@@ -2315,6 +2677,7 @@ fn handle_add_node(
 
     InstancedMesh(
       id: _,
+      children: _,
       geometry: geometry,
       material: material,
       instances: instances,
@@ -2328,17 +2691,26 @@ fn handle_add_node(
         parent_id,
       )
 
-    Light(id: _, light: light, transform: transform) ->
-      handle_add_light(state, id, light, transform, parent_id)
+    Light(
+      id: _,
+      children: _,
+      transform: transform,
+      light: light,
+    ) -> handle_add_light(state, id, light, transform, parent_id)
 
-    Group(id: _, transform: transform, children: _) ->
+    Empty(id: _, children: _, transform: transform) ->
       handle_add_group(state, id, transform, parent_id)
 
-    LOD(id: _, transform: transform, levels: levels) ->
-      handle_add_lod(state, id, transform, levels, parent_id)
+    LOD(
+      id: _,
+      children: _,
+      levels: levels,
+      transform: transform,
+    ) -> handle_add_lod(state, id, transform, levels, parent_id)
 
     Model3D(
       id: _,
+      children: _,
       object: object,
       transform: transform,
       animation: animation,
@@ -2356,6 +2728,7 @@ fn handle_add_node(
 
     InstancedModel(
       id: _,
+      children: _,
       object: object,
       instances: instances,
       physics: physics,
@@ -2369,15 +2742,18 @@ fn handle_add_node(
         parent_id,
       )
 
-    Audio(id: _, audio: audio) -> handle_add_audio(state, id, audio, parent_id)
+    Audio(id: _, children: _, audio: audio) ->
+      handle_add_audio(state, id, audio, parent_id)
 
     Camera(
       id: _,
+      children: _,
       camera: camera,
       transform: transform,
       look_at: look_at,
       active: active,
       viewport: viewport,
+      postprocessing: postprocessing,
     ) ->
       handle_add_camera(
         state,
@@ -2387,38 +2763,78 @@ fn handle_add_node(
         look_at,
         active,
         viewport,
+        postprocessing,
         parent_id,
       )
 
-    DebugBox(id: _, min: min, max: max, color: color) ->
-      handle_add_debug_box(state, id, min, max, color, parent_id)
+    DebugBox(
+      id: _,
+      children: _,
+      min: min,
+      max: max,
+      color: color,
+    ) -> handle_add_debug_box(state, id, min, max, color, parent_id)
 
-    DebugSphere(id: _, center: center, radius: radius, color: color) ->
-      handle_add_debug_sphere(state, id, center, radius, color, parent_id)
+    DebugSphere(
+      id: _,
+      children: _,
+      center: center,
+      radius: radius,
+      color: color,
+    ) -> handle_add_debug_sphere(state, id, center, radius, color, parent_id)
 
-    DebugLine(id: _, from: from, to: to, color: color) ->
-      handle_add_debug_line(state, id, from, to, color, parent_id)
+    DebugLine(
+      id: _,
+      children: _,
+      from: from,
+      to: to,
+      color: color,
+    ) -> handle_add_debug_line(state, id, from, to, color, parent_id)
 
-    DebugAxes(id: _, origin: origin, size: size) ->
+    DebugAxes(id: _, children: _, origin: origin, size: size) ->
       handle_add_debug_axes(state, id, origin, size, parent_id)
 
-    DebugGrid(id: _, size: size, divisions: divisions, color: color) ->
-      handle_add_debug_grid(state, id, size, divisions, color, parent_id)
+    DebugGrid(
+      id: _,
+      children: _,
+      size: size,
+      divisions: divisions,
+      color: color,
+    ) -> handle_add_debug_grid(state, id, size, divisions, color, parent_id)
 
-    DebugPoint(id: _, position: position, size: size, color: color) ->
-      handle_add_debug_point(state, id, position, size, color, parent_id)
+    DebugPoint(
+      id: _,
+      children: _,
+      position: position,
+      size: size,
+      color: color,
+    ) -> handle_add_debug_point(state, id, position, size, color, parent_id)
 
-    Particles(id: _, emitter: emitter, transform: transform, active: active) ->
-      handle_add_particles(state, id, emitter, transform, active, parent_id)
+    Particles(
+      id: _,
+      children: _,
+      emitter: emitter,
+      transform: transform,
+      active: active,
+    ) -> handle_add_particles(state, id, emitter, transform, active, parent_id)
 
-    CSS2DLabel(id: _, html: html, transform: trans) ->
-      handle_add_css2d_label(state, id, html, trans, parent_id)
+    CSS2DLabel(
+      id: _,
+      children: _,
+      html: html,
+      transform: trans,
+    ) -> handle_add_css2d_label(state, id, html, trans, parent_id)
 
-    CSS3DLabel(id: _, html: html, transform: trans) ->
-      handle_add_css3d_label(state, id, html, trans, parent_id)
+    CSS3DLabel(
+      id: _,
+      children: _,
+      html: html,
+      transform: trans,
+    ) -> handle_add_css3d_label(state, id, html, trans, parent_id)
 
     Canvas(
       id: _,
+      children: _,
       encoded_picture: encoded_picture,
       texture_width: tw,
       texture_height: th,
@@ -2440,6 +2856,7 @@ fn handle_add_node(
 
     AnimatedSprite(
       id: _,
+      children: _,
       spritesheet: sheet,
       animation: anim,
       state: anim_state,
@@ -2673,9 +3090,10 @@ fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
   case node {
     Mesh(
       id: _,
+      children: _,
+      transform: transform,
       geometry: geometry,
       material: material,
-      transform: transform,
       physics: _,
     ) -> {
       let geometry_three = geometry.create_geometry(geometry)
@@ -2684,13 +3102,14 @@ fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
       apply_transform_ffi(mesh, transform)
       mesh
     }
-    Group(id: _, transform: transform, children: _) -> {
+    Empty(id: _, children: _, transform: transform) -> {
       let group = create_group_ffi()
       apply_transform_ffi(group, transform)
       group
     }
     Model3D(
       id: _,
+      children: _,
       object: object,
       transform: transform,
       animation: _,
@@ -2821,6 +3240,7 @@ fn handle_add_camera(
   look_at: Option(Vec3(Float)),
   active: Bool,
   viewport: Option(#(Int, Int, Int, Int)),
+  postprocessing: Option(postprocessing.PostProcessing),
   parent_id: Option(id),
 ) -> RendererState(id) {
   let canvas = get_dom_element(state.renderer)
@@ -2890,13 +3310,23 @@ fn handle_add_camera(
     option.None -> state.cache
   }
 
+  // Store postprocessing if specified
+  let cache_with_postprocessing = case postprocessing {
+    option.Some(pp) ->
+      object_cache.set_camera_postprocessing(cache_with_viewport, id, pp)
+    option.None -> cache_with_viewport
+  }
+
+  // Mark this ID as a camera in the cache
+  let cache_with_camera = object_cache.add_camera(cache_with_postprocessing, id)
+
   // Set as active camera if specified
   case active {
     True -> set_active_camera_ffi(camera_obj)
     False -> Nil
   }
 
-  let new_cache = object_cache.add_object(cache_with_viewport, id, three_obj)
+  let new_cache = object_cache.add_object(cache_with_camera, id, three_obj)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3040,11 +3470,8 @@ fn handle_remove_node(state: RendererState(id), id: id) -> RendererState(id) {
       // Remove from scene
       remove_from_scene_ffi(state.scene, obj_dynamic)
 
-      // Dispose geometry and material
-      let geometry = get_object_geometry_ffi(obj_dynamic)
-      let material = get_object_material_ffi(obj_dynamic)
-      dispose_geometry_ffi(geometry)
-      dispose_material_ffi(material)
+      // Dispose object recursively (geometry, materials, textures, children)
+      dispose_object_3d_ffi(obj_dynamic)
 
       // Stop audio if it's an audio node (using Gleam audio manager)
       let new_audio_manager =
@@ -3437,6 +3864,21 @@ fn handle_set_active_camera(
     }
     option.None -> state
   }
+}
+
+fn handle_update_camera_postprocessing(
+  state: RendererState(id),
+  id: id,
+  pp: Option(postprocessing.PostProcessing),
+) -> RendererState(id) {
+  // Update the postprocessing config in the cache
+  let new_cache = case pp {
+    option.Some(pp_config) ->
+      object_cache.set_camera_postprocessing(state.cache, id, pp_config)
+    option.None -> object_cache.remove_camera_postprocessing(state.cache, id)
+  }
+
+  RendererState(..state, cache: new_cache)
 }
 
 fn handle_update_particle_emitter(
@@ -3912,15 +4354,12 @@ pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
 
 @internal
 pub fn clear_cache(state: RendererState(id)) -> RendererState(id) {
-  // Dispose all objects
+  // Dispose all objects recursively (geometry, materials, textures, children)
   let objects = object_cache.get_all_objects(state.cache)
   list.each(objects, fn(entry) {
     let #(_id, obj) = entry
     let obj_dynamic = object_cache.unwrap_object(obj)
-    let geometry = get_object_geometry_ffi(obj_dynamic)
-    let material = get_object_material_ffi(obj_dynamic)
-    dispose_geometry_ffi(geometry)
-    dispose_material_ffi(material)
+    dispose_object_3d_ffi(obj_dynamic)
   })
 
   let new_cache = object_cache.clear(state.cache)
@@ -3935,6 +4374,26 @@ pub fn get_cameras_with_viewports(
   |> list.map(fn(entry) {
     let #(camera_obj, viewport) = entry
     #(object_cache.unwrap_object(camera_obj), viewport)
+  })
+}
+
+/// Get all cameras with their viewport and postprocessing configurations
+/// Returns: List of (camera_id_string, camera_object, Option(viewport), Option(postprocessing))
+@internal
+pub fn get_all_cameras_with_info(
+  state: RendererState(id),
+) -> List(
+  #(
+    String,
+    asset.Object3D,
+    Option(object_cache.Viewport),
+    Option(postprocessing.PostProcessing),
+  ),
+) {
+  object_cache.get_all_cameras_with_info(state.cache)
+  |> list.map(fn(entry) {
+    let #(id_string, camera_obj, viewport_opt, pp_opt) = entry
+    #(id_string, object_cache.unwrap_object(camera_obj), viewport_opt, pp_opt)
   })
 }
 

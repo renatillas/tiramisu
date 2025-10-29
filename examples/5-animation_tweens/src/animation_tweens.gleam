@@ -111,13 +111,13 @@ fn easing_name(index: Int) -> String {
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(String)) {
+fn view(model: Model, _) -> scene.Node(String) {
   let position = animation.get_tween_value(model.tween)
   let _ = easing_name(model.current_easing)
   let assert Ok(camera) =
     camera.perspective(field_of_view: 45.0, near: 0.1, far: 100.0)
 
-  [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
       id: "main_camera",
       camera: camera,
@@ -125,6 +125,7 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.light(
       id: "ambient",
@@ -198,5 +199,5 @@ fn view(model: Model, _) -> List(scene.Node(String)) {
       transform: transform.at(position: vec3.Vec3(5.0, 0.0, 0.0)),
       physics: option.None,
     ),
-  ]
+  ])
 }

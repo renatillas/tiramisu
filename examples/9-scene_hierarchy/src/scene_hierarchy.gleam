@@ -1,7 +1,3 @@
-/// Scene Hierarchy Example
-///
-/// Demonstrates Group nodes, parent-child relationships, and nested transforms
-import gleam/list
 import gleam/option
 import gleam/result
 import tiramisu
@@ -25,6 +21,8 @@ pub type Id {
   Moon1
   Planet2Orbit
   Planet2
+  Scene
+  PlanetarySystem
 }
 
 pub type Model {
@@ -66,7 +64,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
+fn view(model: Model, _) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
     |> result.map(fn(camera) {
@@ -78,11 +76,11 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         transform: transform.at(position: vec3.Vec3(0.0, 5.0, 15.0)),
         look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
         viewport: option.None,
+        postprocessing: option.None,
       )
-      |> list.wrap
     })
 
-  let lights = [
+  let lights =
     scene.light(
       id: Point,
       light: {
@@ -91,11 +89,10 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         light
       },
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
-    ),
-  ]
+    )
 
   // Solar system: sun with orbiting planets in groups
-  let sun = [
+  let sun =
     scene.mesh(
       id: Sun,
       geometry: {
@@ -116,14 +113,12 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
         |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
       physics: option.None,
-    ),
-  ]
+    )
 
   // Planets as children of rotating groups
-  let planet_system = case model.show_planets {
-    True -> [
-      // Planet 1 group (rotates around sun)
-      scene.group(
+  let planet_system =
+    scene.empty(id: PlanetarySystem, transform: transform.identity, children: [
+      scene.empty(
         id: Planet1Orbit,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(
@@ -159,7 +154,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             physics: option.None,
           ),
           // Moon orbiting planet1
-          scene.group(
+          scene.empty(
             id: Moon1Orbit,
             transform: transform.at(position: vec3.Vec3(4.0, 0.0, 0.0))
               |> transform.with_euler_rotation(vec3.Vec3(
@@ -194,7 +189,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         ],
       ),
       // Planet 2 group (rotates around sun)
-      scene.group(
+      scene.empty(
         id: Planet2Orbit,
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(
@@ -231,9 +226,12 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
           ),
         ],
       ),
-    ]
-    False -> []
-  }
+    ])
 
-  list.flatten([camera, lights, sun, planet_system])
+  scene.empty(id: Scene, transform: transform.identity, children: [
+    camera,
+    lights,
+    sun,
+    planet_system,
+  ])
 }

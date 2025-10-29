@@ -676,7 +676,7 @@ fn collider_box(
   let world_corners = list.map(corners, transform_point(_, transform))
 
   // Create wireframe lines for the box
-  scene.group(id:, transform: transform.identity, children: [
+  scene.empty(id:, transform: transform.identity, children: [
     // Bottom face
     line(id, list_at(world_corners, 0), list_at(world_corners, 1), color),
     line(id, list_at(world_corners, 1), list_at(world_corners, 2), color),
@@ -741,7 +741,7 @@ fn collider_capsule(
       line(id, start, end, color)
     })
 
-  scene.group(id:, transform: transform.identity, children:)
+  scene.empty(id:, transform: transform.identity, children:)
 }
 
 /// Generate wireframe lines for a capsule in local space
@@ -861,7 +861,7 @@ fn collider_cylinder(
       line(id, start, end, color)
     })
 
-  scene.group(id:, transform: transform.identity, children:)
+  scene.empty(id:, transform: transform.identity, children:)
 }
 
 /// Generate wireframe lines for a cylinder in local space

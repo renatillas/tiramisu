@@ -18,6 +18,8 @@ pub fn standard_direct_test() {
       roughness: 0.5,
       transparent: False,
       opacity: 1.0,
+      emissive: 0x000000,
+      emissive_intensity: 0.0,
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,

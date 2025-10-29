@@ -92,17 +92,17 @@ Three.js provides a **professional foundation** that:
 - **Scene Graph Integration**: Leverage Three.js scene graph with functional updates
 
 ### Target Features
-1. Core loop (update/render cycle)
-2. Input handling (keyboard, mouse, touch)
-3. 3D rendering (Three.js WebGL via FFI)
-4. 2D sprite support (orthographic camera + planes)
-5. Scene/entity management (integrate with Three.js scene graph)
-6. Basic physics (collision detection, raycasting)
-7. Asset loading (models, textures, audio via Three.js loaders)
-8. Animation system (Three.js AnimationMixer + custom)
-9. Camera controls (orbital, first-person, 2D)
-10. Lighting and materials
-11. Post-processing effects
+1. ✅ Core loop (update/render cycle)
+2. ✅ Input handling (keyboard, mouse, touch)
+3. ✅ 3D rendering (Three.js WebGL via FFI)
+4. ✅ 2D sprite support (orthographic camera + planes)
+5. ✅ Scene/entity management (integrate with Three.js scene graph)
+6. ✅ Basic physics (collision detection, raycasting with Rapier)
+7. ✅ Asset loading (models, textures, audio via Three.js loaders)
+8. ✅ Animation system (Three.js AnimationMixer + custom state machines)
+9. ✅ Camera controls (multiple cameras, viewports, 2D orthographic)
+10. ✅ Lighting and materials
+11. ✅ **Post-processing effects (camera-based, multi-camera support)**
 
 ### Non-Goals (Initially)
 - Custom WebGL shaders (use Three.js built-ins first)
@@ -204,6 +204,231 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
 ```
 
 For cameras with custom viewports, the aspect ratio uses the viewport dimensions. For main cameras, it uses the window dimensions (which update automatically on resize in fullscreen mode).
+
+## Postprocessing System
+
+### Overview
+
+Tiramisu provides a comprehensive postprocessing system powered by Three.js EffectComposer. Postprocessing effects are **camera-based**, following industry standards from Unity and Unreal Engine.
+
+**Key Principle**: Postprocessing is attached to cameras, not scene nodes.
+
+This enables:
+- Split-screen with different effects per player
+- Mini-maps without effects (clean view)
+- Picture-in-picture with different visual styles
+- Security camera feeds with glitch/film grain aesthetics
+
+### Architecture
+
+Each `Camera` node can have its own postprocessing pipeline:
+
+```gleam
+import tiramisu/postprocessing as pp
+
+let camera = scene.camera(
+  id: "main",
+  camera: cam,
+  transform: transform.identity,
+  look_at: option.None,
+  active: True,
+  viewport: option.None,
+  postprocessing: option.Some(
+    pp.new()
+    |> pp.add_pass(pp.bloom(strength: 1.5, threshold: 0.7, radius: 0.5))
+    |> pp.add_pass(pp.vignette(darkness: 0.8, offset: 1.0))
+    |> pp.add_pass(pp.fxaa())
+  ),
+)
+```
+
+### Available Effects
+
+**Bloom**: Makes bright areas glow
+```gleam
+pp.bloom(strength: 1.5, threshold: 0.85, radius: 0.4)
+```
+
+**Pixelate**: Retro pixel-art aesthetic
+```gleam
+pp.pixelate(pixel_size: 4)
+// Or with edge detection:
+pp.pixelate_with_edges(
+  pixel_size: 4,
+  normal_edge_strength: 1.0,
+  depth_edge_strength: 0.5,
+)
+```
+
+**Film Grain**: Analog film texture
+```gleam
+pp.film_grain(
+  noise_intensity: 0.3,
+  scanline_intensity: 0.2,
+  scanline_count: 512,
+  grayscale: False,
+)
+```
+
+**Vignette**: Darkened edges
+```gleam
+pp.vignette(darkness: 1.0, offset: 1.0)
+```
+
+**FXAA**: Fast anti-aliasing (usually last pass)
+```gleam
+pp.fxaa()
+```
+
+**Glitch**: Digital corruption artifacts
+```gleam
+pp.glitch(dt_size: 64)
+```
+
+**Color Correction**: Brightness/contrast/saturation
+```gleam
+pp.color_correction(
+  brightness: 0.1,
+  contrast: 0.2,
+  saturation: 0.3,
+)
+```
+
+**Custom Shader**: Advanced effects
+```gleam
+pp.custom_shader(
+  vertex_shader: "...",
+  fragment_shader: "...",
+  uniforms: [
+    #("intensity", pp.FloatUniform(1.5)),
+    #("color", pp.ColorUniform(0xff0000)),
+  ],
+)
+```
+
+### Effect Order
+
+Effects are applied in the order you add them:
+
+```gleam
+pp.new()
+|> pp.add_pass(pp.bloom(...))        // 1. Brighten glowing areas
+|> pp.add_pass(pp.pixelate(...))     // 2. Retro pixel effect
+|> pp.add_pass(pp.film_grain(...))   // 3. Add texture
+|> pp.add_pass(pp.vignette(...))     // 4. Darken edges
+|> pp.add_pass(pp.fxaa())            // 5. Smooth final output
+```
+
+### Multi-Camera Postprocessing
+
+Different cameras can have different postprocessing pipelines:
+
+#### Split-Screen Example
+
+```gleam
+// Player 1 camera - retro pixel effect
+let camera1 = scene.camera(
+  id: "player1",
+  camera: cam1,
+  viewport: option.Some(scene.Viewport(x: 0, y: 0, width: 400, height: 600)),
+  postprocessing: option.Some(
+    pp.new()
+    |> pp.add_pass(pp.pixelate(4))
+  ),
+  // ...
+)
+
+// Player 2 camera - cinematic bloom
+let camera2 = scene.camera(
+  id: "player2",
+  camera: cam2,
+  viewport: option.Some(scene.Viewport(x: 400, y: 0, width: 400, height: 600)),
+  postprocessing: option.Some(
+    pp.new()
+    |> pp.add_pass(pp.bloom(strength: 1.5, threshold: 0.7, radius: 0.5))
+    |> pp.add_pass(pp.vignette(darkness: 0.8, offset: 1.0))
+  ),
+  // ...
+)
+```
+
+#### Mini-Map Example
+
+```gleam
+// Main camera with full effects
+let main_camera = scene.camera(
+  id: "main",
+  viewport: option.None,  // Full screen
+  postprocessing: option.Some(full_postprocessing_pipeline),
+  // ...
+)
+
+// Mini-map camera - no effects for clarity
+let minimap_camera = scene.camera(
+  id: "minimap",
+  viewport: option.Some(scene.Viewport(x: 650, y: 500, width: 150, height: 100)),
+  postprocessing: option.None,  // Clean view
+  // ...
+)
+```
+
+### Rendering Pipeline
+
+Under the hood, each camera with postprocessing gets its own Three.js EffectComposer:
+
+1. **ClearPass** - Clears render target with scene background color
+2. **RenderPass** - Renders scene objects (with `clear = false`)
+3. **Effect Passes** - Your postprocessing effects in order
+4. **OutputPass** - Final tone mapping and output to screen
+
+This 4-pass pipeline ensures backgrounds render correctly with postprocessing.
+
+### Performance Considerations
+
+- Each camera with postprocessing creates a separate EffectComposer
+- Each composer requires its own WebGLRenderTarget (memory overhead)
+- More effects = more render passes = higher GPU cost
+- For mobile devices, use fewer effects or lower quality settings
+- Composers are cached and reused across frames
+- Composers are disposed when cameras are removed
+
+### Dynamic Postprocessing
+
+Toggle effects at runtime by returning different camera configurations:
+
+```gleam
+fn view(model: Model, _ctx) -> scene.Node(String) {
+  let postprocessing = case model.low_health {
+    True -> option.Some(
+      pp.new()
+      |> pp.add_pass(pp.vignette(darkness: 1.5, offset: 0.8))
+      |> pp.add_pass(pp.color_correction(
+        brightness: -0.2,
+        contrast: 0.3,
+        saturation: -0.3,
+      ))
+    )
+    False -> option.None
+  }
+
+  let camera = scene.camera(
+    id: "main",
+    camera: cam,
+    postprocessing: postprocessing,
+    // ...
+  )
+
+  // ...
+}
+```
+
+### Best Practices
+
+1. **FXAA Last**: Add FXAA as the final pass for smooth output
+2. **Bloom Early**: Apply bloom before other effects for best results
+3. **Test Performance**: Profile on target devices, postprocessing is GPU-intensive
+4. **Subtle Effects**: Less is often more - avoid over-processing
+5. **Per-Camera**: Use different pipelines for different cameras strategically
 
 ## Migration Guide from v1.0.0
 

@@ -157,6 +157,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
 
   let lights = [

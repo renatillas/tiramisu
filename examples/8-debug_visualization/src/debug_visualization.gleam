@@ -46,6 +46,7 @@ pub type Id {
   Trail(Int)
   Corner(Int)
   TransformBox
+  Scene
 }
 
 pub type Msg {
@@ -177,7 +178,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
+fn view(model: Model, _) -> scene.Node(Id) {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let camera =
@@ -189,6 +190,7 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     )
     |> list.wrap
   let lights = [
@@ -378,5 +380,9 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
     }
   }
 
-  list.flatten([camera, lights, objects, debug_nodes])
+  scene.empty(
+    id: Scene,
+    transform: transform.identity,
+    children: list.flatten([camera, lights, objects, debug_nodes]),
+  )
 }

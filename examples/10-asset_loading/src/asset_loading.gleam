@@ -3,7 +3,6 @@ import gleam/io
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
-import gleam/result
 import tiramisu
 import tiramisu/asset
 import tiramisu/audio
@@ -18,6 +17,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -127,21 +127,20 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> List(scene.Node(Id)) {
-  let assert Ok(camera) =
+fn view(model: Model, _) -> scene.Node(Id) {
+  let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-    |> result.map(fn(camera) {
-      camera
-      |> scene.camera(
-        id: MainCamera,
-        camera: _,
-        transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
-        look_at: option.None,
-        active: True,
-        viewport: option.None,
-      )
-      |> list.wrap
-    })
+
+  let camera_node =
+    scene.camera(
+      id: MainCamera,
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
+      look_at: option.None,
+      active: True,
+      viewport: option.None,
+      postprocessing: option.None,
+    )
 
   let lights = [
     scene.light(
@@ -189,13 +188,16 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
             )),
           physics: option.None,
         )
-        |> list.wrap
 
-      list.flatten([camera, loading_cube, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera_node,
+        loading_cube,
+        ..lights
+      ])
     }
 
     Loaded(cache) -> {
-      let audio_node = case
+      let audio_nodes = case
         asset.get_audio(
           cache,
           "https://actions.google.com/sounds/v1/alarms/beep_short.ogg",
@@ -283,10 +285,22 @@ fn view(model: Model, _) -> List(scene.Node(Id)) {
         }
       }
 
-      list.flatten([camera, audio_node, cube_nodes, lights])
+      scene.empty(
+        id: Scene,
+        transform: transform.identity,
+        children: list.flatten([
+          [camera_node],
+          audio_nodes,
+          cube_nodes,
+          lights,
+        ]),
+      )
     }
     Failed(_errors) -> {
-      list.flatten([camera, lights])
+      scene.empty(id: Scene, transform: transform.identity, children: [
+        camera_node,
+        ..lights
+      ])
     }
   }
 }
