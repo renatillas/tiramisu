@@ -11,32 +11,46 @@ import tiramisu/transform
 import vec/vec3
 
 pub fn main() {
-  // Benchmark Vec3 operations that return Vec3
   bench.run(
     [
       bench.Input(
         "Small (10 nodes)",
-        ScenePair(create_flat_scene(10), create_flat_scene(10)),
+        ScenePair(
+          wrap_in_group("root", create_flat_scene(10)),
+          wrap_in_group("root", create_flat_scene(10)),
+        ),
       ),
       bench.Input(
         "Medium (100 nodes)",
-        ScenePair(create_flat_scene(100), create_flat_scene(100)),
+        ScenePair(
+          wrap_in_group("root", create_flat_scene(100)),
+          wrap_in_group("root", create_flat_scene(100)),
+        ),
       ),
       bench.Input(
         "Large (1000 nodes)",
-        ScenePair(create_flat_scene(1000), create_flat_scene(1000)),
+        ScenePair(
+          wrap_in_group("root", create_flat_scene(1000)),
+          wrap_in_group("root", create_flat_scene(1000)),
+        ),
       ),
       bench.Input(
         "Nested (10 levels)",
-        ScenePair(create_nested_scene(10), create_nested_scene(10)),
+        ScenePair(
+          wrap_in_group("root", create_nested_scene(10)),
+          wrap_in_group("root", create_nested_scene(10)),
+        ),
       ),
       bench.Input("No changes (100 nodes)", {
-        let nodes = create_flat_scene(100)
-        ScenePair(nodes, nodes)
+        let node = wrap_in_group("root", create_flat_scene(100))
+        ScenePair(node, node)
       }),
       bench.Input(
         "All changed (100 nodes)",
-        ScenePair(create_flat_scene(100), create_flat_scene_offset(100, 10.0)),
+        ScenePair(
+          wrap_in_group("root", create_flat_scene(100)),
+          wrap_in_group("root", create_flat_scene_offset(100, 10.0)),
+        ),
       ),
     ],
     [
@@ -109,10 +123,17 @@ pub fn main() {
 }
 
 pub type ScenePair(id) {
-  ScenePair(previous: List(scene.Node(id)), current: List(scene.Node(id)))
+  ScenePair(
+    previous: option.Option(scene.Node(id)),
+    current: option.Option(scene.Node(id)),
+  )
 }
 
 // --- Helper Functions ---
+
+fn wrap_in_group(id: id, children: List(scene.Node(id))) -> option.Option(scene.Node(id)) {
+  option.Some(scene.empty(id: id, transform: transform.identity, children: children))
+}
 
 fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
   let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
@@ -192,7 +213,7 @@ fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
       )
 
     False ->
-      scene.group(
+      scene.empty(
         id: "group_" <> int.to_string(current),
         transform: transform.identity,
         children: [create_nested_group(depth, current + 1)],

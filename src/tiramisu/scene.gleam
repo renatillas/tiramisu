@@ -45,7 +45,6 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/order
-import gleam/set
 import paint
 import paint/encode as paint_encode
 import tiramisu/animation.{type AnimationPlayback}
@@ -108,11 +107,7 @@ pub fn lod_level(distance distance: Float, node node: Node(id)) -> LODLevel(id) 
 pub opaque type Node(id) {
   /// Empty node for organization, pivot points, and grouping without visual representation.
   /// Replaces the old Group type with clearer intent.
-  Empty(
-    id: id,
-    children: List(Node(id)),
-    transform: transform.Transform,
-  )
+  Empty(id: id, children: List(Node(id)), transform: transform.Transform)
   Mesh(
     id: id,
     children: List(Node(id)),
@@ -165,11 +160,7 @@ pub opaque type Node(id) {
     instances: List(transform.Transform),
     physics: Option(physics.RigidBody),
   )
-  Audio(
-    id: id,
-    children: List(Node(id)),
-    audio: audio.Audio,
-  )
+  Audio(id: id, children: List(Node(id)), audio: audio.Audio)
   Particles(
     id: id,
     children: List(Node(id)),
@@ -236,12 +227,7 @@ pub opaque type Node(id) {
     to: Vec3(Float),
     color: Int,
   )
-  DebugAxes(
-    id: id,
-    children: List(Node(id)),
-    origin: Vec3(Float),
-    size: Float,
-  )
+  DebugAxes(id: id, children: List(Node(id)), origin: Vec3(Float), size: Float)
   DebugGrid(
     id: id,
     children: List(Node(id)),
@@ -297,14 +283,7 @@ pub fn mesh(
   transform transform: transform.Transform,
   physics physics: Option(physics.RigidBody),
 ) -> Node(id) {
-  Mesh(
-    id:,
-    children: [],
-    transform:,
-    geometry:,
-    material:,
-    physics:,
-  )
+  Mesh(id:, children: [], transform:, geometry:, material:, physics:)
 }
 
 /// Create an instanced mesh for rendering many identical objects efficiently.
@@ -354,13 +333,7 @@ pub fn instanced_mesh(
   material material: material.Material,
   instances instances: List(transform.Transform),
 ) -> Node(id) {
-  InstancedMesh(
-    id:,
-    geometry:,
-    material:,
-    instances:,
-    children: [],
-  )
+  InstancedMesh(id:, geometry:, material:, instances:, children: [])
 }
 
 /// Create an empty node for organization, pivot points, or grouping.
@@ -610,14 +583,7 @@ pub fn model_3d(
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
 ) -> Node(id) {
-  Model3D(
-    id:,
-    object:,
-    transform:,
-    animation:,
-    physics:,
-    children: [],
-  )
+  Model3D(id:, object:, transform:, animation:, physics:, children: [])
 }
 
 /// Create instanced 3D models for rendering many copies of a loaded asset.
@@ -661,13 +627,7 @@ pub fn instanced_model(
   instances instances: List(transform.Transform),
   physics physics: Option(physics.RigidBody),
 ) -> Node(id) {
-  InstancedModel(
-    id:,
-    object:,
-    instances:,
-    physics:,
-    children: [],
-  )
+  InstancedModel(id:, object:, instances:, physics:, children: [])
 }
 
 /// Create an audio scene node.
@@ -741,13 +701,7 @@ pub fn particles(
   transform transform: transform.Transform,
   active active: Bool,
 ) -> Node(id) {
-  Particles(
-    id:,
-    emitter:,
-    transform:,
-    active:,
-    children: [],
-  )
+  Particles(id:, emitter:, transform:, active:, children: [])
 }
 
 /// Create a CSS2D label that follows a 3D position in screen space.
@@ -1043,13 +997,7 @@ pub fn debug_sphere(
   radius radius: Float,
   color color: Int,
 ) -> Node(id) {
-  DebugSphere(
-    id:,
-    center:,
-    radius:,
-    color:,
-    children: [],
-  )
+  DebugSphere(id:, center:, radius:, color:, children: [])
 }
 
 /// Create a debug line segment visualization.
@@ -1139,13 +1087,7 @@ pub fn debug_grid(
   divisions divisions: Int,
   color color: Int,
 ) -> Node(id) {
-  DebugGrid(
-    id:,
-    size:,
-    divisions:,
-    color:,
-    children: [],
-  )
+  DebugGrid(id:, size:, divisions:, color:, children: [])
 }
 
 /// Create a debug point visualization.
@@ -1182,13 +1124,7 @@ pub fn debug_point(
   size size: Float,
   color color: Int,
 ) -> Node(id) {
-  DebugPoint(
-    id:,
-    position:,
-    size:,
-    color:,
-    children: [],
-  )
+  DebugPoint(id:, position:, size:, color:, children: [])
 }
 
 pub fn with_children(node: Node(id), children children: List(Node(id))) {
@@ -1325,90 +1261,94 @@ pub fn diff(
   previous: Option(Node(id)),
   current: Option(Node(id)),
 ) -> List(Patch(id)) {
-  // Convert optional nodes to lists for flatten_scene
-  let prev_list = case previous {
-    option.Some(node) -> [node]
-    option.None -> []
-  }
-  let curr_list = case current {
-    option.Some(node) -> [node]
-    option.None -> []
-  }
-
-  let prev_dict = flatten_scene(prev_list)
-  let curr_dict = flatten_scene(curr_list)
-
-  // Early exit: if both scenes are empty, no patches needed
-  let prev_size = dict.size(prev_dict)
-  let curr_size = dict.size(curr_dict)
-  case prev_size == 0 && curr_size == 0 {
+  // Early exit: if scenes are identical by reference, no work needed
+  case previous == current {
     True -> []
     False -> {
-      // Convert to sets for O(log n) lookups instead of O(n) list.contains
-      let prev_ids = dict.keys(prev_dict)
-      let curr_ids = dict.keys(curr_dict)
-      let prev_id_set = set.from_list(prev_ids)
-      let curr_id_set = set.from_list(curr_ids)
+      // Convert optional nodes to lists for flatten_scene
+      let prev_list = case previous {
+        option.Some(node) -> [node]
+        option.None -> []
+      }
+      let curr_list = case current {
+        option.Some(node) -> [node]
+        option.None -> []
+      }
 
-      // Find removals: IDs in previous but not in current
-      let removals =
-        list.filter(prev_ids, fn(id) { !set.contains(curr_id_set, id) })
-        |> list.map(fn(id) { RemoveNode(id) })
+      let prev_dict = flatten_scene(prev_list)
+      let curr_dict = flatten_scene(curr_list)
 
-      // Find nodes that exist in both but have changed parents (need remove + add)
-      let #(parent_changed_ids, same_parent_ids) =
-        list.filter(curr_ids, fn(id) { set.contains(prev_id_set, id) })
-        |> list.partition(fn(id) {
-          case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-            Ok(NodeWithParent(_, prev_parent)),
-              Ok(NodeWithParent(_, curr_parent))
-            -> prev_parent != curr_parent
-            _, _ -> False
-          }
-        })
+      // Early exit: if both scenes are empty, no patches needed
+      let prev_size = dict.size(prev_dict)
+      let curr_size = dict.size(curr_dict)
+      case prev_size == 0 && curr_size == 0 {
+        True -> []
+        False -> {
+          // Use dict.has_key for O(log n) membership checks (no set allocation needed)
+          let prev_ids = dict.keys(prev_dict)
+          let curr_ids = dict.keys(curr_dict)
 
-      // For nodes with changed parents, treat as remove + add
-      let parent_change_removals =
-        list.map(parent_changed_ids, fn(id) { RemoveNode(id) })
+          // Find removals: IDs in previous but not in current
+          let removals =
+            list.filter(prev_ids, fn(id) { !dict.has_key(curr_dict, id) })
+            |> list.map(fn(id) { RemoveNode(id) })
 
-      let parent_change_additions =
-        list.filter_map(parent_changed_ids, fn(id) {
-          case dict.get(curr_dict, id) {
-            Ok(NodeWithParent(node, parent_id)) ->
-              Ok(AddNode(id, node, parent_id))
-            Error(_) -> Error(Nil)
-          }
-        })
+          // Find nodes that exist in both but have changed parents (need remove + add)
+          let #(parent_changed_ids, same_parent_ids) =
+            list.filter(curr_ids, fn(id) { dict.has_key(prev_dict, id) })
+            |> list.partition(fn(id) {
+              case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+                Ok(NodeWithParent(_, prev_parent)),
+                  Ok(NodeWithParent(_, curr_parent))
+                -> prev_parent != curr_parent
+                _, _ -> False
+              }
+            })
 
-      // Find additions: IDs in current but not in previous
-      // Sort additions so parents are added before children
-      let additions =
-        list.filter(curr_ids, fn(id) { !set.contains(prev_id_set, id) })
-        |> list.filter_map(fn(id) {
-          case dict.get(curr_dict, id) {
-            Ok(NodeWithParent(node, parent_id)) ->
-              Ok(AddNode(id, node, parent_id))
-            Error(_) -> Error(Nil)
-          }
-        })
-        |> list.append(parent_change_additions)
-        |> sort_patches_by_hierarchy(curr_dict)
+          // For nodes with changed parents, treat as remove + add
+          let parent_change_removals =
+            list.map(parent_changed_ids, fn(id) { RemoveNode(id) })
 
-      // Find updates: IDs in both with same parent, compare node properties
-      let updates =
-        list.flat_map(same_parent_ids, fn(id) {
-          case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-            Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
-              compare_nodes(id, prev_node, curr_node)
-            _, _ -> []
-          }
-        })
+          let parent_change_additions =
+            list.filter_map(parent_changed_ids, fn(id) {
+              case dict.get(curr_dict, id) {
+                Ok(NodeWithParent(node, parent_id)) ->
+                  Ok(AddNode(id, node, parent_id))
+                Error(_) -> Error(Nil)
+              }
+            })
 
-      // Batch patches by type for optimal renderer processing:
-      // 1. Removals first (free resources)
-      // 2. Updates (modify existing)
-      // 3. Additions last (create new, already sorted by hierarchy)
-      batch_patches(removals, parent_change_removals, updates, additions)
+          // Find additions: IDs in current but not in previous
+          // Sort additions so parents are added before children
+          let additions =
+            list.filter(curr_ids, fn(id) { !dict.has_key(prev_dict, id) })
+            |> list.filter_map(fn(id) {
+              case dict.get(curr_dict, id) {
+                Ok(NodeWithParent(node, parent_id)) ->
+                  Ok(AddNode(id, node, parent_id))
+                Error(_) -> Error(Nil)
+              }
+            })
+            |> list.append(parent_change_additions)
+            |> sort_patches_by_hierarchy(curr_dict)
+
+          // Find updates: IDs in both with same parent, compare node properties
+          let updates =
+            list.flat_map(same_parent_ids, fn(id) {
+              case dict.get(prev_dict, id), dict.get(curr_dict, id) {
+                Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
+                  compare_nodes(id, prev_node, curr_node)
+                _, _ -> []
+              }
+            })
+
+          // Batch patches by type for optimal renderer processing:
+          // 1. Removals first (free resources)
+          // 2. Updates (modify existing)
+          // 3. Additions last (create new, already sorted by hierarchy)
+          batch_patches(removals, parent_change_removals, updates, additions)
+        }
+      }
     }
   }
 }
@@ -1462,12 +1402,14 @@ fn batch_patches(
 }
 
 /// Efficiently concatenate multiple lists using fold + prepend
-/// O(n) total instead of list.flatten's O(n * m)
+/// O(n) optimized: process lists in reverse order to avoid final reverse
 fn concat_patches(lists: List(List(Patch(id)))) -> List(Patch(id)) {
-  list.fold(lists, [], fn(acc, patches) {
+  // Reverse list of lists, then prepend each list to build result in correct order
+  lists
+  |> list.reverse
+  |> list.fold([], fn(acc, patches) {
     list.fold(patches, acc, fn(acc2, patch) { [patch, ..acc2] })
   })
-  |> list.reverse
 }
 
 /// Sort AddNode patches so that parents are added before their children
@@ -1770,30 +1712,15 @@ fn compare_nodes_detailed(
       html: previous_html,
       transform: prev_transform,
     ),
-      CSS2DLabel(
-        id: _,
-        children: _,
-        html: curr_html,
-        transform: curr_transform,
-      )
+      CSS2DLabel(id: _, children: _, html: curr_html, transform: curr_transform)
     ->
       case previous_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS2DLabel(id, curr_html, curr_transform)]
         False -> []
       }
 
-    CSS3DLabel(
-      id: _,
-      children: _,
-      html: prev_html,
-      transform: prev_transform,
-    ),
-      CSS3DLabel(
-        id: _,
-        children: _,
-        html: curr_html,
-        transform: curr_transform,
-      )
+    CSS3DLabel(id: _, children: _, html: prev_html, transform: prev_transform),
+      CSS3DLabel(id: _, children: _, html: curr_html, transform: curr_transform)
     ->
       case prev_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS3DLabel(id, curr_html, curr_transform)]
@@ -2691,22 +2618,14 @@ fn handle_add_node(
         parent_id,
       )
 
-    Light(
-      id: _,
-      children: _,
-      transform: transform,
-      light: light,
-    ) -> handle_add_light(state, id, light, transform, parent_id)
+    Light(id: _, children: _, transform: transform, light: light) ->
+      handle_add_light(state, id, light, transform, parent_id)
 
     Empty(id: _, children: _, transform: transform) ->
       handle_add_group(state, id, transform, parent_id)
 
-    LOD(
-      id: _,
-      children: _,
-      levels: levels,
-      transform: transform,
-    ) -> handle_add_lod(state, id, transform, levels, parent_id)
+    LOD(id: _, children: _, levels: levels, transform: transform) ->
+      handle_add_lod(state, id, transform, levels, parent_id)
 
     Model3D(
       id: _,
@@ -2767,13 +2686,8 @@ fn handle_add_node(
         parent_id,
       )
 
-    DebugBox(
-      id: _,
-      children: _,
-      min: min,
-      max: max,
-      color: color,
-    ) -> handle_add_debug_box(state, id, min, max, color, parent_id)
+    DebugBox(id: _, children: _, min: min, max: max, color: color) ->
+      handle_add_debug_box(state, id, min, max, color, parent_id)
 
     DebugSphere(
       id: _,
@@ -2783,13 +2697,8 @@ fn handle_add_node(
       color: color,
     ) -> handle_add_debug_sphere(state, id, center, radius, color, parent_id)
 
-    DebugLine(
-      id: _,
-      children: _,
-      from: from,
-      to: to,
-      color: color,
-    ) -> handle_add_debug_line(state, id, from, to, color, parent_id)
+    DebugLine(id: _, children: _, from: from, to: to, color: color) ->
+      handle_add_debug_line(state, id, from, to, color, parent_id)
 
     DebugAxes(id: _, children: _, origin: origin, size: size) ->
       handle_add_debug_axes(state, id, origin, size, parent_id)
@@ -2802,13 +2711,8 @@ fn handle_add_node(
       color: color,
     ) -> handle_add_debug_grid(state, id, size, divisions, color, parent_id)
 
-    DebugPoint(
-      id: _,
-      children: _,
-      position: position,
-      size: size,
-      color: color,
-    ) -> handle_add_debug_point(state, id, position, size, color, parent_id)
+    DebugPoint(id: _, children: _, position: position, size: size, color: color) ->
+      handle_add_debug_point(state, id, position, size, color, parent_id)
 
     Particles(
       id: _,
@@ -2818,19 +2722,11 @@ fn handle_add_node(
       active: active,
     ) -> handle_add_particles(state, id, emitter, transform, active, parent_id)
 
-    CSS2DLabel(
-      id: _,
-      children: _,
-      html: html,
-      transform: trans,
-    ) -> handle_add_css2d_label(state, id, html, trans, parent_id)
+    CSS2DLabel(id: _, children: _, html: html, transform: trans) ->
+      handle_add_css2d_label(state, id, html, trans, parent_id)
 
-    CSS3DLabel(
-      id: _,
-      children: _,
-      html: html,
-      transform: trans,
-    ) -> handle_add_css3d_label(state, id, html, trans, parent_id)
+    CSS3DLabel(id: _, children: _, html: html, transform: trans) ->
+      handle_add_css3d_label(state, id, html, trans, parent_id)
 
     Canvas(
       id: _,

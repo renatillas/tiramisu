@@ -1,5 +1,5 @@
+import gleam/list
 import gleam/option
-import gleeunit/should
 import tiramisu/geometry
 import tiramisu/light
 import tiramisu/material
@@ -7,7 +7,7 @@ import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
-type TestId {
+pub type TestId {
   Cube1
   Light1
   Root
@@ -29,10 +29,8 @@ pub fn diff_empty_to_single_node_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.AddNode(id: Cube1, node: _, parent_id: option.None)] -> Nil
-    _ -> should.fail()
-  }
+  let assert Ok(scene.AddNode(id: Cube1, node: _, parent_id: option.None)) =
+    list.first(patches)
 }
 
 pub fn diff_single_node_to_empty_test() {
@@ -51,10 +49,7 @@ pub fn diff_single_node_to_empty_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.RemoveNode(id: Cube1)] -> Nil
-    _ -> should.fail()
-  }
+  let assert Ok(scene.RemoveNode(id: Cube1)) = list.first(patches)
 }
 
 pub fn diff_transform_change_test() {
@@ -80,12 +75,10 @@ pub fn diff_transform_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateTransform(id: Cube1, transform: t)] -> {
-      assert transform.position(t) == vec3.Vec3(5.0, 0.0, 0.0)
-    }
-    _ -> should.fail()
-  }
+  let assert Ok(scene.UpdateTransform(id: Cube1, transform: t)) =
+    list.first(patches)
+
+  assert transform.position(t) == vec3.Vec3(5.0, 0.0, 0.0)
 }
 
 pub fn diff_material_change_test() {
@@ -112,10 +105,9 @@ pub fn diff_material_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateMaterial(id: Cube1, material: _)] -> Nil
-    _ -> should.fail()
-  }
+  let assert Ok(scene.UpdateMaterial(id: Cube1, material: updated_mat)) =
+    list.first(patches)
+  assert updated_mat == mat2
 }
 
 pub fn diff_geometry_change_test() {
@@ -142,10 +134,9 @@ pub fn diff_geometry_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateGeometry(id: Cube1, geometry: _)] -> Nil
-    _ -> should.fail()
-  }
+  let assert Ok(scene.UpdateGeometry(id: Cube1, geometry: updated_geom)) =
+    list.first(patches)
+  assert updated_geom == geom2
 }
 
 pub fn diff_multiple_changes_test() {
@@ -182,10 +173,7 @@ pub fn diff_multiple_changes_test() {
   let patches = scene.diff(prev, next)
 
   // Should have 2 patches: UpdateTransform and AddNode
-  case patches {
-    [_, _] -> Nil
-    _ -> should.fail()
-  }
+  assert list.length(patches) == 2
 }
 
 pub fn diff_no_changes_test() {
@@ -211,8 +199,5 @@ pub fn diff_no_changes_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [] -> Nil
-    _ -> should.fail()
-  }
+  assert list.is_empty(patches)
 }

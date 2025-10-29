@@ -1,10 +1,11 @@
+import gleam/list
 import gleam/option
 import paint as p
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
-type TestId {
+pub type TestId {
   Canvas1
   Canvas2
   Root
@@ -28,10 +29,8 @@ pub fn diff_add_canvas_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.AddNode(id: Canvas1, node: _, parent_id: option.None)] -> Nil
-    _ -> panic as "Expected AddNode patch for canvas"
-  }
+  let assert Ok(scene.AddNode(id: Canvas1, node: _, parent_id: option.None)) =
+    list.first(patches)
 }
 
 /// Test that removing a canvas generates a RemoveNode patch
@@ -52,10 +51,7 @@ pub fn diff_remove_canvas_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.RemoveNode(id: Canvas1)] -> Nil
-    _ -> panic as "Expected RemoveNode patch for canvas"
-  }
+  let assert Ok(scene.RemoveNode(id: Canvas1)) = list.first(patches)
 }
 
 /// Test that identical canvas nodes generate no patches (encoding optimization working)
@@ -85,11 +81,7 @@ pub fn diff_canvas_no_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [] -> Nil
-    _ ->
-      panic as "Expected no patches for identical canvas nodes (encoding optimization should prevent re-rendering)"
-  }
+  let assert Error(Nil) = list.first(patches)
 }
 
 /// Test that changing picture content generates UpdateCanvas patch
@@ -120,10 +112,7 @@ pub fn diff_canvas_picture_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateCanvas(id: Canvas1, ..)] -> Nil
-    _ -> panic as "Expected UpdateCanvas patch when picture changes"
-  }
+  let assert Ok(scene.UpdateCanvas(id: Canvas1, ..)) = list.first(patches)
 }
 
 /// Test that changing texture dimensions generates UpdateCanvas patch
@@ -153,10 +142,7 @@ pub fn diff_canvas_dimensions_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateCanvas(id: Canvas1, ..)] -> Nil
-    _ -> panic as "Expected UpdateCanvas patch when texture dimensions change"
-  }
+  let assert Ok(scene.UpdateCanvas(id: Canvas1, ..)) = list.first(patches)
 }
 
 /// Test that changing canvas size generates UpdateCanvas patch
@@ -186,10 +172,7 @@ pub fn diff_canvas_size_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateCanvas(id: Canvas1, ..)] -> Nil
-    _ -> panic as "Expected UpdateCanvas patch when canvas size changes"
-  }
+  let assert Ok(scene.UpdateCanvas(id: Canvas1, ..)) = list.first(patches)
 }
 
 /// Test that changing transform generates UpdateCanvas patch
@@ -219,10 +202,7 @@ pub fn diff_canvas_transform_change_test() {
 
   let patches = scene.diff(prev, next)
 
-  case patches {
-    [scene.UpdateCanvas(id: Canvas1, ..)] -> Nil
-    _ -> panic as "Expected UpdateCanvas patch when transform changes"
-  }
+  let assert Ok(scene.UpdateCanvas(id: Canvas1, ..)) = list.first(patches)
 }
 
 /// Test encoding optimization: Creating the same picture twice should generate identical encoded strings
@@ -255,11 +235,7 @@ pub fn canvas_encoding_consistency_test() {
   // If encoding is consistent, diff should produce no patches
   let patches = scene.diff(option.Some(canvas1), option.Some(canvas2))
 
-  case patches {
-    [] -> Nil
-    _ ->
-      panic as "Expected no patches - identical pictures should encode to identical strings"
-  }
+  let assert Error(Nil) = list.first(patches)
 }
 
 /// Test that multiple canvas updates work correctly
@@ -306,9 +282,5 @@ pub fn diff_multiple_canvas_test() {
 
   let patches = scene.diff(prev, next)
 
-  // Should only have AddNode for Canvas2, no update for Canvas1
-  case patches {
-    [scene.AddNode(id: Canvas2, ..)] -> Nil
-    _ -> panic as "Expected only AddNode patch for new canvas"
-  }
+  let assert Ok(scene.AddNode(id: Canvas2, ..)) = list.first(patches)
 }
