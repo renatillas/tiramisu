@@ -191,6 +191,45 @@ pub opaque type Material {
   )
 }
 
+/// Material override configuration for loaded 3D models.
+///
+/// Allows setting material properties on loaded assets without modifying the source.
+/// Useful for vegetation, transparent objects, and material adjustments.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/material
+/// import gleam/option
+///
+/// // For vegetation with alpha-tested transparency
+/// let foliage_override = material.MaterialOverride(
+///   map: option.Some(texture),
+///   transparent: option.Some(True),
+///   alpha_test: option.Some(0.5),
+///   side: option.Some(material.DoubleSide),
+///   roughness: option.Some(0.9),
+///   metalness: option.Some(0.0),
+/// )
+/// ```
+pub type MaterialOverride {
+  MaterialOverride(
+    map: Option(asset.Texture),
+    transparent: Option(Bool),
+    alpha_test: Option(Float),
+    side: Option(MaterialSide),
+    roughness: Option(Float),
+    metalness: Option(Float),
+  )
+}
+
+/// Which sides of geometry to render.
+pub type MaterialSide {
+  FrontSide
+  BackSide
+  DoubleSide
+}
+
 pub type MaterialError {
   OutOfBoundsColor(Int)
   OutOfBoundsOpacity(Float)

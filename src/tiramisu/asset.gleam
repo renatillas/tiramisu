@@ -993,6 +993,11 @@ fn apply_texture_to_object_ffi(
   filter_mode: String,
 ) -> Nil
 
+/// Enable transparency on all materials in a 3D model
+/// This is useful for vegetation and other alpha-tested geometry
+@external(javascript, "../threejs.ffi.mjs", "enableTransparency")
+pub fn enable_transparency(object: Object3D) -> Nil
+
 /// Apply a texture to all materials in a loaded 3D model
 pub fn apply_texture_to_object(
   object: Object3D,

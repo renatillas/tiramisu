@@ -229,7 +229,13 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
         active: True,
         transform: transform.at(position: vec3.Vec3(0.0, 1.5, 20.0)),
         viewport: option.None,
-        postprocessing: option.None,
+        postprocessing: option.Some(
+          postprocessing.new()
+          |> postprocessing.add_pass(postprocessing.clear_pass(option.None))
+          |> postprocessing.add_pass(postprocessing.render_pass())
+          |> postprocessing.add_pass(postprocessing.pixelate(4))
+          |> postprocessing.add_pass(postprocessing.output_pass()),
+        ),
       )
     })
 
@@ -342,6 +348,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
+          material_override: option.None,
         )
 
       scene.empty(id: Scene, transform: transform.identity, children: [

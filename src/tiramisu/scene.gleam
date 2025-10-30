@@ -152,6 +152,7 @@ pub opaque type Node(id) {
     transform: transform.Transform,
     animation: Option(AnimationPlayback),
     physics: Option(physics.RigidBody),
+    material_override: Option(material.MaterialOverride),
   )
   InstancedModel(
     id: id,
@@ -582,8 +583,17 @@ pub fn model_3d(
   transform transform: transform.Transform,
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
+  material_override material_override: Option(material.MaterialOverride),
 ) -> Node(id) {
-  Model3D(id:, object:, transform:, animation:, physics:, children: [])
+  Model3D(
+    id:,
+    object:,
+    transform:,
+    animation:,
+    physics:,
+    material_override:,
+    children: [],
+  )
 }
 
 /// Create instanced 3D models for rendering many copies of a loaded asset.
@@ -1630,6 +1640,7 @@ fn compare_nodes_detailed(
       transform: previous_transform,
       animation: previous_animation,
       physics: previous_physics,
+      material_override: previous_material_override,
     ),
       Model3D(
         id: _,
@@ -1638,6 +1649,7 @@ fn compare_nodes_detailed(
         transform: current_transform,
         animation: current_animation,
         physics: current_physics,
+        material_override: current_material_override,
       )
     ->
       compare_model3d_fields(
@@ -1645,9 +1657,11 @@ fn compare_nodes_detailed(
         previous_transform:,
         previous_animation:,
         previous_physics:,
+        previous_material_override:,
         current_transform:,
         current_animation:,
         current_physics:,
+        current_material_override:,
       )
 
     InstancedModel(
@@ -1986,9 +2000,11 @@ fn compare_model3d_fields(
   previous_transform prev_trans: transform.Transform,
   previous_animation prev_anim: Option(AnimationPlayback),
   previous_physics prev_phys: Option(physics.RigidBody),
+  previous_material_override prev_mat: Option(material.MaterialOverride),
   current_transform curr_trans: transform.Transform,
   current_animation curr_anim: Option(AnimationPlayback),
   current_physics curr_phys: Option(physics.RigidBody),
+  current_material_override curr_mat: Option(material.MaterialOverride),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -2634,6 +2650,7 @@ fn handle_add_node(
       transform: transform,
       animation: animation,
       physics: physics,
+      material_override: material_override,
     ) ->
       handle_add_model3d(
         state,
@@ -2642,6 +2659,7 @@ fn handle_add_node(
         transform,
         animation,
         physics,
+        material_override,
         parent_id,
       )
 
@@ -3010,9 +3028,15 @@ fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
       transform: transform,
       animation: _,
       physics: _,
+      material_override: material_override,
     ) -> {
       let cloned = clone_object_ffi(object)
       apply_transform_ffi(cloned, transform)
+      // Apply material overrides if provided
+      case material_override {
+        option.Some(override) -> apply_material_override_ffi(cloned, override)
+        option.None -> Nil
+      }
       cloned
     }
     _ -> {
@@ -3029,9 +3053,16 @@ fn handle_add_model3d(
   transform: transform.Transform,
   animation: Option(AnimationPlayback),
   physics: Option(physics.RigidBody),
+  material_override: Option(material.MaterialOverride),
   parent_id: Option(id),
 ) -> RendererState(id) {
   apply_transform_ffi(object, transform)
+
+  // Apply material overrides if provided
+  case material_override {
+    option.Some(override) -> apply_material_override_ffi(object, override)
+    option.None -> Nil
+  }
 
   // Create animation mixer
   let mixer_dynamic = create_animation_mixer_ffi(object)
@@ -4338,4 +4369,10 @@ fn update_canvas_size_ffi(
   object: asset.Object3D,
   width: Float,
   height: Float,
+) -> Nil
+
+@external(javascript, "../threejs.ffi.mjs", "applyMaterialOverride")
+fn apply_material_override_ffi(
+  object: asset.Object3D,
+  override: material.MaterialOverride,
 ) -> Nil
