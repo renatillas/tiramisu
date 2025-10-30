@@ -218,7 +218,11 @@ pub fn set_camera_postprocessing(
   let string_id = id.to_string(id)
   CacheState(
     ..cache,
-    camera_postprocessing: dict.insert(cache.camera_postprocessing, string_id, pp),
+    camera_postprocessing: dict.insert(
+      cache.camera_postprocessing,
+      string_id,
+      pp,
+    ),
   )
 }
 
@@ -260,7 +264,14 @@ pub fn remove_camera(cache: CacheState, id: id) -> CacheState {
 /// Returns list of tuples: (camera_id_string, camera_object, Option(viewport), Option(postprocessing))
 pub fn get_all_cameras_with_info(
   cache: CacheState,
-) -> List(#(String, ThreeObject, Option(Viewport), Option(postprocessing.PostProcessing))) {
+) -> List(
+  #(
+    String,
+    ThreeObject,
+    Option(Viewport),
+    Option(postprocessing.PostProcessing),
+  ),
+) {
   // Iterate over camera IDs and look up their info
   set.to_list(cache.cameras)
   |> list.filter_map(fn(camera_id) {

@@ -131,8 +131,15 @@ pub type ScenePair(id) {
 
 // --- Helper Functions ---
 
-fn wrap_in_group(id: id, children: List(scene.Node(id))) -> option.Option(scene.Node(id)) {
-  option.Some(scene.empty(id: id, transform: transform.identity, children: children))
+fn wrap_in_group(
+  id: id,
+  children: List(scene.Node(id)),
+) -> option.Option(scene.Node(id)) {
+  option.Some(scene.empty(
+    id: id,
+    transform: transform.identity,
+    children: children,
+  ))
 }
 
 fn create_flat_scene(count: Int) -> List(scene.Node(String)) {

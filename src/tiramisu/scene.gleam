@@ -1346,8 +1346,9 @@ pub fn diff(
           let updates =
             list.flat_map(same_parent_ids, fn(id) {
               case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-                Ok(NodeWithParent(prev_node, _)), Ok(NodeWithParent(curr_node, _)) ->
-                  compare_nodes(id, prev_node, curr_node)
+                Ok(NodeWithParent(prev_node, _)),
+                  Ok(NodeWithParent(curr_node, _))
+                -> compare_nodes(id, prev_node, curr_node)
                 _, _ -> []
               }
             })
