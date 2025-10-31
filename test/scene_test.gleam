@@ -107,7 +107,7 @@ pub fn diff_material_change_test() {
 
   let assert Ok(scene.UpdateMaterial(id: Cube1, material: updated_mat)) =
     list.first(patches)
-  assert updated_mat == mat2
+  assert updated_mat == option.Some(mat2)
 }
 
 pub fn diff_geometry_change_test() {

@@ -172,6 +172,9 @@ pub opaque type Material {
     map: Option(asset.Texture),
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
+    transparent: Bool,
+    opacity: Float,
+    alpha_test: Float,
   )
   /// Cartoon-style material with banded shading.
   ToonMaterial(
@@ -188,38 +191,6 @@ pub opaque type Material {
     map: Option(asset.Texture),
     transparent: Bool,
     opacity: Float,
-  )
-}
-
-/// Material override configuration for loaded 3D models.
-///
-/// Allows setting material properties on loaded assets without modifying the source.
-/// Useful for vegetation, transparent objects, and material adjustments.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu/material
-/// import gleam/option
-///
-/// // For vegetation with alpha-tested transparency
-/// let foliage_override = material.MaterialOverride(
-///   map: option.Some(texture),
-///   transparent: option.Some(True),
-///   alpha_test: option.Some(0.5),
-///   side: option.Some(material.DoubleSide),
-///   roughness: option.Some(0.9),
-///   metalness: option.Some(0.0),
-/// )
-/// ```
-pub type MaterialOverride {
-  MaterialOverride(
-    map: Option(asset.Texture),
-    transparent: Option(Bool),
-    alpha_test: Option(Float),
-    side: Option(MaterialSide),
-    roughness: Option(Float),
-    metalness: Option(Float),
   )
 }
 
@@ -419,12 +390,31 @@ pub fn lambert(
   map map: Option(asset.Texture),
   normal_map normal_map: Option(asset.Texture),
   ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  transparent transparent: Bool,
+  opacity opacity: Float,
+  alpha_test alpha_test: Float,
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
     Error(OutOfBoundsColor(color)),
   )
-  Ok(LambertMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
+  use <- bool.guard(
+    opacity <. 0.0 || opacity >. 1.0,
+    Error(OutOfBoundsOpacity(opacity)),
+  )
+  use <- bool.guard(
+    alpha_test <. 0.0 || alpha_test >. 1.0,
+    Error(OutOfBoundsOpacity(alpha_test)),
+  )
+  Ok(LambertMaterial(
+    color:,
+    map:,
+    normal_map:,
+    ambient_oclusion_map:,
+    transparent:,
+    opacity:,
+    alpha_test:,
+  ))
 }
 
 /// Create a Phong material for shiny surfaces with specular highlights.
@@ -909,8 +899,24 @@ pub fn create_material(material: Material) -> ThreeMaterial {
         normal_map,
         ambient_oclusion_map,
       )
-    LambertMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
-      create_lambert_material(color, map, normal_map, ambient_oclusion_map)
+    LambertMaterial(
+      color:,
+      map:,
+      normal_map:,
+      ambient_oclusion_map:,
+      transparent:,
+      opacity:,
+      alpha_test:,
+    ) ->
+      create_lambert_material(
+        color,
+        map,
+        normal_map,
+        ambient_oclusion_map,
+        transparent,
+        opacity,
+        alpha_test,
+      )
     ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
       create_toon_material(color, map, normal_map, ambient_oclusion_map)
     LineMaterial(color:, linewidth:) -> create_line_material(color, linewidth)
@@ -958,6 +964,9 @@ fn create_lambert_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
+  transparent: Bool,
+  opacity: Float,
+  alpha_test: Float,
 ) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createToonMaterial")

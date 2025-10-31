@@ -126,6 +126,9 @@ pub fn lambert_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 }
 

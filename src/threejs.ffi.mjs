@@ -721,7 +721,7 @@ export function createPhongMaterial(color, shininess, map, normalMap, aoMap) {
  * @param {THREE.Texture|null} aoMap
  * @returns {THREE.MeshLambertMaterial}
  */
-export function createLambertMaterial(color, map, normalMap, aoMap) {
+export function createLambertMaterial(color, map, normalMap, aoMap, transparent, opacity, alphaTest) {
   const validMap = optionToNull(map);
   const validNormalMap = optionToNull(normalMap);
   const validAoMap = optionToNull(aoMap);
@@ -730,8 +730,18 @@ export function createLambertMaterial(color, map, normalMap, aoMap) {
     color,
     map: validMap,
     normalMap: validNormalMap,
-    aoMap: validAoMap
+    aoMap: validAoMap,
+    transparent,
+    opacity,
+    alphaTest,
+    side: THREE.DoubleSide,
   });
+
+  // Ensure texture is configured for transparency
+  if (validMap && transparent) {
+    validMap.format = THREE.RGBAFormat;
+    validMap.needsUpdate = true;
+  }
 
   if (validNormalMap) {
     material.normalScale.set(1.0, 1.0);
@@ -2704,114 +2714,25 @@ export function enableTransparency(object) {
 }
 
 /**
- * Apply material overrides to all materials in an Object3D
- * @param {THREE.Object3D} object
- * @param {Object} override - Gleam MaterialOverride record
+ * Apply a Three.js material to all meshes in an Object3D
+ * Note: This expects a THREE.Material, not a Tiramisu Material.
+ * The Tiramisu Material should be converted using create_material first (from material.mjs)
+ * @param {THREE.Object3D} object - The object to apply the material to
+ * @param {THREE.Material} threeMaterial - The Three.js material
  */
-export function applyMaterialOverride(object, override) {
-  console.log('[applyMaterialOverride] FUNCTION CALLED!', 'object:', object, 'override:', override);
-  // Gleam MaterialOverride has named properties in JS:
-  // map, transparent, alpha_test, side, roughness, metalness
-  const mapOption = override.map;
-  console.log('[applyMaterialOverride] mapOption:', mapOption, 'mapOption.$:', mapOption?.$, 'mapOption[0]:', mapOption?.[0]);
-  const transparentOption = override.transparent;
-  const alphaTestOption = override.alpha_test;
-  const sideOption = override.side;
-  const roughnessOption = override.roughness;
-  const metalnessOption = override.metalness;
-
+export function applyMaterialToObject(object, threeMaterial) {
+  // Traverse and replace all materials
   object.traverse((child) => {
     if (child.isMesh) {
-      const applyToMaterial = (mat, materialIndex) => {
-        // Check if we need to convert to StandardMaterial for PBR properties
-        const needsPBR =
-          (roughnessOption && roughnessOption[0] !== undefined) ||
-          (metalnessOption && metalnessOption[0] !== undefined);
-
-        let targetMat = mat;
-
-        // Get the texture to use (from override or existing material)
-        let textureToUse = mat.map;
-        if (mapOption && mapOption[0]) {
-          textureToUse = mapOption[0];
-          console.log('[Material Override] Applying texture:', textureToUse, 'to material:', mat.type);
-          // Set texture filtering for pixelated look
-          textureToUse.minFilter = THREE.NearestFilter;
-          textureToUse.magFilter = THREE.NearestFilter;
-          textureToUse.generateMipmaps = false;
-          textureToUse.colorSpace = THREE.SRGBColorSpace;
-          textureToUse.needsUpdate = true;
-        }
-
-        // Convert to StandardMaterial if we need PBR properties and current material doesn't support them
-        if (needsPBR && mat.roughness === undefined) {
-          const newMat = new THREE.MeshStandardMaterial({
-            map: textureToUse,
-            color: mat.color,
-            transparent: mat.transparent,
-            opacity: mat.opacity,
-            side: mat.side,
-            alphaTest: mat.alphaTest,
-            roughness: 1.0,
-            metalness: 0.0,
-          });
-
-          // Replace the material on the mesh
-          if (Array.isArray(child.material)) {
-            child.material[materialIndex] = newMat;
-          } else {
-            child.material = newMat;
-          }
-
-          // Dispose old material
-          mat.dispose();
-          targetMat = newMat;
-        } else if (textureToUse) {
-          // Apply texture to existing material
-          targetMat.map = textureToUse;
-        }
-
-        // Apply transparent override
-        if (transparentOption && transparentOption[0] !== undefined) {
-          targetMat.transparent = transparentOption[0];
-        }
-
-        // Apply alpha_test override
-        if (alphaTestOption && alphaTestOption[0] !== undefined) {
-          targetMat.alphaTest = alphaTestOption[0];
-        }
-
-        // Apply side override
-        if (sideOption && sideOption[0]) {
-          const sideValue = sideOption[0];
-          // MaterialSide variants don't have .$ either, they're just objects with numbered properties
-          // FrontSide, BackSide, DoubleSide are just constructor names
-          // Check the constructor name directly
-          const sideName = sideValue.constructor.name;
-          if (sideName === 'FrontSide') targetMat.side = THREE.FrontSide;
-          else if (sideName === 'BackSide') targetMat.side = THREE.BackSide;
-          else if (sideName === 'DoubleSide') targetMat.side = THREE.DoubleSide;
-        }
-
-        // Apply roughness override
-        if (roughnessOption && roughnessOption[0] !== undefined) {
-          targetMat.roughness = roughnessOption[0];
-        }
-
-        // Apply metalness override
-        if (metalnessOption && metalnessOption[0] !== undefined) {
-          targetMat.metalness = metalnessOption[0];
-        }
-
-        targetMat.needsUpdate = true;
-      };
-
-      const material = child.material;
-      if (Array.isArray(material)) {
-        material.forEach((mat, index) => applyToMaterial(mat, index));
-      } else if (material) {
-        applyToMaterial(material, 0);
+      // Dispose old material(s)
+      if (Array.isArray(child.material)) {
+        child.material.forEach(mat => mat.dispose());
+      } else if (child.material) {
+        child.material.dispose();
       }
+
+      // Apply new material
+      child.material = threeMaterial;
     }
   });
 }

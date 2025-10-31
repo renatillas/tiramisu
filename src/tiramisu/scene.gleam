@@ -152,7 +152,7 @@ pub opaque type Node(id) {
     transform: transform.Transform,
     animation: Option(AnimationPlayback),
     physics: Option(physics.RigidBody),
-    material_override: Option(material.MaterialOverride),
+    material: Option(material.Material),
   )
   InstancedModel(
     id: id,
@@ -160,6 +160,7 @@ pub opaque type Node(id) {
     object: asset.Object3D,
     instances: List(transform.Transform),
     physics: Option(physics.RigidBody),
+    material: Option(material.Material),
   )
   Audio(id: id, children: List(Node(id)), audio: audio.Audio)
   Particles(
@@ -583,7 +584,7 @@ pub fn model_3d(
   transform transform: transform.Transform,
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
-  material_override material_override: Option(material.MaterialOverride),
+  material material: Option(material.Material),
 ) -> Node(id) {
   Model3D(
     id:,
@@ -591,7 +592,7 @@ pub fn model_3d(
     transform:,
     animation:,
     physics:,
-    material_override:,
+    material:,
     children: [],
   )
 }
@@ -636,8 +637,9 @@ pub fn instanced_model(
   object object: asset.Object3D,
   instances instances: List(transform.Transform),
   physics physics: Option(physics.RigidBody),
+  material material: Option(material.Material),
 ) -> Node(id) {
-  InstancedModel(id:, object:, instances:, physics:, children: [])
+  InstancedModel(id:, object:, instances:, physics:, material:, children: [])
 }
 
 /// Create an audio scene node.
@@ -1202,7 +1204,7 @@ pub type Patch(id) {
   AddNode(id: id, node: Node(id), parent_id: Option(id))
   RemoveNode(id: id)
   UpdateTransform(id: id, transform: transform.Transform)
-  UpdateMaterial(id: id, material: material.Material)
+  UpdateMaterial(id: id, material: Option(material.Material))
   UpdateGeometry(id: id, geometry: geometry.Geometry)
   UpdateLight(id: id, light: light.Light)
   UpdateAnimation(id: id, animation: Option(AnimationPlayback))
@@ -1641,7 +1643,7 @@ fn compare_nodes_detailed(
       transform: previous_transform,
       animation: previous_animation,
       physics: previous_physics,
-      material_override: previous_material_override,
+      material: previous_material,
     ),
       Model3D(
         id: _,
@@ -1650,7 +1652,7 @@ fn compare_nodes_detailed(
         transform: current_transform,
         animation: current_animation,
         physics: current_physics,
-        material_override: current_material_override,
+        material: current_material,
       )
     ->
       compare_model3d_fields(
@@ -1658,11 +1660,11 @@ fn compare_nodes_detailed(
         previous_transform:,
         previous_animation:,
         previous_physics:,
-        previous_material_override:,
+        previous_material:,
         current_transform:,
         current_animation:,
         current_physics:,
-        current_material_override:,
+        current_material:,
       )
 
     InstancedModel(
@@ -1671,6 +1673,7 @@ fn compare_nodes_detailed(
       object: _,
       instances: previous_instances,
       physics: previous_physics,
+      material: previous_material,
     ),
       InstancedModel(
         id: _,
@@ -1678,14 +1681,17 @@ fn compare_nodes_detailed(
         object: _,
         instances: current_instances,
         physics: current_physics,
+        material: current_material,
       )
     ->
       compare_instanced_model_fields(
         id:,
         previous_instances:,
         previous_physics:,
+        previous_material:,
         current_instances:,
         current_physics:,
+        current_material:,
       )
 
     Audio(id: _, children: _, audio: prev_audio),
@@ -1854,7 +1860,7 @@ fn compare_mesh_fields(
   }
 
   let patches = case prev_mat != curr_mat {
-    True -> [UpdateMaterial(id, curr_mat), ..patches]
+    True -> [UpdateMaterial(id, option.Some(curr_mat)), ..patches]
     False -> patches
   }
 
@@ -1884,7 +1890,7 @@ fn compare_instanced_mesh_fields(
   let patches = []
 
   let patches = case prev_mat != curr_mat {
-    True -> [UpdateMaterial(id, curr_mat), ..patches]
+    True -> [UpdateMaterial(id, option.Some(curr_mat)), ..patches]
     False -> patches
   }
 
@@ -2001,11 +2007,11 @@ fn compare_model3d_fields(
   previous_transform prev_trans: transform.Transform,
   previous_animation prev_anim: Option(AnimationPlayback),
   previous_physics prev_phys: Option(physics.RigidBody),
-  previous_material_override prev_mat: Option(material.MaterialOverride),
+  previous_material prev_mat: Option(material.Material),
   current_transform curr_trans: transform.Transform,
   current_animation curr_anim: Option(AnimationPlayback),
   current_physics curr_phys: Option(physics.RigidBody),
-  current_material_override curr_mat: Option(material.MaterialOverride),
+  current_material curr_mat: Option(material.Material),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -2024,6 +2030,11 @@ fn compare_model3d_fields(
     False -> patches
   }
 
+  let patches = case prev_mat != curr_mat {
+    True -> [UpdateMaterial(id, curr_mat), ..patches]
+    False -> patches
+  }
+
   patches
 }
 
@@ -2032,8 +2043,10 @@ fn compare_instanced_model_fields(
   id id: id,
   previous_instances previous_instances: List(transform.Transform),
   previous_physics previous_physics: Option(physics.RigidBody),
+  previous_material previous_material: Option(material.Material),
   current_instances current_instances: List(transform.Transform),
   current_physics current_physics: Option(physics.RigidBody),
+  current_material current_material: Option(material.Material),
 ) -> List(Patch(id)) {
   let patches = []
 
@@ -2044,6 +2057,11 @@ fn compare_instanced_model_fields(
 
   let patches = case previous_physics != current_physics {
     True -> [UpdatePhysics(id, current_physics), ..patches]
+    False -> patches
+  }
+
+  let patches = case previous_material != current_material {
+    True -> [UpdateMaterial(id, current_material), ..patches]
     False -> patches
   }
 
@@ -2651,7 +2669,7 @@ fn handle_add_node(
       transform: transform,
       animation: animation,
       physics: physics,
-      material_override: material_override,
+      material: material,
     ) ->
       handle_add_model3d(
         state,
@@ -2660,7 +2678,7 @@ fn handle_add_node(
         transform,
         animation,
         physics,
-        material_override,
+        material,
         parent_id,
       )
 
@@ -2670,6 +2688,7 @@ fn handle_add_node(
       object: object,
       instances: instances,
       physics: physics,
+      material: material,
     ) ->
       handle_add_instanced_model(
         state,
@@ -2677,6 +2696,7 @@ fn handle_add_node(
         object,
         instances,
         physics,
+        material,
         parent_id,
       )
 
@@ -2882,12 +2902,20 @@ fn handle_add_instanced_model(
   object: asset.Object3D,
   instances: List(transform.Transform),
   physics: Option(physics.RigidBody),
+  material: Option(material.Material),
   parent_id: Option(id),
 ) -> RendererState(id) {
   // Extract all mesh/material pairs from the loaded model
   let pairs = extract_mesh_material_pairs_ffi(object)
   let geometries = get_pairs_geometries_ffi(pairs)
-  let materials = get_pairs_materials_ffi(pairs)
+  let materials = case material {
+    option.Some(mat) -> {
+      // Create Material for each geometry if material override is provided
+      let three_mat = material.create_material(mat)
+      list.repeat(three_mat, list.length(geometries))
+    }
+    option.None -> get_pairs_materials_ffi(pairs)
+  }
 
   // Create a group to hold all the instanced meshes
   let group = create_group_ffi()
@@ -3029,13 +3057,13 @@ fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
       transform: transform,
       animation: _,
       physics: _,
-      material_override: material_override,
+      material: material,
     ) -> {
       let cloned = clone_object_ffi(object)
       apply_transform_ffi(cloned, transform)
-      // Apply material overrides if provided
-      case material_override {
-        option.Some(override) -> apply_material_override_ffi(cloned, override)
+      // Apply material if provided
+      case material {
+        option.Some(mat) -> apply_material_to_object_ffi(cloned, mat)
         option.None -> Nil
       }
       cloned
@@ -3054,14 +3082,14 @@ fn handle_add_model3d(
   transform: transform.Transform,
   animation: Option(AnimationPlayback),
   physics: Option(physics.RigidBody),
-  material_override: Option(material.MaterialOverride),
+  material: Option(material.Material),
   parent_id: Option(id),
 ) -> RendererState(id) {
   apply_transform_ffi(object, transform)
 
-  // Apply material overrides if provided
-  case material_override {
-    option.Some(override) -> apply_material_override_ffi(object, override)
+  // Apply material if provided
+  case material {
+    option.Some(mat) -> apply_material_to_object_ffi(object, mat)
     option.None -> Nil
   }
 
@@ -3478,16 +3506,23 @@ fn handle_update_transform(
 fn handle_update_material(
   state: RendererState(id),
   id: id,
-  material: material.Material,
+  material: Option(material.Material),
 ) -> RendererState(id) {
   case object_cache.get_object(state.cache, id) {
     option.Some(obj) -> {
       let obj_dynamic = object_cache.unwrap_object(obj)
-      let old_material = get_object_material_ffi(obj_dynamic)
-      dispose_material_ffi(old_material)
 
-      let new_material = material.create_material(material)
-      set_object_material_ffi(obj_dynamic, new_material)
+      // Only update if material is provided
+      case material {
+        option.Some(mat) -> {
+          let old_material = get_object_material_ffi(obj_dynamic)
+          dispose_material_ffi(old_material)
+
+          let new_material = material.create_material(mat)
+          set_object_material_ffi(obj_dynamic, new_material)
+        }
+        option.None -> Nil
+      }
 
       state
     }
@@ -4372,8 +4407,16 @@ fn update_canvas_size_ffi(
   height: Float,
 ) -> Nil
 
-@external(javascript, "../threejs.ffi.mjs", "applyMaterialOverride")
-fn apply_material_override_ffi(
+@external(javascript, "../threejs.ffi.mjs", "applyMaterialToObject")
+fn apply_material_to_object_ffi_raw(
   object: asset.Object3D,
-  override: material.MaterialOverride,
+  three_material: material.ThreeMaterial,
 ) -> Nil
+
+fn apply_material_to_object_ffi(
+  object: asset.Object3D,
+  material: material.Material,
+) -> Nil {
+  let three_material = material.create_material(material)
+  apply_material_to_object_ffi_raw(object, three_material)
+}
