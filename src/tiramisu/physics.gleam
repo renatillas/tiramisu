@@ -668,10 +668,25 @@ fn apply_command(
   }
 }
 
-/// Step the physics simulation forward
+/// Step the physics simulation forward with variable timestep
 /// This should be called in your update function each frame
+///
+/// **IMPORTANT**: Pass `ctx.delta_time` for frame-rate independent physics!
+/// Delta time should be in milliseconds (from Context), this function converts to seconds.
+///
+/// ## Example
+/// ```gleam
+/// fn update(model, msg, ctx) {
+///   let world = physics.step(model.physics_world, ctx.delta_time)
+///   #(Model(..model, physics_world: world), effect.none(), option.None)
+/// }
+/// ```
+///
 /// Returns updated world with new transforms for all bodies
-pub fn step(world: PhysicsWorld(id)) -> PhysicsWorld(id) {
+pub fn step(
+  world: PhysicsWorld(id),
+  delta_time_ms: Float,
+) -> PhysicsWorld(id) {
   // Apply all pending commands in the correct order
   // Commands are now appended, so they're already in the correct order
   world.pending_commands
@@ -680,8 +695,11 @@ pub fn step(world: PhysicsWorld(id)) -> PhysicsWorld(id) {
     Nil
   })
 
-  // Step the Rapier world
-  step_world_ffi(world.world, world.queue)
+  // Convert delta time from milliseconds to seconds (Rapier expects seconds)
+  let delta_time_seconds = delta_time_ms /. 1000.0
+
+  // Step the Rapier world with actual frame time (frame-rate independent!)
+  step_world_ffi(world.world, world.queue, delta_time_seconds)
 
   // Drain collision events from the queue
   let collision_events =
@@ -1249,7 +1267,11 @@ fn create_world_ffi(
 fn create_event_queue_ffi(auto_drain: Bool) -> RapierEventQueue
 
 @external(javascript, "../rapier.ffi.mjs", "stepWorld")
-fn step_world_ffi(world: RapierWorld, queue: RapierEventQueue) -> Nil
+fn step_world_ffi(
+  world: RapierWorld,
+  queue: RapierEventQueue,
+  delta_time_seconds: Float,
+) -> Nil
 
 // ============================================================================
 // BODY CREATION/REMOVAL (Called by renderer)

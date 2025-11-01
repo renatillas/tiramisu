@@ -267,7 +267,7 @@ fn update(
       }
 
       // NOW step the physics simulation AFTER all commands have been queued
-      let physics_world = physics.step(physics_world)
+      let physics_world = physics.step(physics_world, ctx.delta_time)
 
       // Get collision events from the updated world
       let collision_events = physics.get_collision_events(physics_world)

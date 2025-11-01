@@ -2097,6 +2097,29 @@ export function updateCanvasSize(object, width, height) {
   }
 }
 
+/**
+ * Get cached encoded picture from canvas object's userData
+ * Performance optimization: avoid recreating textures when picture hasn't changed
+ * @param {THREE.Object3D} object
+ * @returns {string} Cached encoded picture, or empty string if not cached
+ */
+export function getCanvasCachedPicture(object) {
+  return object.userData?.cachedEncodedPicture || '';
+}
+
+/**
+ * Store encoded picture in canvas object's userData for comparison next frame
+ * Performance optimization: tracks picture changes to skip texture recreation
+ * @param {THREE.Object3D} object
+ * @param {string} encodedPicture
+ */
+export function setCanvasCachedPicture(object, encodedPicture) {
+  if (!object.userData) {
+    object.userData = {};
+  }
+  object.userData.cachedEncodedPicture = encodedPicture;
+}
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================

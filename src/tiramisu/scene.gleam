@@ -4007,6 +4007,9 @@ fn handle_add_canvas(
   // Apply transform
   apply_transform_ffi(canvas_mesh, trans)
 
+  // Cache the encoded picture to avoid recreating texture on first update
+  set_canvas_cached_picture_ffi(canvas_mesh, encoded_picture)
+
   let three_obj = object_cache.wrap_object(canvas_mesh)
   add_to_scene_or_parent(state, three_obj, parent_id)
 
@@ -4028,19 +4031,31 @@ fn handle_update_canvas(
     option.Some(obj) -> {
       let obj_3d = object_cache.unwrap_object(obj)
 
-      // Picture is already encoded, use it directly
-      let texture =
-        create_canvas_texture_from_picture_ffi(
-          encoded_picture,
-          texture_width,
-          texture_height,
-        )
-      update_canvas_texture_ffi(obj_3d, texture)
+      // Performance optimization: Only create new texture if picture changed
+      // Check if encoded_picture differs from cached value
+      let cached_picture = get_canvas_cached_picture_ffi(obj_3d)
+      let picture_changed = cached_picture != encoded_picture
 
-      // Update size
+      case picture_changed {
+        True -> {
+          // Picture changed - create new texture and cache the picture data
+          let texture =
+            create_canvas_texture_from_picture_ffi(
+              encoded_picture,
+              texture_width,
+              texture_height,
+            )
+          update_canvas_texture_ffi(obj_3d, texture)
+          set_canvas_cached_picture_ffi(obj_3d, encoded_picture)
+        }
+        False -> {
+          // Picture unchanged - skip expensive texture creation
+          Nil
+        }
+      }
+
+      // Always update size and transform (cheap operations)
       update_canvas_size_ffi(obj_3d, width, height)
-
-      // Update transform
       apply_transform_ffi(obj_3d, trans)
 
       state
@@ -4435,6 +4450,12 @@ fn update_canvas_size_ffi(
   width: Float,
   height: Float,
 ) -> Nil
+
+@external(javascript, "../threejs.ffi.mjs", "getCanvasCachedPicture")
+fn get_canvas_cached_picture_ffi(object: asset.Object3D) -> String
+
+@external(javascript, "../threejs.ffi.mjs", "setCanvasCachedPicture")
+fn set_canvas_cached_picture_ffi(object: asset.Object3D, picture: String) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "applyMaterialToObject")
 fn apply_material_to_object_ffi_raw(

@@ -30,12 +30,49 @@ export function createWorld(gravityX, gravityY, gravityZ) {
 }
 
 /**
- * Step the physics simulation
+ * Step the physics simulation with fixed timestep + accumulator pattern
+ * This ensures physics runs at consistent speed regardless of framerate
+ *
+ * Uses the "Fix Your Timestep" pattern: https://gafferongames.com/post/fix_your_timestep/
+ * - Fixed timestep: 1/60s (stable physics)
+ * - Accumulator: Tracks leftover time between frames
+ * - Steps multiple times if frame is slow, zero times if fast
+ *
  * @param {RAPIER.World} world
  * @param {RAPIER.EventQueue} eventQueue
+ * @param {number} deltaTimeSeconds - Frame time in seconds
+ * @returns {number} Number of physics steps executed (for debugging)
  */
-export function stepWorld(world, eventQueue) {
-  world.step(eventQueue);
+export function stepWorld(world, eventQueue, deltaTimeSeconds) {
+  // Fixed timestep (1/60s = 60 FPS physics)
+  // Rapier recommends fixed timestep for stability
+  // NOTE: You can change this to 1/120 for faster physics, but may be less stable
+  const FIXED_TIMESTEP = 1.0 / 60.0;
+  const MAX_STEPS = 5; // Prevent spiral of death (cap at 5 steps per frame)
+
+  // Initialize accumulator on world if not present
+  if (world.timeAccumulator === undefined) {
+    world.timeAccumulator = 0.0;
+  }
+
+  // Add frame time to accumulator
+  world.timeAccumulator += deltaTimeSeconds;
+
+  let stepsExecuted = 0;
+
+  // Step physics in fixed increments
+  while (world.timeAccumulator >= FIXED_TIMESTEP && stepsExecuted < MAX_STEPS) {
+    world.step(eventQueue);
+    world.timeAccumulator -= FIXED_TIMESTEP;
+    stepsExecuted++;
+  }
+
+  // If we hit max steps, reset accumulator to prevent spiral of death
+  if (stepsExecuted >= MAX_STEPS) {
+    world.timeAccumulator = 0.0;
+  }
+
+  return stepsExecuted;
 }
 
 /**

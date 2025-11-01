@@ -59,7 +59,7 @@ fn update(
   let assert option.Some(physics_world) = ctx.physics_world
   case msg {
     Tick -> {
-      let new_physics_world = physics.step(physics_world)
+      let new_physics_world = physics.step(physics_world, ctx.delta_time)
       case input.is_key_just_pressed(ctx.input, input.KeyD) {
         True -> #(
           Model(!model.debug),
