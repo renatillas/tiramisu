@@ -691,9 +691,12 @@ export function createStandardMaterial(color, metalness, roughness, transparent,
  * @param {THREE.Texture|null} map
  * @param {THREE.Texture|null} normalMap
  * @param {THREE.Texture|null} aoMap
+ * @param {boolean} transparent
+ * @param {number} opacity
+ * @param {number} alphaTest
  * @returns {THREE.MeshPhongMaterial}
  */
-export function createPhongMaterial(color, shininess, map, normalMap, aoMap) {
+export function createPhongMaterial(color, shininess, map, normalMap, aoMap, transparent, opacity, alphaTest) {
   const validMap = optionToNull(map);
   const validNormalMap = optionToNull(normalMap);
   const validAoMap = optionToNull(aoMap);
@@ -703,7 +706,10 @@ export function createPhongMaterial(color, shininess, map, normalMap, aoMap) {
     shininess,
     map: validMap,
     normalMap: validNormalMap,
-    aoMap: validAoMap
+    aoMap: validAoMap,
+    transparent,
+    opacity,
+    alphaTest
   });
 
   if (validNormalMap) {
@@ -756,14 +762,20 @@ export function createLambertMaterial(color, map, normalMap, aoMap, transparent,
  * @param {THREE.Texture|null} map
  * @param {THREE.Texture|null} normalMap
  * @param {THREE.Texture|null} aoMap
+ * @param {boolean} transparent
+ * @param {number} opacity
+ * @param {number} alphaTest
  * @returns {THREE.MeshToonMaterial}
  */
-export function createToonMaterial(color, map, normalMap, aoMap) {
+export function createToonMaterial(color, map, normalMap, aoMap, transparent, opacity, alphaTest) {
   return new THREE.MeshToonMaterial({
     color,
     map: optionToNull(map),
     normalMap: optionToNull(normalMap),
-    aoMap: optionToNull(aoMap)
+    aoMap: optionToNull(aoMap),
+    transparent,
+    opacity,
+    alphaTest
   });
 }
 

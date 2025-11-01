@@ -384,6 +384,16 @@ export function setBodyRotation2(body, x, y, z, w, wakeUp) {
   body.setRotation({ x, y, z, w }, wakeUp);
 }
 
+/**
+ * Check if a rigid body is currently sleeping (inactive)
+ * Sleeping bodies don't need transform updates since they haven't moved
+ * @param {RAPIER.RigidBody} body - The rigid body handle
+ * @returns {boolean} True if body is sleeping, false if awake/active
+ */
+export function isBodySleeping(body) {
+  return body.isSleeping();
+}
+
 // ============================================================================
 // COLLIDER DESCRIPTORS
 // ============================================================================

@@ -673,9 +673,8 @@ fn apply_command(
 /// Returns updated world with new transforms for all bodies
 pub fn step(world: PhysicsWorld(id)) -> PhysicsWorld(id) {
   // Apply all pending commands in the correct order
-  // Commands are prepended to the list, so we need to reverse before applying
+  // Commands are now appended, so they're already in the correct order
   world.pending_commands
-  |> list.reverse
   |> list.each(fn(command) {
     let _ = apply_command(command, world.rapier_bodies)
     Nil
@@ -806,10 +805,12 @@ pub fn apply_force(
   force: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyForce(id:, force:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 /// Queue an impulse to be applied to a rigid body during the next physics step.
@@ -827,10 +828,12 @@ pub fn apply_impulse(
   impulse: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyImpulse(id:, impulse:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 /// Queue a velocity change for a rigid body during the next physics step.
@@ -841,10 +844,12 @@ pub fn set_velocity(
   velocity: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = SetVelocity(id:, velocity:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 /// Get the current velocity of a rigid body
@@ -865,10 +870,12 @@ pub fn set_angular_velocity(
   velocity: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = SetAngularVelocity(id:, velocity:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 /// Get the current angular velocity of a rigid body
@@ -889,10 +896,12 @@ pub fn apply_torque(
   torque: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyTorque(id:, torque:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 /// Queue a torque impulse to be applied to a rigid body during the next physics step.
@@ -903,10 +912,12 @@ pub fn apply_torque_impulse(
   impulse: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyTorqueImpulse(id:, impulse:)
-  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
-    command,
-    ..world.pending_commands
-  ])
+  // Append to maintain order (avoids reverse() in step())
+  PhysicsWorld(
+    ..world,
+    bodies: world.bodies,
+    pending_commands: list.append(world.pending_commands, [command]),
+  )
 }
 
 // --- Raycasting ---
@@ -1043,10 +1054,25 @@ pub fn for_each_body_raw(
   let ids = dict.keys(world.rapier_bodies)
 
   list.each(ids, fn(id) {
-    case get_body_transform_raw(world, id), dict.get(world.bodies, id) {
-      Ok(#(position, quaternion)), Ok(body_config) ->
-        callback(id, position, quaternion, body_config.kind)
-      _, _ -> Nil
+    case
+      dict.get(world.rapier_bodies, id),
+      get_body_transform_raw(world, id),
+      dict.get(world.bodies, id)
+    {
+      Ok(rapier_body), Ok(#(position, quaternion)), Ok(body_config) -> {
+        // Performance: Skip sleeping/inactive bodies (they haven't moved)
+        // Only Dynamic bodies can sleep; Kinematic/Fixed are always considered "awake"
+        case body_config.kind {
+          Dynamic ->
+            case is_body_sleeping_ffi(rapier_body) {
+              True -> Nil
+              False -> callback(id, position, quaternion, body_config.kind)
+            }
+          // Kinematic and Fixed bodies don't sleep, always process them
+          Kinematic | Fixed -> callback(id, position, quaternion, body_config.kind)
+        }
+      }
+      _, _, _ -> Nil
     }
   })
 }
@@ -1380,6 +1406,13 @@ pub fn update_body_transform(
   }
 }
 
+/// Check if a rigid body exists in the physics world
+/// This is used by the renderer to determine if a body needs to be created or updated
+@internal
+pub fn has_body(world: PhysicsWorld(id), id: id) -> Bool {
+  dict.has_key(world.rapier_bodies, id)
+}
+
 /// Remove a rigid body from the physics world
 /// This is called by the renderer when a scene node with physics is removed
 @internal
@@ -1471,6 +1504,9 @@ fn set_body_rotation_ffi(
   w: Float,
   wake_up: Bool,
 ) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "isBodySleeping")
+fn is_body_sleeping_ffi(body: RapierRigidBody) -> Bool
 
 @external(javascript, "../rapier.ffi.mjs", "setLinearDamping")
 fn set_linear_damping_ffi(desc: RapierBodyDesc, damping: Float) -> Nil

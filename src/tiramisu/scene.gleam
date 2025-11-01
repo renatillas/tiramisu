@@ -1248,23 +1248,26 @@ pub type Patch(id) {
 }
 
 type NodeWithParent(id) {
-  NodeWithParent(node: Node(id), parent_id: Option(id))
+  NodeWithParent(node: Node(id), parent_id: Option(id), depth: Int)
 }
 
 fn flatten_scene(nodes: List(Node(id))) -> dict.Dict(id, NodeWithParent(id)) {
-  flatten_scene_helper(nodes, option.None, dict.new())
+  flatten_scene_helper(nodes, option.None, 0, dict.new())
 }
 
 fn flatten_scene_helper(
   nodes: List(Node(id)),
   parent_id: Option(id),
+  current_depth: Int,
   acc: dict.Dict(id, NodeWithParent(id)),
 ) -> dict.Dict(id, NodeWithParent(id)) {
   list.fold(nodes, acc, fn(acc, node) {
     let node_id = node.id
-    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id))
+    // Store node with cached depth (avoids recursive calculation later)
+    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id, current_depth))
     let children = node.children
-    flatten_scene_helper(children, option.Some(node_id), acc)
+    // Recurse with incremented depth
+    flatten_scene_helper(children, option.Some(node_id), current_depth + 1, acc)
   })
 }
 
@@ -1310,8 +1313,8 @@ pub fn diff(
             list.filter(curr_ids, fn(id) { dict.has_key(prev_dict, id) })
             |> list.partition(fn(id) {
               case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-                Ok(NodeWithParent(_, prev_parent)),
-                  Ok(NodeWithParent(_, curr_parent))
+                Ok(NodeWithParent(_, prev_parent, _)),
+                  Ok(NodeWithParent(_, curr_parent, _))
                 -> prev_parent != curr_parent
                 _, _ -> False
               }
@@ -1324,7 +1327,7 @@ pub fn diff(
           let parent_change_additions =
             list.filter_map(parent_changed_ids, fn(id) {
               case dict.get(curr_dict, id) {
-                Ok(NodeWithParent(node, parent_id)) ->
+                Ok(NodeWithParent(node, parent_id, _)) ->
                   Ok(AddNode(id, node, parent_id))
                 Error(_) -> Error(Nil)
               }
@@ -1336,7 +1339,7 @@ pub fn diff(
             list.filter(curr_ids, fn(id) { !dict.has_key(prev_dict, id) })
             |> list.filter_map(fn(id) {
               case dict.get(curr_dict, id) {
-                Ok(NodeWithParent(node, parent_id)) ->
+                Ok(NodeWithParent(node, parent_id, _)) ->
                   Ok(AddNode(id, node, parent_id))
                 Error(_) -> Error(Nil)
               }
@@ -1348,8 +1351,8 @@ pub fn diff(
           let updates =
             list.flat_map(same_parent_ids, fn(id) {
               case dict.get(prev_dict, id), dict.get(curr_dict, id) {
-                Ok(NodeWithParent(prev_node, _)),
-                  Ok(NodeWithParent(curr_node, _))
+                Ok(NodeWithParent(prev_node, _, _)),
+                  Ok(NodeWithParent(curr_node, _, _))
                 -> compare_nodes(id, prev_node, curr_node)
                 _, _ -> []
               }
@@ -1463,7 +1466,8 @@ fn sort_patches_by_hierarchy(
   })
 }
 
-/// Calculate the depth of a node in the hierarchy (0 = root)
+/// Get the depth of a node in the hierarchy (0 = root)
+/// Depth is now pre-computed during flatten_scene (performance optimization)
 fn calculate_depth(
   parent_id: Option(id),
   node_dict: dict.Dict(id, NodeWithParent(id)),
@@ -1473,8 +1477,9 @@ fn calculate_depth(
     option.None -> current_depth
     option.Some(id) ->
       case dict.get(node_dict, id) {
-        Ok(NodeWithParent(_, parent_parent_id)) ->
-          calculate_depth(parent_parent_id, node_dict, current_depth + 1)
+        // Use cached depth value (no recursion needed!)
+        Ok(NodeWithParent(_, _, parent_depth)) ->
+          parent_depth + 1
         Error(_) -> current_depth + 1
       }
   }
@@ -3636,43 +3641,67 @@ fn handle_update_animation(
 fn handle_update_physics(
   state: RendererState(id),
   id: id,
-  physics: Option(physics.RigidBody),
+  new_physics: Option(physics.RigidBody),
 ) -> RendererState(id) {
   case state.physics_world {
     option.Some(world) -> {
-      // First, remove existing physics body
-      let world_after_remove = physics.remove_body(world, id)
+      // Check if body already exists
+      let body_exists = physics.has_body(world, id)
 
-      // Then, create new physics body if provided
-      let new_world = case physics {
-        option.Some(physics_config) -> {
+      case body_exists, new_physics {
+        // Body exists, new config provided -> UPDATE transform
+        // TODO: In future, detect if collider shape changed and only then recreate
+        // For now, we just update the transform which covers most use cases
+        True, option.Some(_physics_config) -> {
           // Get current transform from Three.js object
           case object_cache.get_object(state.cache, id) {
             option.Some(obj) -> {
               let obj_dynamic = object_cache.unwrap_object(obj)
-              // Get transform from object
               let position = get_object_position_ffi(obj_dynamic)
               let rotation = get_object_rotation_ffi(obj_dynamic)
               let scale = get_object_scale_ffi(obj_dynamic)
-
-              // Convert to Transform
               let object_transform =
                 dynamic_to_transform(position, rotation, scale)
 
-              physics.create_body(
-                world_after_remove,
-                id,
-                physics_config,
-                object_transform,
-              )
+              // Just update the transform (preserves velocity!)
+              let new_world =
+                physics.update_body_transform(world, id, object_transform)
+
+              RendererState(..state, physics_world: option.Some(new_world))
             }
-            option.None -> world_after_remove
+            option.None -> state
           }
         }
-        option.None -> world_after_remove
-      }
 
-      RendererState(..state, physics_world: option.Some(new_world))
+        // Body exists, None provided -> REMOVE it
+        True, option.None -> {
+          let new_world = physics.remove_body(world, id)
+          RendererState(..state, physics_world: option.Some(new_world))
+        }
+
+        // No body, config provided -> CREATE it
+        False, option.Some(physics_config) -> {
+          case object_cache.get_object(state.cache, id) {
+            option.Some(obj) -> {
+              let obj_dynamic = object_cache.unwrap_object(obj)
+              let position = get_object_position_ffi(obj_dynamic)
+              let rotation = get_object_rotation_ffi(obj_dynamic)
+              let scale = get_object_scale_ffi(obj_dynamic)
+              let object_transform =
+                dynamic_to_transform(position, rotation, scale)
+
+              let new_world =
+                physics.create_body(world, id, physics_config, object_transform)
+
+              RendererState(..state, physics_world: option.Some(new_world))
+            }
+            option.None -> state
+          }
+        }
+
+        // No body, None provided -> NOP
+        False, option.None -> state
+      }
     }
     option.None -> state
   }

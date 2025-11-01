@@ -165,6 +165,9 @@ pub opaque type Material {
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
     shininess: Float,
+    transparent: Bool,
+    opacity: Float,
+    alpha_test: Float,
   )
   /// Matte material (like cloth or wood). Non-shiny diffuse lighting.
   LambertMaterial(
@@ -182,6 +185,9 @@ pub opaque type Material {
     map: Option(asset.Texture),
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
+    transparent: Bool,
+    opacity: Float,
+    alpha_test: Float,
   )
   /// Material for rendering lines.
   LineMaterial(color: Int, linewidth: Float)
@@ -455,13 +461,33 @@ pub fn phong(
   map map: Option(asset.Texture),
   normal_map normal_map: Option(asset.Texture),
   ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  transparent transparent: Bool,
+  opacity opacity: Float,
+  alpha_test alpha_test: Float,
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
     Error(OutOfBoundsColor(color)),
   )
   use <- bool.guard(shininess <. 0.0, Error(NonPositiveShininess(shininess)))
-  Ok(PhongMaterial(color:, shininess:, map:, normal_map:, ambient_oclusion_map:))
+  use <- bool.guard(
+    opacity <. 0.0 || opacity >. 1.0,
+    Error(OutOfBoundsOpacity(opacity)),
+  )
+  use <- bool.guard(
+    alpha_test <. 0.0 || alpha_test >. 1.0,
+    Error(OutOfBoundsOpacity(alpha_test)),
+  )
+  Ok(PhongMaterial(
+    color:,
+    shininess:,
+    map:,
+    normal_map:,
+    ambient_oclusion_map:,
+    transparent:,
+    opacity:,
+    alpha_test:,
+  ))
 }
 
 /// Create a Toon material for cartoon-style cel-shaded rendering.
@@ -499,12 +525,31 @@ pub fn toon(
   map map: Option(asset.Texture),
   normal_map normal_map: Option(asset.Texture),
   ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  transparent transparent: Bool,
+  opacity opacity: Float,
+  alpha_test alpha_test: Float,
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
     Error(OutOfBoundsColor(color)),
   )
-  Ok(ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:))
+  use <- bool.guard(
+    opacity <. 0.0 || opacity >. 1.0,
+    Error(OutOfBoundsOpacity(opacity)),
+  )
+  use <- bool.guard(
+    alpha_test <. 0.0 || alpha_test >. 1.0,
+    Error(OutOfBoundsOpacity(alpha_test)),
+  )
+  Ok(ToonMaterial(
+    color:,
+    map:,
+    normal_map:,
+    ambient_oclusion_map:,
+    transparent:,
+    opacity:,
+    alpha_test:,
+  ))
 }
 
 // --- Material Builder Pattern ---
@@ -891,13 +936,25 @@ pub fn create_material(material: Material) -> ThreeMaterial {
         emissive,
         emissive_intensity,
       )
-    PhongMaterial(color:, map:, normal_map:, ambient_oclusion_map:, shininess:) ->
+    PhongMaterial(
+      color:,
+      map:,
+      normal_map:,
+      ambient_oclusion_map:,
+      shininess:,
+      transparent:,
+      opacity:,
+      alpha_test:,
+    ) ->
       create_phong_material(
         color,
         shininess,
         map,
         normal_map,
         ambient_oclusion_map,
+        transparent,
+        opacity,
+        alpha_test,
       )
     LambertMaterial(
       color:,
@@ -917,8 +974,24 @@ pub fn create_material(material: Material) -> ThreeMaterial {
         opacity,
         alpha_test,
       )
-    ToonMaterial(color:, map:, normal_map:, ambient_oclusion_map:) ->
-      create_toon_material(color, map, normal_map, ambient_oclusion_map)
+    ToonMaterial(
+      color:,
+      map:,
+      normal_map:,
+      ambient_oclusion_map:,
+      transparent:,
+      opacity:,
+      alpha_test:,
+    ) ->
+      create_toon_material(
+        color,
+        map,
+        normal_map,
+        ambient_oclusion_map,
+        transparent,
+        opacity,
+        alpha_test,
+      )
     LineMaterial(color:, linewidth:) -> create_line_material(color, linewidth)
     SpriteMaterial(color:, map:, transparent:, opacity:) ->
       create_sprite_material(color, transparent, opacity, map)
@@ -956,6 +1029,9 @@ fn create_phong_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
+  transparent: Bool,
+  opacity: Float,
+  alpha_test: Float,
 ) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createLambertMaterial")
@@ -975,6 +1051,9 @@ fn create_toon_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
+  transparent: Bool,
+  opacity: Float,
+  alpha_test: Float,
 ) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createLineMaterial")

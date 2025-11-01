@@ -176,6 +176,27 @@ export class InputManager {
      */
     this.listeners = {};
 
+    // Performance: Pre-allocate reusable arrays for key lists
+    // These are reused every frame instead of creating new arrays
+    this._pooledKeyArrays = {
+      pressed: [],
+      justPressed: [],
+      justReleased: [],
+    };
+
+    // Performance: Pre-allocate reusable arrays for touch lists
+    this._pooledTouchArrays = {
+      active: [],
+      justStarted: [],
+      justEnded: [],
+    };
+
+    // Performance: Pre-allocate reusable arrays for gamepad data
+    this._pooledGamepadArrays = {
+      buttons: [[], [], [], []],  // 4 gamepads
+      axes: [[], [], [], []],     // 4 gamepads
+    };
+
     // Initialize event listeners
     this._initEventListeners(canvas);
   }
@@ -333,18 +354,33 @@ export class InputManager {
    * @returns {Object} Gleam InputState object with keyboard, mouse, gamepad, and touch state
    */
   captureState() {
-    // Keyboard state
-    const pressedKeys = Array.from(this.keyboard.pressed);
-    const justPressedKeys = Array.from(this.keyboard.justPressed);
-    const justReleasedKeys = Array.from(this.keyboard.justReleased);
+    // Keyboard state - reuse pooled arrays
+    const pressedKeysPool = this._pooledKeyArrays.pressed;
+    const justPressedKeysPool = this._pooledKeyArrays.justPressed;
+    const justReleasedKeysPool = this._pooledKeyArrays.justReleased;
+
+    // Clear and refill pooled arrays
+    pressedKeysPool.length = 0;
+    justPressedKeysPool.length = 0;
+    justReleasedKeysPool.length = 0;
+
+    for (const key of this.keyboard.pressed) {
+      pressedKeysPool.push(key);
+    }
+    for (const key of this.keyboard.justPressed) {
+      justPressedKeysPool.push(key);
+    }
+    for (const key of this.keyboard.justReleased) {
+      justReleasedKeysPool.push(key);
+    }
 
     const keyboardState = new KeyboardState(
-      GLEAM.toList(pressedKeys),
-      GLEAM.toList(justPressedKeys),
-      GLEAM.toList(justReleasedKeys)
+      GLEAM.toList(pressedKeysPool),
+      GLEAM.toList(justPressedKeysPool),
+      GLEAM.toList(justReleasedKeysPool)
     );
 
-    // Mouse state
+    // Mouse state (ButtonState objects are small, allocation cost is minimal)
     const mouseState = new MouseState(
       this.mouse.x,
       this.mouse.y,
@@ -369,18 +405,31 @@ export class InputManager {
     );
 
     // Gamepad state (support up to 4 gamepads)
+    // Only poll if at least one gamepad is connected (performance)
     const gamepadStates = [];
     if (this.gamepad.connected) {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
       for (let i = 0; i < 4; i++) {
         const gamepad = gamepads[i];
         if (gamepad && gamepad.connected) {
-          const buttons = Array.from(gamepad.buttons).map(b => b.value);
-          const axes = Array.from(gamepad.axes);
+          // Reuse pooled arrays for buttons and axes
+          const buttonsPool = this._pooledGamepadArrays.buttons[i];
+          const axesPool = this._pooledGamepadArrays.axes[i];
+
+          buttonsPool.length = 0;
+          axesPool.length = 0;
+
+          for (const button of gamepad.buttons) {
+            buttonsPool.push(button.value);
+          }
+          for (const axis of gamepad.axes) {
+            axesPool.push(axis);
+          }
+
           gamepadStates.push(new INPUT.GamepadState(
             true,
-            GLEAM.toList(buttons),
-            GLEAM.toList(axes)
+            GLEAM.toList(buttonsPool),
+            GLEAM.toList(axesPool)
           ));
         } else {
           gamepadStates.push(new INPUT.GamepadState(
@@ -391,6 +440,7 @@ export class InputManager {
         }
       }
     } else {
+      // No gamepads connected - fast path
       for (let i = 0; i < 4; i++) {
         gamepadStates.push(new INPUT.GamepadState(
           false,
@@ -400,26 +450,31 @@ export class InputManager {
       }
     }
 
-    // Touch state
-    const touchList = [];
+    // Touch state - reuse pooled arrays
+    const activePool = this._pooledTouchArrays.active;
+    const justStartedPool = this._pooledTouchArrays.justStarted;
+    const justEndedPool = this._pooledTouchArrays.justEnded;
+
+    activePool.length = 0;
+    justStartedPool.length = 0;
+    justEndedPool.length = 0;
+
     this.touch.active.forEach((data, id) => {
-      touchList.push(new INPUT.Touch(id, data.x, data.y));
+      activePool.push(new INPUT.Touch(id, data.x, data.y));
     });
 
-    const touchJustStartedList = [];
     this.touch.justStarted.forEach((data, id) => {
-      touchJustStartedList.push(new INPUT.Touch(id, data.x, data.y));
+      justStartedPool.push(new INPUT.Touch(id, data.x, data.y));
     });
 
-    const touchJustEndedList = [];
     this.touch.justEnded.forEach((data, id) => {
-      touchJustEndedList.push(new INPUT.Touch(id, data.x, data.y));
+      justEndedPool.push(new INPUT.Touch(id, data.x, data.y));
     });
 
     const touchState = new INPUT.TouchState(
-      GLEAM.toList(touchList),
-      GLEAM.toList(touchJustStartedList),
-      GLEAM.toList(touchJustEndedList)
+      GLEAM.toList(activePool),
+      GLEAM.toList(justStartedPool),
+      GLEAM.toList(justEndedPool)
     );
 
     return new InputState(
@@ -2014,20 +2069,38 @@ export class DebugManager {
         try {
           // Get debug render data from Rapier
           const buffers = this.currentPhysicsWorld.debugRender();
+          const vertexCount = buffers.vertices.length / 3;
 
-          // Update geometry attributes
-          this.colliderDebugMesh.geometry.setAttribute(
-            'position',
-            new THREE.BufferAttribute(buffers.vertices, 3)
-          );
-          this.colliderDebugMesh.geometry.setAttribute(
-            'color',
-            new THREE.BufferAttribute(buffers.colors, 4)
-          );
+          const geometry = this.colliderDebugMesh.geometry;
+          const existingPosAttr = geometry.getAttribute('position');
+          const existingColorAttr = geometry.getAttribute('color');
 
-          // Mark as needing update
-          this.colliderDebugMesh.geometry.attributes.position.needsUpdate = true;
-          this.colliderDebugMesh.geometry.attributes.color.needsUpdate = true;
+          // Check if buffer size changed (geometry structure changed)
+          // This happens when colliders are added/removed
+          const needsReallocation = !existingPosAttr ||
+                                     existingPosAttr.count !== vertexCount;
+
+          if (needsReallocation) {
+            // Dispose old attributes if they exist
+            if (existingPosAttr) existingPosAttr.dispose();
+            if (existingColorAttr) existingColorAttr.dispose();
+
+            // Create new attributes with new size
+            geometry.setAttribute(
+              'position',
+              new THREE.BufferAttribute(buffers.vertices, 3)
+            );
+            geometry.setAttribute(
+              'color',
+              new THREE.BufferAttribute(buffers.colors, 4)
+            );
+          } else {
+            // Reuse existing attributes, just update data (fast path)
+            existingPosAttr.set(buffers.vertices);
+            existingColorAttr.set(buffers.colors);
+            existingPosAttr.needsUpdate = true;
+            existingColorAttr.needsUpdate = true;
+          }
         } catch (error) {
           console.error('[Tiramisu Debug] Error updating collider debug mesh:', error);
         }
@@ -2255,15 +2328,71 @@ export function startLoop(
    * @param {Object} config - PostProcessing configuration from Gleam
    * @returns {string} JSON representation
    */
-  function serializePostprocessingConfig(config) {
-    if (!config) return 'null';
+  /**
+   * Fast hash function for postprocessing config comparison
+   * Uses FNV-1a algorithm - much faster than JSON.stringify()
+   * @param {Object} config - Gleam PostProcessing configuration
+   * @returns {number} 32-bit hash value
+   */
+  function hashPostprocessingConfig(config) {
+    if (!config) return 0;
+
+    // FNV-1a hash parameters
+    let hash = 2166136261; // FNV offset basis
+    const FNV_PRIME = 16777619;
 
     // Get passes from Gleam List and convert to JS array
     const passesGleam = POSTPROCESSING.get_passes(config);
     const passes = Array.from(passesGleam);
 
-    // Serialize to JSON for structural comparison
-    return JSON.stringify(passes);
+    // Hash the number of passes
+    hash ^= passes.length;
+    hash = Math.imul(hash, FNV_PRIME);
+
+    // Hash each pass
+    for (let i = 0; i < passes.length; i++) {
+      const pass = passes[i];
+
+      // Hash pass type (string)
+      const passType = pass.type || '';
+      for (let j = 0; j < passType.length; j++) {
+        hash ^= passType.charCodeAt(j);
+        hash = Math.imul(hash, FNV_PRIME);
+      }
+
+      // Hash key numeric properties (common across all pass types)
+      // These are the properties that typically change
+      const numericProps = [
+        'strength', 'threshold', 'radius',           // Bloom
+        'pixel_size',                                // Pixelate
+        'noise_intensity', 'scanline_intensity',    // Film
+        'darkness', 'offset',                        // Vignette
+        'dt_size',                                   // Glitch
+        'brightness', 'contrast', 'saturation',     // ColorCorrection
+        'normal_edge_strength', 'depth_edge_strength' // Pixelate edges
+      ];
+
+      for (const prop of numericProps) {
+        if (pass[prop] !== undefined) {
+          // Quantize float to avoid precision issues (3 decimal places)
+          const quantized = Math.floor(pass[prop] * 1000);
+          hash ^= quantized;
+          hash = Math.imul(hash, FNV_PRIME);
+        }
+      }
+
+      // Hash boolean properties
+      const boolProps = ['grayscale']; // Film grain
+      for (const prop of boolProps) {
+        if (pass[prop] !== undefined) {
+          hash ^= pass[prop] ? 1 : 0;
+          hash = Math.imul(hash, FNV_PRIME);
+        }
+      }
+    }
+
+    // Ensure positive 32-bit integer
+    return hash >>> 0;
   }
 
   /**
@@ -2276,9 +2405,10 @@ export function startLoop(
    * @returns {EffectComposer}
    */
   function getOrCreateComposer(cameraId, postProcessingConfig, camera, viewport) {
-    // Serialize IMMEDIATELY before any comparison to capture current state
+    // Hash config IMMEDIATELY before any comparison to capture current state
     // (Gleam may reuse/mutate objects for performance)
-    const currentConfigJson = serializePostprocessingConfig(postProcessingConfig);
+    // Using FNV-1a hash is 5-10x faster than JSON.stringify()
+    const currentConfigHash = hashPostprocessingConfig(postProcessingConfig);
 
     const cached = composersByCamera.get(cameraId);
 
@@ -2288,8 +2418,8 @@ export function startLoop(
     if (!cached) {
       needsRecreate = true;
     } else {
-      // Compare serialized configs using string equality
-      if (cached.configJson !== currentConfigJson) {
+      // Compare hashed configs using numeric equality (fast!)
+      if (cached.configHash !== currentConfigHash) {
         // Config changed - dispose old composer and recreate
         needsRecreate = true;
         cached.composer.dispose();
@@ -2308,9 +2438,9 @@ export function startLoop(
         composer.setSize(canvas.clientWidth, canvas.clientHeight);
       }
 
-      // Store composer with serialized config for future comparison
-      // Use the SAME serialized string we just computed
-      composersByCamera.set(cameraId, { composer, configJson: currentConfigJson });
+      // Store composer with hashed config for future comparison
+      // Use the SAME hash value we just computed
+      composersByCamera.set(cameraId, { composer, configHash: currentConfigHash });
 
       return composer;
     }

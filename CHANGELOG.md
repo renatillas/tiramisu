@@ -3,16 +3,76 @@
 ## v6.0.0 - 2025-10-28
 
 ### Added
+
+- **Postprocessing System** - Camera-based post-processing effects using Three.js EffectComposer
+  - New `tiramisu/postprocessing` module with comprehensive effect pipeline
+  - Built-in effects: bloom, pixelate, film grain, vignette, FXAA, glitch, color correction
+  - Custom shader support with uniform parameters (float, color, texture)
+  - Multi-camera support - each camera can have different effects
+  - Dynamic updates - toggle effects at runtime based on game state
+  - Added `postprocessing` parameter to `scene.Camera` nodes
+  - Perfect for split-screen games, mini-maps, and picture-in-picture with different visual styles
+
+- **Material Enhancements**
+  - `MaterialSide` type for controlling face culling (`FrontSide`, `BackSide`, `DoubleSide`)
+  - Emissive properties for `StandardMaterial` (perfect for bloom effects)
+    - `emissive` parameter - hex color for glow (0x000000 to 0xFFFFFF)
+    - `emissive_intensity` parameter - intensity of emissive glow
+    - `with_emissive()` and `with_emissive_intensity()` builder methods
+  - Transparency support for `LambertMaterial`
+    - `transparent`, `opacity`, and `alpha_test` parameters
+  - Transparency support for `PhongMaterial`
+    - `transparent`, `opacity`, and `alpha_test` parameters
+  - Transparency support for `ToonMaterial`
+    - `transparent`, `opacity`, and `alpha_test` parameters
 - **Physics support for animated sprites**: `scene.AnimatedSprite` nodes now support physics simulation
   - Added `physics` parameter to `scene.animated_sprite()` constructor
   - Animated sprites can now have rigid body physics (Dynamic, Kinematic, Fixed)
   - Physics bodies automatically sync with sprite transforms
   - Works seamlessly with collision detection and the physics world
 
+- **Scene Helpers**
+  - `scene.empty()` - Create empty group nodes with just transform and children
+  - `scene.with_children()` - Add children to existing nodes
+  - `scene.audio()` - Simplified audio node constructor
+
 ### Changed
+
+- **BREAKING**: `tiramisu.run()` view function signature changed
+  - Old: `view: fn(state, Context(id)) -> List(scene.Node(id))`
+  - New: `view: fn(state, Context(id)) -> scene.Node(id)`
+  - Migration: Wrap multiple nodes in a root node using `scene.empty()`
+
+- **BREAKING**: `scene.Camera` now has `children` field and `postprocessing` parameter
+  - Add `children: []` and `postprocessing: option.None` to existing camera nodes
+  - Or use the `scene.camera()` constructor which handles defaults
+
+- **BREAKING**: `material.standard()` now requires `emissive` and `emissive_intensity` parameters
+  - Migration: Add `emissive: 0x000000, emissive_intensity: 0.0` for materials without glow
+
+- **BREAKING**: `material.lambert()` now requires `transparent`, `opacity`, and `alpha_test` parameters
+  - Migration: Add `transparent: False, opacity: 1.0, alpha_test: 0.0` for opaque materials
+
+- **BREAKING**: `material.phong()` now requires `transparent`, `opacity`, and `alpha_test` parameters
+  - Migration: Add `transparent: False, opacity: 1.0, alpha_test: 0.0` for opaque materials
+
+- **BREAKING**: `material.toon()` now requires `transparent`, `opacity`, and `alpha_test` parameters
+  - Migration: Add `transparent: False, opacity: 1.0, alpha_test: 0.0` for opaque materials
 - **BREAKING**: `scene.animated_sprite()` now requires a `physics` parameter
   - Migration: Add `physics: option.None` to all existing `animated_sprite()` calls
   - To enable physics, pass `option.Some(rigid_body)` instead
+
+- Updated `paint` dependency to v1.0.0
+
+### Removed
+
+- **BREAKING**: `scene.group()` function removed - use `scene.empty()` instead
+- Removed unnecessary internal functions from `tiramisu/asset` module
+- Removed debug logging from runtime
+
+### Performance
+
+- Performance optimizations in rendering pipeline
 
 ## v5.0.1 - 2025-10-27
 

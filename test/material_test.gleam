@@ -94,6 +94,9 @@ pub fn phong_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 }
 
@@ -105,6 +108,9 @@ pub fn phong_invalid_shininess_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 }
 
@@ -116,6 +122,9 @@ pub fn phong_zero_shininess_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 }
 
@@ -139,6 +148,9 @@ pub fn toon_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 }
 
