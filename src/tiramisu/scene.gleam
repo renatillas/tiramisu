@@ -1264,7 +1264,8 @@ fn flatten_scene_helper(
   list.fold(nodes, acc, fn(acc, node) {
     let node_id = node.id
     // Store node with cached depth (avoids recursive calculation later)
-    let acc = dict.insert(acc, node_id, NodeWithParent(node, parent_id, current_depth))
+    let acc =
+      dict.insert(acc, node_id, NodeWithParent(node, parent_id, current_depth))
     let children = node.children
     // Recurse with incremented depth
     flatten_scene_helper(children, option.Some(node_id), current_depth + 1, acc)
@@ -1478,8 +1479,7 @@ fn calculate_depth(
     option.Some(id) ->
       case dict.get(node_dict, id) {
         // Use cached depth value (no recursion needed!)
-        Ok(NodeWithParent(_, _, parent_depth)) ->
-          parent_depth + 1
+        Ok(NodeWithParent(_, _, parent_depth)) -> parent_depth + 1
         Error(_) -> current_depth + 1
       }
   }

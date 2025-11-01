@@ -683,10 +683,7 @@ fn apply_command(
 /// ```
 ///
 /// Returns updated world with new transforms for all bodies
-pub fn step(
-  world: PhysicsWorld(id),
-  delta_time_ms: Float,
-) -> PhysicsWorld(id) {
+pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
   // Apply all pending commands in the correct order
   // Commands are now appended, so they're already in the correct order
   world.pending_commands
@@ -1087,7 +1084,8 @@ pub fn for_each_body_raw(
               False -> callback(id, position, quaternion, body_config.kind)
             }
           // Kinematic and Fixed bodies don't sleep, always process them
-          Kinematic | Fixed -> callback(id, position, quaternion, body_config.kind)
+          Kinematic | Fixed ->
+            callback(id, position, quaternion, body_config.kind)
         }
       }
       _, _, _ -> Nil

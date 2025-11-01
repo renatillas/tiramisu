@@ -93,22 +93,10 @@ pub fn benchmark_static_scene() {
 
   bench.run(
     [
-      bench.Input(
-        "10 nodes (Unchanged)",
-        ScenePair(scene_10, scene_10),
-      ),
-      bench.Input(
-        "50 nodes (Unchanged)",
-        ScenePair(scene_50, scene_50),
-      ),
-      bench.Input(
-        "100 nodes (Unchanged)",
-        ScenePair(scene_100, scene_100),
-      ),
-      bench.Input(
-        "500 nodes (Unchanged)",
-        ScenePair(scene_500, scene_500),
-      ),
+      bench.Input("10 nodes (Unchanged)", ScenePair(scene_10, scene_10)),
+      bench.Input("50 nodes (Unchanged)", ScenePair(scene_50, scene_50)),
+      bench.Input("100 nodes (Unchanged)", ScenePair(scene_100, scene_100)),
+      bench.Input("500 nodes (Unchanged)", ScenePair(scene_500, scene_500)),
     ],
     [
       bench.Function("diff", fn(pair: ScenePair(String)) {
@@ -120,9 +108,7 @@ pub fn benchmark_static_scene() {
   |> bench.table([bench.IPS, bench.Min, bench.Mean, bench.Max])
   |> io.println
 
-  io.println(
-    "\n📊 Target: >1,000,000 ops/sec (just a pointer comparison)",
-  )
+  io.println("\n📊 Target: >1,000,000 ops/sec (just a pointer comparison)")
   io.println("   This validates the referential equality optimization works")
 }
 
@@ -192,10 +178,10 @@ pub fn benchmark_deep_hierarchy() {
   |> io.println
 
   io.println("\n📊 Optimization Opportunity:")
+  io.println("   Cache depth during flatten_scene() (Phase 3 optimization)")
   io.println(
-    "   Cache depth during flatten_scene() (Phase 3 optimization)",
+    "   Avoid recursive depth calculation in sort_patches_by_hierarchy",
   )
-  io.println("   Avoid recursive depth calculation in sort_patches_by_hierarchy")
 }
 
 // ============================================================================
@@ -243,10 +229,7 @@ fn create_scene(count: Int) -> option.Option(scene.Node(String)) {
 }
 
 /// Create a pair of scenes (previous and current) with offset positions
-fn create_scene_pair(
-  count: Int,
-  offset: Float,
-) -> ScenePair(String) {
+fn create_scene_pair(count: Int, offset: Float) -> ScenePair(String) {
   let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(material) =
     material.basic(

@@ -372,6 +372,31 @@ pub fn compose(first: Transform, second: Transform) -> Transform {
 @external(javascript, "../threejs.ffi.mjs", "multiplyQuaternions")
 pub fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion
 
+/// Spherically interpolate between two quaternions.
+///
+/// Performs smooth interpolation between two rotations using spherical linear
+/// interpolation (slerp). This produces the smoothest possible rotation between
+/// two orientations.
+///
+/// - **from**: Starting rotation quaternion
+/// - **to**: Target rotation quaternion
+/// - **amount**: Interpolation factor (0.0 = from, 1.0 = to)
+///
+/// ## Example
+///
+/// ```gleam
+/// let start_rotation = transform.euler_to_quaternion(Vec3(0.0, 0.0, 0.0))
+/// let end_rotation = transform.euler_to_quaternion(Vec3(0.0, 1.57, 0.0))
+/// // Rotate 50% of the way
+/// let mid_rotation = transform.slerp(from: start_rotation, to: end_rotation, amount: 0.5)
+/// ```
+@external(javascript, "../threejs.ffi.mjs", "slerpQuaternions")
+pub fn slerp(
+  from from: Quaternion,
+  to to: Quaternion,
+  amount amount: Float,
+) -> Quaternion
+
 /// Compute quaternion rotation to orient from one position toward another.
 /// Uses Three.js's Matrix4.lookAt for proper orthonormal basis construction,
 /// avoiding gimbal lock issues from Euler angle composition.

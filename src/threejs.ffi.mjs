@@ -2065,7 +2065,8 @@ export function createCanvasPlane(texture, width, height) {
     map: texture,
     transparent: true,
     side: THREE.DoubleSide,
-    depthWrite: false,
+    depthWrite: true,
+    alphaTest: 0.1,  // Discard fully transparent pixels to avoid z-fighting
   });
   const mesh = new THREE.Mesh(geometry, material);
   return mesh;
@@ -2645,6 +2646,21 @@ export function multiplyQuaternions(q1, q2) {
   const threeQ2 = new THREE.Quaternion(q2.x, q2.y, q2.z, q2.w);
   threeQ1.multiply(threeQ2);
   return new Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
+}
+
+/**
+ * Spherical linear interpolation between two quaternions
+ * @param {Quaternion} from - Starting quaternion
+ * @param {Quaternion} to - Target quaternion
+ * @param {number} amount - Interpolation factor (0.0 to 1.0)
+ * @returns {Quaternion} Interpolated quaternion
+ */
+export function slerpQuaternions(from, to, amount) {
+  const threeFrom = new THREE.Quaternion(from.x, from.y, from.z, from.w);
+  const threeTo = new THREE.Quaternion(to.x, to.y, to.z, to.w);
+  const result = new THREE.Quaternion();
+  result.slerpQuaternions(threeFrom, threeTo, amount);
+  return new Quaternion(result.x, result.y, result.z, result.w);
 }
 
 /**
