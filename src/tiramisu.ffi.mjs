@@ -2081,9 +2081,8 @@ export class DebugManager {
                                      existingPosAttr.count !== vertexCount;
 
           if (needsReallocation) {
-            // Dispose old attributes if they exist
-            if (existingPosAttr) existingPosAttr.dispose();
-            if (existingColorAttr) existingColorAttr.dispose();
+            // BufferAttributes are automatically garbage collected when replaced
+            // No need to manually dispose them
 
             // Create new attributes with new size
             geometry.setAttribute(
