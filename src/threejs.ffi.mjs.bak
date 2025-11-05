@@ -2644,7 +2644,7 @@ export function setObjectQuaternion(object, x, y, z, w) {
 export function eulerToQuaternion(euler) {
   const threeEuler = new THREE.Euler(euler.x, euler.y, euler.z, 'XYZ');
   const threeQuaternion = new THREE.Quaternion().setFromEuler(threeEuler);
-  return Quaternion$Quaternion(threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w);
+  return new Quaternion(threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w);
 }
 
 /**
@@ -2655,7 +2655,7 @@ export function eulerToQuaternion(euler) {
 export function quaternionToEuler(q) {
   const threeQuaternion = new THREE.Quaternion(q.x, q.y, q.z, q.w);
   const threeEuler = new THREE.Euler().setFromQuaternion(threeQuaternion, 'XYZ');
-  return Vec3$Vec3(threeEuler.x, threeEuler.y, threeEuler.z);
+  return new Vec3(threeEuler.x, threeEuler.y, threeEuler.z);
 }
 
 /**
@@ -2668,7 +2668,7 @@ export function multiplyQuaternions(q1, q2) {
   const threeQ1 = new THREE.Quaternion(q1.x, q1.y, q1.z, q1.w);
   const threeQ2 = new THREE.Quaternion(q2.x, q2.y, q2.z, q2.w);
   threeQ1.multiply(threeQ2);
-  return Quaternion$Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
+  return new Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
 }
 
 /**
@@ -2683,7 +2683,7 @@ export function slerpQuaternions(from, to, amount) {
   const threeTo = new THREE.Quaternion(to.x, to.y, to.z, to.w);
   const result = new THREE.Quaternion();
   result.slerpQuaternions(threeFrom, threeTo, amount);
-  return Quaternion$Quaternion(result.x, result.y, result.z, result.w);
+  return new Quaternion(result.x, result.y, result.z, result.w);
 }
 
 /**
@@ -2709,7 +2709,7 @@ export function quaternionLookAt(from, to, up) {
   const quat = new THREE.Quaternion();
   quat.setFromRotationMatrix(matrix);
 
-  return Quaternion$Quaternion(quat.x, quat.y, quat.z, quat.w);
+  return new Quaternion(quat.x, quat.y, quat.z, quat.w);
 }
 
 /**
@@ -2732,7 +2732,7 @@ export function quaternionFromBasis(xAxis, yAxis, zAxis) {
   const quat = new THREE.Quaternion();
   quat.setFromRotationMatrix(matrix);
 
-  return Quaternion$Quaternion(quat.x, quat.y, quat.z, quat.w);
+  return new Quaternion(quat.x, quat.y, quat.z, quat.w);
 }
 
 // ============================================================================

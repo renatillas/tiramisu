@@ -2855,11 +2855,16 @@ fn handle_add_mesh(
 
   let new_cache = object_cache.add_object(state.cache, id, three_obj)
 
-  // Create physics body if specified - update physics world in state
+  // Create physics body if specified - use world transform (includes parent transforms)
   let new_state = RendererState(..state, cache: new_cache)
   case physics, new_state.physics_world {
     option.Some(physics_config), option.Some(world) -> {
-      let new_world = physics.create_body(world, id, physics_config, transform)
+      // Get world position and rotation from the Three.js object (includes parent transforms)
+      let unwrapped_obj = object_cache.unwrap_object(three_obj)
+      let world_pos = get_world_position_ffi(unwrapped_obj)
+      let world_quat = get_world_quaternion_ffi(unwrapped_obj)
+      let world_transform = transform.at(world_pos) |> transform.with_quaternion_rotation(world_quat)
+      let new_world = physics.create_body(world, id, physics_config, world_transform)
       RendererState(..new_state, physics_world: option.Some(new_world))
     }
     _, _ -> new_state
@@ -4459,3 +4464,9 @@ fn apply_material_to_object_ffi(
   let three_material = material.create_material(material)
   apply_material_to_object_ffi_raw(object, three_material)
 }
+
+@external(javascript, "../threejs.ffi.mjs", "getWorldPosition")
+fn get_world_position_ffi(object: asset.Object3D) -> Vec3(Float)
+
+@external(javascript, "../threejs.ffi.mjs", "getWorldQuaternion")
+fn get_world_quaternion_ffi(object: asset.Object3D) -> transform.Quaternion
