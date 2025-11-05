@@ -1263,6 +1263,7 @@ fn flatten_scene_helper(
 ) -> dict.Dict(id, NodeWithParent(id)) {
   list.fold(nodes, acc, fn(acc, node) {
     let node_id = node.id
+
     // Store node with cached depth (avoids recursive calculation later)
     let acc =
       dict.insert(acc, node_id, NodeWithParent(node, parent_id, current_depth))
@@ -1279,7 +1280,9 @@ pub fn diff(
 ) -> List(Patch(id)) {
   // Early exit: if scenes are identical by reference, no work needed
   case previous == current {
-    True -> []
+    True -> {
+      []
+    }
     False -> {
       // Convert optional nodes to lists for flatten_scene
       let prev_list = case previous {
@@ -1419,13 +1422,11 @@ fn batch_patches(
 }
 
 /// Efficiently concatenate multiple lists using fold + prepend
-/// O(n) optimized: process lists in reverse order to avoid final reverse
+/// O(n) optimized: use list.append which preserves order
 fn concat_patches(lists: List(List(Patch(id)))) -> List(Patch(id)) {
-  // Reverse list of lists, then prepend each list to build result in correct order
-  lists
-  |> list.reverse
-  |> list.fold([], fn(acc, patches) {
-    list.fold(patches, acc, fn(acc2, patch) { [patch, ..acc2] })
+  // Simply flatten the list of lists while preserving order
+  list.fold(lists, [], fn(acc, patches) {
+    list.append(acc, patches)
   })
 }
 
@@ -1439,8 +1440,12 @@ fn sort_patches_by_hierarchy(
   let patches_with_depth =
     list.map(patches, fn(patch) {
       case patch {
-        AddNode(_, _, parent_id) -> {
-          let depth = calculate_depth(parent_id, node_dict, 0)
+        AddNode(id, _, _) -> {
+          // Look up the node's pre-computed depth from node_dict
+          let depth = case dict.get(node_dict, id) {
+            Ok(NodeWithParent(_, _, node_depth)) -> node_depth
+            Error(_) -> 0  // Fallback if not found
+          }
           #(depth, patch)
         }
         _ -> #(0, patch)
@@ -1465,24 +1470,6 @@ fn sort_patches_by_hierarchy(
     let #(_, patch) = tuple
     patch
   })
-}
-
-/// Get the depth of a node in the hierarchy (0 = root)
-/// Depth is now pre-computed during flatten_scene (performance optimization)
-fn calculate_depth(
-  parent_id: Option(id),
-  node_dict: dict.Dict(id, NodeWithParent(id)),
-  current_depth: Int,
-) -> Int {
-  case parent_id {
-    option.None -> current_depth
-    option.Some(id) ->
-      case dict.get(node_dict, id) {
-        // Use cached depth value (no recursion needed!)
-        Ok(NodeWithParent(_, _, parent_depth)) -> parent_depth + 1
-        Error(_) -> current_depth + 1
-      }
-  }
 }
 
 fn compare_nodes(id: id, prev: Node(id), curr: Node(id)) -> List(Patch(id)) {
@@ -3090,16 +3077,18 @@ fn handle_add_model3d(
   material: Option(material.Material),
   parent_id: Option(id),
 ) -> RendererState(id) {
-  apply_transform_ffi(object, transform)
+  // Clone the object to avoid modifying shared assets
+  let cloned = clone_object_ffi(object)
+  apply_transform_ffi(cloned, transform)
 
   // Apply material if provided
   case material {
-    option.Some(mat) -> apply_material_to_object_ffi(object, mat)
+    option.Some(mat) -> apply_material_to_object_ffi(cloned, mat)
     option.None -> Nil
   }
 
   // Create animation mixer
-  let mixer_dynamic = create_animation_mixer_ffi(object)
+  let mixer_dynamic = create_animation_mixer_ffi(cloned)
   let mixer = object_cache.wrap_mixer(mixer_dynamic)
   let cache_with_mixer = object_cache.add_mixer(state.cache, id, mixer)
 
@@ -3110,7 +3099,7 @@ fn handle_add_model3d(
     option.None -> cache_with_mixer
   }
 
-  let three_obj = object_cache.wrap_object(object)
+  let three_obj = object_cache.wrap_object(cloned)
   add_to_scene_or_parent(state, three_obj, parent_id)
 
   let new_cache = object_cache.add_object(cache_with_animation, id, three_obj)

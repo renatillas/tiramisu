@@ -201,3 +201,113 @@ pub fn diff_no_changes_test() {
 
   assert list.is_empty(patches)
 }
+
+pub type HierarchyId {
+  Parent
+  Child1
+  Child2
+  Grandchild
+}
+
+// Test that patches for hierarchical scenes are ordered correctly:
+// Parents must be added before their children
+pub fn diff_hierarchy_ordering_test() {
+  let assert Ok(geom) = geometry.box(1.0, 1.0, 1.0)
+  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+
+  let prev = option.None
+  let next =
+    option.Some(
+      scene.empty(id: Parent, transform: transform.identity, children: [
+        scene.mesh(
+          id: Child1,
+          geometry: geom,
+          material: mat,
+          transform: transform.identity,
+          physics: option.None,
+        ),
+        scene.mesh(
+          id: Child2,
+          geometry: geom,
+          material: mat,
+          transform: transform.identity,
+          physics: option.None,
+        ),
+      ]),
+    )
+
+  let patches = scene.diff(prev, next)
+
+  // Should have 3 AddNode patches
+  assert list.length(patches) == 3
+
+  // First patch should be the Parent (depth 0)
+  let assert Ok(scene.AddNode(id: Parent, node: _, parent_id: option.None)) =
+    list.first(patches)
+
+  // Second and third patches should be children (depth 1)
+  // Both should have Parent as parent_id
+  let assert Ok(rest) = list.rest(patches)
+  let assert Ok(scene.AddNode(
+    id: child1_id,
+    node: _,
+    parent_id: option.Some(Parent),
+  )) = list.first(rest)
+
+  let assert Ok(rest2) = list.rest(rest)
+  let assert Ok(scene.AddNode(
+    id: child2_id,
+    node: _,
+    parent_id: option.Some(Parent),
+  )) = list.first(rest2)
+
+  // Both children should be present (order between children doesn't matter)
+  assert child1_id == Child1 || child1_id == Child2
+  assert child2_id == Child1 || child2_id == Child2
+  assert child1_id != child2_id
+}
+
+// Test deeper hierarchy with grandchildren
+pub fn diff_deep_hierarchy_ordering_test() {
+  let assert Ok(geom) = geometry.box(1.0, 1.0, 1.0)
+  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+
+  let prev = option.None
+  let next =
+    option.Some(
+      scene.empty(id: Parent, transform: transform.identity, children: [
+        scene.empty(id: Child1, transform: transform.identity, children: [
+          scene.mesh(
+            id: Grandchild,
+            geometry: geom,
+            material: mat,
+            transform: transform.identity,
+            physics: option.None,
+          ),
+        ]),
+      ]),
+    )
+
+  let patches = scene.diff(prev, next)
+
+  // Should have 3 AddNode patches
+  assert list.length(patches) == 3
+
+  // Verify order: Parent (depth 0), Child1 (depth 1), Grandchild (depth 2)
+  let assert Ok(scene.AddNode(id: Parent, node: _, parent_id: option.None)) =
+    list.first(patches)
+
+  let assert Ok(rest) = list.rest(patches)
+  let assert Ok(scene.AddNode(
+    id: Child1,
+    node: _,
+    parent_id: option.Some(Parent),
+  )) = list.first(rest)
+
+  let assert Ok(rest2) = list.rest(rest)
+  let assert Ok(scene.AddNode(
+    id: Grandchild,
+    node: _,
+    parent_id: option.Some(Child1),
+  )) = list.first(rest2)
+}

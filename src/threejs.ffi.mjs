@@ -18,6 +18,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { Quaternion } from './tiramisu/transform.mjs';
 import { Vec3 } from '../vec/vec/vec3.mjs';
+import { Option$isSome } from '../gleam_stdlib/gleam/option.mjs';
 
 // ============================================================================
 // UTILITY FUNCTIONS
