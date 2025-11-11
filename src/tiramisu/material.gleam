@@ -149,6 +149,9 @@ pub opaque type Material {
     map: Option(asset.Texture),
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
+    displacement_map: Option(asset.Texture),
+    displacement_scale: Float,
+    displacement_bias: Float,
     roughness_map: Option(asset.Texture),
     metalness_map: Option(asset.Texture),
     metalness: Float,
@@ -268,6 +271,9 @@ pub fn standard(
   map map: option.Option(asset.Texture),
   normal_map normal_map: option.Option(asset.Texture),
   ambient_oclusion_map ambient_oclusion_map: option.Option(asset.Texture),
+  displacement_map displacement_map: option.Option(asset.Texture),
+  displacement_scale displacement_scale: Float,
+  displacement_bias displacement_bias: Float,
   roughness_map roughness_map: option.Option(asset.Texture),
   metalness_map metalness_map: option.Option(asset.Texture),
   emissive emissive: Int,
@@ -309,6 +315,9 @@ pub fn standard(
     roughness_map:,
     metalness_map:,
     ambient_oclusion_map:,
+    displacement_map:,
+    displacement_scale:,
+    displacement_bias:,
     emissive:,
     emissive_intensity:,
   ))
@@ -568,6 +577,9 @@ pub opaque type StandardMaterialBuilder {
     map: Option(asset.Texture),
     normal_map: Option(asset.Texture),
     ambient_oclusion_map: Option(asset.Texture),
+    displacement_map: Option(asset.Texture),
+    displacement_scale: Float,
+    displacement_bias: Float,
     roughness_map: Option(asset.Texture),
     metalness_map: Option(asset.Texture),
     emissive: Int,
@@ -607,6 +619,9 @@ pub fn new() -> StandardMaterialBuilder {
     map: option.None,
     normal_map: option.None,
     ambient_oclusion_map: option.None,
+    displacement_map: option.None,
+    displacement_scale: 1.0,
+    displacement_bias: 0.0,
     roughness_map: option.None,
     metalness_map: option.None,
     emissive: 0x000000,
@@ -737,6 +752,83 @@ pub fn with_ambient_oclusion_map(
     ..builder,
     ambient_oclusion_map: option.Some(ambient_oclusion_map),
   )
+}
+
+/// Set the displacement map for vertex deformation.
+///
+/// The displacement map affects the position of the mesh's vertices.
+/// Unlike other maps which only affect the light and shade of the material
+/// the displaced vertices can cast shadows, block other objects, and
+/// otherwise act as real geometry. The displacement texture is an image
+/// where the value of each pixel (white being the highest) is mapped against,
+/// and repositions, the vertices of the mesh.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(dm) = asset.get_texture(cache, "water.jpg")
+///
+/// material.new()
+///   |> material.with_displacement_map(dm)
+/// ```
+pub fn with_displacement_map(
+  builder: StandardMaterialBuilder,
+  displacement_map: asset.Texture,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(
+    ..builder,
+    displacement_map: option.Some(displacement_map),
+  )
+}
+
+/// Set the displacement scale for vertex deformation.
+///
+/// If a displacement map texture is set, this affects how much the
+/// texture affects the deformation of vertices. Greater values cause
+/// greater deformation, lesser values create less deformation. Negative
+/// values invert the effect.
+///
+/// The default value is `1.0`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(dm) = asset.get_texture(cache, "water.jpg")
+///
+/// material.new()
+///   |> material.with_displacement_map(dm)
+///   |> material.with_displacement_scale(2.5)
+/// ```
+pub fn with_displacement_scale(
+  builder: StandardMaterialBuilder,
+  displacement_scale: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, displacement_scale:)
+}
+
+/// Set the displacement bias for vertex deformation.
+///
+/// If a displacement map texture is set, this adjusts the
+/// base offset of the deformation. Since the displacement map texture
+/// is from 0.0 to 1.0 (black to white), negative displacement can
+/// be achieved by using a negative value for the bias.
+///
+/// The default value is `0.0`.
+///
+/// ## Example
+///
+/// ```gleam
+/// let assert Ok(dm) = asset.get_texture(cache, "water.jpg")
+///
+/// material.new()
+///   |> material.with_displacement_map(dm)
+///   |> material.with_displacement_bias(0.5)
+/// ```
+pub fn with_displacement_bias(
+  builder: StandardMaterialBuilder,
+  displacement_bias: Float,
+) -> StandardMaterialBuilder {
+  StandardMaterialBuilder(..builder, displacement_bias:)
 }
 
 /// Set the roughness map for per-pixel roughness variation.
@@ -893,6 +985,9 @@ pub fn build(
     map: builder.map,
     normal_map: builder.normal_map,
     ambient_oclusion_map: builder.ambient_oclusion_map,
+    displacement_map: builder.displacement_map,
+    displacement_scale: builder.displacement_scale,
+    displacement_bias: builder.displacement_bias,
     roughness_map: builder.roughness_map,
     metalness_map: builder.metalness_map,
     emissive: builder.emissive,
@@ -913,6 +1008,9 @@ pub fn create_material(material: Material) -> ThreeMaterial {
       map:,
       normal_map:,
       ambient_oclusion_map:,
+      displacement_map:,
+      displacement_scale:,
+      displacement_bias:,
       roughness_map:,
       metalness_map:,
       metalness:,
@@ -931,6 +1029,9 @@ pub fn create_material(material: Material) -> ThreeMaterial {
         map,
         normal_map,
         ambient_oclusion_map,
+        displacement_map,
+        displacement_scale,
+        displacement_bias,
         roughness_map,
         metalness_map,
         emissive,
@@ -1016,6 +1117,9 @@ fn create_standard_material(
   map: Option(asset.Texture),
   normal_map: Option(asset.Texture),
   ao_map: Option(asset.Texture),
+  displacement_map: Option(asset.Texture),
+  displacement_scale: Float,
+  displacement_bias: Float,
   roughness_map: Option(asset.Texture),
   metalness_map: Option(asset.Texture),
   emissive: Int,

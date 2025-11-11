@@ -23,6 +23,9 @@ pub fn standard_direct_test() {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      displacement_map: option.None,
+      displacement_scale: 1.0,
+      displacement_bias: 0.0,
       roughness_map: option.None,
       metalness_map: option.None,
     )
