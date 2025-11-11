@@ -17,6 +17,7 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Id {
+  Scene
   MainCamera
   Ambient
   Directional
@@ -144,7 +145,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   // Camera setup
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 500.0)
@@ -293,5 +294,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
   let ground =
     scene.debug_grid(id: Ground, size: 400.0, divisions: 40, color: 0x444444)
 
-  list.flatten([[camera_node], lights, lod_objects, [ground]])
+  scene.empty(
+    id: Scene,
+    transform: transform.identity,
+    children: list.flatten([[camera_node], lights, lod_objects, [ground]]),
+  )
 }

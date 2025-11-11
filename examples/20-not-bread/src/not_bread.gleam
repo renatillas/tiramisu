@@ -5,7 +5,6 @@ import gleam/io
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
-import gleam/result
 import tiramisu
 import tiramisu/asset
 import tiramisu/background
@@ -208,6 +207,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: option.None,
           physics: option.None,
+          material: option.None,
         ),
       ]
     }

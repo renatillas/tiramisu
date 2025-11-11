@@ -2254,7 +2254,7 @@ fn create_group_ffi() -> asset.Object3D
 @external(javascript, "../threejs.ffi.mjs", "createLOD")
 fn create_lod_ffi() -> asset.Object3D
 
-@external(javascript, "../threejs.ffi.mjs", "cloneObject")
+@external(javascript, "../threejs.ffi.mjs", "cloneObject3D")
 fn clone_object_ffi(object: asset.Object3D) -> asset.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "extractMeshMaterialPairs")
@@ -3108,18 +3108,24 @@ fn handle_add_model3d(
   material: Option(material.Material),
   parent_id: Option(id),
 ) -> RendererState(id) {
-  // Clone the object to avoid modifying shared assets
-  let cloned = clone_object_ffi(object)
-  apply_transform_ffi(cloned, transform)
+  // For models with animations, we cannot clone because the animation clips
+  // reference the original skeleton. Cloning would break the bone references.
+  // For models without animations, we can clone to avoid modifying shared assets.
+  let model_object = case animation {
+    option.Some(_) -> object
+    option.None -> clone_object_ffi(object)
+  }
+
+  apply_transform_ffi(model_object, transform)
 
   // Apply material if provided
   case material {
-    option.Some(mat) -> apply_material_to_object_ffi(cloned, mat)
+    option.Some(mat) -> apply_material_to_object_ffi(model_object, mat)
     option.None -> Nil
   }
 
   // Create animation mixer
-  let mixer_dynamic = create_animation_mixer_ffi(cloned)
+  let mixer_dynamic = create_animation_mixer_ffi(model_object)
   let mixer = object_cache.wrap_mixer(mixer_dynamic)
   let cache_with_mixer = object_cache.add_mixer(state.cache, id, mixer)
 
@@ -3130,7 +3136,7 @@ fn handle_add_model3d(
     option.None -> cache_with_mixer
   }
 
-  let three_obj = object_cache.wrap_object(cloned)
+  let three_obj = object_cache.wrap_object(model_object)
   add_to_scene_or_parent(state, three_obj, parent_id)
 
   let new_cache = object_cache.add_object(cache_with_animation, id, three_obj)
