@@ -3622,9 +3622,7 @@ fn get_object_rotation_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 fn get_object_scale_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 
 @external(javascript, "../threejs.ffi.mjs", "getObjectQuaternion")
-fn get_object_quaternion_ffi(
-  object: asset.Object3D,
-) -> transform.Quaternion
+fn get_object_quaternion_ffi(object: asset.Object3D) -> transform.Quaternion
 
 @external(javascript, "../threejs.ffi.mjs", "setObjectPosition")
 fn set_object_position_ffi(
