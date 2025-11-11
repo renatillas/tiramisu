@@ -41,10 +41,7 @@ fn color_hex(color: Color) -> Int {
   }
 }
 
-pub fn view(
-  model: Model,
-  ctx: tiramisu.Context(String),
-) -> List(scene.Node(String)) {
+pub fn view(model: Model, ctx: tiramisu.Context(String)) -> scene.Node(String) {
   let cam =
     camera.camera_2d(
       width: float.round(ctx.canvas_width),
@@ -59,6 +56,7 @@ pub fn view(
       look_at: option.None,
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.light(
       id: "ambient",
@@ -73,12 +71,18 @@ pub fn view(
     list.append(init_elements, create_static_view(ctx))
     |> list.append(create_score_display(model, ctx))
 
-  base_elements
-  |> list.append(case model.game_state {
-    Running -> create_running_game_view(model, ctx)
-    GameOver -> create_game_over(model, ctx)
-    _ -> []
-  })
+  let all_elements =
+    base_elements
+    |> list.append(case model.game_state {
+      Running -> create_running_game_view(model)
+      GameOver -> create_game_over(model)
+      _ -> []
+    })
+  scene.empty(
+    id: "rootNode",
+    children: all_elements,
+    transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
+  )
 }
 
 fn create_static_view(ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
@@ -150,7 +154,7 @@ fn create_static_view(ctx: tiramisu.Context(String)) -> List(scene.Node(String))
   borders
 }
 
-pub fn create_game_over(model: Model, ctx: tiramisu.Context(String)) {
+pub fn create_game_over(model: Model) {
   let assert Ok(game_over_text_material) =
     material.new()
     |> material.with_color(color_hex(PrimeColor))
@@ -285,10 +289,7 @@ fn create_score_display(
   text_elements
 }
 
-fn create_running_game_view(
-  model: Model,
-  ctx: tiramisu.Context(String),
-) -> List(scene.Node(String)) {
+fn create_running_game_view(model: Model) -> List(scene.Node(String)) {
   let assert Ok(cube_geometry) =
     geometry.box(width: box_width, height: box_width, depth: 1.0)
   let assert Ok(head_material) =

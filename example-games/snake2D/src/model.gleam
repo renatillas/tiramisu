@@ -6,7 +6,6 @@ import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/javascript/promise
-import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
@@ -366,7 +365,6 @@ fn check_new_direction_is_possible(
             old_direction,
             new_direction,
           )
-        _ -> new_direction
       }
     }
   }
