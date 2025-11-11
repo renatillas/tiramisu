@@ -1425,9 +1425,7 @@ fn batch_patches(
 /// O(n) optimized: use list.append which preserves order
 fn concat_patches(lists: List(List(Patch(id)))) -> List(Patch(id)) {
   // Simply flatten the list of lists while preserving order
-  list.fold(lists, [], fn(acc, patches) {
-    list.append(acc, patches)
-  })
+  list.fold(lists, [], fn(acc, patches) { list.append(acc, patches) })
 }
 
 /// Sort AddNode patches so that parents are added before their children
@@ -1444,7 +1442,8 @@ fn sort_patches_by_hierarchy(
           // Look up the node's pre-computed depth from node_dict
           let depth = case dict.get(node_dict, id) {
             Ok(NodeWithParent(_, _, node_depth)) -> node_depth
-            Error(_) -> 0  // Fallback if not found
+            Error(_) -> 0
+            // Fallback if not found
           }
           #(depth, patch)
         }
@@ -2863,8 +2862,11 @@ fn handle_add_mesh(
       let unwrapped_obj = object_cache.unwrap_object(three_obj)
       let world_pos = get_world_position_ffi(unwrapped_obj)
       let world_quat = get_world_quaternion_ffi(unwrapped_obj)
-      let world_transform = transform.at(world_pos) |> transform.with_quaternion_rotation(world_quat)
-      let new_world = physics.create_body(world, id, physics_config, world_transform)
+      let world_transform =
+        transform.at(world_pos)
+        |> transform.with_quaternion_rotation(world_quat)
+      let new_world =
+        physics.create_body(world, id, physics_config, world_transform)
       RendererState(..new_state, physics_world: option.Some(new_world))
     }
     _, _ -> new_state

@@ -8,7 +8,7 @@
  */
 
 import RAPIER from '@dimforge/rapier3d-compat';
-import { toList, Ok, Error } from '../prelude.mjs';
+import { toList, Ok, Error, Result$Ok, Result$Error } from '../prelude.mjs';
 
 // Initialize Rapier (must be called before creating world)
 await RAPIER.init();
@@ -390,10 +390,15 @@ export function getBodyNumColliders(body) {
  * Get collider at index
  * @param {RAPIER.RigidBody} body
  * @param {number} index
- * @returns {RAPIER.Collider}
+ * @returns {Result<RAPIER.Collider, Nil>}
  */
 export function getBodyCollider(body, index) {
-  return body.collider(index);
+  const collider = body.collider(index);
+  if (collider) {
+    return Result$Ok(collider);
+  } else {
+    return Result$Error(undefined);
+  }
 }
 
 /**
@@ -419,6 +424,18 @@ export function setBodyTranslation2(body, x, y, z, wakeUp) {
  */
 export function setBodyRotation2(body, x, y, z, w, wakeUp) {
   body.setRotation({ x, y, z, w }, wakeUp);
+}
+
+/**
+ * Set next kinematic translation for a kinematic body
+ * This is the proper way to move kinematic bodies in Rapier
+ * @param {RAPIER.RigidBody} body
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ */
+export function setBodyNextKinematicTranslation(body, x, y, z) {
+  body.setNextKinematicTranslation({ x, y, z });
 }
 
 /**
@@ -896,17 +913,28 @@ export function removeCharacterController(world, controller) {
 
 /**
  * Compute character movement
+ * @param {RAPIER.World} world
  * @param {RAPIER.KinematicCharacterController} controller
  * @param {RAPIER.Collider} collider
  * @param {Object} desiredTranslation - {x, y, z}
  * @param {Function} filterFunc - Optional collision filter
  */
-export function computeCharacterMovement(controller, collider, desiredTranslation, filterFunc) {
-  if (filterFunc) {
-    controller.computeColliderMovement(collider, desiredTranslation, filterFunc);
-  } else {
-    controller.computeColliderMovement(collider, desiredTranslation);
-  }
+export function computeCharacterMovement(world, controller, collider, desiredTranslation, filterFunc) {
+  // IMPORTANT: Filter out the player's own collider to prevent self-collision
+  // The filter predicate returns FALSE to EXCLUDE colliders from collision checks
+  const playerHandle = collider.handle;
+  const filter = filterFunc || ((otherCollider) => {
+    // Exclude the player's own collider
+    const shouldExclude = otherCollider.handle === playerHandle;
+    return !shouldExclude;  // Return false to exclude
+  });
+
+  // NOTE: computeColliderMovement signature is (collider, desiredTranslation, filterFlags?, filterGroups?, filterPredicate?)
+  // We pass undefined for filterFlags and filterGroups to use defaults
+  controller.computeColliderMovement(collider, desiredTranslation, undefined, undefined, filter);
+
+  const computed = controller.computedMovement();
+  const grounded = controller.computedGrounded();
 }
 
 /**
@@ -916,6 +944,10 @@ export function computeCharacterMovement(controller, collider, desiredTranslatio
  */
 export function getCharacterComputedMovement(controller) {
   return controller.computedMovement();
+}
+
+export function getCharacterComputedGrounded(controller) {
+  return controller.computedGrounded();
 }
 
 /**

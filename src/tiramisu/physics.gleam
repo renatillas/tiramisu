@@ -76,6 +76,8 @@ type RapierEventQueue
 
 type RapierRigidBody
 
+type RapierCharacterController
+
 /// Opaque handle to the Rapier physics world
 /// This is part of your Model and gets updated each frame
 pub opaque type PhysicsWorld(id) {
@@ -92,6 +94,8 @@ pub opaque type PhysicsWorld(id) {
     collider_to_body: Dict(Int, id),
     /// Collision events from the last physics step
     collision_events: List(CollisionEvent),
+    /// Character controllers for kinematic character movement (one per body)
+    character_controllers: Dict(id, RapierCharacterController),
   )
 }
 
@@ -103,6 +107,7 @@ type PhysicsCommand(body) {
   SetAngularVelocity(id: body, velocity: Vec3(Float))
   ApplyTorque(id: body, torque: Vec3(Float))
   ApplyTorqueImpulse(id: body, impulse: Vec3(Float))
+  SetKinematicTranslation(id: body, position: Vec3(Float))
 }
 
 // --- Public Types ---
@@ -187,6 +192,31 @@ pub type CollisionGroups {
   )
 }
 
+/// Character controller configuration for kinematic character movement.
+///
+/// Character controllers provide collision-aware movement for kinematic bodies,
+/// perfect for player characters, NPCs, and moving platforms.
+///
+/// ## Example
+///
+/// ```gleam
+/// physics.CharacterController(
+///   offset: 0.01,
+///   up_vector: vec3.Vec3(0.0, 1.0, 0.0),
+///   slide_enabled: True,
+/// )
+/// ```
+pub type CharacterController {
+  CharacterController(
+    /// Offset from surfaces (default: 0.01)
+    offset: Float,
+    /// Up vector for the character (default: positive Y)
+    up_vector: Vec3(Float),
+    /// Enable sliding along surfaces (default: True)
+    slide_enabled: Bool,
+  )
+}
+
 /// Physics body configuration
 pub opaque type RigidBody {
   RigidBody(
@@ -210,6 +240,8 @@ pub opaque type RigidBody {
     axis_locks: AxisLock,
     /// Collision groups for filtering interactions
     collision_groups: option.Option(CollisionGroups),
+    /// Character controller configuration (for kinematic bodies)
+    character_controller: option.Option(CharacterController),
   )
 }
 
@@ -289,6 +321,7 @@ pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
     pending_commands: [],
     collider_to_body: dict.new(),
     collision_events: [],
+    character_controllers: dict.new(),
   )
 }
 
@@ -305,6 +338,7 @@ pub opaque type RigidBodyBuilder(a) {
     ccd_enabled: Bool,
     axis_locks: AxisLock,
     collision_groups: option.Option(CollisionGroups),
+    character_controller: option.Option(CharacterController),
   )
 }
 
@@ -363,6 +397,7 @@ pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
       lock_rotation_z: False,
     ),
     collision_groups: option.None,
+    character_controller: option.None,
   )
 }
 
@@ -590,6 +625,48 @@ pub fn with_collision_groups(
   )
 }
 
+/// Add a character controller for collision-aware kinematic movement.
+///
+/// Character controllers are perfect for player characters and NPCs, providing:
+/// - Automatic collision detection and response
+/// - Sliding along surfaces
+/// - Configurable offset from obstacles
+///
+/// **Note**: Character controllers are only useful for Kinematic bodies.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Player character with character controller
+/// let player = physics.new_rigid_body(physics.Kinematic)
+///   |> physics.with_collider(physics.Capsule(
+///     offset: transform.identity,
+///     half_height: 0.9,
+///     radius: 0.3,
+///   ))
+///   |> physics.with_character_controller(
+///     offset: 0.01,
+///     up_vector: vec3.Vec3(0.0, 1.0, 0.0),
+///     slide_enabled: True,
+///   )
+///   |> physics.build()
+/// ```
+pub fn with_character_controller(
+  builder: RigidBodyBuilder(_),
+  offset offset: Float,
+  up_vector up_vector: Vec3(Float),
+  slide_enabled slide_enabled: Bool,
+) -> RigidBodyBuilder(_) {
+  RigidBodyBuilder(
+    ..builder,
+    character_controller: option.Some(CharacterController(
+      offset: offset,
+      up_vector: up_vector,
+      slide_enabled: slide_enabled,
+    )),
+  )
+}
+
 pub type WithCollider
 
 pub type WithoutCollider
@@ -619,6 +696,7 @@ pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
     ccd_enabled: builder.ccd_enabled,
     axis_locks: builder.axis_locks,
     collision_groups: builder.collision_groups,
+    character_controller: builder.character_controller,
   )
 }
 
@@ -665,6 +743,16 @@ fn apply_command(
       )
       Ok(Nil)
     }
+    SetKinematicTranslation(id, position) -> {
+      use rapier_body <- result.try(dict.get(rapier_bodies, id))
+      set_body_next_kinematic_translation_ffi(
+        rapier_body,
+        position.x,
+        position.y,
+        position.z,
+      )
+      Ok(Nil)
+    }
   }
 }
 
@@ -685,8 +773,9 @@ fn apply_command(
 /// Returns updated world with new transforms for all bodies
 pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
   // Apply all pending commands in the correct order
-  // Commands are now appended, so they're already in the correct order
+  // Commands are prepended (O(1)), so reverse once here before processing
   world.pending_commands
+  |> list.reverse
   |> list.each(fn(command) {
     let _ = apply_command(command, world.rapier_bodies)
     Nil
@@ -820,12 +909,11 @@ pub fn apply_force(
   force: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyForce(id:, force:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 /// Queue an impulse to be applied to a rigid body during the next physics step.
@@ -843,12 +931,11 @@ pub fn apply_impulse(
   impulse: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyImpulse(id:, impulse:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 /// Queue a velocity change for a rigid body during the next physics step.
@@ -859,12 +946,11 @@ pub fn set_velocity(
   velocity: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = SetVelocity(id:, velocity:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 /// Get the current velocity of a rigid body
@@ -877,6 +963,90 @@ pub fn get_velocity(
   Ok(vec3.Vec3(vel.x, vel.y, vel.z))
 }
 
+/// Queue a kinematic translation change for a kinematic rigid body during the next physics step.
+/// This is the proper way to move kinematic bodies in Rapier.
+/// Returns updated world with the command queued.
+pub fn set_kinematic_translation(
+  world: PhysicsWorld(body),
+  id: body,
+  position: Vec3(Float),
+) -> PhysicsWorld(body) {
+  let command = SetKinematicTranslation(id:, position:)
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
+}
+
+/// Compute collision-aware movement for a kinematic character.
+/// Returns the actual movement that can be safely applied without penetrating colliders.
+/// Must have created a character controller for this body first.
+pub fn compute_character_movement(
+  world: PhysicsWorld(body),
+  id: body,
+  desired_translation: Vec3(Float),
+) -> Result(Vec3(Float), Nil) {
+  // Get controller for this specific body
+  case dict.get(world.character_controllers, id) {
+    Error(_) -> Error(Nil)
+    Ok(controller) -> {
+      // Get the first collider for this body
+      case dict.get(world.rapier_bodies, id) {
+        Error(_) -> Error(Nil)
+        Ok(rapier_body) -> {
+          let num_colliders = get_body_num_colliders_ffi(rapier_body)
+
+          case num_colliders > 0 {
+            True -> {
+              case get_body_collider_ffi(rapier_body, 0) {
+                Error(_) -> Error(Nil)
+                Ok(collider) -> {
+                  // Compute the collision-aware movement
+                  let desired_translation_obj =
+                    create_vec3_object(
+                      desired_translation.x,
+                      desired_translation.y,
+                      desired_translation.z,
+                    )
+
+                  compute_character_movement_ffi(
+                    world.world,
+                    controller,
+                    collider,
+                    desired_translation_obj,
+                  )
+
+                  // Get the computed safe movement
+                  let safe_movement =
+                    get_character_computed_movement_ffi(controller)
+                  Ok(safe_movement)
+                }
+              }
+            }
+            False -> Error(Nil)
+          }
+        }
+      }
+    }
+  }
+}
+
+/// Check if a character is grounded (on the ground).
+/// This uses the character controller's computed grounded state.
+/// Must have called compute_character_movement for this body first in this frame.
+pub fn is_character_grounded(
+  world: PhysicsWorld(body),
+  id: body,
+) -> Result(Bool, Nil) {
+  case dict.get(world.character_controllers, id) {
+    Error(_) -> Error(Nil)
+    Ok(controller) -> {
+      let grounded = get_character_computed_grounded_ffi(controller)
+      Ok(grounded)
+    }
+  }
+}
+
 /// Queue an angular velocity change for a rigid body during the next physics step.
 /// Returns updated world with the command queued.
 pub fn set_angular_velocity(
@@ -885,12 +1055,11 @@ pub fn set_angular_velocity(
   velocity: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = SetAngularVelocity(id:, velocity:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 /// Get the current angular velocity of a rigid body
@@ -911,12 +1080,11 @@ pub fn apply_torque(
   torque: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyTorque(id:, torque:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 /// Queue a torque impulse to be applied to a rigid body during the next physics step.
@@ -927,12 +1095,11 @@ pub fn apply_torque_impulse(
   impulse: Vec3(Float),
 ) -> PhysicsWorld(body) {
   let command = ApplyTorqueImpulse(id:, impulse:)
-  // Append to maintain order (avoids reverse() in step())
-  PhysicsWorld(
-    ..world,
-    bodies: world.bodies,
-    pending_commands: list.append(world.pending_commands, [command]),
-  )
+  // Prepend for O(1) insertion - reversed before execution in step()
+  PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
+    command,
+    ..world.pending_commands
+  ])
 }
 
 // --- Raycasting ---
@@ -1378,12 +1545,32 @@ pub fn create_body(
   // Register collider handle for collision event tracking
   let collider_handle = get_collider_handle_ffi(collider)
 
+  // Create character controller if configured
+  let character_controllers = case config.character_controller {
+    option.Some(controller_config) -> {
+      let controller =
+        create_character_controller_ffi(world.world, controller_config.offset)
+      // Set up vector
+      set_character_up_vector_ffi(
+        controller,
+        controller_config.up_vector.x,
+        controller_config.up_vector.y,
+        controller_config.up_vector.z,
+      )
+      // Set slide mode
+      set_character_slide_ffi(controller, controller_config.slide_enabled)
+      dict.insert(world.character_controllers, id, controller)
+    }
+    option.None -> world.character_controllers
+  }
+
   // Store body and collider mapping in world
   PhysicsWorld(
     ..world,
     bodies: dict.insert(world.bodies, id, config),
     rapier_bodies: dict.insert(world.rapier_bodies, id, rapier_body),
     collider_to_body: dict.insert(world.collider_to_body, collider_handle, id),
+    character_controllers: character_controllers,
   )
 }
 
@@ -1652,3 +1839,55 @@ type RapierBodyDesc
 type RapierColliderDesc
 
 type RapierCollider
+
+// Character Controller FFI
+@external(javascript, "../rapier.ffi.mjs", "createCharacterController")
+fn create_character_controller_ffi(
+  world: RapierWorld,
+  offset: Float,
+) -> RapierCharacterController
+
+@external(javascript, "../rapier.ffi.mjs", "setCharacterUpVector")
+fn set_character_up_vector_ffi(
+  controller: RapierCharacterController,
+  x: Float,
+  y: Float,
+  z: Float,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setCharacterSlide")
+fn set_character_slide_ffi(
+  controller: RapierCharacterController,
+  enabled: Bool,
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "computeCharacterMovement")
+fn compute_character_movement_ffi(
+  world: RapierWorld,
+  controller: RapierCharacterController,
+  collider: RapierCollider,
+  desired_translation: Vec3(Float),
+) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getCharacterComputedMovement")
+fn get_character_computed_movement_ffi(
+  controller: RapierCharacterController,
+) -> Vec3(Float)
+
+@external(javascript, "../rapier.ffi.mjs", "getCharacterComputedGrounded")
+fn get_character_computed_grounded_ffi(
+  controller: RapierCharacterController,
+) -> Bool
+
+@external(javascript, "../rapier.ffi.mjs", "setBodyNextKinematicTranslation")
+fn set_body_next_kinematic_translation_ffi(
+  body: RapierRigidBody,
+  x: Float,
+  y: Float,
+  z: Float,
+) -> Nil
+
+// Helper to create Vec3 object for FFI
+fn create_vec3_object(x: Float, y: Float, z: Float) -> Vec3(Float) {
+  vec3.Vec3(x, y, z)
+}

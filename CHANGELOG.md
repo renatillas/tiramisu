@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Character Controller System**: Kinematic character controller for player movement with collision detection
+  - `physics.with_character_controller(builder, offset, up_vector, slide_enabled)` - Add character controller to rigid body using builder pattern
+  - Controllers automatically handle collision-aware movement with sliding
+  - `physics.compute_character_movement(world, id, desired_translation)` - Compute safe movement considering collisions
+  - `physics.is_character_grounded(world, id)` - Check if character is on the ground (must be called after `compute_character_movement`)
+  - Perfect for implementing platformer-style player movement with proper collision response
+  - Example:
+    ```gleam
+    physics.new_rigid_body(physics.Kinematic)
+    |> physics.with_collider(physics.Capsule(...))
+    |> physics.with_character_controller(
+      offset: 0.01,
+      up_vector: Vec3(0.0, 1.0, 0.0),
+      slide_enabled: True,
+    )
+    |> physics.build()
+    ```
+
 - **Postprocessing System** - Camera-based post-processing effects using Three.js EffectComposer
   - New `tiramisu/postprocessing` module with comprehensive effect pipeline
   - Built-in effects: bloom, pixelate, film grain, vignette, FXAA, glitch, color correction
@@ -118,9 +136,9 @@
    - **Impact**: 15-25% faster patch sorting for deep scene hierarchies
 
 8. **Physics Command Queue Optimization**
-   - Changed from prepend+reverse to direct append pattern
-   - Eliminates unnecessary list.reverse() allocation
-   - **Impact**: Minor improvement for cleaner code
+   - Changed from O(n) append to O(1) prepend with single reverse before processing
+   - Commands are prepended to queue and reversed once before execution
+   - **Impact**: Faster command queueing for physics operations (force, impulse, velocity, etc.)
 
 **Overall Impact**: Significantly improved frame times, especially for physics-heavy games and games with dynamic UI elements.
 
