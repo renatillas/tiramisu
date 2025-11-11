@@ -234,6 +234,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
                 option.None,
                 option.None,
                 option.None,
+                transparent: False,
+                opacity: 1.0,
+                alpha_test: 0.0,
               )
             material
           },
@@ -314,6 +317,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
+          material: option.None,
         )
 
       scene.empty(id: Scene, transform: transform.identity, children: [

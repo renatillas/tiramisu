@@ -459,6 +459,9 @@ fn view(model: Model, _) -> scene.Node(String) {
       map: onyx_color,
       normal_map: onyx_normal,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
   let assert Ok(lambert_mat) =
     material.lambert(
@@ -466,6 +469,9 @@ fn view(model: Model, _) -> scene.Node(String) {
       map: snow_color,
       normal_map: snow_normal,
       ambient_oclusion_map: snow_ao,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
   let assert Ok(toon_mat) =
     material.toon(
@@ -473,6 +479,9 @@ fn view(model: Model, _) -> scene.Node(String) {
       map: option.None,
       normal_map: option.None,
       ambient_oclusion_map: option.None,
+      transparent: False,
+      opacity: 1.0,
+      alpha_test: 0.0,
     )
 
   let spheres =

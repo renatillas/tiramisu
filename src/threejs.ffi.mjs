@@ -2326,19 +2326,9 @@ export function applyTransformWithQuaternion(object, position, quaternion, scale
 /**
  * Apply camera lookAt with proper world matrix handling
  * @param {THREE.Camera} camera
- * @param {Object} target - {x, y, z}
+ * @param {Vec3} target - Gleam Vec3
  */
 export function applyCameraLookAt(camera, target) {
-  camera.updateMatrixWorld(true);
-  camera.lookAt(target.x, target.y, target.z);
-}
-
-/**
- * Apply camera lookAt with a dynamic target (for reapplying stored lookAt)
- * @param {THREE.Camera} camera
- * @param {any} target - Dynamic target (should have x, y, z properties)
- */
-export function applyCameraLookAtDynamic(camera, target) {
   camera.updateMatrixWorld(true);
   camera.lookAt(target.x, target.y, target.z);
 }
@@ -2570,54 +2560,42 @@ export function setObjectMaterial(object, material) {
 /**
  * Get object position
  * @param {THREE.Object3D} object
- * @returns {Object} - {x, y, z}
+ * @returns {Vec3} - Gleam Vec3
  */
 export function getObjectPosition(object) {
-  return {
-    x: object.position.x,
-    y: object.position.y,
-    z: object.position.z
-  };
+  return Vec3$Vec3(object.position.x, object.position.y, object.position.z);
 }
 
 /**
- * Get object rotation
+ * Get object rotation (Euler angles)
  * @param {THREE.Object3D} object
- * @returns {Object} - {x, y, z}
+ * @returns {Vec3} - Gleam Vec3 with Euler angles in radians
  */
 export function getObjectRotation(object) {
-  return {
-    x: object.rotation.x,
-    y: object.rotation.y,
-    z: object.rotation.z
-  };
+  return Vec3$Vec3(object.rotation.x, object.rotation.y, object.rotation.z);
 }
 
 /**
  * Get object scale
  * @param {THREE.Object3D} object
- * @returns {Object} - {x, y, z}
+ * @returns {Vec3} - Gleam Vec3
  */
 export function getObjectScale(object) {
-  return {
-    x: object.scale.x,
-    y: object.scale.y,
-    z: object.scale.z
-  };
+  return Vec3$Vec3(object.scale.x, object.scale.y, object.scale.z);
 }
 
 /**
  * Get object quaternion
  * @param {THREE.Object3D} object
- * @returns {Object} - {x, y, z, w}
+ * @returns {Quaternion} - Gleam Quaternion
  */
 export function getObjectQuaternion(object) {
-  return {
-    x: object.quaternion.x,
-    y: object.quaternion.y,
-    z: object.quaternion.z,
-    w: object.quaternion.w
-  };
+  return Quaternion$Quaternion(
+    object.quaternion.x,
+    object.quaternion.y,
+    object.quaternion.z,
+    object.quaternion.w
+  );
 }
 
 /**

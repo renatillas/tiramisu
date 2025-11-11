@@ -1,5 +1,5 @@
+//
 /// Character Controller Example
-///
 /// Demonstrates animation state machines with smooth transitions
 import gleam/int
 import gleam/io
@@ -279,6 +279,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
                 option.None,
                 option.None,
                 option.None,
+                False,
+                0.0,
+                0.1,
               )
             mat
           },
@@ -348,7 +351,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           animation: animation,
           physics: option.None,
-          material_override: option.None,
+          material: option.None,
         )
 
       scene.empty(id: Scene, transform: transform.identity, children: [

@@ -2224,9 +2224,9 @@ fn apply_transform_ffi(
 @external(javascript, "../threejs.ffi.mjs", "applyTransformWithQuaternion")
 fn apply_transform_with_quaternion_ffi(
   object: asset.Object3D,
-  position: Dynamic,
-  quaternion: Dynamic,
-  scale: Dynamic,
+  position: vec3.Vec3(Float),
+  quaternion: transform.Quaternion,
+  scale: vec3.Vec3(Float),
 ) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "updateMatrixWorld")
@@ -2234,12 +2234,6 @@ fn update_matrix_world_ffi(object: asset.Object3D, force: Bool) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "applyCameraLookAt")
 fn apply_camera_look_at_ffi(camera: asset.Object3D, target: Vec3(Float)) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "applyCameraLookAtDynamic")
-fn apply_camera_look_at_dynamic_ffi(
-  camera: asset.Object3D,
-  target: Dynamic,
-) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "createMesh")
 fn create_mesh_ffi(
@@ -2312,15 +2306,45 @@ fn is_orthographic_camera_ffi(object: asset.Object3D) -> Bool
 @external(javascript, "../threejs.ffi.mjs", "updateCameraProjectionMatrix")
 fn update_camera_projection_matrix_ffi(camera: asset.Object3D) -> Nil
 
+@external(javascript, "../threejs.ffi.mjs", "setPerspectiveCameraParams")
+fn set_perspective_camera_params_ffi(
+  camera: asset.Object3D,
+  fov: Float,
+  aspect: Float,
+  near: Float,
+  far: Float,
+) -> Nil
+
+@external(javascript, "../threejs.ffi.mjs", "setOrthographicCameraParams")
+fn set_orthographic_camera_params_ffi(
+  camera: asset.Object3D,
+  left: Float,
+  right: Float,
+  top: Float,
+  bottom: Float,
+  near: Float,
+  far: Float,
+) -> Nil
+
 @external(javascript, "../threejs.ffi.mjs", "setCameraUserData")
-fn set_camera_user_data_ffi(
+fn set_camera_user_data_vec3_ffi(
   camera: asset.Object3D,
   key: String,
-  value: Dynamic,
+  value: Vec3(Float),
 ) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "getCameraUserData")
-fn get_camera_user_data_ffi(camera: asset.Object3D, key: String) -> Dynamic
+fn get_camera_user_data_vec3_ffi(
+  camera: asset.Object3D,
+  key: String,
+) -> Vec3(Float)
+
+@external(javascript, "../threejs.ffi.mjs", "setCameraUserData")
+fn set_camera_user_data_bool_ffi(
+  camera: asset.Object3D,
+  key: String,
+  value: Bool,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "hasCameraUserData")
 fn has_camera_user_data_ffi(camera: asset.Object3D, key: String) -> Bool
@@ -3228,12 +3252,8 @@ fn handle_add_camera(
   // Store lookAt target if provided (will apply after adding to scene)
   case look_at {
     option.Some(target) -> {
-      set_camera_user_data_ffi(camera_obj, "lookAtTarget", to_dynamic(target))
-      set_camera_user_data_ffi(
-        camera_obj,
-        "needsLookAtUpdate",
-        to_dynamic(True),
-      )
+      set_camera_user_data_vec3_ffi(camera_obj, "lookAtTarget", target)
+      set_camera_user_data_bool_ffi(camera_obj, "needsLookAtUpdate", True)
     }
     option.None -> Nil
   }
@@ -3479,9 +3499,8 @@ fn handle_update_transform(
         True -> {
           case has_camera_user_data_ffi(object, "lookAtTarget") {
             True -> {
-              let target = get_camera_user_data_ffi(object, "lookAtTarget")
-              // Reapply lookAt with the stored target (it's a Dynamic Vec3)
-              apply_camera_look_at_dynamic_ffi(object, target)
+              let target = get_camera_user_data_vec3_ffi(object, "lookAtTarget")
+              apply_camera_look_at_ffi(object, target)
             }
             False -> Nil
           }
@@ -3588,22 +3607,33 @@ fn handle_update_light(
 
 // FFI declarations for get/set position/rotation/scale
 @external(javascript, "../threejs.ffi.mjs", "getObjectPosition")
-fn get_object_position_ffi(object: asset.Object3D) -> Dynamic
+fn get_object_position_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 
 @external(javascript, "../threejs.ffi.mjs", "getObjectRotation")
-fn get_object_rotation_ffi(object: asset.Object3D) -> Dynamic
+fn get_object_rotation_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 
 @external(javascript, "../threejs.ffi.mjs", "getObjectScale")
-fn get_object_scale_ffi(object: asset.Object3D) -> Dynamic
+fn get_object_scale_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
+
+@external(javascript, "../threejs.ffi.mjs", "getObjectQuaternion")
+fn get_object_quaternion_ffi(
+  object: asset.Object3D,
+) -> transform.Quaternion
 
 @external(javascript, "../threejs.ffi.mjs", "setObjectPosition")
-fn set_object_position_ffi(object: asset.Object3D, position: Dynamic) -> Nil
+fn set_object_position_ffi(
+  object: asset.Object3D,
+  position: vec3.Vec3(Float),
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setObjectRotation")
-fn set_object_rotation_ffi(object: asset.Object3D, rotation: Dynamic) -> Nil
+fn set_object_rotation_ffi(
+  object: asset.Object3D,
+  rotation: vec3.Vec3(Float),
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setObjectScale")
-fn set_object_scale_ffi(object: asset.Object3D, scale: Dynamic) -> Nil
+fn set_object_scale_ffi(object: asset.Object3D, scale: vec3.Vec3(Float)) -> Nil
 
 fn handle_update_animation(
   state: RendererState(id),
@@ -3653,11 +3683,7 @@ fn handle_update_physics(
           case object_cache.get_object(state.cache, id) {
             option.Some(obj) -> {
               let obj_dynamic = object_cache.unwrap_object(obj)
-              let position = get_object_position_ffi(obj_dynamic)
-              let rotation = get_object_rotation_ffi(obj_dynamic)
-              let scale = get_object_scale_ffi(obj_dynamic)
-              let object_transform =
-                dynamic_to_transform(position, rotation, scale)
+              let object_transform = object_to_transform(obj_dynamic)
 
               // Just update the transform (preserves velocity!)
               let new_world =
@@ -3680,11 +3706,7 @@ fn handle_update_physics(
           case object_cache.get_object(state.cache, id) {
             option.Some(obj) -> {
               let obj_dynamic = object_cache.unwrap_object(obj)
-              let position = get_object_position_ffi(obj_dynamic)
-              let rotation = get_object_rotation_ffi(obj_dynamic)
-              let scale = get_object_scale_ffi(obj_dynamic)
-              let object_transform =
-                dynamic_to_transform(position, rotation, scale)
+              let object_transform = object_to_transform(obj_dynamic)
 
               let new_world =
                 physics.create_body(world, id, physics_config, object_transform)
@@ -3703,18 +3725,16 @@ fn handle_update_physics(
   }
 }
 
-// Helper to convert Dynamic position/rotation/scale to Transform
-fn dynamic_to_transform(
-  position: Dynamic,
-  rotation: Dynamic,
-  scale: Dynamic,
-) -> transform.Transform {
-  // For now, use identity transform
-  // TODO: Properly convert Dynamic values to Transform
-  let _ = position
-  let _ = rotation
-  let _ = scale
+// Helper to build Transform from Three.js object's position/quaternion/scale
+fn object_to_transform(object: asset.Object3D) -> transform.Transform {
+  let position = get_object_position_ffi(object)
+  let quaternion = get_object_quaternion_ffi(object)
+  let scale = get_object_scale_ffi(object)
+
   transform.identity
+  |> transform.with_position(position)
+  |> transform.with_quaternion_rotation(quaternion)
+  |> transform.with_scale(scale)
 }
 
 fn handle_update_audio(
@@ -3798,7 +3818,7 @@ fn handle_update_lod_levels(
 fn handle_update_camera(
   state: RendererState(id),
   id: id,
-  _camera_type: camera.Camera,
+  camera_type: camera.Camera,
   look_at: Option(Vec3(Float)),
 ) -> RendererState(id) {
   case object_cache.get_object(state.cache, id) {
@@ -3810,26 +3830,44 @@ fn handle_update_camera(
 
       case is_camera {
         True -> {
+          // Update camera projection parameters from camera_type
+          let projection = camera.get_projection(camera_type)
+          case projection {
+            camera.Perspective(fov:, aspect:, near:, far:) -> {
+              set_perspective_camera_params_ffi(
+                obj_dynamic,
+                fov,
+                aspect,
+                near,
+                far,
+              )
+            }
+            camera.Orthographic(left:, right:, top:, bottom:, near:, far:) -> {
+              set_orthographic_camera_params_ffi(
+                obj_dynamic,
+                left,
+                right,
+                top,
+                bottom,
+                near,
+                far,
+              )
+            }
+          }
+          update_camera_projection_matrix_ffi(obj_dynamic)
+
           // Apply lookAt if provided and update stored target
           case look_at {
             option.Some(target) -> {
               apply_camera_look_at_ffi(obj_dynamic, target)
               // Update the stored lookAtTarget so it's used in future transform updates
-              set_camera_user_data_ffi(
-                obj_dynamic,
-                "lookAtTarget",
-                to_dynamic(target),
-              )
+              set_camera_user_data_vec3_ffi(obj_dynamic, "lookAtTarget", target)
             }
             option.None -> {
               // If None, remove the stored lookAtTarget so the camera can rotate freely
               delete_camera_user_data_ffi(obj_dynamic, "lookAtTarget")
             }
           }
-
-          // Update camera projection parameters
-          // TODO: Extract projection parameters from camera_type and update
-          update_camera_projection_matrix_ffi(obj_dynamic)
 
           state
         }
@@ -4338,9 +4376,9 @@ pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
                 // Apply transform using quaternion directly (no Euler conversion)
                 apply_transform_with_quaternion_ffi(
                   obj_dynamic,
-                  to_dynamic(position),
-                  to_dynamic(quaternion),
-                  to_dynamic(scale),
+                  position,
+                  quaternion,
+                  scale,
                 )
                 update_matrix_world_ffi(obj_dynamic, True)
               }

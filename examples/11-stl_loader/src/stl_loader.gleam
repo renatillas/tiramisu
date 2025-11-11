@@ -149,6 +149,9 @@ fn view(model: Model, _) -> scene.Node(Id) {
                 option.None,
                 option.None,
                 option.None,
+                transparent: False,
+                opacity: 1.0,
+                alpha_test: 0.0,
               )
             material
           },
