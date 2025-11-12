@@ -19,9 +19,6 @@ import tiramisu
 // the key the highscore is stored in the local storage
 const highscore_key = "Highscore"
 
-// draw every <draw_frame>: low -> fast movement, high -> slow movement
-const draw_frame = 8
-
 pub type Model {
   Model(
     time: Float,
