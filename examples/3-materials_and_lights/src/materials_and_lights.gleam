@@ -53,6 +53,7 @@ fn init(
     asset.TextureAsset("wood-floor/WoodFloor041_1K-JPG_NormalGL.jpg"),
     asset.TextureAsset("wood-floor/WoodFloor041_1K-JPG_AmbientOcclusion.jpg"),
     asset.TextureAsset("wood-floor/WoodFloor041_1K-JPG_Roughness.jpg"),
+    asset.TextureAsset("wood-floor/WoodFloor041_1K-JPG_Displacement.jpg"),
     // Paving stones textures
     asset.TextureAsset("paving-stones/PavingStones142_1K-JPG_Color.jpg"),
     asset.TextureAsset("paving-stones/PavingStones142_1K-JPG_NormalGL.jpg"),
@@ -354,6 +355,14 @@ fn view(model: Model, _) -> scene.Node(String) {
       asset.get_texture(cache, "wood-floor/WoodFloor041_1K-JPG_Roughness.jpg")
       |> option.from_result
     })
+  let wood_displacement =
+    option.then(model.assets, fn(cache) {
+      asset.get_texture(
+        cache,
+        "wood-floor/WoodFloor041_1K-JPG_Displacement.jpg",
+      )
+      |> option.from_result
+    })
 
   let paving_color =
     option.then(model.assets, fn(cache) {
@@ -425,12 +434,14 @@ fn view(model: Model, _) -> scene.Node(String) {
     wood_color,
     wood_normal,
     wood_ambient_oclusion,
-    wood_roughness
+    wood_roughness,
+    wood_displacement
   {
     option.Some(color),
       option.Some(normal),
       option.Some(ambient_oclusion),
-      option.Some(roughness)
+      option.Some(roughness),
+      option.Some(displacement)
     -> {
       let assert Ok(standard_mat) =
         material.new()
@@ -440,11 +451,14 @@ fn view(model: Model, _) -> scene.Node(String) {
         |> material.with_color_map(color)
         |> material.with_normal_map(normal)
         |> material.with_ambient_oclusion_map(ambient_oclusion)
+        |> material.with_displacement_map(displacement)
+        |> material.with_displacement_scale(0.3)
+        |> material.with_displacement_bias(-0.15)
         |> material.with_roughness_map(roughness)
         |> material.build()
       standard_mat
     }
-    _, _, _, _ -> {
+    _, _, _, _, _ -> {
       let assert Ok(standard_mat) =
         material.new()
         |> material.build()

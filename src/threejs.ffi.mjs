@@ -652,14 +652,34 @@ export function createBasicMaterial(color, transparent, opacity, map) {
  * @param {THREE.Texture|null} map
  * @param {THREE.Texture|null} normalMap
  * @param {THREE.Texture|null} aoMap
+ * @param {THREE.Texture|null} displacementMap
+ * @param {number} displacementScale
+ * @param {number} displacementBias
  * @param {THREE.Texture|null} roughnessMap
  * @param {THREE.Texture|null} metalnessMap
  * @returns {THREE.MeshStandardMaterial}
  */
-export function createStandardMaterial(color, metalness, roughness, transparent, opacity, map, normalMap, aoMap, roughnessMap, metalnessMap, emissive, emissiveIntensity) {
+export function createStandardMaterial(
+  color,
+  metalness,
+  roughness,
+  transparent,
+  opacity,
+  map,
+  normalMap,
+  aoMap,
+  displacementMap,
+  displacementScale,
+  displacementBias,
+  roughnessMap,
+  metalnessMap,
+  emissive,
+  emissiveIntensity,
+) {
   const validMap = optionToNull(map);
   const validNormalMap = optionToNull(normalMap);
   const validAoMap = optionToNull(aoMap);
+  const validDisplacementMap = optionToNull(displacementMap);
   const validRoughnessMap = optionToNull(roughnessMap);
   const validMetalnessMap = optionToNull(metalnessMap);
 
@@ -672,10 +692,13 @@ export function createStandardMaterial(color, metalness, roughness, transparent,
     map: validMap,
     normalMap: validNormalMap,
     aoMap: validAoMap,
+    displacementMap: validDisplacementMap,
+    displacementBias,
+    displacementScale,
     roughnessMap: validRoughnessMap,
     metalnessMap: validMetalnessMap,
     emissive,
-    emissiveIntensity
+    emissiveIntensity,
   });
 
   if (validNormalMap) {
