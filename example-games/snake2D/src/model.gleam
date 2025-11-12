@@ -28,7 +28,6 @@ pub type Model {
     head: BoxData,
     tail: List(BoxData),
     beute_pos: #(Float, Float),
-    update_frame: Int,
     game_state: GameState,
     maybe_font: option.Option(asset.Font),
     score_info: ScoreInfo,
@@ -103,7 +102,6 @@ fn init_model(
     head: BoxData(x: 0.0, y: 0.0, direction: Right),
     tail: [],
     beute_pos: init_beute_pos,
-    update_frame: 0,
     game_state: Running,
     maybe_font: maybe_font,
     score_info: ScoreInfo(
@@ -231,64 +229,67 @@ fn spawn_too_close(snake_element: BoxData, cand: #(Float, Float)) -> Bool {
 }
 
 fn update_snake_beute(model: Model, ctx: tiramisu.Context(String)) -> Model {
-  let new_time = ctx.delta_time
+  let new_time = model.time +. ctx.delta_time /. 10_000.0
   let new_direction = parse_direction_from_key(ctx, model)
-  let is_grefressen = is_gefressen_cal(model)
 
-  let new_score = case is_grefressen {
-    True -> model.score_info.current_score + 1
-    False -> model.score_info.current_score
-  }
+  let threshold = 0.02
+  case new_time >. threshold {
+    True -> {
+      let is_grefressen = is_gefressen_cal(model)
+      let new_score = case is_grefressen {
+        True -> model.score_info.current_score + 1
+        False -> model.score_info.current_score
+      }
 
-  let new_beute_pos = case is_grefressen {
-    False -> model.beute_pos
-    _ -> calculate_new_beute_pos(model, 0, ctx)
-  }
+      let new_beute_pos = case is_grefressen {
+        False -> model.beute_pos
+        _ -> calculate_new_beute_pos(model, 0, ctx)
+      }
 
-  let enhanced_tail = case is_grefressen {
-    False -> model.tail
-    _ -> {
-      let last_element = case model.tail {
-        [] -> model.head
-        [_, ..] -> {
-          let assert Ok(last_element) = list.last(model.tail)
-          last_element
+      let enhanced_tail = case is_grefressen {
+        False -> model.tail
+        _ -> {
+          let last_element = case model.tail {
+            [] -> model.head
+            [_, ..] -> {
+              let assert Ok(last_element) = list.last(model.tail)
+              last_element
+            }
+          }
+          let new_tail_element = case last_element.direction {
+            Right -> BoxData(..last_element, x: last_element.x -. box_width)
+            Left -> BoxData(..last_element, x: last_element.x +. box_width)
+            Up -> BoxData(..last_element, y: last_element.y -. box_width)
+            Down -> BoxData(..last_element, y: last_element.y +. box_width)
+          }
+          list.append(model.tail, [new_tail_element])
         }
       }
-      let new_tail_element = case last_element.direction {
-        Right -> BoxData(..last_element, x: last_element.x -. box_width)
-        Left -> BoxData(..last_element, x: last_element.x +. box_width)
-        Up -> BoxData(..last_element, y: last_element.y -. box_width)
-        Down -> BoxData(..last_element, y: last_element.y +. box_width)
-      }
-      list.append(model.tail, [new_tail_element])
+      let new_tail = update_tail_pos(model.head, enhanced_tail)
+
+      let #(new_x, new_y) = update_head_pos(model.head, new_direction)
+
+      Model(
+        ..model,
+        time: 0.0,
+        head: BoxData(x: new_x, y: new_y, direction: new_direction),
+        tail: new_tail,
+        beute_pos: new_beute_pos,
+        game_state: Running,
+        score_info: ScoreInfo(..model.score_info, current_score: new_score),
+      )
+    }
+    False -> {
+      Model(
+        ..model,
+        time: new_time,
+        head: BoxData(..model.head, direction: new_direction),
+      )
     }
   }
-
-  let new_tail = update_tail_pos(model.head, enhanced_tail, model.update_frame)
-
-  let #(new_x, new_y) =
-    update_head_pos(model.head, model.update_frame, new_direction)
-
-  Model(
-    ..model,
-    time: new_time,
-    head: BoxData(x: new_x, y: new_y, direction: new_direction),
-    tail: new_tail,
-    beute_pos: new_beute_pos,
-    update_frame: { model.update_frame + 1 } % draw_frame,
-    game_state: Running,
-    score_info: ScoreInfo(..model.score_info, current_score: new_score),
-  )
 }
 
-fn update_head_pos(
-  box_data: BoxData,
-  update_frame: Int,
-  direction: Direction,
-) -> #(Float, Float) {
-  let update_movement = update_frame == 0
-
+fn update_head_pos(box_data: BoxData, direction: Direction) -> #(Float, Float) {
   let horizontal_mov = case direction {
     Right -> box_width
     Left -> float.negate(box_width)
@@ -300,10 +301,7 @@ fn update_head_pos(
     Down -> float.negate(box_width)
     _ -> 0.0
   }
-  case update_movement {
-    True -> #(box_data.x +. horizontal_mov, box_data.y +. vertical_mov)
-    False -> #(box_data.x, box_data.y)
-  }
+  #(box_data.x +. horizontal_mov, box_data.y +. vertical_mov)
 }
 
 fn parse_direction_from_key(
@@ -389,21 +387,12 @@ fn is_gefressen_cal(model: Model) -> Bool {
   && float.absolute_value(hy -. by) <. threshold
 }
 
-fn update_tail_pos(
-  head_pos: BoxData,
-  tail_pos: List(BoxData),
-  update_frame: Int,
-) -> List(BoxData) {
-  case update_frame == 0 {
-    True -> {
-      case tail_pos {
-        [] -> tail_pos
-        _ ->
-          [head_pos]
-          |> list.append(list.reverse(tail_pos) |> list.drop(1) |> list.reverse)
-      }
-    }
-    False -> tail_pos
+fn update_tail_pos(head_pos: BoxData, tail_pos: List(BoxData)) -> List(BoxData) {
+  case tail_pos {
+    [] -> tail_pos
+    _ ->
+      [head_pos]
+      |> list.append(list.reverse(tail_pos) |> list.drop(1) |> list.reverse)
   }
 }
 
