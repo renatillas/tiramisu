@@ -1,0 +1,38 @@
+{
+  "name": "snake_game",
+  "version": "1.0.0",
+  "main": "index.html",
+  "window": {
+    "title": "snake_game",
+    "width": 1920,
+    "height": 1080,
+    "nodejs": true
+  },
+  "scripts": {
+    "build": "gleam run -m lustre/dev build && cp package.json dist/ && nwbuild --glob=false dist"
+  },
+  "nwbuild": {
+    "flavor": "sdk",
+    "srcDir": "dist",
+    "mode": "build",
+    "glob": false,
+    "logLevel": "info",
+    "app": {
+      "icon": "",
+      "LSApplicationCategoryType": "public.app-category.games",
+      "NSHumanReadableCopyright": "Copyright © 2025",
+      "NSLocalNetworkUsageDescription": "This application uses the local network."
+    },
+    "outDir": "./snake_game_desktop_bundle",
+    "macCategory": "public.app-category.games",
+    "cacheDir": "./node_modules/nw"
+  },
+  "devDependencies": {
+    "nw-builder": "^4.16.0"
+  },
+  "node-remote": ["https://cdn.jsdelivr.net/*"],
+  "dependencies": {
+    "three": "^0.180.0",
+    "@dimforge/rapier3d-compat": "^0.11.2"
+  }
+}
