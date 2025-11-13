@@ -78,6 +78,7 @@ If you used Mascarpone, you already have a working game! This section shows how 
 Replace the contents of `src/my_game.gleam` with:
 
 ```gleam
+import tiramisu/physics
 import gleam/option
 import tiramisu
 import tiramisu/background
@@ -111,26 +112,26 @@ pub fn main() {
 }
 
 // Initialize the game state
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
-  #(Model(rotation: 0.0), effect.tick(Tick))
+fn init(_ctx: tiramisu.Context(String)) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
+  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
 // Update game state based on events
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick))
+      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
 // Render the scene
-fn view(model: Model) -> List(scene.Node) {
+fn view(model: Model, _ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
   // Create camera
   let assert Ok(cam) = camera.perspective(
     field_of_view: 75.0,
