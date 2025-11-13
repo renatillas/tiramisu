@@ -86,6 +86,7 @@ import tiramisu/effect
 import tiramisu/geometry
 import tiramisu/light
 import tiramisu/material
+import tiramisu/physics
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -103,7 +104,8 @@ pub type Msg {
 pub fn main() {
   tiramisu.run(
     dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-    background: background.Color(0x1a1a2e),  // Dark blue background
+    background: background.Color(0x1a1a2e),
+    // Dark blue background
     init: init,
     update: update,
     view: view,
@@ -111,48 +113,48 @@ pub fn main() {
 }
 
 // Initialize the game state
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg)) {
-  #(Model(rotation: 0.0), effect.tick(Tick))
+fn init(
+  _ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
+  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
 // Update game state based on events
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg)) {
+  ctx: tiramisu.Context(String),
+) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(id))) {
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick))
+      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
 // Render the scene
-fn view(model: Model) -> List(scene.Node) {
+fn view(
+  model: Model,
+  _ctx: tiramisu.Context(String),
+) -> List(scene.Node(String)) {
   // Create camera
-  let assert Ok(cam) = camera.perspective(
-    field_of_view: 75.0,
-    near: 0.1,
-    far: 1000.0,
-  )
+  let assert Ok(cam) =
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let camera_node = scene.camera(
-    id: "main",
-    camera: cam,
-    transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-    look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
-    active: True,
-    viewport: option.None,
-  )
+  let camera_node =
+    scene.camera(
+      id: "main",
+      camera: cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+      active: True,
+      viewport: option.None,
+    )
 
   // Create rotating cube
-  let assert Ok(cube_geometry) = geometry.box(
-    width: 1.0,
-    height: 1.0,
-    depth: 1.0,
-  )
+  let assert Ok(cube_geometry) =
+    geometry.box(width: 1.0, height: 1.0, depth: 1.0)
 
   let assert Ok(cube_material) =
     material.new()
@@ -161,41 +163,44 @@ fn view(model: Model) -> List(scene.Node) {
     |> material.with_roughness(0.5)
     |> material.build()
 
-  let cube = scene.mesh(
-    id: "cube",
-    geometry: cube_geometry,
-    material: cube_material,
-    transform: transform.identity
-      |> transform.with_position(vec3.Vec3(0.0, 0.0, 0.0))
-      |> transform.with_euler_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
-    physics: option.None,
-  )
+  let cube =
+    scene.mesh(
+      id: "cube",
+      geometry: cube_geometry,
+      material: cube_material,
+      transform: transform.identity
+        |> transform.with_position(vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_euler_rotation(vec3.Vec3(
+          model.rotation,
+          model.rotation,
+          0.0,
+        )),
+      physics: option.None,
+    )
 
   // Add lights
-  let assert Ok(ambient_light) = light.ambient(
-    intensity: 0.5,
-    color: 0xffffff,
-  )
+  let assert Ok(ambient_light) = light.ambient(intensity: 0.5, color: 0xffffff)
 
-  let ambient = scene.light(
-    id: "ambient",
-    light: ambient_light,
-    transform: transform.identity,
-  )
+  let ambient =
+    scene.light(
+      id: "ambient",
+      light: ambient_light,
+      transform: transform.identity,
+    )
 
-  let assert Ok(directional_light) = light.directional(
-    intensity: 0.8,
-    color: 0xffffff,
-  )
+  let assert Ok(directional_light) =
+    light.directional(intensity: 0.8, color: 0xffffff)
 
-  let directional = scene.light(
-    id: "sun",
-    light: directional_light,
-    transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
-  )
+  let directional =
+    scene.light(
+      id: "sun",
+      light: directional_light,
+      transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
+    )
 
   [camera_node, cube, ambient, directional]
 }
+
 ```
 
 ### Run Your Game
