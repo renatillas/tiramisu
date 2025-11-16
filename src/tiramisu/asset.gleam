@@ -582,7 +582,16 @@ pub fn get_fbx_scene(
   }
 }
 
-/// Try to get any asset 
+/// Get a font asset from the cache
+pub fn get_font(cache: AssetCache, url: String) -> Result(Font, AssetError) {
+  case dict.get(cache.asset, url) {
+    Ok(CacheEntry(LoadedFont(font), _)) -> Ok(font)
+    Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
+    Error(_) -> Error(AssetNotFound(url))
+  }
+}
+
+/// Try to get any asset
 pub fn get(cache: AssetCache, url: String) -> Result(LoadedAsset, AssetError) {
   case dict.get(cache.asset, url) {
     Ok(CacheEntry(asset, _)) -> Ok(asset)
