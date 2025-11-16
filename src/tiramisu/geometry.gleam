@@ -74,7 +74,12 @@ pub opaque type Geometry {
   BoxGeometry(width: Float, height: Float, depth: Float)
   SphereGeometry(radius: Float, width_segments: Int, height_segments: Int)
   ConeGeometry(radius: Float, height: Float, segments: Int)
-  PlaneGeometry(width: Float, height: Float)
+  PlaneGeometry(
+    width: Float,
+    height: Float,
+    width_segments: Int,
+    height_segments: Int,
+  )
   CircleGeometry(radius: Float, segments: Int)
   CylinderGeometry(
     radius_top: Float,
@@ -192,10 +197,27 @@ pub fn plane(
   width width: Float,
   height height: Float,
 ) -> Result(Geometry, GeometryError) {
+  sheet(width:, height:, width_segments: 1, height_segments: 1)
+}
+
+pub fn sheet(
+  width width: Float,
+  height height: Float,
+  width_segments width_segments: Int,
+  height_segments height_segments: Int,
+) -> Result(Geometry, GeometryError) {
   use <- bool.guard(width <=. 0.0, Error(NonPositiveWidth(width)))
   use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
+  use <- bool.guard(
+    width_segments < 1,
+    Error(NegativeSegmentCount(width_segments)),
+  )
+  use <- bool.guard(
+    height_segments < 1,
+    Error(NegativeSegmentCount(height_segments)),
+  )
 
-  Ok(PlaneGeometry(width, height))
+  Ok(PlaneGeometry(width:, height:, width_segments:, height_segments:))
 }
 
 pub fn circle(
@@ -408,7 +430,8 @@ pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
       )
     IcosahedronGeometry(radius:, detail:) ->
       create_icosahedron_geometry(radius, detail)
-    PlaneGeometry(width:, height:) -> create_plane_geometry(width, height)
+    PlaneGeometry(width:, height:, width_segments:, height_segments:) ->
+      create_plane_geometry(width, height, width_segments, height_segments)
     SphereGeometry(radius:, width_segments:, height_segments:) ->
       create_sphere_geometry(radius, width_segments, height_segments)
     TetrahedronGeometry(radius:, detail:) ->
@@ -476,7 +499,12 @@ fn create_cylinder_geometry(
 fn create_icosahedron_geometry(radius: Float, detail: Int) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createPlaneGeometry")
-fn create_plane_geometry(width: Float, height: Float) -> ThreeGeometry
+fn create_plane_geometry(
+  width: Float,
+  height: Float,
+  width_segments: Int,
+  height_segments: Int,
+) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createSphereGeometry")
 fn create_sphere_geometry(

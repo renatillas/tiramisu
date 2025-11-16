@@ -53,6 +53,56 @@ pub fn plane_invalid_height_test() {
     geometry.plane(width: 10.0, height: -1.0)
 }
 
+pub fn sheet_valid_test() {
+  let assert Ok(_) =
+    geometry.sheet(
+      width: 10.0,
+      height: 5.0,
+      width_segments: 1,
+      height_segments: 1,
+    )
+}
+
+pub fn sheet_invalid_width_test() {
+  let assert Error(geometry.NonPositiveWidth(0.0)) =
+    geometry.sheet(
+      width: 0.0,
+      height: 5.0,
+      width_segments: 1,
+      height_segments: 1,
+    )
+}
+
+pub fn sheet_invalid_height_test() {
+  let assert Error(geometry.NonPositiveHeight(0.0)) =
+    geometry.sheet(
+      width: 10.0,
+      height: 0.0,
+      width_segments: 1,
+      height_segments: 1,
+    )
+}
+
+pub fn sheet_invalid_width_segments_test() {
+  let assert Error(geometry.NegativeSegmentCount(0)) =
+    geometry.sheet(
+      width: 10.0,
+      height: 5.0,
+      width_segments: 0,
+      height_segments: 1,
+    )
+}
+
+pub fn sheet_invalid_height_segments_test() {
+  let assert Error(geometry.NegativeSegmentCount(0)) =
+    geometry.sheet(
+      width: 10.0,
+      height: 5.0,
+      width_segments: 1,
+      height_segments: 0,
+    )
+}
+
 pub fn circle_valid_test() {
   let assert Ok(_) = geometry.circle(radius: 3.0, segments: 64)
 }
