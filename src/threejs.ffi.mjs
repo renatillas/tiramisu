@@ -474,10 +474,17 @@ export function createConeGeometry(radius, height, segments) {
  * Create plane geometry
  * @param {number} width
  * @param {number} height
+ * @param {number} widthSegments
+ * @param {number} heightSegments
  * @returns {THREE.PlaneGeometry}
  */
-export function createPlaneGeometry(width, height) {
-  return new THREE.PlaneGeometry(width, height);
+export function createPlaneGeometry(
+  width,
+  height,
+  widthSegments,
+  heightSegments,
+) {
+  return new THREE.PlaneGeometry(width, height, widthSegments, heightSegments);
 }
 
 /**
