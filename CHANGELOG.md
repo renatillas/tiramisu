@@ -4,6 +4,23 @@
 
 ### Added
 
+- **Displacement Map Support for StandardMaterial**: Add vertex deformation through displacement maps
+  - `displacement_map` parameter - The displacement map texture for vertex deformation
+  - `displacement_scale` parameter - Controls displacement intensity (default: 1.0)
+  - `displacement_bias` parameter - Base offset of deformation (default: 0.0)
+  - `with_displacement_map()`, `with_displacement_scale()`, `with_displacement_bias()` builder methods
+  - Perfect for terrain, water waves, and detailed surface geometry
+
+- **Plane Geometry Segments**: Control subdivision for plane geometry
+  - `geometry.sheet(width, height, width_segments, height_segments)` - Create planes with custom subdivisions
+  - `geometry.plane()` now internally uses `sheet()` with 1 segment per dimension (backwards compatible)
+  - Subdivided planes enable wave animations, terrain deformation, and better displacement effects
+  - Internal PlaneGeometry type now includes width_segments and height_segments fields
+
+- **Font Asset Retrieval**: Complete asset API with font support
+  - `asset.get_font(cache, url)` - Retrieve fonts from the asset cache
+  - Completes the asset API alongside texture, model, audio, STL, OBJ, and FBX assets
+
 - **Character Controller System**: Kinematic character controller for player movement with collision detection
   - `physics.with_character_controller(builder, offset, up_vector, slide_enabled)` - Add character controller to rigid body using builder pattern
   - Controllers automatically handle collision-aware movement with sliding
@@ -55,6 +72,15 @@
   - `scene.audio()` - Simplified audio node constructor
 
 ### Changed
+
+- **BREAKING**: `scene.model_3d()` now requires a `material` parameter
+  - Old: `model_3d(id:, object:, transform:, animation:, physics:)`
+  - New: `model_3d(id:, object:, transform:, animation:, physics:, material:)`
+  - Migration: Add `material: option.None` to existing calls
+
+- **BREAKING**: `material.standard()` now requires displacement map parameters
+  - New required parameters: `displacement_map`, `displacement_scale`, `displacement_bias`
+  - Migration: Add `displacement_map: option.None, displacement_scale: 1.0, displacement_bias: 0.0`
 
 - **BREAKING**: `tiramisu.run()` view function signature changed
   - Old: `view: fn(state, Context(id)) -> List(scene.Node(id))`
