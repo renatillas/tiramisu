@@ -56,6 +56,7 @@ pub type Id {
   LockedBlock(Int)
   CurrentBlock(Int)
   GridOutLine
+  Scene
 }
 
 // Messages
@@ -246,10 +247,7 @@ pub fn update(
 }
 
 // View
-pub fn view(
-  model: Model,
-  _context: tiramisu.Context(Id),
-) -> List(scene.Node(Id)) {
+pub fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
   // Only add audio node when player actually moved (for one-shot sound effect)
   let move_audio_node = case model.assets_cache, model.player_moved {
     option.Some(cache), True ->
@@ -276,6 +274,7 @@ pub fn view(
       look_at: Some(vec3.Vec3(5.0, 10.0, 0.0)),
       active: True,
       viewport: None,
+      postprocessing: None,
     )
 
   // Lights
@@ -319,10 +318,19 @@ pub fn view(
   let grid_outline = create_grid_outline()
 
   // Combine all scene nodes
-  [camera_node, ambient_light, directional_light, grid_outline]
-  |> list.append(current_piece_blocks)
-  |> list.append(locked_blocks)
-  |> list.append(move_audio_node)
+  scene.empty(
+    id: Scene,
+    transform: transform.identity,
+    children: list.flatten([
+      [camera_node],
+      [ambient_light],
+      [directional_light],
+      [grid_outline],
+      current_piece_blocks,
+      locked_blocks,
+      move_audio_node,
+    ]),
+  )
 }
 
 // Helper: Create a block for the current piece

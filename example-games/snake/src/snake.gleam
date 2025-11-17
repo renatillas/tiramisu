@@ -54,6 +54,7 @@ pub type Id {
   MainCamera
   AmbientLight
   DirectionalLight
+  Scene
 }
 
 pub type Model {
@@ -476,7 +477,7 @@ fn get_eye_positions(
   }
 }
 
-fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
   let fruit_audio = case
     asset.get_audio(model.asset_cache, "fruit-collect.wav"),
     model.ate_food
@@ -543,6 +544,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
       viewport: option.None,
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
+      postprocessing: option.None,
     )
     |> list.wrap
 
@@ -709,14 +711,18 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     )
     |> list.wrap
 
-  list.flatten([
-    fruit_audio,
-    game_over_audio,
-    camera_node,
-    lights,
-    ground_updated,
-    snake_segments,
-    eyes,
-    food_node,
-  ])
+  scene.empty(
+    id: Scene,
+    transform: transform.identity,
+    children: list.flatten([
+      fruit_audio,
+      game_over_audio,
+      camera_node,
+      lights,
+      ground_updated,
+      snake_segments,
+      eyes,
+      food_node,
+    ]),
+  )
 }
