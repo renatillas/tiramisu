@@ -1,3 +1,90 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Pipeline setup",
+////     functions: [
+////       "new",
+////       "add_pass"
+////     ]
+////   },
+////   {
+////     header: "Core passes",
+////     functions: [
+////       "render_pass",
+////       "clear_pass",
+////       "output_pass"
+////     ]
+////   },
+////   {
+////     header: "Visual effects",
+////     functions: [
+////       "bloom",
+////       "pixelate",
+////       "pixelate_with_edges",
+////       "film_grain",
+////       "vignette",
+////       "fxaa",
+////       "glitch",
+////       "color_correction"
+////     ]
+////   },
+////   {
+////     header: "Custom effects",
+////     functions: [
+////       "custom_shader"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Post-processing effects for WebGL rendering using Three.js EffectComposer.
 ////
 //// Post-processing allows you to apply visual effects to your rendered scene,

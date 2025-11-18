@@ -124,14 +124,15 @@ fn update(
 ) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
+      // delta_time is in milliseconds, convert to seconds for smooth rotation
+      let new_rotation = model.rotation +. { ctx.delta_time *. 0.001 }
       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
 // Render the scene
-fn view(model: Model, _ctx: tiramisu.Context(String)) -> List(scene.Node(String)) {
+fn view(model: Model, _ctx: tiramisu.Context(String)) -> scene.Node(String) {
   // Create camera
   let assert Ok(cam) = camera.perspective(
     field_of_view: 75.0,
@@ -146,6 +147,8 @@ fn view(model: Model, _ctx: tiramisu.Context(String)) -> List(scene.Node(String)
     look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
     active: True,
     viewport: option.None,
+    children: [],
+    postprocessing: option.None,
   )
 
   // Create rotating cube
@@ -195,7 +198,11 @@ fn view(model: Model, _ctx: tiramisu.Context(String)) -> List(scene.Node(String)
     transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
   )
 
-  [camera_node, cube, ambient, directional]
+  scene.empty(
+    id: "root",
+    transform: transform.identity,
+    children: [camera_node, cube, ambient, directional],
+  )
 }
 ```
 
@@ -228,7 +235,7 @@ The `Context` type provides timing, input, and canvas dimension information:
 ```gleam
 pub type Context {
   Context(
-    delta_time: Float,      // Time since last frame in seconds (e.g., 0.016 for 60 FPS)
+    delta_time: Float,      // Time since last frame in milliseconds (e.g., 16.0 for 60 FPS)
     input: InputState,      // Keyboard, mouse, touch state
     canvas_width: Float,    // Current canvas width in pixels
     canvas_height: Float,   // Current canvas height in pixels
@@ -237,7 +244,7 @@ pub type Context {
 }
 ```
 
-**Delta Time**: Always use `delta_time` for movement and animations to ensure frame-rate independence. For example, if you want an object to move at 5 units per second, multiply `5.0 *. ctx.delta_time` each frame.
+**Delta Time**: Always use `delta_time` for movement and animations to ensure frame-rate independence. `delta_time` is in **milliseconds**, so convert to seconds by multiplying by `0.001`. For example, if you want an object to move at 5 units per second: `5.0 *. ctx.delta_time *. 0.001` each frame.
 
 #### 2. Effects
 
@@ -252,7 +259,17 @@ effect.none()                         // No effects
 
 #### 3. Scene Nodes
 
-Your `view` function returns a list of `scene.Node(id)` created by using the scene functions.
+Your `view` function returns a single root `scene.Node(id)`. If you have multiple top-level nodes, wrap them in `scene.empty()`:
+
+```gleam
+fn view(model: Model, _ctx: Context(id)) -> scene.Node(id) {
+  scene.empty(
+    id: "root",
+    transform: transform.identity,
+    children: [camera_node, player_mesh, enemy_mesh, light_node],
+  )
+}
+```
 
 
 #### 4. Transforms

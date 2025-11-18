@@ -1,3 +1,100 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Creating effects",
+////     functions: [
+////       "none",
+////       "from",
+////       "from_promise",
+////       "batch"
+////     ]
+////   },
+////   {
+////     header: "Transform effects",
+////     functions: [
+////       "map"
+////     ]
+////   },
+////   {
+////     header: "Timing",
+////     functions: [
+////       "tick",
+////       "delay",
+////       "interval",
+////       "cancel_interval"
+////     ]
+////   },
+////   {
+////     header: "Scene effects",
+////     functions: [
+////       "set_background",
+////       "tween"
+////     ]
+////   },
+////   {
+////     header: "Browser APIs",
+////     functions: [
+////       "request_fullscreen",
+////       "exit_fullscreen",
+////       "request_pointer_lock",
+////       "exit_pointer_lock",
+////       "vibrate",
+////       "gamepad_vibrate",
+////       "clipboard_write",
+////       "clipboard_read"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Effect system for managing side effects in Tiramisu.
 ////
 //// Effects represent side effects as immutable data, following The Elm Architecture.

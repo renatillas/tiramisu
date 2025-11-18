@@ -1,3 +1,96 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Creating state machines",
+////     functions: [
+////       "new",
+////       "add_state",
+////       "add_transition",
+////       "set_default_blend"
+////     ]
+////   },
+////   {
+////     header: "State machine updates",
+////     functions: [
+////       "update",
+////       "transition_to"
+////     ]
+////   },
+////   {
+////     header: "Querying state",
+////     functions: [
+////       "current_state",
+////       "get_current_animation",
+////       "is_blending",
+////       "blend_progress",
+////       "get_state"
+////     ]
+////   },
+////   {
+////     header: "Inspection",
+////     functions: [
+////       "state_ids",
+////       "state_count",
+////       "transition_count"
+////     ]
+////   },
+////   {
+////     header: "Animation playback",
+////     functions: [
+////       "to_playback"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// State Machine module - declarative animation state management.
 ////
 //// Provides a type-safe, immutable state machine for managing complex animation transitions

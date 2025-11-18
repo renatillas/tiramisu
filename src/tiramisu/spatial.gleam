@@ -1,3 +1,96 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Colliders",
+////     functions: [
+////       "collider_box",
+////       "collider_box_from_center",
+////       "collider_sphere",
+////       "collider_from_transform"
+////     ]
+////   },
+////   {
+////     header: "Collider operations",
+////     functions: [
+////       "collider_contains_point",
+////       "collider_intersects",
+////       "collider_center",
+////       "collider_size"
+////     ]
+////   },
+////   {
+////     header: "Octree creation",
+////     functions: [
+////       "octree_new"
+////     ]
+////   },
+////   {
+////     header: "Octree operations",
+////     functions: [
+////       "octree_insert",
+////       "octree_query",
+////       "octree_query_radius",
+////       "octree_query_all"
+////     ]
+////   },
+////   {
+////     header: "Octree queries",
+////     functions: [
+////       "octree_count",
+////       "octree_bounds"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Spatial partitioning data structures for efficient spatial queries.
 ////
 //// Provides octree and Collider (Box and Sphere) for:

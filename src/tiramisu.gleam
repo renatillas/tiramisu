@@ -1,4 +1,3 @@
-//// Tiramisu game engine main module - immutable game loop with effect system.
 ////
 //// This module provides the core game loop following the Model-View-Update (MVU) architecture,
 //// inspired by Lustre. Your game state is immutable, and updates return new state along with effects.

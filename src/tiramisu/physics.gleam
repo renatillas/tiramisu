@@ -1,3 +1,119 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Physics world",
+////     functions: [
+////       "new_world",
+////       "step"
+////     ]
+////   },
+////   {
+////     header: "Rigid body builder",
+////     functions: [
+////       "new_rigid_body",
+////       "with_collider",
+////       "with_mass",
+////       "with_restitution",
+////       "with_friction",
+////       "with_linear_damping",
+////       "with_angular_damping",
+////       "with_body_ccd_enabled",
+////       "with_lock_translation_x",
+////       "with_lock_translation_y",
+////       "with_lock_translation_z",
+////       "with_lock_rotation_x",
+////       "with_lock_rotation_y",
+////       "with_lock_rotation_z",
+////       "with_collision_groups",
+////       "with_character_controller",
+////       "build"
+////     ]
+////   },
+////   {
+////     header: "Body queries",
+////     functions: [
+////       "get_transform",
+////       "get_velocity",
+////       "get_angular_velocity",
+////     ]
+////   },
+////   {
+////     header: "Forces and movement",
+////     functions: [
+////       "apply_force",
+////       "apply_impulse",
+////       "set_velocity",
+////       "set_angular_velocity",
+////       "apply_torque",
+////       "apply_torque_impulse",
+////       "set_kinematic_translation"
+////     ]
+////   },
+////   {
+////     header: "Character controller",
+////     functions: [
+////       "compute_character_movement",
+////       "is_character_grounded"
+////     ]
+////   },
+////   {
+////     header: "Collision detection",
+////     functions: [
+////       "raycast",
+////       "get_collision_events"
+////     ]
+////   },
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Physics simulation using the Rapier physics engine.
 ////
 //// Provides declarative 3D physics with rigid bodies, colliders, forces, and collision detection.

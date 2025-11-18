@@ -1,3 +1,104 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Loading assets",
+////     functions: [
+////       "load_asset",
+////       "load_batch",
+////       "load_batch_simple",
+////       "load_texture",
+////       "load_gltf",
+////       "load_fbx",
+////       "load_obj",
+////       "load_stl",
+////       "load_audio",
+////       "load_font"
+////     ]
+////   },
+////   {
+////     header: "Asset cache",
+////     functions: [
+////       "new_cache",
+////       "new_cache_with_size",
+////       "cache_size",
+////       "is_cached",
+////       "clear_cache",
+////       "cached_urls",
+////       "insert_asset"
+////     ]
+////   },
+////   {
+////     header: "Retrieving assets",
+////     functions: [
+////       "get",
+////       "get_model",
+////       "get_model_scene",
+////       "get_fbx",
+////       "get_fbx_scene",
+////       "get_texture",
+////       "get_audio",
+////       "get_obj",
+////       "get_stl",
+////       "get_font"
+////     ]
+////   },
+////   {
+////     header: "Model utilities",
+////     functions: [
+////       "clone_object3d"
+////     ]
+////   },
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Asset Management System - loading and caching for textures, models, and audio.
 ////
 //// Provides declarative asset loading with progress tracking, caching,

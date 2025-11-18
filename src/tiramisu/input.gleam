@@ -1,3 +1,125 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Input state",
+////     functions: [
+////       "new"
+////     ]
+////   },
+////   {
+////     header: "Keyboard input",
+////     functions: [
+////       "is_key_pressed",
+////       "is_key_just_pressed",
+////       "is_key_just_released"
+////     ]
+////   },
+////   {
+////     header: "Mouse input",
+////     functions: [
+////       "mouse_position",
+////       "mouse_delta",
+////       "is_left_button_pressed",
+////       "is_left_button_just_pressed",
+////       "is_right_button_pressed",
+////       "is_right_button_just_pressed",
+////       "mouse_wheel_delta"
+////     ]
+////   },
+////   {
+////     header: "Gamepad input",
+////     functions: [
+////       "is_gamepad_connected",
+////       "gamepad_button",
+////       "is_gamepad_button_pressed",
+////       "gamepad_axis",
+////       "get_axis_with_deadzone",
+////       "is_left_stick_active",
+////       "is_right_stick_active",
+////       "is_primary_connected",
+////       "is_primary_gamepad_button_pressed",
+////       "get_primary_button",
+////       "get_primary_axis"
+////     ]
+////   },
+////   {
+////     header: "Input actions",
+////     functions: [
+////       "new_bindings",
+////       "bind_key",
+////       "bind_mouse_button",
+////       "bind_gamepad_button",
+////       "is_action_pressed",
+////       "is_action_just_pressed",
+////       "is_action_just_released",
+////       "get_action_value",
+////       "with_buffer",
+////       "update_buffer",
+////       "consume_buffered_action",
+////       "was_action_pressed_buffered",
+////       "clear_buffer"
+////     ]
+////   },
+////   {
+////     header: "Touch input",
+////     functions: [
+////       "touches",
+////       "touches_just_started",
+////       "touches_just_ended",
+////       "touch_count"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Input module - keyboard, mouse, gamepad, and touch input handling.
 ////
 //// Input state is automatically updated each frame and passed to your `update` function

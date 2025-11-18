@@ -1,3 +1,123 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Basic scene nodes",
+////     functions: [
+////       "mesh",
+////       "empty",
+////       "with_children"
+////     ]
+////   },
+////   {
+////     header: "3D models",
+////     functions: [
+////       "model_3d",
+////       "instanced_model"
+////     ]
+////   },
+////   {
+////     header: "Instancing",
+////     functions: [
+////       "instanced_mesh"
+////     ]
+////   },
+////   {
+////     header: "Lighting and cameras",
+////     functions: [
+////       "light",
+////       "camera"
+////     ]
+////   },
+////   {
+////     header: "Level of detail (LOD)",
+////     functions: [
+////       "lod",
+////       "lod_level"
+////     ]
+////   },
+////   {
+////     header: "Audio and particles",
+////     functions: [
+////       "audio",
+////       "particles"
+////     ]
+////   },
+////   {
+////     header: "Sprites",
+////     functions: [
+////       "animated_sprite"
+////     ]
+////   },
+////   {
+////     header: "UI labels",
+////     functions: [
+////       "css2d_label",
+////       "css3d_label",
+////       "canvas"
+////     ]
+////   },
+////   {
+////     header: "Debug visualization",
+////     functions: [
+////       "debug_box",
+////       "debug_sphere",
+////       "debug_line",
+////       "debug_axes",
+////       "debug_grid",
+////       "debug_point"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Scene graph module - declarative 3D scene construction.
 ////
 //// This module provides types and functions for building 3D scenes declaratively.

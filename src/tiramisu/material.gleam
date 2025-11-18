@@ -1,3 +1,90 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Material types",
+////     functions: [
+////       "basic",
+////       "standard",
+////       "lambert",
+////       "phong",
+////       "toon",
+////       "line",
+////       "sprite"
+////     ]
+////   },
+////   {
+////     header: "Standard material builder",
+////     functions: [
+////       "new",
+////       "with_color",
+////       "with_metalness",
+////       "with_roughness",
+////       "with_color_map",
+////       "with_normal_map",
+////       "with_ambient_oclusion_map",
+////       "with_displacement_map",
+////       "with_displacement_scale",
+////       "with_displacement_bias",
+////       "with_roughness_map",
+////       "with_metalness_map",
+////       "with_transparent",
+////       "with_opacity",
+////       "with_emissive",
+////       "with_emissive_intensity",
+////       "build"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Material system for defining how 3D surfaces appear when rendered.
 ////
 //// Materials control the visual appearance of meshes by defining how they interact with lights

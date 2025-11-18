@@ -81,77 +81,77 @@ fn update(
 
   case msg {
     Tick -> {
-      // Step the physics simulation
-      let new_physics_world = physics.step(physics_world)
+      // Step the physics simulation (requires delta_time for fixed timestep)
+      let new_physics_world = physics.step(physics_world, ctx.delta_time)
       #(model, effect.tick(Tick), option.Some(new_physics_world))
     }
   }
 }
 
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert option.Some(physics_world) = ctx.physics_world
 
   let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  [
-    // Camera
-    scene.Camera(
-      id: "camera",
-      camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
-      active: True,
-      viewport: option.None,
-    ),
+  let assert Ok(ground_geo) = geometry.box(width: 20.0, height: 0.5, depth: 20.0)
+  let assert Ok(ground_mat) = material.new()
+    |> material.with_color(0x808080)
+    |> material.build()
 
-    // Static ground
-    scene.Mesh(
-      id: Ground,
-      geometry: {
-        let assert Ok(geo) = geometry.box(width: 20.0, height: 0.5, depth: 20.0)
-        geo
-      },
-      material: {
-        let assert Ok(mat) = material.new()
-          |> material.with_color(0x808080)
-          |> material.build()
-        mat
-      },
-      transform: transform.identity,
-      physics: option.Some(
-        physics.new_rigid_body(physics.Fixed)
-        |> physics.with_collider(physics.Box(transform.identity, 20.0, 0.5, 20.0))
-        |> physics.build()
-      ),
-    ),
+  let assert Ok(ball_geo) = geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 16)
+  let assert Ok(ball_mat) = material.new()
+    |> material.with_color(0xff4444)
+    |> material.build()
 
-    // Bouncing ball
-    scene.Mesh(
-      id: Ball,
-      geometry: {
-        let assert Ok(geo) = geometry.sphere(radius: 1.0, width_segments: 32, height_segments: 16)
-        geo
-      },
-      material: {
-        let assert Ok(mat) = material.new()
-          |> material.with_color(0xff4444)
-          |> material.build()
-        mat
-      },
-      // Get transform from physics simulation, or use initial position
-      transform: case physics.get_transform(physics_world, Ball) {
-        Ok(t) -> t
-        Error(Nil) -> transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
-      },
-      physics: option.Some(
-        physics.new_rigid_body(physics.Dynamic)
-        |> physics.with_collider(physics.Sphere(transform.identity, 1.0))
-        |> physics.with_mass(1.0)
-        |> physics.with_restitution(0.8)  // Very bouncy!
-        |> physics.build()
+  scene.empty(
+    id: "root",
+    transform: transform.identity,
+    children: [
+      // Camera
+      scene.camera(
+        id: "camera",
+        camera: cam,
+        transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
+        look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+        active: True,
+        viewport: option.None,
+        children: [],
+        postprocessing: option.None,
       ),
-    ),
-  ]
+
+      // Static ground
+      scene.mesh(
+        id: Ground,
+        geometry: ground_geo,
+        material: ground_mat,
+        transform: transform.identity,
+        physics: option.Some(
+          physics.new_rigid_body(physics.Fixed)
+          |> physics.with_collider(physics.Box(transform.identity, 20.0, 0.5, 20.0))
+          |> physics.build()
+        ),
+      ),
+
+      // Bouncing ball
+      scene.mesh(
+        id: Ball,
+        geometry: ball_geo,
+        material: ball_mat,
+        // Get transform from physics simulation, or use initial position
+        transform: case physics.get_transform(physics_world, Ball) {
+          Ok(t) -> t
+          Error(Nil) -> transform.at(position: vec3.Vec3(0.0, 10.0, 0.0))
+        },
+        physics: option.Some(
+          physics.new_rigid_body(physics.Dynamic)
+          |> physics.with_collider(physics.Sphere(transform.identity, 1.0))
+          |> physics.with_mass(1.0)
+          |> physics.with_restitution(0.8)  // Very bouncy!
+          |> physics.build()
+        ),
+      ),
+    ],
+  )
 }
 ```
 
@@ -181,7 +181,7 @@ fn init(_ctx: tiramisu.Context(Id)) -> #(Model, effect.Effect(Msg), option.Optio
 
 ### Stepping the Simulation
 
-Call `physics.step()` every frame in your `update()` function:
+Call `physics.step()` every frame in your `update()` function. **Important**: `physics.step()` now requires the `delta_time` parameter (in milliseconds) to implement a fixed timestep physics loop.
 
 ```gleam
 fn update(
@@ -193,7 +193,8 @@ fn update(
 
   case msg {
     Tick -> {
-      let new_physics_world = physics.step(physics_world)
+      // Pass delta_time for fixed timestep (prevents game slowdown)
+      let new_physics_world = physics.step(physics_world, ctx.delta_time)
       #(model, effect.tick(Tick), option.Some(new_physics_world))
     }
   }
@@ -201,6 +202,8 @@ fn update(
 ```
 
 The step function:
+- Uses fixed timestep (60 Hz) with accumulator pattern
+- Prevents game slowdown when FPS drops
 - Applies forces and gravity
 - Detects and resolves collisions
 - Updates body positions and velocities
@@ -209,7 +212,7 @@ The step function:
 ### Accessing the World in View
 
 ```gleam
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
   let assert option.Some(physics_world) = ctx.physics_world
 
   // Get physics transforms for dynamic bodies
@@ -218,7 +221,13 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
     Error(Nil) -> transform.identity  // Fallback for first frame
   }
 
-  // ... rest of scene
+  scene.empty(
+    id: "root",
+    transform: transform.identity,
+    children: [
+      // ... scene nodes
+    ],
+  )
 }
 ```
 
@@ -528,7 +537,7 @@ fn update(
 
   case msg {
     Tick -> {
-      let new_physics_world = physics.step(physics_world)
+      let new_physics_world = physics.step(physics_world, ctx.delta_time)
 
       // Check for collisions
       let events = physics.get_collision_events(new_physics_world)

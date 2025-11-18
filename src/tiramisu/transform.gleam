@@ -1,3 +1,112 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Creating transforms",
+////     functions: [
+////       "identity",
+////       "at"
+////     ]
+////   },
+////   {
+////     header: "Accessing transform properties",
+////     functions: [
+////       "position",
+////       "rotation",
+////       "rotation_quaternion",
+////       "scale"
+////     ]
+////   },
+////   {
+////     header: "Setting transform properties",
+////     functions: [
+////       "with_position",
+////       "with_euler_rotation",
+////       "with_quaternion_rotation",
+////       "with_scale"
+////     ]
+////   },
+////   {
+////     header: "Transform operations",
+////     functions: [
+////       "translate",
+////       "rotate_by",
+////       "rotate_x",
+////       "rotate_y",
+////       "rotate_z",
+////       "scale_by",
+////       "scale_uniform",
+////       "compose",
+////       "look_at"
+////     ]
+////   },
+////   {
+////     header: "Interpolation",
+////     functions: [
+////       "lerp",
+////       "slerp"
+////     ]
+////   },
+////   {
+////     header: "Quaternion utilities",
+////     functions: [
+////       "euler_to_quaternion",
+////       "quaternion_to_euler",
+////       "multiply_quaternions",
+////       "quaternion_from_basis",
+////       "identity_quaternion"
+////     ]
+////   }
+//// ]
+////
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+////
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+////
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+////
+////
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+////
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+////
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>
 //// Transform module - position, rotation, and scale for 3D objects.
 ////
 //// Transforms define where objects are in 3D space, how they're rotated, and their size.

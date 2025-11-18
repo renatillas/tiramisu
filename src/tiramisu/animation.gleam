@@ -1,3 +1,83 @@
+//// <script>
+//// const docs = [
+////   {
+////     header: "Tweening",
+////     functions: [
+////       "ease",
+////       "tween",
+////       "update_tween",
+////       "get_tween_value",
+////       "is_tween_complete",
+////       "tween_vec3",
+////       "tween_float",
+////       "tween_transform",
+////       "reset_tween",
+////       "reverse_tween"
+////     ]
+////   },
+////   {
+////     header: "Model animations",
+////     functions: [
+////       "new_animation",
+////       "clip_duration",
+////       "clip_name",
+////       "set_loop",
+////       "set_speed",
+////       "set_weight"
+////     ]
+////   }
+//// ]
+//// 
+//// const callback = () => {
+////   const list = document.querySelector(".sidebar > ul:last-of-type")
+////   const sortedLists = document.createDocumentFragment()
+////   const sortedMembers = document.createDocumentFragment()
+//// 
+////   for (const section of docs) {
+////     sortedLists.append((() => {
+////       const node = document.createElement("h3")
+////       node.append(section.header)
+////       return node
+////     })())
+////     sortedMembers.append((() => {
+////       const node = document.createElement("h2")
+////       node.append(section.header)
+////       return node
+////     })())
+//// 
+////     const sortedList = document.createElement("ul")
+////     sortedLists.append(sortedList)
+//// 
+//// 
+////     for (const funcName of section.functions) {
+////       const href = `#${funcName}`
+////       const member = document.querySelector(
+////         `.member:has(h2 > a[href="${href}"])`
+////       )
+////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
+////       sortedList.append(sidebar)
+////       sortedMembers.append(member)
+////     }
+////   }
+//// 
+////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
+////   document
+////     .querySelector(".module-members:has(#module-values)")
+////     .insertBefore(
+////       sortedMembers,
+////       document.querySelector("#module-values").nextSibling
+////     )
+//// }
+//// 
+//// document.readyState !== "loading"
+////   ? callback()
+////   : document.addEventListener(
+////     "DOMContentLoaded",
+////     callback,
+////     { once: true }
+////   )
+//// </script>//// Tiramisu game engine main module - immutable game loop with effect system.
+////
 //// Animation and tweening system for smooth transitions and Three.js model animations.
 ////
 //// This module provides two main systems:

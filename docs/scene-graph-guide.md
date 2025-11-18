@@ -20,20 +20,24 @@ Every object in your game is a `scene.Node(id)`. Nodes can be:
 
 ### The View Function
 
-Your `view()` function returns a `List(scene.Node(id))` every frame:
+Your `view()` function returns a single root `scene.Node(id)` every frame. If you have multiple top-level nodes, wrap them in `scene.empty()`:
 
 ```gleam
-fn view(model: Model) -> List(scene.Node(id)) {
-  [
-    camera_node,
-    player_mesh,
-    enemy_mesh,
-    light_node,
-  ]
+fn view(model: Model) -> scene.Node(id) {
+  scene.empty(
+    id: "root",
+    transform: transform.identity,
+    children: [
+      camera_node,
+      player_mesh,
+      enemy_mesh,
+      light_node,
+    ],
+  )
 }
 ```
 
-Tiramisu automatically **diffs** this list against the previous frame and applies only the changes.
+Tiramisu automatically **diffs** the scene tree against the previous frame and applies only the changes.
 
 ## Creating Scene Nodes
 
@@ -135,8 +139,10 @@ let assert Ok(mat) =
   |> material.with_color(0x4ecdc4)
   |> material.with_metalness(0.8)  // 0.0 = non-metal, 1.0 = metal
   |> material.with_roughness(0.2)  // 0.0 = smooth, 1.0 = rough
-  |> material.with_map(texture)
+  |> material.with_color_map(texture)
   |> material.with_normal_map(normal_texture)
+  |> material.with_emissive(0x000000)  // No glow by default
+  |> material.with_emissive_intensity(0.0)
   |> material.build()
 
 // Or direct constructor with all parameters
@@ -149,6 +155,13 @@ let assert Ok(mat2) = material.standard(
   ambient_oclusion_map: option.None,
   roughness_map: option.None,
   metalness_map: option.None,
+  displacement_map: option.None,
+  displacement_scale: 1.0,
+  displacement_bias: 0.0,
+  emissive: 0x000000,
+  emissive_intensity: 0.0,
+  transparent: False,
+  opacity: 1.0,
 )
 ```
 
@@ -158,6 +171,7 @@ let assert Ok(basic_mat) = material.basic(
   color: 0xff0000,
   transparent: False,
   opacity: 1.0,
+  alpha_test: 0.0,
   map: option.None,
 )
 ```
@@ -168,6 +182,9 @@ let assert Ok(phong_mat) = material.phong(
   color: 0xffe66d,
   shininess: 100.0,
   map: option.None,
+  transparent: False,
+  opacity: 1.0,
+  alpha_test: 0.0,
 )
 ```
 
@@ -176,6 +193,9 @@ let assert Ok(phong_mat) = material.phong(
 let assert Ok(lambert_mat) = material.lambert(
   color: 0x95e1d3,
   map: option.None,
+  transparent: False,
+  opacity: 1.0,
+  alpha_test: 0.0,
 )
 ```
 
@@ -184,6 +204,9 @@ let assert Ok(lambert_mat) = material.lambert(
 let assert Ok(toon_mat) = material.toon(
   color: 0xf38181,
   map: option.None,
+  transparent: False,
+  opacity: 1.0,
+  alpha_test: 0.0,
 )
 ```
 
@@ -283,6 +306,8 @@ scene.camera(
   look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Point camera at origin
   active: True,  // This camera is used for rendering
   viewport: option.None,
+  children: [],
+  postprocessing: option.None,
 )
 ```
 
@@ -303,6 +328,8 @@ scene.camera(
   transform: transform.identity,
   active: True,
   viewport: option.None,
+  children: [],
+  postprocessing: option.None,
 )
 ```
 
@@ -317,6 +344,8 @@ scene.camera(
   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),  // Distance from scene
   active: True,
   viewport: option.None,
+  children: [],
+  postprocessing: option.None,
 )
 ```
 
@@ -334,31 +363,39 @@ let assert Ok(minimap_cam) = camera.perspective(
   far: 1000.0,
 )
 
-[
-  // Main camera (full screen)
-  scene.camera(
-    id: "main",
-    camera: main_cam,
-    transform: transform.identity,
-    look_at: option.None,
-    active: True,
-    viewport: option.None,
-  ),
-  // Mini-map camera (top-right corner)
-  scene.camera(
-    id: "minimap",
-    camera: minimap_cam,
-    transform: transform.at(position: vec3.Vec3(0.0, 100.0, 0.0)),
-    look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
-    active: False,
-    viewport: option.Some(#(800, 450, 200, 150)),  // x, y, width, height
-  ),
-]
+scene.empty(
+  id: "root",
+  transform: transform.identity,
+  children: [
+    // Main camera (full screen)
+    scene.camera(
+      id: "main",
+      camera: main_cam,
+      transform: transform.identity,
+      look_at: option.None,
+      active: True,
+      viewport: option.None,
+      children: [],
+      postprocessing: option.None,
+    ),
+    // Mini-map camera (top-right corner)
+    scene.camera(
+      id: "minimap",
+      camera: minimap_cam,
+      transform: transform.at(position: vec3.Vec3(0.0, 100.0, 0.0)),
+      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+      active: False,
+      viewport: option.Some(scene.Viewport(x: 800, y: 450, width: 200, height: 150)),
+      children: [],
+      postprocessing: option.None,
+    ),
+  ],
+)
 ```
 
-## Hierarchy with Groups
+## Hierarchy with Empty Nodes
 
-Group nodes contain children, creating parent-child relationships:
+Empty nodes act as containers for children, creating parent-child relationships:
 
 ```gleam
 let assert Ok(body_geo) = geometry.box(width: 1.0, height: 2.0, depth: 1.0)
@@ -378,10 +415,11 @@ let assert Ok(healthbar_mat) = material.basic(
   color: 0x00ff00,
   transparent: False,
   opacity: 1.0,
+  alpha_test: 0.0,
   map: option.None,
 )
 
-scene.group(
+scene.empty(
   id: "player",
   transform: player_transform,
   children: [
@@ -526,6 +564,7 @@ let assert Ok(billboard_mat) = material.basic(
   color: 0x808080,
   transparent: True,
   opacity: 0.8,
+  alpha_test: 0.0,
   map: option.Some(building_texture),
 )
 
@@ -689,19 +728,28 @@ id: Ground
 
 ```gleam
 // ❌ Bad: Deep nesting (slow)
-Group(
-  "root",
+scene.empty(
+  id: "root",
+  transform: transform.identity,
   children: [
-    Group("level1", children: [
-      Group("level2", children: [
-        Group("level3", children: [mesh])
-      ])
-    ])
+    scene.empty(
+      id: "level1",
+      transform: transform.identity,
+      children: [
+        scene.empty(
+          id: "level2",
+          transform: transform.identity,
+          children: [
+            scene.empty(id: "level3", transform: transform.identity, children: [mesh])
+          ]
+        )
+      ]
+    )
   ]
 )
 
 // ✅ Good: Flat or 2-3 levels max
-Group("player", children: [body, weapon, ui])
+scene.empty(id: "player", transform: transform.identity, children: [body, weapon, ui])
 ```
 
 ### 3. Use instanced_mesh() for Repeated Objects
