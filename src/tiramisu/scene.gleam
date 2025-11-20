@@ -161,6 +161,7 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -2087,7 +2088,6 @@ fn compare_camera_fields(
     False -> patches
   }
 
-  // If camera config, look_at, or viewport changed, emit UpdateCamera patch
   let patches = case
     prev_cam != curr_cam
     || prev_look_at != curr_look_at
@@ -3957,11 +3957,28 @@ fn handle_update_camera(
           // Update camera projection parameters from camera_type
           let projection = camera.get_projection(camera_type)
           case projection {
-            camera.Perspective(fov:, aspect:, near:, far:) -> {
+            camera.Perspective(fov:, aspect: _, near:, far:) -> {
+              // Calculate the correct aspect ratio instead of using placeholder
+              let canvas = get_dom_element(state.renderer)
+              let viewport = object_cache.get_viewport(state.cache, id)
+              // Convert Viewport to tuple format for calculate_aspect_ratio
+              let viewport_tuple = case viewport {
+                option.Some(object_cache.Viewport(x:, y:, width:, height:)) ->
+                  option.Some(#(
+                    float.round(x),
+                    float.round(y),
+                    float.round(width),
+                    float.round(height),
+                  ))
+                option.None -> option.None
+              }
+              let calculated_aspect =
+                calculate_aspect_ratio(viewport_tuple, canvas)
+
               set_perspective_camera_params_ffi(
                 obj_dynamic,
                 fov,
-                aspect,
+                calculated_aspect,
                 near,
                 far,
               )
