@@ -1,6 +1,10 @@
 # Changelog
 
-## v6.0.0 - 2025-10-28
+## v6.0.1 - 2025-11-20
+
+- Fix camera not calculating perspective correctly after changing it's type. 
+
+## v6.0.0 - 2025-11-19
 
 ### Added
 
