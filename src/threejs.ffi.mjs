@@ -1337,7 +1337,10 @@ export function loadTexture(url) {
   return new Promise((resolve, reject) => {
     loader.load(
       url,
-      (texture) => resolve(texture),
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        resolve(texture);
+      },
       undefined,
       (error) => reject(error)
     );

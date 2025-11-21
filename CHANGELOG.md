@@ -2,6 +2,10 @@
 
 ## v6.0.1 - 2025-11-20
 
+- Fix washing up of textures on load.
+
+## v6.0.1 - 2025-11-20
+
 - Fix camera not calculating perspective correctly after changing it's type. 
 
 ## v6.0.0 - 2025-11-19

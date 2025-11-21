@@ -48,6 +48,7 @@ type Msg {
 }
 
 type Ids {
+  Scene
   Cube
   MainCamera
   Sun
@@ -87,7 +88,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
     |> material.build()
   let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
 
-  [
+  scene.empty(id: Scene, transform: transform.identity, children: [
     scene.camera(
       id: MainCamera,
       camera: cam,
@@ -95,6 +96,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
+      postprocessing: option.None,
     ),
     scene.mesh(
       id: Cube,
@@ -109,7 +111,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
       light: sun,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
-  ]
+  ])
 }
 ```
 
