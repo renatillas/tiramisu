@@ -2446,17 +2446,15 @@ export function hasCameraUserData(camera, key) {
 export function updateInstancedMeshTransforms(mesh, instances) {
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
-  const rotation = new THREE.Euler();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3();
 
   let i = 0;
   for (const inst of instances) {
     position.set(inst.position.x, inst.position.y, inst.position.z);
-    rotation.set(inst.rotation.x, inst.rotation.y, inst.rotation.z);
+    quaternion.set(inst.rotation.x, inst.rotation.y, inst.rotation.z, inst.rotation.w);
     scale.set(inst.scale.x, inst.scale.y, inst.scale.z);
 
-    quaternion.setFromEuler(rotation);
     matrix.compose(position, quaternion, scale);
 
     mesh.setMatrixAt(i, matrix);
