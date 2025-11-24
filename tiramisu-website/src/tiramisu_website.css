@@ -1,0 +1,430 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tiramisu-cream: #f4e4c1;
+  --color-tiramisu-coffee: #6f4e37;
+  --color-tiramisu-cocoa: #3e2723;
+  --color-tiramisu-mascarpone: #fff8dc;
+  --color-tiramisu-accent: #ff6b35;
+}
+
+body {
+  @apply bg-gradient-to-br from-tiramisu-mascarpone to-tiramisu-cream;
+  @apply min-h-screen;
+  @apply font-sans;
+  @apply text-tiramisu-cocoa;
+}
+
+.container {
+  @apply max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center;
+}
+
+/* Header Styles */
+.header {
+  @apply mb-6 text-center;
+}
+
+.header-content {
+  @apply flex flex-col items-center gap-6;
+}
+
+.logo {
+  @apply w-70 h-70 object-contain drop-shadow-lg;
+}
+
+.header-text h1 {
+  @apply text-6xl font-bold text-tiramisu-coffee;
+  @apply drop-shadow-md;
+}
+
+.tagline {
+  @apply text-xl text-tiramisu-coffee/80;
+  @apply italic;
+}
+
+/* Navigation Styles */
+.nav {
+  @apply sticky top-4 z-50;
+  @apply mb-12;
+  @apply bg-white/80 backdrop-blur-sm;
+  @apply rounded-2xl shadow-lg;
+  @apply p-2;
+  @apply transition-all duration-300;
+  @apply max-w-fit
+}
+
+.nav:hover {
+  @apply shadow-2xl;
+  @apply bg-white/90;
+}
+
+.nav-list {
+  @apply flex flex-wrap justify-center gap-2;
+  @apply list-none m-0 p-0;
+}
+
+.nav-item {
+  @apply px-6 py-3;
+  @apply rounded-xl;
+  @apply font-semibold;
+  @apply transition-all duration-300;
+  @apply text-tiramisu-coffee;
+  @apply hover:bg-tiramisu-cream hover:shadow-md;
+  @apply hover:-translate-y-0.5;
+  @apply no-underline;
+  @apply cursor-pointer;
+}
+
+.nav-item.active {
+  @apply bg-tiramisu-coffee text-white;
+  @apply shadow-lg;
+  @apply scale-105;
+}
+
+/* Main Content */
+.main {
+  @apply bg-white/70 backdrop-blur-sm;
+  @apply rounded-2xl shadow-xl;
+  @apply p-8 md:p-12;
+  @apply mb-12;
+}
+
+.page {
+  @apply opacity-100 transition-opacity duration-300;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-title {
+  @apply text-4xl md:text-5xl font-bold;
+  @apply text-tiramisu-coffee;
+  @apply mb-6;
+  @apply text-center;
+}
+
+.lead {
+  @apply text-xl text-tiramisu-coffee/80;
+  @apply mb-10;
+  @apply text-center;
+  @apply max-w-3xl mx-auto;
+}
+
+/* Feature Cards */
+.features-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  @apply gap-6;
+  @apply mb-12;
+}
+
+.feature-card {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply border-2 border-tiramisu-cream;
+  @apply hover:shadow-xl hover:border-tiramisu-coffee/30;
+  @apply transition-all duration-300;
+  @apply overflow-hidden;
+  @apply hover:scale-105;
+}
+
+.feature-card-image-container {
+  @apply relative;
+  @apply w-full h-48;
+  @apply overflow-hidden;
+  @apply bg-tiramisu-cream;
+}
+
+.feature-card-image {
+  @apply w-full h-full;
+  @apply object-cover;
+  @apply transition-transform duration-300;
+}
+
+.feature-card:hover .feature-card-image {
+  @apply scale-110;
+}
+
+.feature-card-content {
+  @apply p-6;
+}
+
+.feature-icon {
+  @apply text-5xl mb-4;
+}
+
+.feature-title {
+  @apply text-xl font-bold text-tiramisu-coffee;
+  @apply mb-2;
+}
+
+.feature-description {
+  @apply text-tiramisu-coffee/70;
+}
+
+/* Quick Start Section */
+.quick-start-section {
+  @apply bg-tiramisu-cream/30;
+  @apply rounded-xl;
+  @apply p-8;
+  @apply mb-8;
+}
+
+.quick-start-section h3 {
+  @apply text-2xl font-bold text-tiramisu-coffee;
+  @apply mb-4;
+}
+
+.quick-start-section p {
+  @apply text-tiramisu-coffee/80;
+  @apply mb-4;
+}
+
+/* Code Blocks */
+.code-block {
+  @apply bg-tiramisu-cocoa;
+  @apply text-tiramisu-cream;
+  @apply p-4 rounded-lg;
+  @apply font-mono text-sm;
+  @apply mb-4;
+  @apply overflow-x-auto;
+}
+
+.code-block.large {
+  @apply text-lg p-6;
+}
+
+.code-block code {
+  @apply text-tiramisu-cream;
+}
+
+/* Links Section */
+.links-section {
+  @apply flex flex-wrap justify-center gap-4;
+}
+
+/* Tutorial Cards */
+.tutorial-list {
+  @apply grid grid-cols-1 md:grid-cols-2;
+  @apply gap-6;
+}
+
+.tutorial-card {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply p-6;
+  @apply border-l-4 border-tiramisu-accent;
+  @apply hover:shadow-xl;
+  @apply transition-all duration-200;
+}
+
+.tutorial-title {
+  @apply text-2xl font-bold text-tiramisu-coffee;
+  @apply mb-2;
+}
+
+.tutorial-subtitle {
+  @apply text-tiramisu-accent font-semibold;
+  @apply mb-3;
+}
+
+.tutorial-description {
+  @apply text-tiramisu-coffee/70;
+  @apply mb-2;
+}
+
+/* Examples Grid */
+.examples-grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  @apply gap-6;
+}
+
+.example-card {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply p-6;
+  @apply border-2 border-tiramisu-cream;
+  @apply hover:shadow-xl hover:scale-105;
+  @apply transition-all duration-200;
+  @apply cursor-pointer;
+}
+
+.example-title {
+  @apply text-xl font-bold text-tiramisu-coffee;
+  @apply mb-2;
+}
+
+.example-description {
+  @apply text-tiramisu-coffee/70;
+  @apply text-sm;
+}
+
+/* Mascarpone Page */
+.mascarpone-hero {
+  @apply mb-12;
+  @apply text-center;
+}
+
+.features-section,
+.steps-section,
+.templates-section {
+  @apply mb-12;
+}
+
+.features-section h3,
+.steps-section h3,
+.templates-section h3 {
+  @apply text-3xl font-bold text-tiramisu-coffee;
+  @apply mb-8;
+  @apply text-center;
+}
+
+.mascarpone-features {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  @apply gap-6;
+}
+
+.mascarpone-feature {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply p-6;
+  @apply border-2 border-tiramisu-cream;
+}
+
+.mascarpone-feature .feature-icon {
+  @apply text-4xl mb-3;
+}
+
+.mascarpone-feature .feature-title {
+  @apply text-lg font-bold text-tiramisu-coffee;
+  @apply mb-2;
+}
+
+/* Steps Grid */
+.steps-grid {
+  @apply grid grid-cols-1 md:grid-cols-3;
+  @apply gap-6;
+}
+
+.step-card {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply p-6;
+  @apply text-center;
+}
+
+.step-number {
+  @apply w-16 h-16;
+  @apply bg-tiramisu-coffee text-white;
+  @apply rounded-full;
+  @apply flex items-center justify-center;
+  @apply text-3xl font-bold;
+  @apply mx-auto mb-4;
+}
+
+.step-title {
+  @apply text-xl font-bold text-tiramisu-coffee;
+  @apply mb-4;
+}
+
+.step-card .code-block {
+  @apply text-left;
+}
+
+/* Templates Grid */
+.templates-grid {
+  @apply grid grid-cols-1 md:grid-cols-2;
+  @apply gap-6;
+}
+
+.template-card {
+  @apply bg-white;
+  @apply rounded-xl shadow-md;
+  @apply p-6;
+  @apply border-2 border-tiramisu-cream;
+  @apply hover:shadow-xl;
+  @apply transition-all duration-200;
+}
+
+.template-title {
+  @apply text-2xl font-bold text-tiramisu-coffee;
+  @apply mb-3;
+}
+
+.template-description {
+  @apply text-tiramisu-coffee/70;
+}
+
+/* CTA Section */
+.cta-section {
+  @apply text-center;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-block;
+  @apply px-8 py-4;
+  @apply rounded-xl;
+  @apply font-bold;
+  @apply text-lg;
+  @apply transition-all duration-200;
+  @apply no-underline;
+  @apply shadow-md hover:shadow-xl;
+}
+
+.btn-primary {
+  @apply bg-tiramisu-coffee text-white;
+  @apply hover:bg-tiramisu-cocoa;
+  @apply hover:scale-105;
+}
+
+.btn-secondary {
+  @apply bg-tiramisu-accent text-white;
+  @apply hover:bg-tiramisu-accent/80;
+  @apply hover:scale-105;
+}
+
+/* Links */
+.link {
+  @apply text-tiramisu-coffee;
+  @apply font-semibold;
+  @apply underline decoration-tiramisu-accent;
+  @apply hover:text-tiramisu-accent;
+  @apply transition-colors duration-200;
+}
+
+/* Footer */
+.footer {
+  @apply text-center;
+  @apply py-8;
+  @apply text-tiramisu-coffee/70;
+}
+
+.footer-content {
+  @apply space-y-2;
+}
+
+.footer p {
+  @apply m-0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header-text h1 {
+    @apply text-4xl;
+  }
+
+  .page-title {
+    @apply text-3xl;
+  }
+
+  .logo {
+    @apply w-32 h-32;
+  }
+}
