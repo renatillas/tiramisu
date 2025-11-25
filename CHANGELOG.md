@@ -1,7 +1,8 @@
 # Changelog
 
-## v6.0.1 - 2025-11-20
+## v6.0.2 - 2025-11-25
 
+- Fix instance mesh rotation - pass quaternion directly
 - Fix washing up of textures on load.
 
 ## v6.0.1 - 2025-11-20
