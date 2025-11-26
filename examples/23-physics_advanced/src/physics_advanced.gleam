@@ -369,6 +369,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
           1,
           2,
         ])
+        |> physics.with_collision_events()
         |> physics.build()
       }),
     )
@@ -396,6 +397,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
           0,
           2,
         ])
+        |> physics.with_collision_events()
         |> physics.build(),
       ),
     )
@@ -421,6 +423,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
           1,
           2,
         ])
+        |> physics.with_collision_events()
         |> physics.build()
       }),
     )
@@ -451,6 +454,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
             1,
             2,
           ])
+          |> physics.with_collision_events()
           |> physics.build()
         }),
       )
@@ -487,6 +491,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
           1,
           2,
         ])
+        |> physics.with_collision_events()
         |> physics.build(),
       ),
     )
@@ -512,6 +517,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
           1,
           2,
         ])
+        |> physics.with_collision_events()
         |> physics.build(),
       ),
     )
@@ -530,6 +536,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,
         ])
+        |> physics.with_collision_events()
         |> physics.build(),
       ),
     )
@@ -547,6 +554,7 @@ fn view(model: Model, context: tiramisu.Context(Ids)) -> scene.Node(Ids) {
         |> physics.with_collision_groups(membership: [0], can_collide_with: [
           1,
         ])
+        |> physics.with_collision_events()
         |> physics.build(),
       ),
     )

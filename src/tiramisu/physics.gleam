@@ -357,6 +357,8 @@ pub opaque type RigidBody {
     collision_groups: option.Option(CollisionGroups),
     /// Character controller configuration (for kinematic bodies)
     character_controller: option.Option(CharacterController),
+    /// Enable collision event tracking (default: False)
+    track_collision_events: Bool,
   )
 }
 
@@ -454,6 +456,7 @@ pub opaque type RigidBodyBuilder(a) {
     axis_locks: AxisLock,
     collision_groups: option.Option(CollisionGroups),
     character_controller: option.Option(CharacterController),
+    track_collision_events: Bool,
   )
 }
 
@@ -513,6 +516,7 @@ pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
     ),
     collision_groups: option.None,
     character_controller: option.None,
+    track_collision_events: False,
   )
 }
 
@@ -782,6 +786,44 @@ pub fn with_character_controller(
   )
 }
 
+/// Enable collision event tracking for this body.
+///
+/// By default, collision events are not tracked to minimize performance overhead.
+/// Call this method if you need to receive collision events via `get_collision_events()`.
+///
+/// **Performance Note:** Only enable collision events for bodies where you actually
+/// need to detect collisions (e.g., player, enemies, collectibles). Static decorations
+/// and particle effects typically don't need event tracking.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Player needs collision events (e.g., for damage detection)
+/// let player = physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Capsule(
+///     offset: transform.identity,
+///     half_height: 0.9,
+///     radius: 0.3,
+///   ))
+///   |> physics.with_collision_events()  // Enable events
+///   |> physics.build()
+///
+/// // Static ground doesn't need events
+/// let ground = physics.new_rigid_body(physics.Fixed)
+///   |> physics.with_collider(physics.Box(
+///     offset: transform.identity,
+///     width: 50.0,
+///     height: 1.0,
+///     depth: 50.0,
+///   ))
+///   |> physics.build()  // No events, saves performance
+/// ```
+pub fn with_collision_events(
+  builder: RigidBodyBuilder(_),
+) -> RigidBodyBuilder(_) {
+  RigidBodyBuilder(..builder, track_collision_events: True)
+}
+
 pub type WithCollider
 
 pub type WithoutCollider
@@ -812,6 +854,7 @@ pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
     axis_locks: builder.axis_locks,
     collision_groups: builder.collision_groups,
     character_controller: builder.character_controller,
+    track_collision_events: builder.track_collision_events,
   )
 }
 
@@ -1653,6 +1696,13 @@ pub fn create_body(
     option.None -> Nil
   }
 
+  // Enable collision events if configured
+  case config.track_collision_events {
+    True ->
+      set_collider_active_events_ffi(collider_desc, get_active_events_ffi())
+    False -> Nil
+  }
+
   // Create collider attached to body
   let collider = create_collider_ffi(world.world, collider_desc, rapier_body)
 
@@ -1904,6 +1954,12 @@ fn set_collider_collision_groups_ffi(
   desc: RapierColliderDesc,
   groups: Int,
 ) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderActiveEvents")
+fn set_collider_active_events_ffi(desc: RapierColliderDesc, events: Int) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getActiveEvents")
+fn get_active_events_ffi() -> Int
 
 @external(javascript, "../rapier.ffi.mjs", "setColliderTranslation")
 fn set_collider_translation_ffi(

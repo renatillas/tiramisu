@@ -585,6 +585,15 @@ export function setColliderSolverGroups(desc, groups) {
 }
 
 /**
+ * Set active events for collision detection
+ * @param {RAPIER.ColliderDesc} desc
+ * @param {number} events - Active events flags (e.g., RAPIER.ActiveEvents.COLLISION_EVENTS)
+ */
+export function setColliderActiveEvents(desc, events) {
+  desc.setActiveEvents(events);
+}
+
+/**
  * Set collider translation (position offset relative to rigid body)
  * @param {RAPIER.ColliderDesc} desc
  * @param {number} x
