@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Collision Event Tracking**: Fix collision events not firing - Rapier requires explicit opt-in via active events
+  - Add `physics.with_collision_events()` builder method to enable collision event tracking (opt-in for performance)
+  - Collision events are now disabled by default to minimize overhead
+  - Call `with_collision_events()` on rigid bodies that need collision detection
+  - Example: `physics.new_rigid_body(physics.Dynamic) |> physics.with_collider(...) |> physics.with_collision_events() |> physics.build()`
+
+### Changed
+
+- **BREAKING**: `CollisionEvent` is now generic over ID type: `CollisionEvent(id)`
+  - Collision events now use typed IDs instead of strings for better type safety
+  - `CollisionStarted(body_a: String, body_b: String)` → `CollisionStarted(body_a: id, body_b: id)`
+  - `CollisionEnded(body_a: String, body_b: String)` → `CollisionEnded(body_a: id, body_b: id)`
+  - Pattern matching syntax remains the same, but explicit type references need the generic parameter
+  - Enables direct pattern matching on typed IDs without string conversion
+
 ## v6.0.2 - 2025-11-25
 
 - Fix instance mesh rotation - pass quaternion directly
