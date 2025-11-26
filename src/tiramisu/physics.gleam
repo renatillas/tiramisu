@@ -182,7 +182,6 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
-import tiramisu/internal/id
 import tiramisu/transform.{type Quaternion, type Transform}
 import vec/vec3.{type Vec3}
 
@@ -209,7 +208,7 @@ pub opaque type PhysicsWorld(id) {
     /// Mapping from collider handles to body string IDs
     collider_to_body: Dict(Int, id),
     /// Collision events from the last physics step
-    collision_events: List(CollisionEvent),
+    collision_events: List(CollisionEvent(id)),
     /// Character controllers for kinematic character movement (one per body)
     character_controllers: Dict(id, RapierCharacterController),
   )
@@ -384,11 +383,11 @@ pub type RaycastHit(id) {
 }
 
 /// Collision events that occurred during the physics step
-pub type CollisionEvent {
+pub type CollisionEvent(id) {
   /// Two bodies started colliding
-  CollisionStarted(body_a: String, body_b: String)
+  CollisionStarted(body_a: id, body_b: id)
   /// Two bodies stopped colliding
-  CollisionEnded(body_a: String, body_b: String)
+  CollisionEnded(body_a: id, body_b: id)
 }
 
 // --- Constructor Functions ---
@@ -906,8 +905,7 @@ pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
   // Drain collision events from the queue
   let collision_events =
     world.collider_to_body
-    |> dict.map_values(fn(_, body_id) { id.to_string(body_id) })
-    |> drain_collision_events(world.queue, _)
+    |> drain_collision_events(world, _)
 
   // Return world with cleared commands and updated events
   PhysicsWorld(
@@ -920,11 +918,11 @@ pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
 /// Drain collision events from the Rapier event queue
 /// Converts collider handles to body IDs using the collider_to_body mapping
 fn drain_collision_events(
-  queue: RapierEventQueue,
-  collider_to_body: Dict(Int, String),
-) -> List(CollisionEvent) {
+  world: PhysicsWorld(id),
+  collider_to_body: Dict(Int, id),
+) -> List(CollisionEvent(id)) {
   // Call FFI to drain events and return them as a list
-  let raw_events = drain_collision_events_ffi(queue)
+  let raw_events = drain_collision_events_ffi(world.queue)
 
   // Convert raw events (with collider handles) to CollisionEvents (with body IDs)
   list.filter_map(raw_events, fn(raw_event) {
@@ -1306,7 +1304,7 @@ pub fn raycast(
 ///   }
 /// })
 /// ```
-pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent) {
+pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent(id)) {
   world.collision_events
 }
 
