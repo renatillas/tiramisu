@@ -1655,6 +1655,9 @@ pub fn create_body(
     option.None -> Nil
   }
 
+  // Enable collision events for this collider
+  set_collider_active_events_ffi(collider_desc, get_active_events_ffi())
+
   // Create collider attached to body
   let collider = create_collider_ffi(world.world, collider_desc, rapier_body)
 
@@ -1906,6 +1909,12 @@ fn set_collider_collision_groups_ffi(
   desc: RapierColliderDesc,
   groups: Int,
 ) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderActiveEvents")
+fn set_collider_active_events_ffi(desc: RapierColliderDesc, events: Int) -> Nil
+
+@external(javascript, "../rapier.ffi.mjs", "getActiveEvents")
+fn get_active_events_ffi() -> Int
 
 @external(javascript, "../rapier.ffi.mjs", "setColliderTranslation")
 fn set_collider_translation_ffi(
