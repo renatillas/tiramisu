@@ -1,3 +1,6 @@
+import gleam/float
+import gleam/int
+import gleam/list
 import tiramisu/animation
 import tiramisu/transform
 import vec/vec3
@@ -68,6 +71,240 @@ pub fn ease_sine_inout_test() {
   let _result = animation.ease(animation.EaseInOutSine, 0.5)
   let _result = animation.ease(animation.EaseInOutSine, 1.0)
   // Sine functions have complex calculations, just verify they run
+}
+
+pub fn ease_quartic_in_test() {
+  assert animation.ease(animation.EaseInQuartic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInQuartic, 1.0) == 1.0
+  assert animation.ease(animation.EaseInQuartic, 0.75) == 0.31640625
+}
+
+pub fn ease_quartic_out_test() {
+  assert animation.ease(animation.EaseOutQuartic, 0.0) == 1.0
+  assert animation.ease(animation.EaseOutQuartic, 1.0) == 0.0
+  assert animation.ease(animation.EaseOutQuartic, 0.75) == 0.68359375
+}
+
+pub fn ease_quartic_inout_test() {
+  assert animation.ease(animation.EaseInOutQuartic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutQuartic, 0.5) == 0.5
+  assert animation.ease(animation.EaseInOutQuartic, 1.0) == 1.0
+  assert animation.ease(animation.EaseInOutQuartic, 0.25)
+    == animation.ease(animation.EaseInQuartic, 0.5) /. 2.0
+  assert animation.ease(animation.EaseInOutQuartic, 0.75)
+    == animation.ease(animation.EaseOutQuartic, 0.5) /. 2.0 +. 0.5
+}
+
+pub fn ease_quintic_in_test() {
+  assert animation.ease(animation.EaseInQuintic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInQuintic, 1.0) == 1.0
+  assert animation.ease(animation.EaseInQuintic, 0.75) == 0.2373046875
+}
+
+pub fn ease_quintic_out_test() {
+  assert animation.ease(animation.EaseOutQuintic, 0.0) == 1.0
+  assert animation.ease(animation.EaseOutQuintic, 1.0) == 0.0
+  assert animation.ease(animation.EaseOutQuintic, 0.75) == 0.7626953125
+}
+
+pub fn ease_quintic_inout_test() {
+  assert animation.ease(animation.EaseInOutQuintic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutQuintic, 0.5) == 0.5
+  assert animation.ease(animation.EaseInOutQuintic, 1.0) == 1.0
+  assert animation.ease(animation.EaseInOutQuintic, 0.25)
+    == animation.ease(animation.EaseInQuintic, 0.5) /. 2.0
+  assert animation.ease(animation.EaseInOutQuintic, 0.75)
+    == animation.ease(animation.EaseOutQuintic, 0.5) /. 2.0 +. 0.5
+}
+
+pub fn ease_exponential_in_test() {
+  assert animation.ease(animation.EaseInExponential, 0.0) == 0.0
+  assert animation.ease(animation.EaseInExponential, 1.0) == 1.0
+  assert animation.ease(animation.EaseInExponential, 0.1) == 0.001953125
+  assert animation.ease(animation.EaseInExponential, 0.5) == 0.03125
+  assert animation.ease(animation.EaseInExponential, 0.9) == 0.5
+}
+
+pub fn ease_exponential_out_test() {
+  assert animation.ease(animation.EaseOutExponential, 0.0) == 0.0
+  assert animation.ease(animation.EaseOutExponential, 1.0) == 1.0
+  assert animation.ease(animation.EaseOutExponential, 0.1) == 0.5
+  assert animation.ease(animation.EaseOutExponential, 0.5) == 0.96875
+  assert animation.ease(animation.EaseOutExponential, 0.9) == 0.998046875
+}
+
+pub fn ease_exponential_inout_test() {
+  assert animation.ease(animation.EaseInOutExponential, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutExponential, 1.0) == 1.0
+  assert animation.ease(animation.EaseInOutExponential, 0.5) == 0.5
+  assert animation.ease(animation.EaseInOutExponential, 0.1) == 0.001953125
+  assert animation.ease(animation.EaseInOutExponential, 0.9) == 0.998046875
+}
+
+pub fn ease_circular_in_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInCircular, 0.0) == 0.0
+  assert animation.ease(animation.EaseInCircular, 1.0) == 1.0
+  assert animation.ease(animation.EaseInCircular, 0.1)
+    |> float.loosely_equals(with: 0.005012562893, tolerating:)
+  assert animation.ease(animation.EaseInCircular, 0.5)
+    |> float.loosely_equals(with: 0.1339745962, tolerating:)
+  assert animation.ease(animation.EaseInCircular, 0.9)
+    |> float.loosely_equals(with: 0.5641101056, tolerating:)
+}
+
+pub fn ease_circular_out_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseOutCircular, 0.0) == 0.0
+  assert animation.ease(animation.EaseOutCircular, 1.0) == 1.0
+  assert animation.ease(animation.EaseOutCircular, 0.1)
+    |> float.loosely_equals(with: 0.43588989435, tolerating:)
+  assert animation.ease(animation.EaseOutCircular, 0.5)
+    |> float.loosely_equals(with: 0.8660254038, tolerating:)
+  assert animation.ease(animation.EaseOutCircular, 0.9)
+    |> float.loosely_equals(with: 0.9949874371, tolerating:)
+}
+
+pub fn ease_circular_inout_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInOutCircular, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutCircular, 1.0) == 1.0
+  assert animation.ease(animation.EaseInOutCircular, 0.5) == 0.5
+  assert animation.ease(animation.EaseInOutCircular, 0.1)
+    |> float.loosely_equals(with: 0.010102051443, tolerating:)
+  assert animation.ease(animation.EaseInOutCircular, 0.9)
+    |> float.loosely_equals(with: 0.989897948557, tolerating:)
+}
+
+pub fn ease_back_in_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInBack, 0.0) == 0.0
+  assert animation.ease(animation.EaseInBack, 0.5) <. 0.0
+  assert animation.ease(animation.EaseInBack, 1.0)
+    |> float.loosely_equals(with: 1.0, tolerating:)
+}
+
+pub fn ease_back_out_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseOutBack, 0.0)
+    |> float.loosely_equals(with: 0.0, tolerating:)
+  assert animation.ease(animation.EaseOutBack, 0.5) >. 1.0
+  assert animation.ease(animation.EaseOutBack, 1.0)
+    |> float.loosely_equals(with: 1.0, tolerating:)
+}
+
+pub fn ease_back_inout_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInOutBack, 0.0)
+    |> float.loosely_equals(with: 0.0, tolerating:)
+  assert animation.ease(animation.EaseInOutBack, 0.25) <. 0.0
+  assert animation.ease(animation.EaseInOutBack, 0.5) == 0.5
+  assert animation.ease(animation.EaseInOutBack, 0.75) >. 1.0
+  assert animation.ease(animation.EaseInOutBack, 1.0)
+    |> float.loosely_equals(with: 1.0, tolerating:)
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeInElastic")
+fn ease_in_elastic_js(x: Float) -> Float
+
+pub fn ease_elastic_in_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInElastic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInElastic, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    assert animation.ease(animation.EaseInElastic, t)
+      |> float.loosely_equals(with: ease_in_elastic_js(t), tolerating:)
+  })
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeOutElastic")
+fn ease_out_elastic_js(x: Float) -> Float
+
+pub fn ease_elastic_out_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseOutElastic, 0.0) == 0.0
+  assert animation.ease(animation.EaseOutElastic, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    assert animation.ease(animation.EaseOutElastic, t)
+      |> float.loosely_equals(with: ease_out_elastic_js(t), tolerating:)
+  })
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeInOutElastic")
+fn ease_inout_elastic_js(x: Float) -> Float
+
+pub fn ease_elastic_inout_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInOutElastic, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutElastic, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    assert animation.ease(animation.EaseInOutElastic, t)
+      |> float.loosely_equals(with: ease_inout_elastic_js(t), tolerating:)
+  })
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeInBounce")
+fn ease_in_bounce_js(x: Float) -> Float
+
+pub fn ease_bounce_in_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInBounce, 0.0) == 0.0
+  assert animation.ease(animation.EaseInBounce, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    let eased = animation.ease(animation.EaseInBounce, t)
+    assert float.loosely_equals(eased, with: ease_in_bounce_js(t), tolerating:)
+    // Bounce never goes beyond 0..1
+    assert eased <=. 1.0
+    assert eased >=. 0.0
+  })
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeOutBounce")
+fn ease_out_bounce_js(x: Float) -> Float
+
+pub fn ease_bounce_out_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseOutBounce, 0.0) == 0.0
+  assert animation.ease(animation.EaseOutBounce, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    let eased = animation.ease(animation.EaseOutBounce, t)
+    assert float.loosely_equals(eased, with: ease_out_bounce_js(t), tolerating:)
+    // Bounce never goes beyond 0..1
+    assert eased <=. 1.0
+    assert eased >=. 0.0
+  })
+}
+
+@external(javascript, "./easings.ffi.mjs", "easeInOutBounce")
+fn ease_inout_bounce_js(x: Float) -> Float
+
+pub fn ease_bounce_inout_test() {
+  let tolerating = 0.0000000001
+  assert animation.ease(animation.EaseInOutBounce, 0.0) == 0.0
+  assert animation.ease(animation.EaseInOutBounce, 1.0) == 1.0
+  list.range(1, 99)
+  |> list.each(fn(i) {
+    let t = int.to_float(i) /. 100.0
+    let eased = animation.ease(animation.EaseInOutBounce, t)
+    assert float.loosely_equals(
+      eased,
+      with: ease_inout_bounce_js(t),
+      tolerating:,
+    )
+    // Bounce never goes beyond 0..1
+    assert eased <=. 1.0
+    assert eased >=. 0.0
+  })
 }
 
 pub fn ease_clamps_values_test() {

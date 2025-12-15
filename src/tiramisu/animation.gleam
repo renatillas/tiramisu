@@ -27,12 +27,12 @@
 ////     ]
 ////   }
 //// ]
-//// 
+////
 //// const callback = () => {
 ////   const list = document.querySelector(".sidebar > ul:last-of-type")
 ////   const sortedLists = document.createDocumentFragment()
 ////   const sortedMembers = document.createDocumentFragment()
-//// 
+////
 ////   for (const section of docs) {
 ////     sortedLists.append((() => {
 ////       const node = document.createElement("h3")
@@ -44,11 +44,11 @@
 ////       node.append(section.header)
 ////       return node
 ////     })())
-//// 
+////
 ////     const sortedList = document.createElement("ul")
 ////     sortedLists.append(sortedList)
-//// 
-//// 
+////
+////
 ////     for (const funcName of section.functions) {
 ////       const href = `#${funcName}`
 ////       const member = document.querySelector(
@@ -59,7 +59,7 @@
 ////       sortedMembers.append(member)
 ////     }
 ////   }
-//// 
+////
 ////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
 ////   document
 ////     .querySelector(".module-members:has(#module-values)")
@@ -68,7 +68,7 @@
 ////       document.querySelector("#module-values").nextSibling
 ////     )
 //// }
-//// 
+////
 //// document.readyState !== "loading"
 ////   ? callback()
 ////   : document.addEventListener(
@@ -153,9 +153,30 @@ pub type Easing {
   EaseInCubic
   EaseOutCubic
   EaseInOutCubic
+  EaseInQuartic
+  EaseOutQuartic
+  EaseInOutQuartic
+  EaseInQuintic
+  EaseOutQuintic
+  EaseInOutQuintic
   EaseInSine
   EaseOutSine
   EaseInOutSine
+  EaseInExponential
+  EaseOutExponential
+  EaseInOutExponential
+  EaseInCircular
+  EaseOutCircular
+  EaseInOutCircular
+  EaseInBack
+  EaseOutBack
+  EaseInOutBack
+  EaseInElastic
+  EaseOutElastic
+  EaseInOutElastic
+  EaseInBounce
+  EaseOutBounce
+  EaseInOutBounce
 }
 
 /// Apply an easing function to a normalized value.
@@ -177,6 +198,13 @@ pub type Easing {
 pub fn ease(easing: Easing, t: Float) -> Float {
   // Clamp t to [0, 1]
   let t = float.clamp(t, 0.0, 1.0)
+
+  // Constants for some of the easings
+  let c1 = 1.70158
+  let c2 = c1 *. 1.525
+  let c3 = c1 +. 1.0
+  let c4 = 2.0 *. maths.pi() /. 3.0
+  let c5 = 2.0 *. maths.pi() /. 4.5
 
   case easing {
     Linear -> t
@@ -203,6 +231,26 @@ pub fn ease(easing: Easing, t: Float) -> Float {
           { t_adj *. t_adj *. t_adj +. 2.0 } /. 2.0
         }
       }
+    EaseInQuartic -> t *. t *. t *. t
+    EaseOutQuartic -> 1.0 -. { t *. t *. t *. t }
+    EaseInOutQuartic ->
+      case t {
+        x if x <. 0.5 -> 8.0 *. x *. x *. x *. x
+        x -> {
+          let x = -2.0 *. x +. 2.0
+          1.0 -. { x *. x *. x *. x } /. 2.0
+        }
+      }
+    EaseInQuintic -> t *. t *. t *. t *. t
+    EaseOutQuintic -> 1.0 -. { t *. t *. t *. t *. t }
+    EaseInOutQuintic ->
+      case t {
+        x if x <. 0.5 -> 16.0 *. x *. x *. x *. x *. x
+        x -> {
+          let x = -2.0 *. x +. 2.0
+          1.0 -. { x *. x *. x *. x *. x } /. 2.0
+        }
+      }
     EaseInSine -> {
       let angle = t *. 1.5707963267948966
       1.0 -. maths.cos(angle)
@@ -215,6 +263,136 @@ pub fn ease(easing: Easing, t: Float) -> Float {
       let angle = 3.141592653589793 *. t
       { 1.0 -. maths.cos(angle) } /. 2.0
     }
+    EaseInExponential ->
+      case t {
+        0.0 -> 0.0
+        _ -> {
+          let assert Ok(r) = float.power(2.0, 10.0 *. t -. 10.0)
+          r
+        }
+      }
+    EaseOutExponential ->
+      case t {
+        1.0 -> 1.0
+        _ -> {
+          let assert Ok(r) = float.power(2.0, -10.0 *. t)
+          1.0 -. r
+        }
+      }
+    EaseInOutExponential ->
+      case t {
+        0.0 -> 0.0
+        1.0 -> 1.0
+        x if x <. 0.5 -> {
+          let assert Ok(r) = float.power(2.0, 20.0 *. x -. 10.0)
+          r /. 2.0
+        }
+        _ -> {
+          let assert Ok(r) = float.power(2.0, -20.0 *. t +. 10.0)
+          { 2.0 -. r } /. 2.0
+        }
+      }
+    EaseInCircular -> {
+      let assert Ok(i) = float.power(t, 2.0)
+      let assert Ok(o) = float.square_root(1.0 -. i)
+      1.0 -. o
+    }
+    EaseOutCircular -> {
+      let assert Ok(i) = float.power(t -. 1.0, 2.0)
+      let assert Ok(o) = float.square_root(1.0 -. i)
+      o
+    }
+    EaseInOutCircular ->
+      case t <. 0.5 {
+        True -> {
+          let assert Ok(i) = float.power(2.0 *. t, 2.0)
+          let assert Ok(o) = float.square_root(1.0 -. i)
+          { 1.0 -. o } /. 2.0
+        }
+        False -> {
+          let assert Ok(i) = float.power(-2.0 *. t +. 2.0, 2.0)
+          let assert Ok(o) = float.square_root(1.0 -. i)
+          { o +. 1.0 } /. 2.0
+        }
+      }
+    EaseInBack -> { c3 *. t *. t *. t } -. { c1 *. t *. t }
+    EaseOutBack -> {
+      let x = t -. 1.0
+      1.0 +. { c3 *. x *. x *. x } +. { c1 *. x *. x }
+    }
+    EaseInOutBack ->
+      case t <. 0.5 {
+        True -> {
+          let x = t *. 2.0
+          { x *. x } *. { { c2 +. 1.0 } *. x -. c2 } /. 2.0
+        }
+        False -> {
+          let x = { t *. 2.0 } -. 2.0
+          { { x *. x } *. { { c2 +. 1.0 } *. x +. c2 } +. 2.0 } /. 2.0
+        }
+      }
+    EaseInElastic ->
+      case t {
+        0.0 -> 0.0
+        1.0 -> 1.0
+        x -> {
+          let assert Ok(p) = float.power(2.0, 10.0 *. x -. 10.0)
+          { 0.0 -. p } *. maths.sin({ x *. 10.0 -. 10.75 } *. c4)
+        }
+      }
+    EaseOutElastic ->
+      case t {
+        0.0 -> 0.0
+        1.0 -> 1.0
+        x -> {
+          let assert Ok(p) = float.power(2.0, -10.0 *. x)
+          p *. maths.sin({ x *. 10.0 -. 0.75 } *. c4) +. 1.0
+        }
+      }
+    EaseInOutElastic ->
+      case t {
+        0.0 -> 0.0
+        1.0 -> 1.0
+        x if x <. 0.5 -> {
+          let assert Ok(p) = float.power(2.0, 20.0 *. x -. 10.0)
+          { 0.0 -. p } *. maths.sin({ 20.0 *. x -. 11.125 } *. c5) /. 2.0
+        }
+        x -> {
+          let assert Ok(p) = float.power(2.0, -20.0 *. x +. 10.0)
+          p *. maths.sin({ 20.0 *. x -. 11.125 } *. c5) /. 2.0 +. 1.0
+        }
+      }
+    EaseInBounce -> 1.0 -. ease(EaseOutBounce, 1.0 -. t)
+    EaseOutBounce -> {
+      let n1 = 7.5625
+      let d1 = 2.75
+      let a = 1.0 /. d1
+      let b = 2.0 *. a
+      let c = 2.5 *. a
+
+      case t {
+        t if t <. a -> {
+          n1 *. t *. t
+        }
+        t if t <. b -> {
+          let t = t -. { 1.5 /. d1 }
+          n1 *. t *. t +. 0.75
+        }
+        t if t <. c -> {
+          let t = t -. { 2.25 /. d1 }
+          n1 *. t *. t +. 0.9375
+        }
+        _ -> {
+          let t = t -. { 2.625 /. d1 }
+          n1 *. t *. t +. 0.984375
+        }
+      }
+    }
+    EaseInOutBounce ->
+      case t {
+        x if x <. 0.5 -> 0.5 *. ease(EaseInBounce, 2.0 *. x)
+        x -> 0.5 +. 0.5 *. ease(EaseOutBounce, 2.0 *. x -. 1.0)
+      }
   }
 }
 
