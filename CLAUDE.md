@@ -181,7 +181,7 @@ let assert Ok(cam) = camera.perspective(
 ### Game Context
 
 The `Context` passed to `init()` and `update()` contains:
-- `delta_time`: Time in seconds since last frame (for frame-rate independent movement)
+- `delta_time`: Time since last frame as a Duration (use `duration.to_seconds()` to convert)
 - `input`: Current input state (keyboard, mouse, touch)
 - `canvas_width`: Current canvas width in pixels
 - `canvas_height`: Current canvas height in pixels
@@ -189,6 +189,8 @@ The `Context` passed to `init()` and `update()` contains:
 The canvas dimensions are automatically updated on window resize in fullscreen mode, making them ideal for coordinate conversion:
 
 ```gleam
+import gleam/time/duration
+
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
     TouchMove(x, y) -> {
@@ -196,7 +198,11 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
       let world_x = { x -. ctx.canvas_width /. 2.0 } /. 100.0
       let world_y = { ctx.canvas_height /. 2.0 -. y } /. 100.0
 
-      // Update model with converted coordinates
+      // Use delta_time for frame-rate independent movement
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let speed = 5.0  // units per second
+      let new_position = position +. speed *. delta_seconds
+
       Model(..model, position: vec3.Vec3(world_x, world_y, 0.0))
     }
   }
@@ -436,7 +442,58 @@ This section helps developers migrate from v1.0.0 to the next version.
 
 ### Breaking Changes
 
-#### 1. Background API
+#### 1. IDs are now plain Strings (no longer generic)
+
+**Major Change**: All scene node IDs, physics body IDs, and audio source IDs are now `String` instead of being generic over any custom type.
+
+**Old (v1.0.0):**
+```gleam
+type GameId {
+  Player
+  Enemy(Int)
+  Bullet(Int)
+}
+
+scene.mesh(
+  id: Player,  // Custom type as ID
+  // ...
+)
+
+pub fn view(model: Model, ctx: Context) -> scene.Node {
+  // ...
+}
+```
+
+**New:**
+```gleam
+// Use plain strings as IDs
+scene.mesh(
+  id: "player",  // String ID
+  // ...
+)
+
+pub fn view(model: Model, ctx: Context) -> scene.Node {
+  // ...
+}
+```
+
+**Migration steps:**
+1. Remove generic `id` type parameters from your `Context`, `scene.Node`, and `PhysicsWorld` types
+2. Convert all IDs to strings:
+   - Simple types: `Player` → `"player"`
+   - Types with data: `Enemy(5)` → `"enemy-5"` or `"enemy_" <> int.to_string(5)`
+   - Generate unique strings for instances: `Bullet(id)` → `"bullet-" <> int.to_string(id)`
+
+**Why this change?**
+- Eliminates runtime ID serialization overhead
+- Simplifies type signatures
+- Reduces FFI complexity
+- Makes debugging easier (IDs are readable strings)
+- Follows industry standards (most game engines use string IDs)
+
+**Note**: The `tiramisu/internal/id` module is now deprecated and unused.
+
+#### 2. Background API
 
 The `background` parameter now uses a `Background` type instead of a simple hex color integer, allowing for color, texture, or cube texture (skybox) backgrounds.
 
@@ -595,7 +652,7 @@ scene.Camera(
 
 #### 6. Context Type
 
-The `Context` type now includes canvas dimensions:
+The `Context` type now uses `Duration` for delta_time:
 
 **Old:**
 ```gleam
@@ -606,9 +663,11 @@ pub type Context {
 
 **New:**
 ```gleam
+import gleam/time/duration.{type Duration}
+
 pub type Context {
   Context(
-    delta_time: Float,
+    delta_time: Duration,
     input: input.InputState,
     canvas_width: Float,
     canvas_height: Float,
@@ -616,23 +675,26 @@ pub type Context {
 }
 ```
 
-**Impact:** If you pattern match on Context, update your patterns:
+**Impact:** Use `duration.to_seconds()` or `duration.to_seconds()` to extract numeric values:
 
 ```gleam
+import gleam/time/duration
+
 // Old
-fn update(model: Model, msg: Msg, Context(delta_time, input)) { ... }
+fn update(model: Model, msg: Msg, Context(delta_time, input)) { 
+  let speed = 5.0 *. delta_time *. 0.001  // Convert ms to seconds
+  ...
+}
 
 // New
-fn update(model: Model, msg: Msg, Context(delta_time, input, width, height)) { ... }
-
-// Or just use record access
 fn update(model: Model, msg: Msg, ctx: Context) {
-  let x = ctx.canvas_width
-  // ...
+  let delta_seconds = duration.to_seconds(ctx.delta_time)
+  let speed = 5.0 *. delta_seconds  // Type-safe!
+  ...
 }
 ```
 
-#### 7. Geometry and Material Types
+#### 10. Geometry and Material Types
 
 Geometry and material types are now in separate modules with validated constructors and builder patterns:
 
@@ -681,7 +743,7 @@ scene.Mesh(
 )
 ```
 
-#### 8. Light Constructors
+#### 10. Light Constructors
 
 Lights are now in a separate module with validated constructors:
 
@@ -710,7 +772,7 @@ scene.Light(
 )
 ```
 
-#### 9. State Machine Generic Types
+#### 10. State Machine Generic Types
 
 State machines are now generic over state type:
 

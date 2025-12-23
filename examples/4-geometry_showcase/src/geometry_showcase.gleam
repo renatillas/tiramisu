@@ -6,6 +6,7 @@
 ///
 /// Each geometry rotates slowly to show its shape
 import gleam/option
+import gleam/time/duration
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -35,26 +36,24 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(
-  _ctx: tiramisu.Context(String),
-) -> #(Model, Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model, _) -> scene.Node(String) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -159,7 +158,7 @@ fn create_mesh(
   y: Float,
   rotation: Float,
   color: Int,
-) -> scene.Node(String) {
+) -> scene.Node {
   let assert Ok(material) =
     material.new() |> material.with_color(color) |> material.build
 

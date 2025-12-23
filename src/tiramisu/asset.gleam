@@ -133,11 +133,8 @@ import gleam/option
 import gleam/order
 import tiramisu/animation.{type AnimationClip}
 import tiramisu/audio.{type AudioBuffer}
-
-/// Opaque type for Three.js textures.
-///
-/// Created via `asset.load_texture()` and used in materials.
-pub type Texture
+import tiramisu/geometry
+import tiramisu/texture
 
 /// Opaque type for Three.js Object3D.
 ///
@@ -156,17 +153,6 @@ pub type TextureFilter {
   /// Perfect for pixel art, low-poly aesthetics, and retro games
   NearestFilter
 }
-
-/// Opaque type for Three.js BufferGeometry.
-///
-/// Created by loading 3D models with `asset.load_stl()`.
-pub type BufferGeometry
-
-/// Opaque type for Three.js Font (for TextGeometry).
-///
-/// Created via `asset.load_font()` and used in text geometries.
-/// Fonts must be in typeface.json format.
-pub type Font
 
 // --- Public Types ---
 
@@ -258,12 +244,12 @@ pub type AssetType {
 /// A loaded asset (opaque to enforce type safety)
 pub opaque type LoadedAsset {
   LoadedModel(data: GLTFData)
-  LoadedTexture(texture: Texture)
+  LoadedTexture(texture: texture.Texture)
   LoadedAudio(audio: AudioBuffer)
-  LoadedSTL(geometry: BufferGeometry)
+  LoadedSTL(geometry: geometry.BufferGeometry)
   LoadedOBJ(object: Object3D)
   LoadedFBX(data: FBXData)
-  LoadedFont(font: Font)
+  LoadedFont(font: geometry.Font)
 }
 
 // Internal constructors for FFI use
@@ -273,7 +259,7 @@ pub fn loaded_model(data: GLTFData) -> LoadedAsset {
 }
 
 @internal
-pub fn loaded_texture(texture: Texture) -> LoadedAsset {
+pub fn loaded_texture(texture: texture.Texture) -> LoadedAsset {
   LoadedTexture(texture)
 }
 
@@ -283,7 +269,7 @@ pub fn loaded_audio(audio: AudioBuffer) -> LoadedAsset {
 }
 
 @internal
-pub fn loaded_stl(geometry: BufferGeometry) -> LoadedAsset {
+pub fn loaded_stl(geometry: geometry.BufferGeometry) -> LoadedAsset {
   LoadedSTL(geometry)
 }
 
@@ -298,7 +284,7 @@ pub fn loaded_fbx(data: FBXData) -> LoadedAsset {
 }
 
 @internal
-pub fn loaded_font(font: Font) -> LoadedAsset {
+pub fn loaded_font(font: geometry.Font) -> LoadedAsset {
   LoadedFont(font)
 }
 
@@ -580,7 +566,7 @@ pub fn get_model_scene(
 pub fn get_texture(
   cache: AssetCache,
   url: String,
-) -> Result(Texture, AssetError) {
+) -> Result(texture.Texture, AssetError) {
   case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedTexture(tex), _)) -> Ok(tex)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
@@ -604,7 +590,7 @@ pub fn get_audio(
 pub fn get_stl(
   cache: AssetCache,
   url: String,
-) -> Result(BufferGeometry, AssetError) {
+) -> Result(geometry.BufferGeometry, AssetError) {
   case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedSTL(geom), _)) -> Ok(geom)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
@@ -684,7 +670,10 @@ pub fn get_fbx_scene(
 }
 
 /// Get a font asset from the cache
-pub fn get_font(cache: AssetCache, url: String) -> Result(Font, AssetError) {
+pub fn get_font(
+  cache: AssetCache,
+  url: String,
+) -> Result(geometry.Font, AssetError) {
   case dict.get(cache.asset, url) {
     Ok(CacheEntry(LoadedFont(font), _)) -> Ok(font)
     Ok(CacheEntry(_, _)) -> Error(InvalidAssetType(url))
@@ -762,7 +751,7 @@ fn evict_lru(cache: AssetCache) -> AssetCache {
 fn load_audio_ffi(url: String) -> Promise(Result(AudioBuffer, String))
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadTextureSafe")
-fn load_texture_ffi(url: String) -> Promise(Result(Texture, String))
+fn load_texture_ffi(url: String) -> Promise(Result(texture.Texture, String))
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadBatch")
 fn load_batch_ffi(
@@ -771,7 +760,9 @@ fn load_batch_ffi(
 ) -> Promise(BatchLoadResult)
 
 /// Load an STL file from a URL using Promises
-pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError)) {
+pub fn load_stl(
+  url: String,
+) -> Promise(Result(geometry.BufferGeometry, LoadError)) {
   // Validate URL
   case url == "" {
     True -> promise.resolve(Error(InvalidUrl(url)))
@@ -789,10 +780,10 @@ pub fn load_stl(url: String) -> Promise(Result(BufferGeometry, LoadError)) {
 }
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadSTLSafe")
-fn load_stl_ffi(url: String) -> Promise(Result(BufferGeometry, String))
+fn load_stl_ffi(url: String) -> Promise(Result(geometry.BufferGeometry, String))
 
 /// Load a texture from a URL using Promises
-pub fn load_texture(url: String) -> Promise(Result(Texture, LoadError)) {
+pub fn load_texture(url: String) -> Promise(Result(texture.Texture, LoadError)) {
   // Validate URL
   case url == "" {
     True -> promise.resolve(Error(InvalidUrl(url)))
@@ -1009,7 +1000,7 @@ fn load_fbx_ffi(
 /// - `Error(LoadError)`: File not found
 /// - `Error(InvalidUrl)`: Invalid URL provided
 /// - `Error(ParseError)`: Failed to parse font file
-pub fn load_font(url: String) -> Promise(Result(Font, LoadError)) {
+pub fn load_font(url: String) -> Promise(Result(geometry.Font, LoadError)) {
   // Validate URL
   case url == "" {
     True -> promise.resolve(Error(InvalidUrl(url)))
@@ -1027,7 +1018,7 @@ pub fn load_font(url: String) -> Promise(Result(Font, LoadError)) {
 }
 
 @external(javascript, "../tiramisu.ffi.mjs", "loadFontSafe")
-fn load_font_ffi(url: String) -> Promise(Result(Font, String))
+fn load_font_ffi(url: String) -> Promise(Result(geometry.Font, String))
 
 /// Clone an Object3D for reuse in multiple scene locations
 ///

@@ -54,7 +54,7 @@ pub fn main() {
     ],
     [
       bench.Function("scene.diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current, option.None).0
+        scene.diff(pair.previous, pair.current)
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],

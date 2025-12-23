@@ -128,11 +128,11 @@
 //// }
 //// ```
 
-import gleam/dynamic.{type Dynamic}
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import plinth/browser/window
 import tiramisu/background.{type Background}
+import tiramisu/texture
 
 /// Opaque effect type that can dispatch messages back to the application.
 ///
@@ -331,45 +331,35 @@ pub fn set_background(background: Background) -> Effect(msg) {
   })
 }
 
+type GameScene
+
 // FFI bindings for background setting
 @external(javascript, "../threejs.ffi.mjs", "getGameScene")
-fn get_game_scene_ffi() -> Dynamic
+fn get_game_scene_ffi() -> GameScene
 
 @external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundColor")
-fn set_scene_background_color_ffi(scene: Dynamic, color: Int) -> Nil
+fn set_scene_background_color_ffi(scene: GameScene, color: Int) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundTexture")
-fn set_scene_background_texture_ffi(scene: Dynamic, texture: Dynamic) -> Nil
+fn set_scene_background_texture_ffi(
+  scene: GameScene,
+  texture: texture.Texture,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundCubeTexture")
 fn set_scene_background_cube_texture_ffi(
-  scene: Dynamic,
-  cube_texture: Dynamic,
+  scene: GameScene,
+  cube_texture: texture.Texture,
 ) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "loadTexture")
-fn load_texture_ffi(url: String) -> Promise(Dynamic)
+fn load_texture_ffi(url: String) -> Promise(texture.Texture)
 
 @external(javascript, "../threejs.ffi.mjs", "loadEquirectangularTexture")
-fn load_equirectangular_texture_ffi(url: String) -> Promise(Dynamic)
+fn load_equirectangular_texture_ffi(url: String) -> Promise(texture.Texture)
 
 @external(javascript, "../threejs.ffi.mjs", "loadCubeTexture")
-fn load_cube_texture_ffi(urls: List(String)) -> Promise(Dynamic)
-
-// ============================================================================
-// TIME & ANIMATION EFFECTS
-// ============================================================================
-
-/// Easing function types for animations and tweens.
-pub type Easing {
-  Linear
-  EaseInQuad
-  EaseOutQuad
-  EaseInOutQuad
-  EaseInCubic
-  EaseOutCubic
-  EaseInOutCubic
-}
+fn load_cube_texture_ffi(urls: List(String)) -> Promise(texture.Texture)
 
 /// Delay dispatching a message by a specified duration.
 ///
@@ -483,76 +473,6 @@ pub fn cancel_interval(id: Int) -> Effect(msg) {
     cancel_interval_ffi(id)
     Nil
   })
-}
-
-/// Animate a value from start to end over a duration with easing.
-///
-/// Dispatches `on_update` messages with interpolated values each frame,
-/// and `on_complete` when the animation finishes.
-///
-/// ## Example
-///
-/// ```gleam
-/// type Msg {
-///   FadeIn
-///   UpdateOpacity(Float)
-///   FadeComplete
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     FadeIn -> #(
-///       model,
-///       effect.tween(
-///         from: 0.0,
-///         to: 1.0,
-///         duration_ms: 1000,
-///         easing: effect.EaseInOutQuad,
-///         on_update: UpdateOpacity,
-///         on_complete: FadeComplete,
-///       ),
-///     )
-///     UpdateOpacity(opacity) -> #(
-///       Model(..model, opacity: opacity),
-///       effect.none(),
-///     )
-///     FadeComplete -> #(model, effect.none())
-///     _ -> #(model, effect.none())
-///   }
-/// }
-/// ```
-pub fn tween(
-  from start: Float,
-  to end: Float,
-  duration_ms duration_ms: Int,
-  easing easing: Easing,
-  on_update on_update: fn(Float) -> msg,
-  on_complete on_complete: msg,
-) -> Effect(msg) {
-  Effect(perform: fn(dispatch) {
-    tween_ffi(
-      start,
-      end,
-      duration_ms,
-      easing_to_string(easing),
-      fn(value) { dispatch(on_update(value)) },
-      fn() { dispatch(on_complete) },
-    )
-    Nil
-  })
-}
-
-// Helper to convert Easing to string for FFI
-fn easing_to_string(easing: Easing) -> String {
-  case easing {
-    Linear -> "linear"
-    EaseInQuad -> "easeInQuad"
-    EaseOutQuad -> "easeOutQuad"
-    EaseInOutQuad -> "easeInOutQuad"
-    EaseInCubic -> "easeInCubic"
-    EaseOutCubic -> "easeOutCubic"
-    EaseInOutCubic -> "easeInOutCubic"
-  }
 }
 
 // ============================================================================
@@ -847,16 +767,6 @@ fn interval_ffi(milliseconds: Int, callback: fn() -> Nil) -> Int
 
 @external(javascript, "../tiramisu.ffi.mjs", "cancelInterval")
 fn cancel_interval_ffi(id: Int) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "tween")
-fn tween_ffi(
-  start: Float,
-  end: Float,
-  duration_ms: Int,
-  easing: String,
-  on_update: fn(Float) -> Nil,
-  on_complete: fn() -> Nil,
-) -> Nil
 
 // System & Browser FFI
 @external(javascript, "../tiramisu.ffi.mjs", "requestFullscreen")

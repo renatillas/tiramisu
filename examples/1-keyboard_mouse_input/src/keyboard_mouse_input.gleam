@@ -7,6 +7,7 @@
 /// - Right Click: Change cube color to blue
 /// - Mouse Wheel: Scale the cube up/down
 import gleam/option
+import gleam/time/duration
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -43,7 +44,7 @@ pub fn main() -> Nil {
 }
 
 fn init(
-  _ctx: tiramisu.Context(String),
+  _ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let model =
     Model(
@@ -58,7 +59,7 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
@@ -68,8 +69,8 @@ fn update(
         input.is_key_pressed(ctx.input, input.KeyD),
         input.is_key_pressed(ctx.input, input.KeyA)
       {
-        True, False -> move_speed *. ctx.delta_time /. 1000.0
-        False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
+        True, False -> move_speed *. duration.to_seconds(ctx.delta_time)
+        False, True -> 0.0 -. move_speed *. duration.to_seconds(ctx.delta_time)
         _, _ -> 0.0
       }
 
@@ -77,8 +78,8 @@ fn update(
         input.is_key_pressed(ctx.input, input.KeyW),
         input.is_key_pressed(ctx.input, input.KeyS)
       {
-        True, False -> move_speed *. ctx.delta_time /. 1000.0
-        False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
+        True, False -> move_speed *. duration.to_seconds(ctx.delta_time)
+        False, True -> 0.0 -. move_speed *. duration.to_seconds(ctx.delta_time)
         _, _ -> 0.0
       }
 
@@ -125,7 +126,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> scene.Node(String) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   scene.empty(id: "scene", transform: transform.identity, children: [

@@ -1,9 +1,8 @@
-/// Effects System Example
-///
-/// Demonstrates the effect system with tick and custom effects
 import gleam/float
+import gleam/int
 import gleam/list
 import gleam/option
+import gleam/time/duration
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -28,14 +27,6 @@ pub type Cube {
   )
 }
 
-pub type Id {
-  Scene
-  MainCamera
-  AmbientLight
-  DirectionalLight
-  CubeId(Int)
-}
-
 pub type Msg {
   Tick
   AddCube
@@ -52,7 +43,7 @@ pub fn main() -> Nil {
 }
 
 fn init(
-  _ctx: tiramisu.Context(Id),
+  _ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   #(
     Model(cubes: [], next_id: 0),
@@ -64,7 +55,7 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
@@ -73,9 +64,15 @@ fn update(
         list.map(model.cubes, fn(cube) {
           let new_pos =
             vec3.Vec3(
-              cube.position.x +. cube.velocity.x *. ctx.delta_time /. 1000.0,
-              cube.position.y +. cube.velocity.y *. ctx.delta_time /. 1000.0,
-              cube.position.z +. cube.velocity.z *. ctx.delta_time /. 1000.0,
+              cube.position.x
+                +. cube.velocity.x
+                *. duration.to_seconds(ctx.delta_time),
+              cube.position.y
+                +. cube.velocity.y
+                *. duration.to_seconds(ctx.delta_time),
+              cube.position.z
+                +. cube.velocity.z
+                *. duration.to_seconds(ctx.delta_time),
             )
           Cube(..cube, position: new_pos)
         })
@@ -128,7 +125,7 @@ fn list_at(list: List(a), index: Int) -> Result(a, Nil) {
   }
 }
 
-fn view(model: Model, _) -> scene.Node(Id) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -137,7 +134,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
 
   let camera_node =
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
       look_at: option.None,
@@ -148,7 +145,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
 
   let lights = [
     scene.light(
-      id: AmbientLight,
+      id: "ambient-light",
       light: {
         let assert Ok(light) = light.ambient(intensity: 0.6, color: 0xffffff)
         light
@@ -156,7 +153,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
       transform: transform.identity,
     ),
     scene.light(
-      id: DirectionalLight,
+      id: "directional-light",
       light: {
         let assert Ok(light) =
           light.directional(intensity: 0.8, color: 0xffffff)
@@ -172,7 +169,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
         material.new() |> material.with_color(cube.color) |> material.build
 
       scene.mesh(
-        id: CubeId(cube.id),
+        id: int.to_string(cube.id),
         geometry: box_geometry,
         material: cube_material,
         transform: transform.at(position: cube.position)
@@ -186,7 +183,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
       )
     })
 
-  scene.empty(id: Scene, transform: transform.identity, children: [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     camera_node,
     ..list.append(lights, cubes)
   ])

@@ -16,9 +16,24 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-import { Quaternion$Quaternion } from './tiramisu/transform.mjs';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { Vec3$Vec3 } from '../vec/vec/vec3.mjs';
 import { Option$isSome } from '../gleam_stdlib/gleam/option.mjs';
+
+// Export THREE so other modules can use the same instance
+export { THREE, TransformControls };
+
+// CRITICAL: Expose THREE and TransformControls from THIS module's imports
+// This ensures they use the same THREE instance that the rest of Tiramisu uses
+if (typeof window !== 'undefined') {
+  window.__TIRAMISU_THREE = THREE;
+  window.__TIRAMISU_TransformControls = TransformControls;
+
+  // Also set window.THREE for backwards compatibility
+  if (!window.THREE) {
+    window.THREE = THREE;
+  }
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -60,33 +75,33 @@ function getConstructorId(constructor) {
 }
 
 /**
- * Serialize a Gleam ID to a stable string representation
+ * DEPRECATED: serializeId is no longer needed since IDs are now plain strings.
+ * This function was used to convert generic Gleam custom types to stable string
+ * representations for use as dictionary keys. Now that IDs must be strings,
+ * no serialization is necessary.
+ * 
+ * Kept for backward compatibility but should not be used in new code.
  *
- * This function converts any Gleam custom type instance into a unique string
- * that can be used as a Map/Dict key. It uses a stable numeric constructor ID
- * combined with JSON-serialized properties to ensure uniqueness even for types
- * with no fields (e.g., Player vs Enemy).
- *
- * This approach avoids relying on constructor.name which can be minified in
- * production builds, making the serialization stable across different build
- * configurations.
- *
- * @param {any} id - Any Gleam custom type instance
- * @returns {string} - Stable string representation
+ * @deprecated Use plain strings as IDs instead
+ * @param {any} id - Any value (historically a Gleam custom type)
+ * @returns {string} - String representation
  *
  * @example
- * // In Gleam: type GameId { Player(Int) | Enemy(Int) }
- * serializeId(Player(1))  // Returns "0:{\"0\":1}"  (if Player constructor gets ID 0)
- * serializeId(Enemy(1))   // Returns "1:{\"0\":1}"  (if Enemy constructor gets ID 1)
+ * // Old way (deprecated):
+ * serializeId(Player(1))  // Returns "0:{\"0\":1}"
+ * 
+ * // New way (use strings directly):
+ * const id = "player-1";  // Just use a string!
  */
 export function serializeId(id) {
-  // Get stable numeric ID for the constructor (doesn't rely on minifiable name)
+  // If it's already a string, just return it
+  if (typeof id === 'string') {
+    return id;
+  }
+
+  // For backward compatibility with old code, still serialize complex types
   const constructorId = getConstructorId(id.constructor);
-
-  // Serialize the object's properties
   const props = JSON.stringify(id);
-
-  // Combine both for a unique key
   return `${constructorId}:${props}`;
 }
 
@@ -142,6 +157,20 @@ export function createRenderer(options) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+  // If dev mode is enabled, patch the render method to expose scene/camera
+  if (typeof window !== 'undefined' && window.__tiramisuDevMode) {
+    const originalRender = renderer.render.bind(renderer);
+    renderer.render = function (scene, camera) {
+      // Expose scene and camera globally
+      window.tiramisuScene = scene;
+      window.tiramisuCamera = camera;
+
+      // Call original render
+      return originalRender(scene, camera);
+    };
+    console.log('[Tiramisu Dev] Patched renderer instance - scene and camera will be exposed');
+  }
+
   // Set renderer size based on dimensions or fullscreen
   const dimensions = optionToNull(options.dimensions);
   if (dimensions) {
@@ -168,14 +197,32 @@ export function createRenderer(options) {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
           } else if (camera.isOrthographicCamera) {
-            // Update orthographic camera frustum
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            camera.left = -width / 2;
-            camera.right = width / 2;
-            camera.top = height / 2;
-            camera.bottom = -height / 2;
-            camera.updateProjectionMatrix();
+            // Preserve original aspect ratio of orthographic camera
+            if (camera._originalLeft !== undefined) {
+              const origWidth = camera._originalRight - camera._originalLeft;
+              const origHeight = camera._originalTop - camera._originalBottom;
+              const origAspect = origWidth / origHeight;
+              const newAspect = window.innerWidth / window.innerHeight;
+
+              if (newAspect > origAspect) {
+                // Window is wider - expand horizontally
+                const newWidth = origHeight * newAspect;
+                const centerX = (camera._originalLeft + camera._originalRight) / 2;
+                camera.left = centerX - newWidth / 2;
+                camera.right = centerX + newWidth / 2;
+                camera.top = camera._originalTop;
+                camera.bottom = camera._originalBottom;
+              } else {
+                // Window is taller - expand vertically
+                const newHeight = origWidth / newAspect;
+                const centerY = (camera._originalTop + camera._originalBottom) / 2;
+                camera.left = camera._originalLeft;
+                camera.right = camera._originalRight;
+                camera.top = centerY + newHeight / 2;
+                camera.bottom = centerY - newHeight / 2;
+              }
+              camera.updateProjectionMatrix();
+            }
           }
         }
       });
@@ -401,7 +448,13 @@ export function createPerspectiveCamera(fov, aspect, near, far) {
  * @returns {THREE.OrthographicCamera}
  */
 export function createOrthographicCamera(left, right, top, bottom, near, far) {
-  return new THREE.OrthographicCamera(left, right, top, bottom, near, far);
+  const camera = new THREE.OrthographicCamera(left, right, top, bottom, near, far);
+  // Store original bounds as custom properties for aspect ratio preservation during resize
+  camera._originalLeft = left;
+  camera._originalRight = right;
+  camera._originalTop = top;
+  camera._originalBottom = bottom;
+  return camera;
 }
 
 /**
@@ -1167,12 +1220,12 @@ export function getWorldPosition(object) {
 /**
  * Get world quaternion from object (includes parent transforms)
  * @param {THREE.Object3D} object
- * @returns {Quaternion} Gleam Quaternion with world rotation
+ * @returns {Array[Number]} Gleam Quaternion with world rotation
  */
 export function getWorldQuaternion(object) {
   const worldQuat = new THREE.Quaternion();
   object.getWorldQuaternion(worldQuat);
-  return Quaternion$Quaternion(worldQuat.x, worldQuat.y, worldQuat.z, worldQuat.w);
+  return [worldQuat.x, worldQuat.y, worldQuat.z, worldQuat.w];
 }
 
 /**
@@ -2550,6 +2603,11 @@ export function setOrthographicCameraParams(camera, left, right, top, bottom, ne
   camera.bottom = bottom;
   camera.near = near;
   camera.far = far;
+  // Update stored original bounds for aspect ratio preservation during resize
+  camera._originalLeft = left;
+  camera._originalRight = right;
+  camera._originalTop = top;
+  camera._originalBottom = bottom;
 }
 
 /**
@@ -2618,15 +2676,15 @@ export function getObjectScale(object) {
 /**
  * Get object quaternion
  * @param {THREE.Object3D} object
- * @returns {Quaternion} - Gleam Quaternion
+ * @returns {Array[Number]} - Gleam Quaternion
  */
 export function getObjectQuaternion(object) {
-  return Quaternion$Quaternion(
+  return [
     object.quaternion.x,
     object.quaternion.y,
     object.quaternion.z,
     object.quaternion.w
-  );
+  ];
 }
 
 /**
@@ -2639,109 +2697,6 @@ export function getObjectQuaternion(object) {
  */
 export function setObjectQuaternion(object, x, y, z, w) {
   object.quaternion.set(x, y, z, w);
-}
-
-// ============================================================================
-// EULER <-> QUATERNION CONVERSION
-// ============================================================================
-
-/**
- * Convert Euler angles to Quaternion using Three.js's built-in conversion
- * @param {Vec3} euler - Euler angles as Vec3(x, y, z) in radians
- * @returns {Quaternion} Quaternion
- */
-export function eulerToQuaternion(euler) {
-  const threeEuler = new THREE.Euler(euler.x, euler.y, euler.z, 'XYZ');
-  const threeQuaternion = new THREE.Quaternion().setFromEuler(threeEuler);
-  return Quaternion$Quaternion(threeQuaternion.x, threeQuaternion.y, threeQuaternion.z, threeQuaternion.w);
-}
-
-/**
- * Convert Quaternion to Euler angles using Three.js's built-in conversion
- * @param {Quaternion} q - Quaternion
- * @returns {Vec3} Euler angles as Vec3(x, y, z) in radians
- */
-export function quaternionToEuler(q) {
-  const threeQuaternion = new THREE.Quaternion(q.x, q.y, q.z, q.w);
-  const threeEuler = new THREE.Euler().setFromQuaternion(threeQuaternion, 'XYZ');
-  return Vec3$Vec3(threeEuler.x, threeEuler.y, threeEuler.z);
-}
-
-/**
- * Multiply two quaternions using Three.js
- * @param {Quaternion} q1 - First quaternion
- * @param {Quaternion} q2 - Second quaternion
- * @returns {Quaternion} Result of q1 * q2
- */
-export function multiplyQuaternions(q1, q2) {
-  const threeQ1 = new THREE.Quaternion(q1.x, q1.y, q1.z, q1.w);
-  const threeQ2 = new THREE.Quaternion(q2.x, q2.y, q2.z, q2.w);
-  threeQ1.multiply(threeQ2);
-  return Quaternion$Quaternion(threeQ1.x, threeQ1.y, threeQ1.z, threeQ1.w);
-}
-
-/**
- * Spherical linear interpolation between two quaternions
- * @param {Quaternion} from - Starting quaternion
- * @param {Quaternion} to - Target quaternion
- * @param {number} amount - Interpolation factor (0.0 to 1.0)
- * @returns {Quaternion} Interpolated quaternion
- */
-export function slerpQuaternions(from, to, amount) {
-  const threeFrom = new THREE.Quaternion(from.x, from.y, from.z, from.w);
-  const threeTo = new THREE.Quaternion(to.x, to.y, to.z, to.w);
-  const result = new THREE.Quaternion();
-  result.slerpQuaternions(threeFrom, threeTo, amount);
-  return Quaternion$Quaternion(result.x, result.y, result.z, result.w);
-}
-
-/**
- * Compute quaternion rotation to look from one position toward another
- * Uses Three.js's Matrix4.lookAt for proper orthonormal basis construction
- * @param {Vec3} from - Source position
- * @param {Vec3} to - Target position
- * @param {Vec3} up - Up vector (default: 0, 1, 0)
- * @returns {Quaternion} Rotation quaternion to orient from toward to
- */
-export function quaternionLookAt(from, to, up) {
-  const matrix = new THREE.Matrix4();
-  const upVec = up ? new THREE.Vector3(up.x, up.y, up.z) : new THREE.Vector3(0, 1, 0);
-
-  // lookAt creates a matrix that orients -Z toward the target
-  matrix.lookAt(
-    new THREE.Vector3(from.x, from.y, from.z),
-    new THREE.Vector3(to.x, to.y, to.z),
-    upVec
-  );
-
-  // Extract quaternion from the matrix
-  const quat = new THREE.Quaternion();
-  quat.setFromRotationMatrix(matrix);
-
-  return Quaternion$Quaternion(quat.x, quat.y, quat.z, quat.w);
-}
-
-/**
- * Build a quaternion from three orthonormal basis vectors
- * @param {Vec3} xAxis - Right vector (+X axis)
- * @param {Vec3} yAxis - Up vector (+Y axis)
- * @param {Vec3} zAxis - Forward vector (+Z axis)
- * @returns {Quaternion} Rotation quaternion representing this orientation
- */
-export function quaternionFromBasis(xAxis, yAxis, zAxis) {
-  // Build a rotation matrix from the three basis vectors
-  const matrix = new THREE.Matrix4();
-  matrix.makeBasis(
-    new THREE.Vector3(xAxis.x, xAxis.y, xAxis.z),
-    new THREE.Vector3(yAxis.x, yAxis.y, yAxis.z),
-    new THREE.Vector3(zAxis.x, zAxis.y, zAxis.z)
-  );
-
-  // Extract quaternion from the matrix
-  const quat = new THREE.Quaternion();
-  quat.setFromRotationMatrix(matrix);
-
-  return Quaternion$Quaternion(quat.x, quat.y, quat.z, quat.w);
 }
 
 // ============================================================================

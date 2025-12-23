@@ -175,11 +175,11 @@ import vec/vec3f
 /// )
 /// ```
 pub fn bounding_box(
-  id: id,
+  id: String,
   min: Vec3(Float),
   max: Vec3(Float),
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   scene.debug_box(id, min, max, color)
 }
 
@@ -208,11 +208,11 @@ pub fn bounding_box(
 /// )
 /// ```
 pub fn sphere(
-  id: id,
+  id: String,
   center: Vec3(Float),
   radius: Float,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   scene.debug_sphere(id, center, radius, color)
 }
 
@@ -241,11 +241,11 @@ pub fn sphere(
 /// )
 /// ```
 pub fn line(
-  id: id,
+  id: String,
   from: Vec3(Float),
   to: Vec3(Float),
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   scene.debug_line(id, from, to, color)
 }
 
@@ -276,12 +276,12 @@ pub fn line(
 /// )
 /// ```
 pub fn ray(
-  id: id,
+  id: String,
   origin: Vec3(Float),
   direction: Vec3(Float),
   length: Float,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   let end = vec3f.add(origin, vec3f.scale(direction, length))
   scene.debug_line(id, origin, end, color)
 }
@@ -309,7 +309,7 @@ pub fn ray(
 /// // Show object-local axes
 /// debug.axes("player-axes", player_position, 2.0)
 /// ```
-pub fn axes(id: id, origin: Vec3(Float), size: Float) -> scene.Node(id) {
+pub fn axes(id: String, origin: Vec3(Float), size: Float) -> scene.Node {
   scene.debug_axes(id, origin, size)
 }
 
@@ -331,7 +331,7 @@ pub fn axes(id: id, origin: Vec3(Float), size: Float) -> scene.Node(id) {
 /// // Create a 20×20 grid with 20 divisions
 /// debug.grid("ground-grid", 20.0, 20, debug.color_white)
 /// ```
-pub fn grid(id: id, size: Float, divisions: Int, color: Int) -> scene.Node(id) {
+pub fn grid(id: String, size: Float, divisions: Int, color: Int) -> scene.Node {
   scene.debug_grid(id, size, divisions, color)
 }
 
@@ -355,11 +355,11 @@ pub fn grid(id: id, size: Float, divisions: Int, color: Int) -> scene.Node(id) {
 /// debug.point("spawn-2", spawn_pos_2, 0.3, debug.color_green)
 /// ```
 pub fn point(
-  id: id,
+  id: String,
   position: Vec3(Float),
   size: Float,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   scene.debug_point(id, position, size, color)
 }
 
@@ -388,10 +388,10 @@ pub fn point(
 /// debug.box_from_transform("cube-bounds", cube_transform, debug.color_orange)
 /// ```
 pub fn box_from_transform(
-  id: id,
+  id: String,
   t: transform.Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   let scale = transform.scale(t)
   let pos = transform.position(t)
 
@@ -440,24 +440,24 @@ pub fn box_from_transform(
 /// )
 /// ```
 pub fn path(
-  id: fn(Int) -> id,
+  id: String,
   points: List(Vec3(Float)),
   color: Int,
-) -> List(scene.Node(id)) {
+) -> List(scene.Node) {
   create_path_lines(id, points, color, 0, [])
 }
 
 fn create_path_lines(
-  id: fn(Int) -> id,
+  id: String,
   points: List(Vec3(Float)),
   color: Int,
   index: Int,
-  acc: List(scene.Node(id)),
-) -> List(scene.Node(id)) {
+  acc: List(scene.Node),
+) -> List(scene.Node) {
   case points {
     [] | [_] -> list.reverse(acc)
     [p1, p2, ..rest] -> {
-      let line_node = line(id(index), p1, p2, color)
+      let line_node = line(id <> int.to_string(index), p1, p2, color)
       create_path_lines(id, [p2, ..rest], color, index + 1, [line_node, ..acc])
     }
   }
@@ -492,11 +492,11 @@ fn create_path_lines(
 /// )
 /// ```
 pub fn cross(
-  id: id,
+  id: String,
   position: Vec3(Float),
   size: Float,
   color: Int,
-) -> List(scene.Node(id)) {
+) -> List(scene.Node) {
   let half_size = size /. 2.0
   [
     line(
@@ -579,10 +579,7 @@ pub fn get_performance_stats() -> PerformanceStats
 
 /// Enable/disable collision shape visualization for a specific physics world
 @external(javascript, "../tiramisu.ffi.mjs", "showColliders")
-fn show_colliders_ffi(
-  physics_world: physics.PhysicsWorld(id),
-  enabled: Bool,
-) -> Nil
+fn show_colliders_ffi(physics_world: physics.PhysicsWorld, enabled: Bool) -> Nil
 
 // ============================================================================
 // COLOR CONSTANTS
@@ -660,7 +657,7 @@ pub const color_purple = 0x800080
 /// }
 /// ```
 pub fn show_collider_wireframes(
-  physics_world: physics.PhysicsWorld(id),
+  physics_world: physics.PhysicsWorld,
   enabled: Bool,
 ) -> Nil {
   show_colliders_ffi(physics_world, enabled)
@@ -670,9 +667,9 @@ pub fn show_collider_wireframes(
 ///
 /// This function is kept for backwards compatibility but will be removed in a future version.
 pub fn with_collider_wireframes(
-  nodes: List(scene.Node(id)),
+  nodes: List(scene.Node),
   _color: Int,
-) -> List(scene.Node(id)) {
+) -> List(scene.Node) {
   // This function can no longer work without the physics world parameter
   // Users should migrate to show_collider_wireframes()
   nodes
@@ -708,11 +705,11 @@ pub fn with_collider_wireframes(
 /// }
 /// ```
 pub fn collider(
-  id: id,
+  id: String,
   shape: physics.ColliderShape,
   transform: Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   case shape {
     physics.Box(_offset, width, height, depth) ->
       collider_box(id, width, height, depth, transform, color)
@@ -727,13 +724,13 @@ pub fn collider(
 
 /// Visualize a box collider
 fn collider_box(
-  id: id,
+  id: String,
   width: Float,
   height: Float,
   depth: Float,
   transform: Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   // Box collider uses half-extents, so full dimensions are already provided
   let half_w = width /. 2.0
   let half_h = height /. 2.0
@@ -787,23 +784,23 @@ fn list_at(list: List(a), index: Int) -> a {
 
 /// Visualize a sphere collider
 fn collider_sphere(
-  id: id,
+  id: String,
   radius: Float,
   transform: Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   let center = transform.position(transform)
   sphere(id, center, radius, color)
 }
 
 /// Visualize a capsule collider (cylinder with hemispherical caps)
 fn collider_capsule(
-  id: id,
+  id: String,
   half_height: Float,
   radius: Float,
   transform: Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   let segments = 16
 
   // Generate wireframe lines for capsule
@@ -918,12 +915,12 @@ fn generate_capsule_wireframe(
 
 /// Visualize a cylinder collider
 fn collider_cylinder(
-  id: id,
+  id: String,
   half_height: Float,
   radius: Float,
   transform: Transform,
   color: Int,
-) -> scene.Node(id) {
+) -> scene.Node {
   let segments = 16
 
   // Generate wireframe lines for cylinder

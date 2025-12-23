@@ -14,16 +14,18 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/option.{type Option}
+import tiramisu/asset
 import tiramisu/audio.{
   type Audio, type AudioBuffer, type AudioConfig, type AudioGroup,
   type AudioState,
 }
-import tiramisu/internal/id
 
 /// Opaque type wrapping THREE.Audio or THREE.PositionalAudio
 pub opaque type ThreeAudioSource {
   ThreeAudioSource(source: Dynamic)
 }
+
+pub type AudioListener
 
 /// Audio source metadata stored alongside Three.js object
 pub type AudioSourceData {
@@ -87,25 +89,25 @@ pub fn init() -> AudioManagerState {
 /// Register an audio source
 pub fn register_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
   source_data: AudioSourceData,
 ) -> AudioManagerState {
-  let string_id = id.to_string(id)
+  // id is already a string
   AudioManagerState(
     ..state,
-    sources: dict.insert(state.sources, string_id, source_data),
+    sources: dict.insert(state.sources, id, source_data),
   )
 }
 
 /// Unregister an audio source
 pub fn unregister_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
 ) -> AudioManagerState {
-  let string_id = id.to_string(id)
+  // id is already a string
 
   // Stop looping sounds before removing
-  case dict.get(state.sources, string_id) {
+  case dict.get(state.sources, id) {
     Ok(source_data) -> {
       let three_source = unwrap_audio_source(source_data.three_source)
       let is_playing = is_audio_playing_ffi(three_source)
@@ -119,16 +121,16 @@ pub fn unregister_audio_source(
     Error(_) -> Nil
   }
 
-  AudioManagerState(..state, sources: dict.delete(state.sources, string_id))
+  AudioManagerState(..state, sources: dict.delete(state.sources, id))
 }
 
 /// Get audio source data by ID
 pub fn get_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
 ) -> Option(AudioSourceData) {
-  let string_id = id.to_string(id)
-  dict.get(state.sources, string_id) |> option.from_result
+  // id is already a string
+  dict.get(state.sources, id) |> option.from_result
 }
 
 // ============================================================================
@@ -138,16 +140,16 @@ pub fn get_audio_source(
 /// Create and configure an audio source
 pub fn create_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
   buffer: AudioBuffer,
   config: AudioConfig,
   audio_type: Audio,
-  audio_listener: Dynamic,
+  audio_listener: AudioListener,
 ) -> #(AudioManagerState, AudioSourceData) {
-  let string_id = id.to_string(id)
+  // id is already a string
 
   // Remove existing source if it exists
-  let state = case dict.get(state.sources, string_id) {
+  let state = case dict.get(state.sources, id) {
     Ok(existing) -> {
       let three_source = unwrap_audio_source(existing.three_source)
       let is_playing = is_audio_playing_ffi(three_source)
@@ -236,12 +238,12 @@ pub fn create_audio_source(
 /// Apply audio state (Playing, Paused, Stopped)
 pub fn apply_audio_state(
   state: AudioManagerState,
-  id: id,
+  id: String,
   source_data: AudioSourceData,
   buffer: AudioBuffer,
   config: AudioConfig,
 ) -> #(AudioManagerState, AudioSourceData) {
-  let string_id = id.to_string(id)
+  // id is already a string
   let three_source = unwrap_audio_source(source_data.three_source)
 
   let previous_state = case source_data.previous_state {
@@ -280,7 +282,7 @@ pub fn apply_audio_state(
               // Add to pending playbacks
               let pending =
                 PendingPlayback(
-                  id: string_id,
+                  id: id,
                   source_data: source_data,
                   fade_duration_ms: fade_duration_ms,
                 )
@@ -404,7 +406,7 @@ pub fn apply_audio_state(
 /// Update audio configuration for existing source
 pub fn update_audio_config(
   state: AudioManagerState,
-  id: id,
+  id: String,
   buffer: AudioBuffer,
   config: AudioConfig,
 ) -> AudioManagerState {
@@ -434,10 +436,10 @@ pub fn update_audio_config(
         apply_audio_state(state, id, updated_source_data, buffer, config)
 
       // Update registry
-      let string_id = id.to_string(id)
+      // id is already a string
       AudioManagerState(
         ..state,
-        sources: dict.insert(state.sources, string_id, updated_source_data),
+        sources: dict.insert(state.sources, id, updated_source_data),
       )
     }
   }
@@ -692,10 +694,10 @@ fn do_unwrap_audio_buffer(buffer: AudioBuffer) -> Dynamic
 
 // Audio creation
 @external(javascript, "../../threejs.ffi.mjs", "createAudio")
-fn create_audio_ffi(listener: Dynamic) -> Dynamic
+fn create_audio_ffi(listener: AudioListener) -> Dynamic
 
 @external(javascript, "../../threejs.ffi.mjs", "createPositionalAudio")
-fn create_positional_audio_ffi(listener: Dynamic) -> Dynamic
+fn create_positional_audio_ffi(listener: AudioListener) -> Dynamic
 
 // Audio configuration
 @external(javascript, "../../threejs.ffi.mjs", "setAudioBuffer")
@@ -761,3 +763,8 @@ fn get_audio_loop_ffi(audio: Dynamic) -> Bool
 
 @external(javascript, "../../threejs.ffi.mjs", "setMaxDistance")
 fn set_max_distance_ffi(audio: Dynamic, distance: Float) -> Nil
+
+@external(javascript, "../../threejs.ffi.mjs", "identity")
+pub fn audio_listener_to_object3d(
+  audio_listener: AudioListener,
+) -> asset.Object3D

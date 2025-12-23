@@ -160,28 +160,24 @@
 //// ```
 
 import gleam/dict
-import gleam/dynamic.{type Dynamic}
 import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
 import gleam/order
+import gleam/time/duration.{type Duration}
 import paint
 import paint/encode as paint_encode
+import quaternion
 import tiramisu/animation.{type AnimationPlayback}
 import tiramisu/asset
 import tiramisu/audio
 import tiramisu/camera
 import tiramisu/geometry
 import tiramisu/internal/audio_manager
-import tiramisu/internal/object_cache.{
-  type AnimationAction, type AnimationActions, type AnimationMixer,
-  type CacheState, type ThreeObject,
-}
-import tiramisu/internal/particle_manager
+import tiramisu/internal/object_cache
 import tiramisu/light
 import tiramisu/material
-import tiramisu/particle_emitter
 import tiramisu/physics
 import tiramisu/postprocessing
 import tiramisu/spritesheet
@@ -207,8 +203,8 @@ import vec/vec3.{type Vec3}
 ///   transform: transform.identity,
 /// )
 /// ```
-pub type LODLevel(id) {
-  LODLevel(distance: Float, node: Node(id))
+pub type LODLevel {
+  LODLevel(distance: Float, node: Node)
 }
 
 /// Create an LOD level with a distance threshold and scene node.
@@ -221,38 +217,38 @@ pub type LODLevel(id) {
 /// let high_detail = scene.lod_level(distance: 0.0, node: detailed_mesh)
 /// let low_detail = scene.lod_level(distance: 100.0, node: simple_mesh)
 /// ```
-pub fn lod_level(distance distance: Float, node node: Node(id)) -> LODLevel(id) {
+pub fn lod_level(distance distance: Float, node node: Node) -> LODLevel {
   LODLevel(distance: distance, node: node)
 }
 
-pub opaque type Node(id) {
+pub opaque type Node {
   /// Empty node for organization, pivot points, and grouping without visual representation.
   /// Replaces the old Group type with clearer intent.
-  Empty(id: id, children: List(Node(id)), transform: transform.Transform)
+  Empty(id: String, children: List(Node), transform: transform.Transform)
   Mesh(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     transform: transform.Transform,
     geometry: geometry.Geometry,
     material: material.Material,
     physics: Option(physics.RigidBody),
   )
   InstancedMesh(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     geometry: geometry.Geometry,
     material: material.Material,
     instances: List(transform.Transform),
   )
   Light(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     transform: transform.Transform,
     light: light.Light,
   )
   Camera(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     camera: camera.Camera,
     transform: transform.Transform,
     look_at: Option(vec3.Vec3(Float)),
@@ -261,14 +257,14 @@ pub opaque type Node(id) {
     postprocessing: Option(postprocessing.PostProcessing),
   )
   LOD(
-    id: id,
-    children: List(Node(id)),
-    levels: List(LODLevel(id)),
+    id: String,
+    children: List(Node),
+    levels: List(LODLevel),
     transform: transform.Transform,
   )
   Model3D(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     object: asset.Object3D,
     transform: transform.Transform,
     animation: Option(AnimationPlayback),
@@ -276,38 +272,31 @@ pub opaque type Node(id) {
     material: Option(material.Material),
   )
   InstancedModel(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     object: asset.Object3D,
     instances: List(transform.Transform),
     physics: Option(physics.RigidBody),
     material: Option(material.Material),
   )
-  Audio(id: id, children: List(Node(id)), audio: audio.Audio)
-  Particles(
-    id: id,
-    children: List(Node(id)),
-    emitter: particle_emitter.ParticleEmitter,
-    transform: transform.Transform,
-    active: Bool,
-  )
+  Audio(id: String, children: List(Node), audio: audio.Audio)
   // UI overlay nodes
   CSS2DLabel(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     html: String,
     transform: transform.Transform,
   )
   CSS3DLabel(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     html: String,
     transform: transform.Transform,
   )
   // Canvas drawings rendered to texture with depth occlusion
   Canvas(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     encoded_picture: String,
     texture_width: Int,
     texture_height: Int,
@@ -317,8 +306,8 @@ pub opaque type Node(id) {
   )
   // Animated sprite with spritesheet
   AnimatedSprite(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     spritesheet: spritesheet.Spritesheet,
     animation: spritesheet.Animation,
     state: spritesheet.AnimationState,
@@ -330,37 +319,37 @@ pub opaque type Node(id) {
   )
   // Debug visualization nodes
   DebugBox(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     min: Vec3(Float),
     max: Vec3(Float),
     color: Int,
   )
   DebugSphere(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     center: Vec3(Float),
     radius: Float,
     color: Int,
   )
   DebugLine(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     from: Vec3(Float),
     to: Vec3(Float),
     color: Int,
   )
-  DebugAxes(id: id, children: List(Node(id)), origin: Vec3(Float), size: Float)
+  DebugAxes(id: String, children: List(Node), origin: Vec3(Float), size: Float)
   DebugGrid(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     size: Float,
     divisions: Int,
     color: Int,
   )
   DebugPoint(
-    id: id,
-    children: List(Node(id)),
+    id: String,
+    children: List(Node),
     position: Vec3(Float),
     size: Float,
     color: Int,
@@ -400,12 +389,12 @@ pub opaque type Node(id) {
 /// )
 /// ```
 pub fn mesh(
-  id id: id,
+  id id: String,
   geometry geometry: geometry.Geometry,
   material material: material.Material,
   transform transform: transform.Transform,
   physics physics: Option(physics.RigidBody),
-) -> Node(id) {
+) -> Node {
   Mesh(id:, children: [], transform:, geometry:, material:, physics:)
 }
 
@@ -451,11 +440,11 @@ pub fn mesh(
 /// )
 /// ```
 pub fn instanced_mesh(
-  id id: id,
+  id id: String,
   geometry geometry: geometry.Geometry,
   material material: material.Material,
   instances instances: List(transform.Transform),
-) -> Node(id) {
+) -> Node {
   InstancedMesh(id:, geometry:, material:, instances:, children: [])
 }
 
@@ -484,10 +473,10 @@ pub fn instanced_mesh(
 /// )
 /// ```
 pub fn empty(
-  id id: id,
+  id id: String,
   transform transform: transform.Transform,
-  children children: List(Node(id)),
-) -> Node(id) {
+  children children: List(Node),
+) -> Node {
   Empty(id:, children:, transform:)
 }
 
@@ -516,27 +505,11 @@ pub fn empty(
 /// )
 /// ```
 pub fn light(
-  id id: id,
+  id id: String,
   light light: light.Light,
   transform transform: transform.Transform,
-) -> Node(id) {
+) -> Node {
   Light(id:, children: [], transform:, light:)
-}
-
-/// Viewport configuration for split-screen or picture-in-picture rendering.
-///
-/// Coordinates are in pixels from the top-left of the canvas.
-pub type ViewPort {
-  ViewPort(
-    /// X position from left edge in pixels
-    x: Int,
-    /// Y position from top edge in pixels
-    y: Int,
-    /// Width in pixels
-    width: Int,
-    /// Height in pixels
-    height: Int,
-  )
 }
 
 /// Create a camera scene node.
@@ -581,18 +554,18 @@ pub type ViewPort {
 ///     |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
 ///   look_at: option.None,
 ///   active: True,
-///   viewport: option.Some(scene.ViewPort(x: 10, y: 10, width: 200, height: 200)),
+///   viewport: option.Some(camera.ViewPort(x: 10, y: 10, width: 200, height: 200)),
 /// )
 /// ```
 pub fn camera(
-  id id: id,
+  id id: String,
   camera camera: camera.Camera,
   transform transform: transform.Transform,
   look_at look_at: Option(vec3.Vec3(Float)),
   active active: Bool,
-  viewport viewport: Option(ViewPort),
+  viewport viewport: Option(camera.ViewPort),
   postprocessing postprocessing: Option(postprocessing.PostProcessing),
-) -> Node(id) {
+) -> Node {
   Camera(
     id:,
     children: [],
@@ -654,10 +627,10 @@ pub fn camera(
 /// )
 /// ```
 pub fn lod(
-  id id: id,
-  levels levels: List(LODLevel(id)),
+  id id: String,
+  levels levels: List(LODLevel),
   transform transform: transform.Transform,
-) -> Node(id) {
+) -> Node {
   LOD(id:, levels:, transform:, children: [])
 }
 
@@ -700,13 +673,13 @@ pub fn lod(
 /// )
 /// ```
 pub fn model_3d(
-  id id: id,
+  id id: String,
   object object: asset.Object3D,
   transform transform: transform.Transform,
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
   material material: Option(material.Material),
-) -> Node(id) {
+) -> Node {
   Model3D(
     id:,
     object:,
@@ -754,12 +727,12 @@ pub fn model_3d(
 /// )
 /// ```
 pub fn instanced_model(
-  id id: id,
+  id id: String,
   object object: asset.Object3D,
   instances instances: List(transform.Transform),
   physics physics: Option(physics.RigidBody),
   material material: Option(material.Material),
-) -> Node(id) {
+) -> Node {
   InstancedModel(id:, object:, instances:, physics:, material:, children: [])
 }
 
@@ -791,50 +764,8 @@ pub fn instanced_model(
 ///
 /// scene.audio(id: "jump-sfx", audio: jump_sound, children: [])
 /// ```
-pub fn audio(id id: id, audio audio: audio.Audio) -> Node(id) {
+pub fn audio(id id: String, audio audio: audio.Audio) -> Node {
   Audio(id:, audio:, children: [])
-}
-
-/// Create a particle emitter scene node.
-///
-/// Particle systems create effects like fire, smoke, sparks, or magic spells.
-/// See the `particle_emitter` module for configuring emitters.
-///
-/// **Active**: Set to `True` to emit particles, `False` to pause emission.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu/scene
-/// import tiramisu/particle_emitter as particles
-/// import tiramisu/transform
-/// import vec/vec3
-/// import gleam/option
-///
-/// // Fire effect
-/// let fire_emitter = particles.new()
-///   |> particles.with_rate(50.0)  // 50 particles per second
-///   |> particles.with_lifetime(1.0, 2.0)  // Live 1-2 seconds
-///   |> particles.with_initial_velocity(vec3.Vec3(0.0, 3.0, 0.0))
-///   |> particles.with_velocity_randomness(vec3.Vec3(0.5, 0.5, 0.5))
-///   |> particles.with_size(0.5, 0.1)  // Start large, end small
-///   |> particles.with_color(0xff4500, 0xff0000)  // Orange to red
-///   |> particles.with_opacity(1.0, 0.0)  // Fade out
-///
-/// scene.particles(
-///   id: "campfire",
-///   emitter: fire_emitter,
-///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
-///   active: True,
-/// )
-/// ```
-pub fn particles(
-  id id: id,
-  emitter emitter: particle_emitter.ParticleEmitter,
-  transform transform: transform.Transform,
-  active active: Bool,
-) -> Node(id) {
-  Particles(id:, emitter:, transform:, active:, children: [])
 }
 
 /// Create a CSS2D label that follows a 3D position in screen space.
@@ -872,10 +803,10 @@ pub fn particles(
 /// )
 /// ```
 pub fn css2d_label(
-  id id: id,
+  id id: String,
   html html: String,
   transform transform: transform.Transform,
-) -> Node(id) {
+) -> Node {
   CSS2DLabel(id:, html:, transform:, children: [])
 }
 
@@ -902,10 +833,10 @@ pub fn css2d_label(
 /// )
 /// ```
 pub fn css3d_label(
-  id id: id,
+  id id: String,
   html html: String,
   transform transform: transform.Transform,
-) -> Node(id) {
+) -> Node {
   CSS3DLabel(id:, html:, transform:, children: [])
 }
 
@@ -955,14 +886,14 @@ pub fn css3d_label(
 /// )
 /// ```
 pub fn canvas(
-  id id: id,
+  id id: String,
   picture picture: paint.Picture,
   texture_width texture_width: Int,
   texture_height texture_height: Int,
   width width: Float,
   height height: Float,
   transform transform: transform.Transform,
-) -> Node(id) {
+) -> Node {
   // Encode picture to string for efficient comparison and storage
   let encoded_picture = paint_encode.to_string(picture)
 
@@ -1053,7 +984,7 @@ pub fn canvas(
 /// }
 /// ```
 pub fn animated_sprite(
-  id id: id,
+  id id: String,
   spritesheet spritesheet: spritesheet.Spritesheet,
   animation animation: spritesheet.Animation,
   state state: spritesheet.AnimationState,
@@ -1062,7 +993,7 @@ pub fn animated_sprite(
   transform transform: transform.Transform,
   pixel_art pixel_art: Bool,
   physics physics: Option(physics.RigidBody),
-) -> Node(id) {
+) -> Node {
   AnimatedSprite(
     id:,
     spritesheet:,
@@ -1096,11 +1027,11 @@ pub fn animated_sprite(
 /// )
 /// ```
 pub fn debug_box(
-  id id: id,
+  id id: String,
   min min: Vec3(Float),
   max max: Vec3(Float),
   color color: Int,
-) -> Node(id) {
+) -> Node {
   DebugBox(id:, min:, max:, color:, children: [])
 }
 
@@ -1125,11 +1056,11 @@ pub fn debug_box(
 /// )
 /// ```
 pub fn debug_sphere(
-  id id: id,
+  id id: String,
   center center: Vec3(Float),
   radius radius: Float,
   color color: Int,
-) -> Node(id) {
+) -> Node {
   DebugSphere(id:, center:, radius:, color:, children: [])
 }
 
@@ -1153,11 +1084,11 @@ pub fn debug_sphere(
 /// )
 /// ```
 pub fn debug_line(
-  id id: id,
+  id id: String,
   from from: Vec3(Float),
   to to: Vec3(Float),
   color color: Int,
-) -> Node(id) {
+) -> Node {
   DebugLine(id:, from:, to:, color:, children: [])
 }
 
@@ -1187,10 +1118,10 @@ pub fn debug_line(
 /// )
 /// ```
 pub fn debug_axes(
-  id id: id,
+  id id: String,
   origin origin: Vec3(Float),
   size size: Float,
-) -> Node(id) {
+) -> Node {
   DebugAxes(id:, origin:, size:, children: [])
 }
 
@@ -1215,11 +1146,11 @@ pub fn debug_axes(
 /// )
 /// ```
 pub fn debug_grid(
-  id id: id,
+  id id: String,
   size size: Float,
   divisions divisions: Int,
   color color: Int,
-) -> Node(id) {
+) -> Node {
   DebugGrid(id:, size:, divisions:, color:, children: [])
 }
 
@@ -1252,15 +1183,15 @@ pub fn debug_grid(
 /// )
 /// ```
 pub fn debug_point(
-  id id: id,
+  id id: String,
   position position: Vec3(Float),
   size size: Float,
   color color: Int,
-) -> Node(id) {
+) -> Node {
   DebugPoint(id:, position:, size:, color:, children: [])
 }
 
-pub fn with_children(node: Node(id), children children: List(Node(id))) {
+pub fn with_children(node: Node, children children: List(Node)) {
   case node {
     AnimatedSprite(..) -> AnimatedSprite(..node, children:)
     Audio(..) -> Audio(..node, children:)
@@ -1281,7 +1212,6 @@ pub fn with_children(node: Node(id), children children: List(Node(id))) {
     Light(..) -> Light(..node, children:)
     Mesh(..) -> Mesh(..node, children:)
     Model3D(..) -> Model3D(..node, children:)
-    Particles(..) -> Particles(..node, children:)
   }
 }
 
@@ -1321,34 +1251,32 @@ pub fn with_children(node: Node(id), children children: List(Node(id))) {
 /// )
 /// ```
 @internal
-pub type Patch(id) {
-  AddNode(id: id, node: Node(id), parent_id: Option(id))
-  RemoveNode(id: id)
-  UpdateTransform(id: id, transform: transform.Transform)
-  UpdateMaterial(id: id, material: Option(material.Material))
-  UpdateGeometry(id: id, geometry: geometry.Geometry)
-  UpdateLight(id: id, light: light.Light)
-  UpdateAnimation(id: id, animation: Option(AnimationPlayback))
-  UpdatePhysics(id: id, physics: Option(physics.RigidBody))
-  UpdateAudio(id: id, audio: audio.Audio)
-  UpdateInstances(id: id, instances: List(transform.Transform))
-  UpdateLODLevels(id: id, levels: List(LODLevel(id)))
+pub type Patch {
+  AddNode(id: String, node: Node, parent_id: Option(String))
+  RemoveNode(id: String)
+  UpdateTransform(id: String, transform: transform.Transform)
+  UpdateMaterial(id: String, material: Option(material.Material))
+  UpdateGeometry(id: String, geometry: geometry.Geometry)
+  UpdateLight(id: String, light: light.Light)
+  UpdateAnimation(id: String, animation: Option(AnimationPlayback))
+  UpdatePhysics(id: String, physics: Option(physics.RigidBody))
+  UpdateAudio(id: String, audio: audio.Audio)
+  UpdateInstances(id: String, instances: List(transform.Transform))
+  UpdateLODLevels(id: String, levels: List(LODLevel))
   UpdateCamera(
-    id: id,
+    id: String,
     camera_type: camera.Camera,
     look_at: Option(vec3.Vec3(Float)),
   )
-  SetActiveCamera(id: id)
+  SetActiveCamera(id: String)
   UpdateCameraPostprocessing(
-    id: id,
+    id: String,
     postprocessing: Option(postprocessing.PostProcessing),
   )
-  UpdateParticleEmitter(id: id, emitter: particle_emitter.ParticleEmitter)
-  UpdateParticleActive(id: id, active: Bool)
-  UpdateCSS2DLabel(id: id, html: String, transform: transform.Transform)
-  UpdateCSS3DLabel(id: id, html: String, transform: transform.Transform)
+  UpdateCSS2DLabel(id: String, html: String, transform: transform.Transform)
+  UpdateCSS3DLabel(id: String, html: String, transform: transform.Transform)
   UpdateCanvas(
-    id: id,
+    id: String,
     encoded_picture: String,
     texture_width: Int,
     texture_height: Int,
@@ -1357,7 +1285,7 @@ pub type Patch(id) {
     transform: transform.Transform,
   )
   UpdateAnimatedSprite(
-    id: id,
+    id: String,
     spritesheet: spritesheet.Spritesheet,
     animation: spritesheet.Animation,
     state: spritesheet.AnimationState,
@@ -1368,20 +1296,22 @@ pub type Patch(id) {
   )
 }
 
-type NodeWithParent(id) {
-  NodeWithParent(node: Node(id), parent_id: Option(id), depth: Int)
+/// Internal cache type for flattened scene nodes (used for optimization)
+@internal
+pub opaque type NodeWithParent {
+  NodeWithParent(node: Node, parent_id: Option(String), depth: Int)
 }
 
-fn flatten_scene(nodes: List(Node(id))) -> dict.Dict(id, NodeWithParent(id)) {
+fn flatten_scene(nodes: List(Node)) -> dict.Dict(String, NodeWithParent) {
   flatten_scene_helper(nodes, option.None, 0, dict.new())
 }
 
 fn flatten_scene_helper(
-  nodes: List(Node(id)),
-  parent_id: Option(id),
+  nodes: List(Node),
+  parent_id: Option(String),
   current_depth: Int,
-  acc: dict.Dict(id, NodeWithParent(id)),
-) -> dict.Dict(id, NodeWithParent(id)) {
+  acc: dict.Dict(String, NodeWithParent),
+) -> dict.Dict(String, NodeWithParent) {
   list.fold(nodes, acc, fn(acc, node) {
     let node_id = node.id
 
@@ -1396,13 +1326,15 @@ fn flatten_scene_helper(
 
 @internal
 pub fn diff(
-  previous: Option(Node(id)),
-  current: Option(Node(id)),
-) -> List(Patch(id)) {
+  previous: Option(Node),
+  current: Option(Node),
+  cached_prev_dict: Option(dict.Dict(String, NodeWithParent)),
+) -> #(List(Patch), dict.Dict(String, NodeWithParent)) {
   // Early exit: if scenes are identical by reference, no work needed
   case previous == current {
     True -> {
-      []
+      let empty_dict = dict.new()
+      #([], cached_prev_dict |> option.unwrap(empty_dict))
     }
     False -> {
       // Convert optional nodes to lists for flatten_scene
@@ -1415,14 +1347,19 @@ pub fn diff(
         option.None -> []
       }
 
-      let prev_dict = flatten_scene(prev_list)
+      // OPTIMIZATION: Reuse cached prev_dict if available (saves one tree traversal!)
+      let prev_dict = case cached_prev_dict {
+        option.Some(cached) -> cached
+        option.None -> flatten_scene(prev_list)
+      }
+
       let curr_dict = flatten_scene(curr_list)
 
       // Early exit: if both scenes are empty, no patches needed
       let prev_size = dict.size(prev_dict)
       let curr_size = dict.size(curr_dict)
       case prev_size == 0 && curr_size == 0 {
-        True -> []
+        True -> #([], curr_dict)
         False -> {
           // Use dict.has_key for O(log n) membership checks (no set allocation needed)
           let prev_ids = dict.keys(prev_dict)
@@ -1487,7 +1424,11 @@ pub fn diff(
           // 1. Removals first (free resources)
           // 2. Updates (modify existing)
           // 3. Additions last (create new, already sorted by hierarchy)
-          batch_patches(removals, parent_change_removals, updates, additions)
+          let patches =
+            batch_patches(removals, parent_change_removals, updates, additions)
+
+          // Return patches + new cached dict for next frame
+          #(patches, curr_dict)
         }
       }
     }
@@ -1497,11 +1438,11 @@ pub fn diff(
 /// Batch patches by type for optimal rendering order
 /// Optimized: Single-pass partitioning + manual concatenation (no list.flatten)
 fn batch_patches(
-  removals: List(Patch(id)),
-  parent_change_removals: List(Patch(id)),
-  updates: List(Patch(id)),
-  additions: List(Patch(id)),
-) -> List(Patch(id)) {
+  removals: List(Patch),
+  parent_change_removals: List(Patch),
+  updates: List(Patch),
+  additions: List(Patch),
+) -> List(Patch) {
   // Single-pass partitioning with fold (O(n) instead of O(3n))
   let #(transform_updates, material_updates, geometry_updates, misc_updates) =
     list.fold(updates, #([], [], [], []), fn(acc, patch) {
@@ -1544,7 +1485,7 @@ fn batch_patches(
 
 /// Efficiently concatenate multiple lists using fold + prepend
 /// O(n) optimized: use list.append which preserves order
-fn concat_patches(lists: List(List(Patch(id)))) -> List(Patch(id)) {
+fn concat_patches(lists: List(List(Patch))) -> List(Patch) {
   // Simply flatten the list of lists while preserving order
   list.fold(lists, [], fn(acc, patches) { list.append(acc, patches) })
 }
@@ -1552,9 +1493,9 @@ fn concat_patches(lists: List(List(Patch(id)))) -> List(Patch(id)) {
 /// Sort AddNode patches so that parents are added before their children
 /// Optimized: pre-compute depths as tuples to avoid dict lookups in comparator
 fn sort_patches_by_hierarchy(
-  patches: List(Patch(id)),
-  node_dict: dict.Dict(id, NodeWithParent(id)),
-) -> List(Patch(id)) {
+  patches: List(Patch),
+  node_dict: dict.Dict(String, NodeWithParent),
+) -> List(Patch) {
   // Pre-compute (depth, patch) tuples for efficient sorting
   let patches_with_depth =
     list.map(patches, fn(patch) {
@@ -1592,7 +1533,7 @@ fn sort_patches_by_hierarchy(
   })
 }
 
-fn compare_nodes(id: id, prev: Node(id), curr: Node(id)) -> List(Patch(id)) {
+fn compare_nodes(id: String, prev: Node, curr: Node) -> List(Patch) {
   case prev == curr {
     True -> []
     False -> compare_nodes_detailed(id, prev, curr)
@@ -1601,11 +1542,7 @@ fn compare_nodes(id: id, prev: Node(id), curr: Node(id)) -> List(Patch(id)) {
 
 /// Detailed comparison of node properties (called only when nodes differ)
 /// Uses accumulator pattern to avoid empty list allocations
-fn compare_nodes_detailed(
-  id: id,
-  prev: Node(id),
-  curr: Node(id),
-) -> List(Patch(id)) {
+fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
   case prev, curr {
     Mesh(
       id: _,
@@ -1814,31 +1751,6 @@ fn compare_nodes_detailed(
         False -> []
       }
 
-    Particles(
-      id: _,
-      children: _,
-      emitter: previous_emitter,
-      transform: previous_transform,
-      active: previous_active,
-    ),
-      Particles(
-        id: _,
-        children: _,
-        emitter: current_emitter,
-        transform: current_transform,
-        active: current_active,
-      )
-    ->
-      compare_particle_fields(
-        id:,
-        previous_emitter:,
-        previous_transform:,
-        previous_active:,
-        current_emitter:,
-        current_transform:,
-        current_active:,
-      )
-
     CSS2DLabel(
       id: _,
       children: _,
@@ -1954,7 +1866,7 @@ fn compare_nodes_detailed(
 
 /// Compare Mesh fields using accumulator pattern (no empty list allocations)
 fn compare_mesh_fields(
-  id: id,
+  id: String,
   previous_geometry prev_geom: geometry.Geometry,
   previous_material prev_mat: material.Material,
   previous_transform prev_trans: transform.Transform,
@@ -1963,7 +1875,7 @@ fn compare_mesh_fields(
   current_material curr_mat: material.Material,
   current_transform curr_trans: transform.Transform,
   current_physics curr_phys: Option(physics.RigidBody),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_trans != curr_trans {
@@ -1991,14 +1903,14 @@ fn compare_mesh_fields(
 
 /// Compare InstancedMesh fields using accumulator pattern
 fn compare_instanced_mesh_fields(
-  id: id,
+  id: String,
   previous_geometry prev_geom: geometry.Geometry,
   previous_material prev_mat: material.Material,
   previous_instances prev_instances: List(transform.Transform),
   current_geometry curr_geom: geometry.Geometry,
   current_material curr_mat: material.Material,
   current_instances curr_instances: List(transform.Transform),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_mat != curr_mat {
@@ -2021,12 +1933,12 @@ fn compare_instanced_mesh_fields(
 
 /// Compare Light fields using accumulator pattern
 fn compare_light_fields(
-  id: id,
+  id: String,
   previous_light prev_light: light.Light,
   previous_transform prev_trans: transform.Transform,
   current_light curr_light: light.Light,
   current_transform curr_trans: transform.Transform,
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_trans != curr_trans {
@@ -2044,12 +1956,12 @@ fn compare_light_fields(
 
 /// Compare LOD fields using accumulator pattern
 fn compare_lod_fields(
-  id: id,
-  previous_levels prev_levels: List(LODLevel(id)),
+  id: String,
+  previous_levels prev_levels: List(LODLevel),
   previous_transform prev_trans: transform.Transform,
-  current_levels curr_levels: List(LODLevel(id)),
+  current_levels curr_levels: List(LODLevel),
   current_transform curr_trans: transform.Transform,
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_trans != curr_trans {
@@ -2067,7 +1979,7 @@ fn compare_lod_fields(
 
 /// Compare Camera fields using accumulator pattern
 fn compare_camera_fields(
-  id: id,
+  id: String,
   previous_camera prev_cam: camera.Camera,
   previous_transform prev_trans: transform.Transform,
   previous_look_at prev_look_at: Option(vec3.Vec3(Float)),
@@ -2080,7 +1992,7 @@ fn compare_camera_fields(
   current_active curr_active: Bool,
   current_viewport curr_viewport: Option(#(Int, Int, Int, Int)),
   current_postprocessing curr_pp: Option(postprocessing.PostProcessing),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_trans != curr_trans {
@@ -2114,7 +2026,7 @@ fn compare_camera_fields(
 
 /// Compare Model3D fields using accumulator pattern
 fn compare_model3d_fields(
-  id: id,
+  id: String,
   previous_transform prev_trans: transform.Transform,
   previous_animation prev_anim: Option(AnimationPlayback),
   previous_physics prev_phys: Option(physics.RigidBody),
@@ -2123,7 +2035,7 @@ fn compare_model3d_fields(
   current_animation curr_anim: Option(AnimationPlayback),
   current_physics curr_phys: Option(physics.RigidBody),
   current_material curr_mat: Option(material.Material),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case prev_trans != curr_trans {
@@ -2151,14 +2063,14 @@ fn compare_model3d_fields(
 
 /// Compare InstancedModel fields using accumulator pattern
 fn compare_instanced_model_fields(
-  id id: id,
+  id id: String,
   previous_instances previous_instances: List(transform.Transform),
   previous_physics previous_physics: Option(physics.RigidBody),
   previous_material previous_material: Option(material.Material),
   current_instances current_instances: List(transform.Transform),
   current_physics current_physics: Option(physics.RigidBody),
   current_material current_material: Option(material.Material),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case previous_instances != current_instances {
@@ -2179,39 +2091,9 @@ fn compare_instanced_model_fields(
   patches
 }
 
-/// Compare Particles fields using accumulator pattern
-fn compare_particle_fields(
-  id id: id,
-  previous_emitter previous_emitter: particle_emitter.ParticleEmitter,
-  previous_transform previous_transform: transform.Transform,
-  previous_active previous_active: Bool,
-  current_emitter current_emitter: particle_emitter.ParticleEmitter,
-  current_transform current_transform: transform.Transform,
-  current_active current_active: Bool,
-) -> List(Patch(id)) {
-  let patches = []
-
-  let patches = case previous_transform != current_transform {
-    True -> [UpdateTransform(id, current_transform), ..patches]
-    False -> patches
-  }
-
-  let patches = case previous_emitter != current_emitter {
-    True -> [UpdateParticleEmitter(id, current_emitter), ..patches]
-    False -> patches
-  }
-
-  let patches = case previous_active != current_active {
-    True -> [UpdateParticleActive(id, current_active), ..patches]
-    False -> patches
-  }
-
-  patches
-}
-
 /// Compare AnimatedSprite fields using accumulator pattern
 fn compare_animated_sprite_fields(
-  id id: id,
+  id id: String,
   previous_spritesheet previous_spritesheet: spritesheet.Spritesheet,
   previous_animation previous_animation: spritesheet.Animation,
   previous_state previous_state: spritesheet.AnimationState,
@@ -2228,7 +2110,7 @@ fn compare_animated_sprite_fields(
   current_transform current_transform: transform.Transform,
   current_pixel_art current_pixel_art: Bool,
   current_physics current_physics: Option(physics.RigidBody),
-) -> List(Patch(id)) {
+) -> List(Patch) {
   let patches = []
 
   let patches = case previous_physics != current_physics {
@@ -2285,28 +2167,24 @@ pub type RendererOptions {
 }
 
 @internal
-pub type RendererState(id) {
+pub type RendererState {
   RendererState(
     /// Three.js renderer instance
     renderer: WebGLRenderer,
     /// Three.js scene instance
     scene: Scene,
     /// Object cache (Three.js objects, mixers, actions, etc.)
-    cache: CacheState,
+    cache: object_cache.CacheState,
     /// Optional physics world
-    physics_world: Option(physics.PhysicsWorld(id)),
+    physics_world: Option(physics.PhysicsWorld),
     /// Audio manager state (Gleam-managed)
     audio_manager: audio_manager.AudioManagerState,
     /// Audio listener (singleton, attached to camera)
-    audio_listener: asset.Object3D,
+    audio_listener: audio_manager.AudioListener,
+    /// Cached flattened scene dictionary from previous frame (optimization)
+    cached_scene_dict: Option(dict.Dict(String, NodeWithParent)),
   )
 }
-
-@external(javascript, "../threejs.ffi.mjs", "identity")
-fn to_dynamic(value: a) -> Dynamic
-
-@external(javascript, "../threejs.ffi.mjs", "identity")
-fn points_to_object3d(points: Dynamic) -> asset.Object3D
 
 @external(javascript, "../threejs.ffi.mjs", "createRenderer")
 fn create_renderer_ffi(options: RendererOptions) -> WebGLRenderer
@@ -2345,7 +2223,7 @@ fn apply_transform_ffi(
 fn apply_transform_with_quaternion_ffi(
   object: asset.Object3D,
   position: vec3.Vec3(Float),
-  quaternion: transform.Quaternion,
+  quaternion: quaternion.Quaternion,
   scale: vec3.Vec3(Float),
 ) -> Nil
 
@@ -2506,10 +2384,15 @@ fn get_window_width_ffi() -> Float
 fn get_window_height_ffi() -> Float
 
 @external(javascript, "../threejs.ffi.mjs", "createAnimationMixer")
-fn create_animation_mixer_ffi(object: asset.Object3D) -> Dynamic
+fn create_animation_mixer_ffi(
+  object: asset.Object3D,
+) -> object_cache.AnimationMixer
 
 @external(javascript, "../threejs.ffi.mjs", "updateMixer")
-fn update_animation_mixer_ffi(mixer: Dynamic, delta_time: Float) -> Nil
+fn update_animation_mixer_ffi(
+  mixer: object_cache.AnimationMixer,
+  delta_time: Float,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "isInstancedMesh")
 fn is_instanced_mesh_ffi(object: asset.Object3D) -> Bool
@@ -2540,7 +2423,7 @@ fn add_lod_level_ffi(
 fn clear_lod_levels_ffi(lod: asset.Object3D) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "createAudioListener")
-fn create_audio_listener_ffi() -> asset.Object3D
+fn create_audio_listener_ffi() -> audio_manager.AudioListener
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugBox")
 fn create_debug_box_ffi(
@@ -2594,7 +2477,7 @@ fn dispose_material_ffi(material: asset.Object3D) -> Nil
 fn dispose_object_3d_ffi(object: asset.Object3D) -> Nil
 
 @internal
-pub fn create(options: RendererOptions) -> RendererState(id) {
+pub fn create(options: RendererOptions) -> RendererState {
   let renderer = create_renderer_ffi(options)
   let scene = create_scene_ffi()
   let canvas = get_dom_element(renderer)
@@ -2610,36 +2493,50 @@ pub fn create(options: RendererOptions) -> RendererState(id) {
     physics_world: option.None,
     audio_manager: audio_manager.init(),
     audio_listener: audio_listener,
+    cached_scene_dict: option.None,
   )
 }
 
 @internal
-pub fn get_renderer(state: RendererState(id)) -> WebGLRenderer {
+pub fn get_renderer(state: RendererState) -> WebGLRenderer {
   state.renderer
 }
 
 @internal
-pub fn get_scene(state: RendererState(id)) -> Scene {
+pub fn get_scene(state: RendererState) -> Scene {
   state.scene
 }
 
 @internal
 pub fn set_physics_world(
-  state: RendererState(id),
-  world: Option(physics.PhysicsWorld(id)),
-) -> RendererState(id) {
+  state: RendererState,
+  world: Option(physics.PhysicsWorld),
+) -> RendererState {
   RendererState(..state, physics_world: world)
 }
 
 @internal
-pub fn get_physics_world(
-  state: RendererState(id),
-) -> Option(physics.PhysicsWorld(id)) {
+pub fn get_physics_world(state: RendererState) -> Option(physics.PhysicsWorld) {
   state.physics_world
 }
 
 @internal
-pub fn resume_audio_context(state: RendererState(id)) -> RendererState(id) {
+pub fn get_cached_scene_dict(
+  state: RendererState,
+) -> Option(dict.Dict(String, NodeWithParent)) {
+  state.cached_scene_dict
+}
+
+@internal
+pub fn set_cached_scene_dict(
+  state: RendererState,
+  cache: Option(dict.Dict(String, NodeWithParent)),
+) -> RendererState {
+  RendererState(..state, cached_scene_dict: cache)
+}
+
+@internal
+pub fn resume_audio_context(state: RendererState) -> RendererState {
   let new_audio_manager =
     audio_manager.resume_audio_context(state.audio_manager)
   RendererState(..state, audio_manager: new_audio_manager)
@@ -2647,80 +2544,74 @@ pub fn resume_audio_context(state: RendererState(id)) -> RendererState(id) {
 
 @internal
 pub fn apply_patches(
-  state: RendererState(id),
-  patches: List(Patch(id)),
-) -> RendererState(id) {
+  state: RendererState,
+  patches: List(Patch),
+) -> RendererState {
   list.fold(patches, state, fn(st, patch) { apply_patch(st, patch) })
 }
 
 @internal
-pub fn apply_patch(
-  state: RendererState(id),
-  patch: Patch(id),
-) -> RendererState(id) {
+pub fn apply_patch(state: RendererState, patch: Patch) -> RendererState {
   case patch {
-    AddNode(id: id, node: node, parent_id: parent_id) ->
-      handle_add_node(state, id, node, parent_id)
+    AddNode(id: id_val, node: node, parent_id: parent_id) ->
+      handle_add_node(state, id_val, node, parent_id)
 
-    RemoveNode(id: id) -> handle_remove_node(state, id)
+    RemoveNode(id: id_val) -> handle_remove_node(state, id_val)
 
-    UpdateTransform(id: id, transform: transform) ->
-      handle_update_transform(state, id, transform)
+    UpdateTransform(id: id_val, transform: transform) ->
+      handle_update_transform(state, id_val, transform)
 
-    UpdateMaterial(id: id, material: material) ->
-      handle_update_material(state, id, material)
+    UpdateMaterial(id: id_val, material: material) ->
+      handle_update_material(state, id_val, material)
 
-    UpdateGeometry(id: id, geometry: geometry) ->
-      handle_update_geometry(state, id, geometry)
+    UpdateGeometry(id: id_val, geometry: geometry) ->
+      handle_update_geometry(state, id_val, geometry)
 
-    UpdateLight(id: id, light: light) -> handle_update_light(state, id, light)
+    UpdateLight(id: id_val, light: light) ->
+      handle_update_light(state, id_val, light)
 
-    UpdateAnimation(id: id, animation: animation) ->
-      handle_update_animation(state, id, animation)
+    UpdateAnimation(id: id_val, animation: animation) ->
+      handle_update_animation(state, id_val, animation)
 
-    UpdatePhysics(id: id, physics: physics) ->
-      handle_update_physics(state, id, physics)
+    UpdatePhysics(id: id_val, physics: physics) ->
+      handle_update_physics(state, id_val, physics)
 
-    UpdateAudio(id: id, audio: audio) -> handle_update_audio(state, id, audio)
+    UpdateAudio(id: id_val, audio: audio) ->
+      handle_update_audio(state, id_val, audio)
 
-    UpdateInstances(id: id, instances: instances) ->
-      handle_update_instances(state, id, instances)
+    UpdateInstances(id: id_val, instances: instances) ->
+      handle_update_instances(state, id_val, instances)
 
-    UpdateLODLevels(id: id, levels: levels) ->
-      handle_update_lod_levels(state, id, levels)
+    UpdateLODLevels(id: id_val, levels: levels) ->
+      handle_update_lod_levels(state, id_val, levels)
 
-    UpdateCamera(id: id, camera_type: camera_type, look_at: look_at) ->
-      handle_update_camera(state, id, camera_type, look_at)
+    UpdateCamera(id: id_val, camera_type: camera_type, look_at: look_at) ->
+      handle_update_camera(state, id_val, camera_type, look_at)
 
-    SetActiveCamera(id: id) -> handle_set_active_camera(state, id)
+    SetActiveCamera(id: id_val) -> handle_set_active_camera(state, id_val)
 
-    UpdateCameraPostprocessing(id: id, postprocessing: pp) ->
-      handle_update_camera_postprocessing(state, id, pp)
+    UpdateCameraPostprocessing(id: id_val, postprocessing: pp) ->
+      handle_update_camera_postprocessing(state, id_val, pp)
 
-    UpdateParticleEmitter(id: id, emitter: emitter) ->
-      handle_update_particle_emitter(state, id, emitter)
+    UpdateCSS2DLabel(id: id_val, html: html, transform: trans) ->
+      handle_update_css2d_label(state, id_val, html, trans)
 
-    UpdateParticleActive(id: id, active: active) ->
-      handle_update_particle_active(state, id, active)
-
-    UpdateCSS2DLabel(id: id, html: html, transform: trans) ->
-      handle_update_css2d_label(state, id, html, trans)
-
-    UpdateCSS3DLabel(id: id, html: html, transform: trans) ->
-      handle_update_css3d_label(state, id, html, trans)
+    UpdateCSS3DLabel(id: id_val, html: html, transform: trans) ->
+      handle_update_css3d_label(state, id_val, html, trans)
 
     UpdateCanvas(
-      id: id,
+      id: id_val,
       encoded_picture: encoded_picture,
       texture_width: tw,
       texture_height: th,
       width: w,
       height: h,
       transform: trans,
-    ) -> handle_update_canvas(state, id, encoded_picture, tw, th, w, h, trans)
+    ) ->
+      handle_update_canvas(state, id_val, encoded_picture, tw, th, w, h, trans)
 
     UpdateAnimatedSprite(
-      id: id,
+      id: id_val,
       spritesheet: sheet,
       animation: anim,
       state: anim_state,
@@ -2731,7 +2622,7 @@ pub fn apply_patch(
     ) ->
       handle_update_animated_sprite(
         state,
-        id,
+        id_val,
         sheet,
         anim,
         anim_state,
@@ -2748,11 +2639,11 @@ pub fn apply_patch(
 // ============================================================================
 
 fn handle_add_node(
-  state: RendererState(id),
-  id: id,
-  node: Node(id),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  state: RendererState,
+  id: String,
+  node: Node,
+  parent_id: Option(String),
+) -> RendererState {
   case node {
     Mesh(
       id: _,
@@ -2888,14 +2779,6 @@ fn handle_add_node(
     DebugPoint(id: _, children: _, position: position, size: size, color: color) ->
       handle_add_debug_point(state, id, position, size, color, parent_id)
 
-    Particles(
-      id: _,
-      children: _,
-      emitter: emitter,
-      transform: transform,
-      active: active,
-    ) -> handle_add_particles(state, id, emitter, transform, active, parent_id)
-
     CSS2DLabel(id: _, children: _, html: html, transform: trans) ->
       handle_add_css2d_label(state, id, html, trans, parent_id)
 
@@ -2954,38 +2837,30 @@ fn handle_add_node(
 
 // Helper: Add object to scene or parent
 fn add_to_scene_or_parent(
-  state: RendererState(id),
-  object: ThreeObject,
-  parent_id: Option(id),
+  state: RendererState,
+  object: asset.Object3D,
+  parent_id: Option(String),
 ) -> Nil {
-  let obj_dynamic = object_cache.unwrap_object(object)
-
   case parent_id {
     option.Some(pid) -> {
       case object_cache.get_object(state.cache, pid) {
-        option.Some(parent_obj) -> {
-          let parent_dynamic = object_cache.unwrap_object(parent_obj)
-          add_child_ffi(parent_dynamic, obj_dynamic)
-        }
-        option.None -> {
-          // Parent not found, add to scene root
-          add_to_scene_ffi(state.scene, obj_dynamic)
-        }
+        option.Some(parent_obj) -> add_child_ffi(parent_obj, object)
+        option.None -> add_to_scene_ffi(state.scene, object)
       }
     }
-    option.None -> add_to_scene_ffi(state.scene, obj_dynamic)
+    option.None -> add_to_scene_ffi(state.scene, object)
   }
 }
 
 fn handle_add_mesh(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   geometry: geometry.Geometry,
   material: material.Material,
   transform: transform.Transform,
   physics: Option(physics.RigidBody),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
   let mesh = create_mesh_ffi(geometry_three, material_three)
@@ -2993,22 +2868,25 @@ fn handle_add_mesh(
   apply_transform_ffi(mesh, transform)
   set_shadow_properties_ffi(mesh, True, True)
 
-  let three_obj = object_cache.wrap_object(mesh)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, mesh, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, mesh)
 
   // Create physics body if specified - use world transform (includes parent transforms)
   let new_state = RendererState(..state, cache: new_cache)
   case physics, new_state.physics_world {
     option.Some(physics_config), option.Some(world) -> {
       // Get world position and rotation from the Three.js object (includes parent transforms)
-      let unwrapped_obj = object_cache.unwrap_object(three_obj)
-      let world_pos = get_world_position_ffi(unwrapped_obj)
-      let world_quat = get_world_quaternion_ffi(unwrapped_obj)
+      let world_pos = get_world_position_ffi(mesh)
+      let #(x, y, z, w) = get_world_quaternion_ffi(mesh)
       let world_transform =
         transform.at(world_pos)
-        |> transform.with_quaternion_rotation(world_quat)
+        |> transform.with_quaternion_rotation(quaternion.Quaternion(
+          x:,
+          y:,
+          z:,
+          w:,
+        ))
       let new_world =
         physics.create_body(world, id, physics_config, world_transform)
       RendererState(..new_state, physics_world: option.Some(new_world))
@@ -3018,13 +2896,13 @@ fn handle_add_mesh(
 }
 
 fn handle_add_instanced_mesh(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   geometry: geometry.Geometry,
   material: material.Material,
   instances: List(transform.Transform),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
   let count = list.length(instances)
@@ -3032,22 +2910,21 @@ fn handle_add_instanced_mesh(
 
   update_instanced_mesh_transforms_ffi(mesh, instances)
 
-  let three_obj = object_cache.wrap_object(mesh)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, mesh, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, mesh)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_instanced_model(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   object: asset.Object3D,
   instances: List(transform.Transform),
   physics: Option(physics.RigidBody),
   material: Option(material.Material),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   // Extract all mesh/material pairs from the loaded model
   let pairs = extract_mesh_material_pairs_ffi(object)
   let geometries = get_pairs_geometries_ffi(pairs)
@@ -3080,10 +2957,9 @@ fn handle_add_instanced_model(
   })
 
   // Add the group to the scene or parent
-  let three_obj = object_cache.wrap_object(group)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, group, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, group)
   let new_state = RendererState(..state, cache: new_cache)
 
   // Create physics bodies for each instance if specified
@@ -3113,48 +2989,46 @@ fn handle_add_instanced_model(
 
 // Helper to generate unique IDs for instance physics bodies
 @external(javascript, "../tiramisu.ffi.mjs", "generateInstanceId")
-fn generate_instance_id(base_id: id, index: Int) -> id
+fn generate_instance_id(base_id: String, index: Int) -> String
 
 fn handle_add_light(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   light: light.Light,
   transform: transform.Transform,
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   let light = light.create_light(light)
   apply_transform_ffi(light, transform)
 
-  let three_obj = object_cache.wrap_object(light)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, light, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, light)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_group(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   transform: transform.Transform,
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   let group = create_group_ffi()
   apply_transform_ffi(group, transform)
 
-  let three_obj = object_cache.wrap_object(group)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, group, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, group)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_lod(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   transform: transform.Transform,
-  levels: List(LODLevel(id)),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  levels: List(LODLevel),
+  parent_id: Option(String),
+) -> RendererState {
   let lod = create_lod_ffi()
   apply_transform_ffi(lod, transform)
 
@@ -3164,15 +3038,14 @@ fn handle_add_lod(
     add_lod_level_ffi(lod, level_obj, level.distance)
   })
 
-  let three_obj = object_cache.wrap_object(lod)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, lod, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, lod)
   RendererState(..state, cache: new_cache)
 }
 
 // Helper: Create Three.js object for LOD level
-fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
+fn create_lod_level_object(node: Node) -> asset.Object3D {
   case node {
     Mesh(
       id: _,
@@ -3219,15 +3092,15 @@ fn create_lod_level_object(node: Node(id)) -> asset.Object3D {
 }
 
 fn handle_add_model3d(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   object: asset.Object3D,
   transform: transform.Transform,
   animation: Option(AnimationPlayback),
   physics: Option(physics.RigidBody),
   material: Option(material.Material),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   // For models with animations, we cannot clone because the animation clips
   // reference the original skeleton. Cloning would break the bone references.
   // For models without animations, we can clone to avoid modifying shared assets.
@@ -3245,8 +3118,7 @@ fn handle_add_model3d(
   }
 
   // Create animation mixer
-  let mixer_dynamic = create_animation_mixer_ffi(model_object)
-  let mixer = object_cache.wrap_mixer(mixer_dynamic)
+  let mixer = create_animation_mixer_ffi(model_object)
   let cache_with_mixer = object_cache.add_mixer(state.cache, id, mixer)
 
   // Setup animation if provided
@@ -3256,10 +3128,10 @@ fn handle_add_model3d(
     option.None -> cache_with_mixer
   }
 
-  let three_obj = object_cache.wrap_object(model_object)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, model_object, parent_id)
 
-  let new_cache = object_cache.add_object(cache_with_animation, id, three_obj)
+  let new_cache =
+    object_cache.add_object(cache_with_animation, id, model_object)
 
   // Create physics body if specified - update physics world in state
   let new_state = RendererState(..state, cache: new_cache)
@@ -3273,11 +3145,11 @@ fn handle_add_model3d(
 }
 
 fn handle_add_audio(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   audio: audio.Audio,
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   // Extract buffer and config from Audio type
   let #(buffer, config) = case audio {
     audio.GlobalAudio(buffer: buffer, config: config) -> #(buffer, config)
@@ -3291,7 +3163,6 @@ fn handle_add_audio(
   }
 
   // Create audio source using Gleam audio manager with state-managed listener
-  let listener_dynamic = to_dynamic(state.audio_listener)
   let #(new_audio_manager, _source_data) =
     audio_manager.create_audio_source(
       state.audio_manager,
@@ -3299,15 +3170,14 @@ fn handle_add_audio(
       buffer,
       config,
       audio,
-      listener_dynamic,
+      state.audio_listener,
     )
 
   // Create placeholder group to track in cache
   let placeholder = create_group_ffi()
-  let three_obj = object_cache.wrap_object(placeholder)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, placeholder, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, placeholder)
   RendererState(..state, cache: new_cache, audio_manager: new_audio_manager)
 }
 
@@ -3340,16 +3210,16 @@ fn calculate_aspect_ratio(
 }
 
 fn handle_add_camera(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   camera_type: camera.Camera,
   transform: transform.Transform,
   look_at: Option(Vec3(Float)),
   active: Bool,
   viewport: Option(#(Int, Int, Int, Int)),
   postprocessing: Option(postprocessing.PostProcessing),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   let canvas = get_dom_element(state.renderer)
 
   // Calculate aspect ratio for perspective cameras
@@ -3357,7 +3227,7 @@ fn handle_add_camera(
 
   // Get projection and create camera based on type
   let projection = camera.get_projection(camera_type)
-  let camera_obj = case projection {
+  let camera = case projection {
     camera.Perspective(fov: fov, aspect: _, near: near, far: far) ->
       create_perspective_camera_ffi(fov, aspect, near, far)
     camera.Orthographic(
@@ -3371,29 +3241,31 @@ fn handle_add_camera(
   }
 
   // Add audio listener to camera
-  add_child_ffi(camera_obj, state.audio_listener)
+  add_child_ffi(
+    camera,
+    audio_manager.audio_listener_to_object3d(state.audio_listener),
+  )
 
-  apply_transform_ffi(camera_obj, transform)
+  apply_transform_ffi(camera, transform)
 
   // Store lookAt target if provided (will apply after adding to scene)
   case look_at {
     option.Some(target) -> {
-      set_camera_user_data_vec3_ffi(camera_obj, "lookAtTarget", target)
-      set_camera_user_data_bool_ffi(camera_obj, "needsLookAtUpdate", True)
+      set_camera_user_data_vec3_ffi(camera, "lookAtTarget", target)
+      set_camera_user_data_bool_ffi(camera, "needsLookAtUpdate", True)
     }
     option.None -> Nil
   }
 
-  update_camera_projection_matrix_ffi(camera_obj)
+  update_camera_projection_matrix_ffi(camera)
 
-  let three_obj = object_cache.wrap_object(camera_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, camera, parent_id)
 
   // Apply lookAt after adding to scene
   case look_at {
     option.Some(target) -> {
-      apply_camera_look_at_ffi(camera_obj, target)
-      delete_camera_user_data_ffi(camera_obj, "needsLookAtUpdate")
+      apply_camera_look_at_ffi(camera, target)
+      delete_camera_user_data_ffi(camera, "needsLookAtUpdate")
     }
     option.None -> Nil
   }
@@ -3425,139 +3297,100 @@ fn handle_add_camera(
 
   // Set as active camera if specified
   case active {
-    True -> set_active_camera_ffi(camera_obj)
+    True -> set_active_camera_ffi(camera)
     False -> Nil
   }
 
-  let new_cache = object_cache.add_object(cache_with_camera, id, three_obj)
+  let new_cache = object_cache.add_object(cache_with_camera, id, camera)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_box(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   min: Vec3(Float),
   max: Vec3(Float),
   color: Int,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_box_ffi(min, max, color)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_box_ffi(min, max, color)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_sphere(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   center: Vec3(Float),
   radius: Float,
   color: Int,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_sphere_ffi(center, radius, color)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_sphere_ffi(center, radius, color)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_line(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   from: Vec3(Float),
   to: Vec3(Float),
   color: Int,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_line_ffi(from, to, color)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_line_ffi(from, to, color)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_axes(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   origin: Vec3(Float),
   size: Float,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_axes_ffi(origin, size)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_axes_ffi(origin, size)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_grid(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   size: Float,
   divisions: Int,
   color: Int,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_grid_ffi(size, divisions, color)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_grid_ffi(size, divisions, color)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_debug_point(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   position: Vec3(Float),
   size: Float,
   color: Int,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let debug_obj = create_debug_point_ffi(position, size, color)
-  let three_obj = object_cache.wrap_object(debug_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let debug = create_debug_point_ffi(position, size, color)
+  add_to_scene_or_parent(state, debug, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
-  RendererState(..state, cache: new_cache)
-}
-
-fn handle_add_particles(
-  state: RendererState(id),
-  id: id,
-  emitter: particle_emitter.ParticleEmitter,
-  transform: transform.Transform,
-  active: Bool,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  // Import particle_manager at the top of the file
-  // Create particle system state
-  let particle_state =
-    particle_manager.create_particle_system(emitter, transform)
-    |> particle_manager.set_active(active)
-
-  // Get the Three.js Points object from particle system
-  let points_object = particle_manager.get_points_object(particle_state)
-  let points_obj3d = points_to_object3d(points_object)
-
-  // Add to scene or parent
-  let three_obj = object_cache.wrap_object(points_obj3d)
-  add_to_scene_or_parent(state, three_obj, parent_id)
-
-  // Store both the Three.js object and the particle system state
-  let new_cache =
-    object_cache.add_object(state.cache, id, three_obj)
-    |> object_cache.add_particle_system(
-      id,
-      particle_manager.wrap_as_cache_entry(particle_state),
-    )
-
+  let new_cache = object_cache.add_object(state.cache, id, debug)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3565,16 +3398,14 @@ fn handle_add_particles(
 // PATCH HANDLERS - REMOVE NODE
 // ============================================================================
 
-fn handle_remove_node(state: RendererState(id), id: id) -> RendererState(id) {
+fn handle_remove_node(state: RendererState, id: String) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-
       // Remove from scene
-      remove_from_scene_ffi(state.scene, obj_dynamic)
+      remove_from_scene_ffi(state.scene, obj)
 
       // Dispose object recursively (geometry, materials, textures, children)
-      dispose_object_3d_ffi(obj_dynamic)
+      dispose_object_3d_ffi(obj)
 
       // Stop audio if it's an audio node (using Gleam audio manager)
       let new_audio_manager =
@@ -3607,13 +3438,12 @@ fn handle_remove_node(state: RendererState(id), id: id) -> RendererState(id) {
 // ============================================================================
 
 fn handle_update_transform(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   transform: transform.Transform,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let object = object_cache.unwrap_object(obj)
+    option.Some(object) -> {
       apply_transform_ffi(object, transform)
       update_matrix_world_ffi(object, True)
 
@@ -3650,22 +3480,20 @@ fn handle_update_transform(
 }
 
 fn handle_update_material(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   material: Option(material.Material),
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-
+    option.Some(object) -> {
       // Only update if material is provided
       case material {
         option.Some(mat) -> {
-          let old_material = get_object_material_ffi(obj_dynamic)
+          let old_material = get_object_material_ffi(object)
           dispose_material_ffi(old_material)
 
           let new_material = material.create_material(mat)
-          set_object_material_ffi(obj_dynamic, new_material)
+          set_object_material_ffi(object, new_material)
         }
         option.None -> Nil
       }
@@ -3677,18 +3505,17 @@ fn handle_update_material(
 }
 
 fn handle_update_geometry(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   geometry: geometry.Geometry,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-      let old_geometry = get_object_geometry_ffi(obj_dynamic)
+    option.Some(object) -> {
+      let old_geometry = get_object_geometry_ffi(object)
       dispose_geometry_ffi(old_geometry)
 
       let new_geometry = geometry.create_geometry(geometry)
-      set_object_geometry_ffi(obj_dynamic, new_geometry)
+      set_object_geometry_ffi(object, new_geometry)
 
       state
     }
@@ -3697,14 +3524,12 @@ fn handle_update_geometry(
 }
 
 fn handle_update_light(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   light: light.Light,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(old_obj) -> {
-      let old_object = object_cache.unwrap_object(old_obj)
-
+    option.Some(old_object) -> {
       // Get old transform
       let position = get_object_position_ffi(old_object)
       let rotation = get_object_rotation_ffi(old_object)
@@ -3723,8 +3548,7 @@ fn handle_update_light(
       add_to_scene_ffi(state.scene, new_light)
 
       // Update cache
-      let new_obj = object_cache.wrap_object(new_light)
-      let new_cache = object_cache.add_object(state.cache, id, new_obj)
+      let new_cache = object_cache.add_object(state.cache, id, new_light)
       RendererState(..state, cache: new_cache)
     }
     option.None -> state
@@ -3742,7 +3566,7 @@ fn get_object_rotation_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 fn get_object_scale_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
 
 @external(javascript, "../threejs.ffi.mjs", "getObjectQuaternion")
-fn get_object_quaternion_ffi(object: asset.Object3D) -> transform.Quaternion
+fn get_object_quaternion_ffi(object: asset.Object3D) -> quaternion.Quaternion
 
 @external(javascript, "../threejs.ffi.mjs", "setObjectPosition")
 fn set_object_position_ffi(
@@ -3760,10 +3584,10 @@ fn set_object_rotation_ffi(
 fn set_object_scale_ffi(object: asset.Object3D, scale: vec3.Vec3(Float)) -> Nil
 
 fn handle_update_animation(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   animation: Option(AnimationPlayback),
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_mixer(state.cache, id) {
     option.Some(mixer) -> {
       case animation {
@@ -3789,10 +3613,10 @@ fn handle_update_animation(
 }
 
 fn handle_update_physics(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   new_physics: Option(physics.RigidBody),
-) -> RendererState(id) {
+) -> RendererState {
   case state.physics_world {
     option.Some(world) -> {
       // Check if body already exists
@@ -3805,9 +3629,8 @@ fn handle_update_physics(
         True, option.Some(_physics_config) -> {
           // Get current transform from Three.js object
           case object_cache.get_object(state.cache, id) {
-            option.Some(obj) -> {
-              let obj_dynamic = object_cache.unwrap_object(obj)
-              let object_transform = object_to_transform(obj_dynamic)
+            option.Some(object) -> {
+              let object_transform = object_to_transform(object)
 
               // Just update the transform (preserves velocity!)
               let new_world =
@@ -3828,9 +3651,8 @@ fn handle_update_physics(
         // No body, config provided -> CREATE it
         False, option.Some(physics_config) -> {
           case object_cache.get_object(state.cache, id) {
-            option.Some(obj) -> {
-              let obj_dynamic = object_cache.unwrap_object(obj)
-              let object_transform = object_to_transform(obj_dynamic)
+            option.Some(object) -> {
+              let object_transform = object_to_transform(object)
 
               let new_world =
                 physics.create_body(world, id, physics_config, object_transform)
@@ -3862,10 +3684,10 @@ fn object_to_transform(object: asset.Object3D) -> transform.Transform {
 }
 
 fn handle_update_audio(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   audio: audio.Audio,
-) -> RendererState(id) {
+) -> RendererState {
   // Extract buffer and config from Audio type
   let #(buffer, config) = case audio {
     audio.GlobalAudio(buffer: buffer, config: config) -> #(buffer, config)
@@ -3886,23 +3708,22 @@ fn handle_update_audio(
 }
 
 fn handle_update_instances(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   instances: List(transform.Transform),
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-      case is_instanced_mesh_ffi(obj_dynamic) {
+    option.Some(object) -> {
+      case is_instanced_mesh_ffi(object) {
         True -> {
           // Single InstancedMesh node
-          update_instanced_mesh_transforms_ffi(obj_dynamic, instances)
+          update_instanced_mesh_transforms_ffi(object, instances)
           state
         }
         False -> {
           // Could be a Group containing InstancedMeshes (InstancedModel)
           // This will recursively update all InstancedMesh children
-          update_group_instanced_meshes_ffi(obj_dynamic, instances)
+          update_group_instanced_meshes_ffi(object, instances)
           state
         }
       }
@@ -3912,22 +3733,21 @@ fn handle_update_instances(
 }
 
 fn handle_update_lod_levels(
-  state: RendererState(id),
-  id: id,
-  levels: List(LODLevel(id)),
-) -> RendererState(id) {
+  state: RendererState,
+  id: String,
+  levels: List(LODLevel),
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-      case is_lod_ffi(obj_dynamic) {
+    option.Some(object) -> {
+      case is_lod_ffi(object) {
         True -> {
           // Clear existing levels
-          clear_lod_levels_ffi(obj_dynamic)
+          clear_lod_levels_ffi(object)
 
           // Add new levels
           list.each(levels, fn(level) {
             let level_obj = create_lod_level_object(level.node)
-            add_lod_level_ffi(obj_dynamic, level_obj, level.distance)
+            add_lod_level_ffi(object, level_obj, level.distance)
           })
 
           state
@@ -3940,17 +3760,15 @@ fn handle_update_lod_levels(
 }
 
 fn handle_update_camera(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   camera_type: camera.Camera,
   look_at: Option(Vec3(Float)),
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
+    option.Some(object) -> {
       let is_camera =
-        is_perspective_camera_ffi(obj_dynamic)
-        || is_orthographic_camera_ffi(obj_dynamic)
+        is_perspective_camera_ffi(object) || is_orthographic_camera_ffi(object)
 
       case is_camera {
         True -> {
@@ -3976,7 +3794,7 @@ fn handle_update_camera(
                 calculate_aspect_ratio(viewport_tuple, canvas)
 
               set_perspective_camera_params_ffi(
-                obj_dynamic,
+                object,
                 fov,
                 calculated_aspect,
                 near,
@@ -3985,7 +3803,7 @@ fn handle_update_camera(
             }
             camera.Orthographic(left:, right:, top:, bottom:, near:, far:) -> {
               set_orthographic_camera_params_ffi(
-                obj_dynamic,
+                object,
                 left,
                 right,
                 top,
@@ -3995,18 +3813,18 @@ fn handle_update_camera(
               )
             }
           }
-          update_camera_projection_matrix_ffi(obj_dynamic)
+          update_camera_projection_matrix_ffi(object)
 
           // Apply lookAt if provided and update stored target
           case look_at {
             option.Some(target) -> {
-              apply_camera_look_at_ffi(obj_dynamic, target)
+              apply_camera_look_at_ffi(object, target)
               // Update the stored lookAtTarget so it's used in future transform updates
-              set_camera_user_data_vec3_ffi(obj_dynamic, "lookAtTarget", target)
+              set_camera_user_data_vec3_ffi(object, "lookAtTarget", target)
             }
             option.None -> {
               // If None, remove the stored lookAtTarget so the camera can rotate freely
-              delete_camera_user_data_ffi(obj_dynamic, "lookAtTarget")
+              delete_camera_user_data_ffi(object, "lookAtTarget")
             }
           }
 
@@ -4019,14 +3837,10 @@ fn handle_update_camera(
   }
 }
 
-fn handle_set_active_camera(
-  state: RendererState(id),
-  id: id,
-) -> RendererState(id) {
+fn handle_set_active_camera(state: RendererState, id: String) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_dynamic = object_cache.unwrap_object(obj)
-      set_active_camera_ffi(obj_dynamic)
+    option.Some(object) -> {
+      set_active_camera_ffi(object)
       state
     }
     option.None -> state
@@ -4034,10 +3848,10 @@ fn handle_set_active_camera(
 }
 
 fn handle_update_camera_postprocessing(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   pp: Option(postprocessing.PostProcessing),
-) -> RendererState(id) {
+) -> RendererState {
   // Update the postprocessing config in the cache
   let new_cache = case pp {
     option.Some(pp_config) ->
@@ -4048,76 +3862,31 @@ fn handle_update_camera_postprocessing(
   RendererState(..state, cache: new_cache)
 }
 
-fn handle_update_particle_emitter(
-  state: RendererState(id),
-  id: id,
-  emitter: particle_emitter.ParticleEmitter,
-) -> RendererState(id) {
-  case object_cache.get_particle_system(state.cache, id) {
-    option.Some(cached_system) -> {
-      // Unwrap, update emitter, and wrap back
-      let particle_state =
-        particle_manager.unwrap_from_cache_entry(cached_system)
-      let updated_state =
-        particle_manager.update_emitter(particle_state, emitter)
-      let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
-
-      let new_cache =
-        object_cache.add_particle_system(state.cache, id, wrapped_system)
-      RendererState(..state, cache: new_cache)
-    }
-    option.None -> state
-  }
-}
-
-fn handle_update_particle_active(
-  state: RendererState(id),
-  id: id,
-  active: Bool,
-) -> RendererState(id) {
-  case object_cache.get_particle_system(state.cache, id) {
-    option.Some(cached_system) -> {
-      // Unwrap, update active state, and wrap back
-      let particle_state =
-        particle_manager.unwrap_from_cache_entry(cached_system)
-      let updated_state = particle_manager.set_active(particle_state, active)
-      let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
-
-      let new_cache =
-        object_cache.add_particle_system(state.cache, id, wrapped_system)
-      RendererState(..state, cache: new_cache)
-    }
-    option.None -> state
-  }
-}
-
 fn handle_add_css2d_label(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   html: String,
   trans: transform.Transform,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let css2d_obj = create_css2d_object_ffi(html)
-  apply_transform_ffi(css2d_obj, trans)
-  let three_obj = object_cache.wrap_object(css2d_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let css2d_object = create_css2d_object_ffi(html)
+  apply_transform_ffi(css2d_object, trans)
+  add_to_scene_or_parent(state, css2d_object, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, css2d_object)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_update_css2d_label(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   html: String,
   trans: transform.Transform,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_3d = object_cache.unwrap_object(obj)
-      update_css2d_object_html_ffi(obj_3d, html)
-      apply_transform_ffi(obj_3d, trans)
+    option.Some(object) -> {
+      update_css2d_object_html_ffi(object, html)
+      apply_transform_ffi(object, trans)
       state
     }
     option.None -> state
@@ -4125,32 +3894,30 @@ fn handle_update_css2d_label(
 }
 
 fn handle_add_css3d_label(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   html: String,
   trans: transform.Transform,
-  parent_id: Option(id),
-) -> RendererState(id) {
-  let css3d_obj = create_css3d_object_ffi(html)
-  apply_transform_ffi(css3d_obj, trans)
-  let three_obj = object_cache.wrap_object(css3d_obj)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  parent_id: Option(String),
+) -> RendererState {
+  let css3d_object = create_css3d_object_ffi(html)
+  apply_transform_ffi(css3d_object, trans)
+  add_to_scene_or_parent(state, css3d_object, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, css3d_object)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_update_css3d_label(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   html: String,
   trans: transform.Transform,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_3d = object_cache.unwrap_object(obj)
-      update_css3d_object_html_ffi(obj_3d, html)
-      apply_transform_ffi(obj_3d, trans)
+    option.Some(object) -> {
+      update_css3d_object_html_ffi(object, html)
+      apply_transform_ffi(object, trans)
       state
     }
     option.None -> state
@@ -4158,16 +3925,16 @@ fn handle_update_css3d_label(
 }
 
 fn handle_add_canvas(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   encoded_picture: String,
   texture_width: Int,
   texture_height: Int,
   width: Float,
   height: Float,
   trans: transform.Transform,
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   // Picture is already encoded, use it directly
   let texture =
     create_canvas_texture_from_picture_ffi(
@@ -4185,30 +3952,27 @@ fn handle_add_canvas(
   // Cache the encoded picture to avoid recreating texture on first update
   set_canvas_cached_picture_ffi(canvas_mesh, encoded_picture)
 
-  let three_obj = object_cache.wrap_object(canvas_mesh)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, canvas_mesh, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, canvas_mesh)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_update_canvas(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   encoded_picture: String,
   texture_width: Int,
   texture_height: Int,
   width: Float,
   height: Float,
   trans: transform.Transform,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
-      let obj_3d = object_cache.unwrap_object(obj)
-
+    option.Some(object) -> {
       // Performance optimization: Only create new texture if picture changed
       // Check if encoded_picture differs from cached value
-      let cached_picture = get_canvas_cached_picture_ffi(obj_3d)
+      let cached_picture = get_canvas_cached_picture_ffi(object)
       let picture_changed = cached_picture != encoded_picture
 
       case picture_changed {
@@ -4220,8 +3984,8 @@ fn handle_update_canvas(
               texture_width,
               texture_height,
             )
-          update_canvas_texture_ffi(obj_3d, texture)
-          set_canvas_cached_picture_ffi(obj_3d, encoded_picture)
+          update_canvas_texture_ffi(object, texture)
+          set_canvas_cached_picture_ffi(object, encoded_picture)
         }
         False -> {
           // Picture unchanged - skip expensive texture creation
@@ -4230,8 +3994,8 @@ fn handle_update_canvas(
       }
 
       // Always update size and transform (cheap operations)
-      update_canvas_size_ffi(obj_3d, width, height)
-      apply_transform_ffi(obj_3d, trans)
+      update_canvas_size_ffi(object, width, height)
+      apply_transform_ffi(object, trans)
 
       state
     }
@@ -4240,8 +4004,8 @@ fn handle_update_canvas(
 }
 
 fn handle_add_animated_sprite(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   sheet: spritesheet.Spritesheet,
   anim: spritesheet.Animation,
   anim_state: spritesheet.AnimationState,
@@ -4250,8 +4014,8 @@ fn handle_add_animated_sprite(
   trans: transform.Transform,
   pixel_art: Bool,
   physics: Option(physics.RigidBody),
-  parent_id: Option(id),
-) -> RendererState(id) {
+  parent_id: Option(String),
+) -> RendererState {
   // Get the base texture and clone it for independent animation
   let base_texture = spritesheet.texture(sheet)
   let sprite_texture = texture.clone(base_texture)
@@ -4282,10 +4046,9 @@ fn handle_add_animated_sprite(
   // Apply transform
   apply_transform_ffi(sprite_mesh, trans)
 
-  let three_obj = object_cache.wrap_object(sprite_mesh)
-  add_to_scene_or_parent(state, three_obj, parent_id)
+  add_to_scene_or_parent(state, sprite_mesh, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, three_obj)
+  let new_cache = object_cache.add_object(state.cache, id, sprite_mesh)
 
   // Create physics body if specified - update physics world in state
   let new_state = RendererState(..state, cache: new_cache)
@@ -4299,8 +4062,8 @@ fn handle_add_animated_sprite(
 }
 
 fn handle_update_animated_sprite(
-  state: RendererState(id),
-  id: id,
+  state: RendererState,
+  id: String,
   sheet: spritesheet.Spritesheet,
   anim: spritesheet.Animation,
   anim_state: spritesheet.AnimationState,
@@ -4308,11 +4071,9 @@ fn handle_update_animated_sprite(
   height: Float,
   trans: transform.Transform,
   pixel_art: Bool,
-) -> RendererState(id) {
+) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     option.Some(obj) -> {
-      let obj_3d = object_cache.unwrap_object(obj)
-
       // Get the base texture and clone it for independent animation
       let base_texture = spritesheet.texture(sheet)
       let sprite_texture = texture.clone(base_texture)
@@ -4341,13 +4102,13 @@ fn handle_update_animated_sprite(
       |> texture.set_offset(offset_x, offset_y)
 
       // Update the mesh texture
-      update_canvas_texture_ffi(obj_3d, sprite_texture)
+      update_canvas_texture_ffi(obj, sprite_texture)
 
       // Update size
-      update_canvas_size_ffi(obj_3d, width, height)
+      update_canvas_size_ffi(obj, width, height)
 
       // Update transform
-      apply_transform_ffi(obj_3d, trans)
+      apply_transform_ffi(obj, trans)
 
       state
     }
@@ -4356,11 +4117,11 @@ fn handle_update_animated_sprite(
 }
 
 fn setup_animation(
-  cache: CacheState,
-  id: id,
-  mixer: AnimationMixer,
+  cache: object_cache.CacheState,
+  id: String,
+  mixer: object_cache.AnimationMixer,
   playback: AnimationPlayback,
-) -> CacheState {
+) -> object_cache.CacheState {
   // Stop existing animations
   case object_cache.get_actions(cache, id) {
     option.Some(actions) -> stop_actions(actions)
@@ -4383,11 +4144,11 @@ fn setup_animation(
       let to_action = create_animation_action(mixer, to_anim)
 
       // Adjust weights based on blend factor
-      adjust_action_weight(
+      set_animation_weight_ffi(
         from_action,
         { 1.0 -. blend_factor } *. from_anim.weight,
       )
-      adjust_action_weight(to_action, blend_factor *. to_anim.weight)
+      set_animation_weight_ffi(to_action, blend_factor *. to_anim.weight)
 
       let actions =
         object_cache.BlendedActions(from: from_action, to: to_action)
@@ -4397,110 +4158,90 @@ fn setup_animation(
 }
 
 fn create_animation_action(
-  mixer: AnimationMixer,
+  mixer: object_cache.AnimationMixer,
   animation: animation.Animation,
-) -> AnimationAction {
-  let mixer_dynamic = object_cache.unwrap_mixer(mixer)
-  let clip_dynamic = to_dynamic(animation.clip)
-  let action_dynamic = create_animation_action_ffi(mixer_dynamic, clip_dynamic)
+) -> object_cache.AnimationAction {
+  let three_animation_action =
+    create_animation_action_ffi(mixer, animation.clip)
 
   // Configure action
   let loop_mode = case animation.loop {
     animation.LoopRepeat -> loop_repeat()
     animation.LoopOnce -> loop_once()
   }
-  set_animation_loop_ffi(action_dynamic, loop_mode)
-  set_animation_time_scale_ffi(action_dynamic, animation.speed)
-  set_animation_weight_ffi(action_dynamic, animation.weight)
-  play_animation_action_ffi(action_dynamic)
+  set_animation_loop_ffi(three_animation_action, loop_mode)
+  set_animation_time_scale_ffi(three_animation_action, animation.speed)
+  set_animation_weight_ffi(three_animation_action, animation.weight)
+  play_animation_action_ffi(three_animation_action)
 
-  object_cache.wrap_action(action_dynamic)
+  three_animation_action
 }
 
-fn stop_actions(actions: AnimationActions) -> Nil {
+fn stop_actions(actions: object_cache.AnimationActions) -> Nil {
   case actions {
     object_cache.SingleAction(action) -> {
-      let action_dynamic = object_cache.unwrap_action(action)
-      stop_animation_action_ffi(action_dynamic)
+      stop_animation_action_ffi(action)
     }
     object_cache.BlendedActions(from: from_action, to: to_action) -> {
-      let from_dynamic = object_cache.unwrap_action(from_action)
-      let to_dynamic = object_cache.unwrap_action(to_action)
-      stop_animation_action_ffi(from_dynamic)
-      stop_animation_action_ffi(to_dynamic)
+      stop_animation_action_ffi(from_action)
+      stop_animation_action_ffi(to_action)
     }
   }
 }
 
-fn adjust_action_weight(action: AnimationAction, weight: Float) -> Nil {
-  let action_dynamic = object_cache.unwrap_action(action)
-  set_animation_weight_ffi(action_dynamic, weight)
-}
-
 // Animation FFI declarations
 @external(javascript, "../threejs.ffi.mjs", "clipAction")
-fn create_animation_action_ffi(mixer: Dynamic, clip: Dynamic) -> Dynamic
+fn create_animation_action_ffi(
+  mixer: object_cache.AnimationMixer,
+  clip: animation.AnimationClip,
+) -> object_cache.AnimationAction
 
 @external(javascript, "../threejs.ffi.mjs", "setActionLoop")
-fn set_animation_loop_ffi(action: Dynamic, loop_mode: Dynamic) -> Nil
+fn set_animation_loop_ffi(
+  action: object_cache.AnimationAction,
+  loop_mode: Loop,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setActionTimeScale")
-fn set_animation_time_scale_ffi(action: Dynamic, time_scale: Float) -> Nil
+fn set_animation_time_scale_ffi(
+  action: object_cache.AnimationAction,
+  time_scale: Float,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setActionWeight")
-fn set_animation_weight_ffi(action: Dynamic, weight: Float) -> Nil
+fn set_animation_weight_ffi(
+  action: object_cache.AnimationAction,
+  weight: Float,
+) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "playAction")
-fn play_animation_action_ffi(action: Dynamic) -> Nil
+fn play_animation_action_ffi(action: object_cache.AnimationAction) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "stopAction")
-fn stop_animation_action_ffi(action: Dynamic) -> Nil
+fn stop_animation_action_ffi(action: object_cache.AnimationAction) -> Nil
+
+type Loop
 
 @external(javascript, "../threejs.ffi.mjs", "getLoopRepeat")
-fn loop_repeat() -> Dynamic
+fn loop_repeat() -> Loop
 
 @external(javascript, "../threejs.ffi.mjs", "getLoopOnce")
-fn loop_once() -> Dynamic
+fn loop_once() -> Loop
 
 @internal
-pub fn update_mixers(state: RendererState(id), delta_time: Float) -> Nil {
+pub fn update_mixers(state: RendererState, delta_time: Duration) -> Nil {
+  let delta_time_seconds = duration.to_seconds(delta_time)
+
   let mixers = object_cache.get_all_mixers(state.cache)
   list.each(mixers, fn(entry) {
     let #(_id, mixer) = entry
-    let mixer_dynamic = object_cache.unwrap_mixer(mixer)
-    update_animation_mixer_ffi(mixer_dynamic, delta_time)
+    // Three.js AnimationMixer.update expects seconds
+    update_animation_mixer_ffi(mixer, delta_time_seconds)
   })
 }
 
 @internal
-pub fn update_particle_systems(
-  state: RendererState(id),
-  delta_time: Float,
-) -> RendererState(id) {
-  let particle_systems = object_cache.get_all_particle_systems(state.cache)
-
-  let updated_cache =
-    list.fold(particle_systems, state.cache, fn(cache, entry) {
-      let #(string_id, cached_system) = entry
-
-      // Unwrap, update, and wrap back
-      let particle_state =
-        particle_manager.unwrap_from_cache_entry(cached_system)
-      let updated_state =
-        particle_manager.update_particles(particle_state, delta_time)
-      let wrapped_system = particle_manager.wrap_as_cache_entry(updated_state)
-
-      // Update cache with new state (using string ID directly)
-      let new_particles =
-        dict.insert(cache.particles, string_id, wrapped_system)
-      object_cache.CacheState(..cache, particles: new_particles)
-    })
-
-  RendererState(..state, cache: updated_cache)
-}
-
-@internal
-pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
+pub fn sync_physics_transforms(state: RendererState) -> Nil {
   case state.physics_world {
     option.Some(world) -> {
       // Use raw quaternion data from physics to avoid conversion errors
@@ -4511,17 +4252,16 @@ pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
             // Get the Three.js object for this body
             case object_cache.get_object(state.cache, id) {
               option.Some(obj) -> {
-                let obj_dynamic = object_cache.unwrap_object(obj)
                 // Use identity scale since physics doesn't affect scale
                 let scale = vec3.Vec3(1.0, 1.0, 1.0)
                 // Apply transform using quaternion directly (no Euler conversion)
                 apply_transform_with_quaternion_ffi(
-                  obj_dynamic,
+                  obj,
                   position,
                   quaternion,
                   scale,
                 )
-                update_matrix_world_ffi(obj_dynamic, True)
+                update_matrix_world_ffi(obj, True)
               }
               option.None -> Nil
             }
@@ -4535,13 +4275,12 @@ pub fn sync_physics_transforms(state: RendererState(id)) -> Nil {
 }
 
 @internal
-pub fn clear_cache(state: RendererState(id)) -> RendererState(id) {
+pub fn clear_cache(state: RendererState) -> RendererState {
   // Dispose all objects recursively (geometry, materials, textures, children)
   let objects = object_cache.get_all_objects(state.cache)
   list.each(objects, fn(entry) {
     let #(_id, obj) = entry
-    let obj_dynamic = object_cache.unwrap_object(obj)
-    dispose_object_3d_ffi(obj_dynamic)
+    dispose_object_3d_ffi(obj)
   })
 
   let new_cache = object_cache.clear(state.cache)
@@ -4550,12 +4289,12 @@ pub fn clear_cache(state: RendererState(id)) -> RendererState(id) {
 
 @internal
 pub fn get_cameras_with_viewports(
-  state: RendererState(id),
+  state: RendererState,
 ) -> List(#(asset.Object3D, object_cache.Viewport)) {
   object_cache.get_cameras_with_viewports(state.cache)
   |> list.map(fn(entry) {
     let #(camera_obj, viewport) = entry
-    #(object_cache.unwrap_object(camera_obj), viewport)
+    #(camera_obj, viewport)
   })
 }
 
@@ -4563,7 +4302,7 @@ pub fn get_cameras_with_viewports(
 /// Returns: List of (camera_id_string, camera_object, Option(viewport), Option(postprocessing))
 @internal
 pub fn get_all_cameras_with_info(
-  state: RendererState(id),
+  state: RendererState,
 ) -> List(
   #(
     String,
@@ -4575,7 +4314,7 @@ pub fn get_all_cameras_with_info(
   object_cache.get_all_cameras_with_info(state.cache)
   |> list.map(fn(entry) {
     let #(id_string, camera_obj, viewport_opt, pp_opt) = entry
-    #(id_string, object_cache.unwrap_object(camera_obj), viewport_opt, pp_opt)
+    #(id_string, camera_obj, viewport_opt, pp_opt)
   })
 }
 
@@ -4604,11 +4343,11 @@ fn create_canvas_texture_from_picture_ffi(
   encoded_picture: String,
   width: Int,
   height: Int,
-) -> asset.Texture
+) -> texture.Texture
 
 @external(javascript, "../threejs.ffi.mjs", "createCanvasPlane")
 fn create_canvas_plane_ffi(
-  texture: asset.Texture,
+  texture: texture.Texture,
   width: Float,
   height: Float,
 ) -> asset.Object3D
@@ -4616,7 +4355,7 @@ fn create_canvas_plane_ffi(
 @external(javascript, "../threejs.ffi.mjs", "updateCanvasTexture")
 fn update_canvas_texture_ffi(
   object: asset.Object3D,
-  texture: asset.Texture,
+  texture: texture.Texture,
 ) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "updateCanvasSize")
@@ -4650,4 +4389,6 @@ fn apply_material_to_object_ffi(
 fn get_world_position_ffi(object: asset.Object3D) -> Vec3(Float)
 
 @external(javascript, "../threejs.ffi.mjs", "getWorldQuaternion")
-fn get_world_quaternion_ffi(object: asset.Object3D) -> transform.Quaternion
+fn get_world_quaternion_ffi(
+  object: asset.Object3D,
+) -> #(Float, Float, Float, Float)

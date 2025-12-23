@@ -141,11 +141,10 @@
 //// }
 //// ```
 
-import gleam/float
 import gleam/int
 import gleam/order
+import gleam/time/duration.{type Duration}
 import iv.{type Array}
-import tiramisu/asset
 import tiramisu/texture
 
 // ============================================================================
@@ -158,7 +157,7 @@ import tiramisu/texture
 /// Each frame has equal dimensions determined by dividing the texture
 /// by the number of columns and rows.
 pub opaque type Spritesheet {
-  Spritesheet(texture: asset.Texture, columns: Int, rows: Int, frame_count: Int)
+  Spritesheet(texture: texture.Texture, columns: Int, rows: Int, frame_count: Int)
 }
 
 /// An animation sequence with frame indices and timing.
@@ -166,7 +165,7 @@ pub type Animation {
   Animation(
     name: String,
     frames: Array(Int),
-    frame_duration: Float,
+    frame_duration: Duration,
     loop: LoopMode,
   )
 }
@@ -188,7 +187,7 @@ pub type AnimationState {
   AnimationState(
     current_animation: String,
     current_frame_index: Int,
-    elapsed_time: Float,
+    elapsed_time: Duration,
     is_playing: Bool,
     ping_pong_forward: Bool,
   )
@@ -234,7 +233,7 @@ pub type SpritesheetError {
 /// )
 /// ```
 pub fn from_grid(
-  texture texture: asset.Texture,
+  texture texture: texture.Texture,
   columns columns: Int,
   rows rows: Int,
 ) -> Result(Spritesheet, SpritesheetError) {
@@ -257,7 +256,7 @@ pub fn from_grid(
 /// )
 /// ```
 pub fn from_grid_with_count(
-  texture texture: asset.Texture,
+  texture texture: texture.Texture,
   columns columns: Int,
   rows rows: Int,
   frame_count frame_count: Int,
@@ -285,7 +284,7 @@ pub fn from_grid_with_count(
 ///
 /// **Note**: This returns the original texture. For animated sprites,
 /// you should clone this texture so each sprite can animate independently.
-pub fn texture(sheet: Spritesheet) -> asset.Texture {
+pub fn texture(sheet: Spritesheet) -> texture.Texture {
   sheet.texture
 }
 
@@ -337,7 +336,7 @@ pub fn frame_count(sheet: Spritesheet) -> Int {
 pub fn animation(
   name name: String,
   frames frames: List(Int),
-  frame_duration frame_duration: Float,
+  frame_duration frame_duration: Duration,
   loop loop: LoopMode,
 ) -> Animation {
   Animation(name, frames |> iv.from_list(), frame_duration, loop)
@@ -366,7 +365,7 @@ pub fn initial_state(animation_name: String) -> AnimationState {
   AnimationState(
     current_animation: animation_name,
     current_frame_index: 0,
-    elapsed_time: 0.0,
+    elapsed_time: duration.nanoseconds(0),
     is_playing: True,
     ping_pong_forward: True,
   )
@@ -395,23 +394,21 @@ pub fn initial_state(animation_name: String) -> AnimationState {
 pub fn update(
   state state: AnimationState,
   animation animation: Animation,
-  delta_time delta_time: Float,
+  delta_time delta_time: Duration,
 ) -> AnimationState {
   case state.is_playing {
     False -> state
     True -> {
-      let new_elapsed = state.elapsed_time +. delta_time
+      let new_elapsed = duration.add(state.elapsed_time, delta_time)
 
-      case
-        float.loosely_compare(new_elapsed, animation.frame_duration, 0.0001)
-      {
+      case duration.compare(new_elapsed, animation.frame_duration) {
         order.Lt -> AnimationState(..state, elapsed_time: new_elapsed)
-        order.Eq | order.Gt ->
-          advance_frame(
-            state,
-            animation,
-            new_elapsed -. animation.frame_duration,
-          )
+        order.Eq | order.Gt -> {
+          // difference(left, right) = right - left
+          // We want: new_elapsed - frame_duration
+          let remaining = duration.difference(animation.frame_duration, new_elapsed)
+          advance_frame(state, animation, remaining)
+        }
       }
     }
   }
@@ -420,9 +417,9 @@ pub fn update(
 fn advance_frame(
   state: AnimationState,
   animation: Animation,
-  remaining_time: Float,
+  remaining_time: Duration,
 ) -> AnimationState {
-  let frame_count = iv.length(animation.frames)
+  let frame_count = iv.size(animation.frames)
 
   let new_state = case animation.loop {
     Repeat -> {
@@ -442,7 +439,7 @@ fn advance_frame(
             ..state,
             current_frame_index: frame_count - 1,
             is_playing: False,
-            elapsed_time: 0.0,
+            elapsed_time: duration.nanoseconds(0),
           )
         False ->
           AnimationState(
@@ -496,24 +493,24 @@ fn advance_frame(
   }
 
   // If we still have enough time for another frame, advance again
-  case
-    new_state.is_playing
-    && {
-      new_state.elapsed_time >=. animation.frame_duration
-      || float.loosely_equals(
-        new_state.elapsed_time,
-        animation.frame_duration,
-        0.0001,
-      )
-    }
-  {
-    True ->
-      advance_frame(
-        new_state,
-        animation,
-        new_state.elapsed_time -. animation.frame_duration,
-      )
+  // Only recurse if elapsed time exceeds or equals frame duration
+  case new_state.is_playing {
     False -> new_state
+    True -> {
+      case duration.compare(new_state.elapsed_time, animation.frame_duration) {
+        order.Lt -> new_state
+        order.Eq -> {
+          // Exactly at frame boundary, advance one more frame with 0 remaining
+          advance_frame(new_state, animation, duration.nanoseconds(0))
+        }
+        order.Gt -> {
+          // Have time left over, subtract frame duration and recurse
+          let remaining =
+            duration.difference(animation.frame_duration, new_state.elapsed_time)
+          advance_frame(new_state, animation, remaining)
+        }
+      }
+    }
   }
 }
 
@@ -537,7 +534,7 @@ pub fn stop(state: AnimationState) -> AnimationState {
     ..state,
     is_playing: False,
     current_frame_index: 0,
-    elapsed_time: 0.0,
+    elapsed_time: duration.nanoseconds(0),
   )
 }
 
@@ -563,7 +560,7 @@ pub fn change_animation(
   AnimationState(
     current_animation: animation_name,
     current_frame_index: 0,
-    elapsed_time: 0.0,
+    elapsed_time: duration.nanoseconds(0),
     is_playing: True,
     ping_pong_forward: True,
   )
@@ -671,9 +668,9 @@ pub fn frame_repeat(sheet: Spritesheet) -> #(Float, Float) {
 /// ```
 pub fn apply_frame(
   sheet: Spritesheet,
-  tex: asset.Texture,
+  tex: texture.Texture,
   frame_index: Int,
-) -> asset.Texture {
+) -> texture.Texture {
   let #(offset_x, offset_y) = frame_offset(sheet, frame_index)
   let #(repeat_x, repeat_y) = frame_repeat(sheet)
 

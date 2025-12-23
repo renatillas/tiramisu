@@ -63,7 +63,7 @@ pub fn main() {
   )
 }
 
-fn init(_ctx: tiramisu.Context(Id)) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   // Create physics world with Earth gravity
   let physics_world = physics.new_world(
     physics.WorldConfig(gravity: vec3.Vec3(0.0, -9.81, 0.0))
@@ -75,7 +75,7 @@ fn init(_ctx: tiramisu.Context(Id)) -> #(Model, effect.Effect(Msg), option.Optio
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let assert option.Some(physics_world) = ctx.physics_world
 
@@ -88,7 +88,7 @@ fn update(
   }
 }
 
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+fn view(model: Model, ctx: tiramisu.Context) -> scene.Node(Id) {
   let assert option.Some(physics_world) = ctx.physics_world
 
   let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -162,7 +162,7 @@ fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 The physics world is initialized in your `init()` function and returned as the third element of the tuple:
 
 ```gleam
-fn init(_ctx: tiramisu.Context(Id)) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let physics_world = physics.new_world(
     physics.WorldConfig(
       gravity: vec3.Vec3(0.0, -9.81, 0.0)  // Earth gravity (m/s²)
@@ -187,7 +187,7 @@ Call `physics.step()` every frame in your `update()` function. **Important**: `p
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let assert option.Some(physics_world) = ctx.physics_world
 
@@ -212,7 +212,7 @@ The step function:
 ### Accessing the World in View
 
 ```gleam
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+fn view(model: Model, ctx: tiramisu.Context) -> scene.Node(Id) {
   let assert option.Some(physics_world) = ctx.physics_world
 
   // Get physics transforms for dynamic bodies
@@ -531,7 +531,7 @@ Get collision events from the physics world after stepping:
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   let assert option.Some(physics_world) = ctx.physics_world
 
@@ -752,7 +752,7 @@ Enable collider wireframes for debugging:
 ```gleam
 import tiramisu/debug
 
-fn view(model: Model, ctx: tiramisu.Context(Id)) -> List(scene.Node(Id)) {
+fn view(model: Model, ctx: tiramisu.Context) -> List(scene.Node(Id)) {
   let assert option.Some(physics_world) = ctx.physics_world
 
   // Show/hide debug wireframes with a key press

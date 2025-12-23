@@ -13,9 +13,10 @@ import { ClearPass } from 'three/addons/postprocessing/ClearPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import * as SCENE from './tiramisu/scene.mjs';
 import * as GLEAM from '../gleam_stdlib/gleam.mjs';
-import { Option$Some, Option$None, Some, None } from '../gleam_stdlib/gleam/option.mjs';
+import { Option$Some, Option$None, Some } from '../gleam_stdlib/gleam/option.mjs';
 import * as INPUT from './tiramisu/input.mjs';
 import * as POSTPROCESSING from './tiramisu/postprocessing.mjs';
+import { seconds, milliseconds, add } from '../gleam_time/gleam/time/duration.mjs';
 import {
   Pass$isRenderPass,
   Pass$isClearPass,
@@ -1635,43 +1636,43 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
 
   // Effect passes
   if (Pass$isBloomPass(gleamPass)) {
-      const strength = gleamPass.strength;
-      const threshold = gleamPass.threshold;
-      const radius = gleamPass.radius;
+    const strength = gleamPass.strength;
+    const threshold = gleamPass.threshold;
+    const radius = gleamPass.radius;
 
-      const size = renderer.getSize(new THREE.Vector2());
-      const bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(size.x, size.y),
-        strength,
-        radius,
-        threshold
-      );
-      return bloomPass;
+    const size = renderer.getSize(new THREE.Vector2());
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(size.x, size.y),
+      strength,
+      radius,
+      threshold
+    );
+    return bloomPass;
   }
 
   if (Pass$isPixelatePass(gleamPass)) {
-      // Pixelation effect using custom shader
-      const pixelSize = gleamPass.pixel_size;
-      const normalEdgeStrength = gleamPass.normal_edge_strength;
-      const depthEdgeStrength = gleamPass.depth_edge_strength;
+    // Pixelation effect using custom shader
+    const pixelSize = gleamPass.pixel_size;
+    const normalEdgeStrength = gleamPass.normal_edge_strength;
+    const depthEdgeStrength = gleamPass.depth_edge_strength;
 
-      const size = renderer.getSize(new THREE.Vector2());
-      const pixelateShader = {
-        uniforms: {
-          'tDiffuse': { value: null },
-          'resolution': { value: new THREE.Vector2(size.x, size.y) },
-          'pixelSize': { value: pixelSize },
-          'normalEdgeStrength': { value: normalEdgeStrength },
-          'depthEdgeStrength': { value: depthEdgeStrength }
-        },
-        vertexShader: `
+    const size = renderer.getSize(new THREE.Vector2());
+    const pixelateShader = {
+      uniforms: {
+        'tDiffuse': { value: null },
+        'resolution': { value: new THREE.Vector2(size.x, size.y) },
+        'pixelSize': { value: pixelSize },
+        'normalEdgeStrength': { value: normalEdgeStrength },
+        'depthEdgeStrength': { value: depthEdgeStrength }
+      },
+      vertexShader: `
           varying vec2 vUv;
           void main() {
             vUv = uv;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
-        fragmentShader: `
+      fragmentShader: `
           uniform sampler2D tDiffuse;
           uniform vec2 resolution;
           uniform float pixelSize;
@@ -1683,39 +1684,39 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
             gl_FragColor = texture2D(tDiffuse, coord);
           }
         `
-      };
+    };
 
-      return new ShaderPass(pixelateShader);
+    return new ShaderPass(pixelateShader);
   }
 
   if (Pass$isFilmPass(gleamPass)) {
-      const noiseIntensity = gleamPass.noise_intensity;
-      const grayscale = gleamPass.grayscale;
-      // Note: scanlineIntensity and scanlineCount were removed from FilmPass in newer Three.js versions
-      // The parameters are kept in the Gleam API for backward compatibility but ignored here
+    const noiseIntensity = gleamPass.noise_intensity;
+    const grayscale = gleamPass.grayscale;
+    // Note: scanlineIntensity and scanlineCount were removed from FilmPass in newer Three.js versions
+    // The parameters are kept in the Gleam API for backward compatibility but ignored here
 
-      const filmPass = new FilmPass(noiseIntensity, grayscale);
-      return filmPass;
+    const filmPass = new FilmPass(noiseIntensity, grayscale);
+    return filmPass;
   }
 
   if (Pass$isVignettePass(gleamPass)) {
-      const darkness = gleamPass.darkness;
-      const offset = gleamPass.offset;
+    const darkness = gleamPass.darkness;
+    const offset = gleamPass.offset;
 
-      const vignetteShader = {
-        uniforms: {
-          'tDiffuse': { value: null },
-          'darkness': { value: darkness },
-          'offset': { value: offset }
-        },
-        vertexShader: `
+    const vignetteShader = {
+      uniforms: {
+        'tDiffuse': { value: null },
+        'darkness': { value: darkness },
+        'offset': { value: offset }
+      },
+      vertexShader: `
           varying vec2 vUv;
           void main() {
             vUv = uv;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
-        fragmentShader: `
+      fragmentShader: `
           uniform sampler2D tDiffuse;
           uniform float darkness;
           uniform float offset;
@@ -1730,45 +1731,45 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
             gl_FragColor = texel;
           }
         `
-      };
+    };
 
-      return new ShaderPass(vignetteShader);
+    return new ShaderPass(vignetteShader);
   }
 
   if (Pass$isFXAAPass(gleamPass)) {
-      const size = renderer.getSize(new THREE.Vector2());
-      const fxaaPass = new ShaderPass(FXAAShader);
-      fxaaPass.material.uniforms['resolution'].value.x = 1 / size.x;
-      fxaaPass.material.uniforms['resolution'].value.y = 1 / size.y;
-      return fxaaPass;
+    const size = renderer.getSize(new THREE.Vector2());
+    const fxaaPass = new ShaderPass(FXAAShader);
+    fxaaPass.material.uniforms['resolution'].value.x = 1 / size.x;
+    fxaaPass.material.uniforms['resolution'].value.y = 1 / size.y;
+    return fxaaPass;
   }
 
   if (Pass$isGlitchPass(gleamPass)) {
-      const dtSize = gleamPass.dt_size;
-      const glitchPass = new GlitchPass(dtSize);
-      return glitchPass;
+    const dtSize = gleamPass.dt_size;
+    const glitchPass = new GlitchPass(dtSize);
+    return glitchPass;
   }
 
   if (Pass$isColorCorrectionPass(gleamPass)) {
-      const brightness = gleamPass.brightness;
-      const contrast = gleamPass.contrast;
-      const saturation = gleamPass.saturation;
+    const brightness = gleamPass.brightness;
+    const contrast = gleamPass.contrast;
+    const saturation = gleamPass.saturation;
 
-      const colorCorrectionShader = {
-        uniforms: {
-          'tDiffuse': { value: null },
-          'brightness': { value: brightness },
-          'contrast': { value: contrast },
-          'saturation': { value: saturation }
-        },
-        vertexShader: `
+    const colorCorrectionShader = {
+      uniforms: {
+        'tDiffuse': { value: null },
+        'brightness': { value: brightness },
+        'contrast': { value: contrast },
+        'saturation': { value: saturation }
+      },
+      vertexShader: `
           varying vec2 vUv;
           void main() {
             vUv = uv;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }
         `,
-        fragmentShader: `
+      fragmentShader: `
           uniform sampler2D tDiffuse;
           uniform float brightness;
           uniform float contrast;
@@ -1791,49 +1792,49 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
             gl_FragColor = texel;
           }
         `
-      };
+    };
 
-      return new ShaderPass(colorCorrectionShader);
+    return new ShaderPass(colorCorrectionShader);
   }
 
   if (Pass$isCustomShaderPass(gleamPass)) {
-      const vertexShader = gleamPass.vertex_shader;
-      const fragmentShader = gleamPass.fragment_shader;
-      const uniforms = gleamPass.uniforms;
+    const vertexShader = gleamPass.vertex_shader;
+    const fragmentShader = gleamPass.fragment_shader;
+    const uniforms = gleamPass.uniforms;
 
-      // Convert Gleam uniforms to Three.js format
-      const threeUniforms = { 'tDiffuse': { value: null } };
-      const uniformsArray = uniforms.toArray();
+    // Convert Gleam uniforms to Three.js format
+    const threeUniforms = { 'tDiffuse': { value: null } };
+    const uniformsArray = uniforms.toArray();
 
-      for (const [name, value] of uniformsArray) {
-        const uniformVariant = value[0];
+    for (const [name, value] of uniformsArray) {
+      const uniformVariant = value[0];
 
-        switch (uniformVariant) {
-          case 'FloatUniform':
-            threeUniforms[name] = { value: value[1] };
-            break;
-          case 'IntUniform':
-            threeUniforms[name] = { value: value[1] };
-            break;
-          case 'Vec2Uniform':
-            threeUniforms[name] = { value: new THREE.Vector2(value[1], value[2]) };
-            break;
-          case 'Vec3Uniform':
-            threeUniforms[name] = { value: new THREE.Vector3(value[1], value[2], value[3]) };
-            break;
-          case 'ColorUniform':
-            threeUniforms[name] = { value: new THREE.Color(value[1]) };
-            break;
-        }
+      switch (uniformVariant) {
+        case 'FloatUniform':
+          threeUniforms[name] = { value: value[1] };
+          break;
+        case 'IntUniform':
+          threeUniforms[name] = { value: value[1] };
+          break;
+        case 'Vec2Uniform':
+          threeUniforms[name] = { value: new THREE.Vector2(value[1], value[2]) };
+          break;
+        case 'Vec3Uniform':
+          threeUniforms[name] = { value: new THREE.Vector3(value[1], value[2], value[3]) };
+          break;
+        case 'ColorUniform':
+          threeUniforms[name] = { value: new THREE.Color(value[1]) };
+          break;
       }
+    }
 
-      const customShader = {
-        uniforms: threeUniforms,
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader
-      };
+    const customShader = {
+      uniforms: threeUniforms,
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader
+    };
 
-      return new ShaderPass(customShader);
+    return new ShaderPass(customShader);
   }
 
   // Unknown pass type
@@ -2078,7 +2079,7 @@ export class DebugManager {
           // Check if buffer size changed (geometry structure changed)
           // This happens when colliders are added/removed
           const needsReallocation = !existingPosAttr ||
-                                     existingPosAttr.count !== vertexCount;
+            existingPosAttr.count !== vertexCount;
 
           if (needsReallocation) {
             // BufferAttributes are automatically garbage collected when replaced
@@ -2475,9 +2476,18 @@ export function startLoop(
 
     // Update context with new delta, input, and canvas dimensions
     // Keep the physics_world from the original context
+    // Convert delta time from milliseconds to Duration using public API
+    const deltaTimeSeconds = Math.floor(deltaTime / 1000);
+    const deltaTimeRemainingMs = deltaTime % 1000;
+
+    // Build duration: seconds + remaining milliseconds
+    const deltaTimeDuration = deltaTimeSeconds > 0
+      ? add(seconds(deltaTimeSeconds), milliseconds(deltaTimeRemainingMs))
+      : milliseconds(deltaTimeRemainingMs);
+
     let newContext = {
       ...context,
-      delta_time: deltaTime,
+      delta_time: deltaTimeDuration,
       input: inputState,
       canvas_width: canvasWidth,
       canvas_height: canvasHeight,
@@ -2518,8 +2528,20 @@ export function startLoop(
       const prevNode = currentNode ? Option$Some(currentNode) : Option$None();
       const currNode = Option$Some(newNode);
 
-      const patches = SCENE.diff(prevNode, currNode);
+      // Get cached dict from renderer state (optimization)
+      const cachedDict = SCENE.get_cached_scene_dict(currentRendererState);
+
+      // Call diff with cache - returns [patches, newCachedDict]
+      const [patches, newCachedDict] = SCENE.diff(prevNode, currNode, cachedDict);
+
+      // Apply patches
       currentRendererState = SCENE.apply_patches(currentRendererState, patches);
+
+      // Store new cached dict for next frame (optimization)
+      currentRendererState = SCENE.set_cached_scene_dict(
+        currentRendererState,
+        Option$Some(newCachedDict)
+      );
 
       // Extract updated physics world from renderer (it may have new bodies)
       const updatedPhysicsWorld = SCENE.get_physics_world(currentRendererState);
@@ -2544,9 +2566,6 @@ export function startLoop(
 
     // Update animation mixers
     SCENE.update_mixers(currentRendererState, deltaTime);
-
-    // Update particle systems (returns updated renderer state)
-    currentRendererState = SCENE.update_particle_systems(currentRendererState, deltaTime);
 
     // Update physics debug visualization (pass scene from renderer state)
     debugManager.update(scene);
@@ -2996,48 +3015,6 @@ export function cancelInterval(intervalId) {
   timerManager.clearTimer(intervalId);
 }
 
-// Easing functions for tweening
-const easingFunctions = {
-  linear: (t) => t,
-  easeInQuad: (t) => t * t,
-  easeOutQuad: (t) => t * (2 - t),
-  easeInOutQuad: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
-  easeInCubic: (t) => t * t * t,
-  easeOutCubic: (t) => (--t) * t * t + 1,
-  easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1),
-};
-
-/**
- * Animate a value from start to end with easing
- * @param {number} start - Starting value
- * @param {number} end - Ending value
- * @param {number} durationMs - Animation duration in milliseconds
- * @param {string} easingName - Name of easing function
- * @param {Function} onUpdate - Callback with interpolated value
- * @param {Function} onComplete - Callback when animation completes
- */
-export function tween(start, end, durationMs, easingName, onUpdate, onComplete) {
-  const easing = easingFunctions[easingName] || easingFunctions.linear;
-  const startTime = performance.now();
-
-  function animate() {
-    const elapsed = performance.now() - startTime;
-    const progress = Math.min(elapsed / durationMs, 1.0);
-    const easedProgress = easing(progress);
-    const value = start + (end - start) * easedProgress;
-
-    onUpdate(value);
-
-    if (progress < 1.0) {
-      requestAnimationFrame(animate);
-    } else {
-      onComplete();
-    }
-  }
-
-  requestAnimationFrame(animate);
-}
-
 // ============================================================================
 // SYSTEM & BROWSER EFFECTS - Browser API interactions
 // ============================================================================
@@ -3261,12 +3238,12 @@ export function getPairsMaterials(pairs) {
 /**
  * Generate a unique ID for an instance's physics body
  * Combines base ID with instance index
- * @param {*} baseId - The base ID (can be any type)
+ * @param {string} baseId - The base ID string
  * @param {number} index - The instance index
- * @returns {*} - Composite ID (tuple of base + index)
+ * @returns {string} - Composite ID string
  */
 export function generateInstanceId(baseId, index) {
-  // Return a tuple that combines the base ID with the index
+  // Return a string that combines the base ID with the index
   // This creates unique IDs for each instance's physics body
-  return [baseId, index];
+  return `${baseId}[${index}]`;
 }

@@ -209,7 +209,7 @@
 
 import gleam/bool
 import gleam/option.{type Option}
-import tiramisu/asset
+import tiramisu/texture
 
 /// Material types for rendering objects.
 ///
@@ -226,21 +226,21 @@ pub opaque type Material {
   /// Unlit material (no lighting calculations). Fast and useful for flat-shaded objects.
   BasicMaterial(
     color: Int,
-    map: Option(asset.Texture),
+    map: Option(texture.Texture),
     transparent: Bool,
     opacity: Float,
   )
   /// Physically-based material with metalness/roughness workflow. Most realistic.
   StandardMaterial(
     color: Int,
-    map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
-    ambient_oclusion_map: Option(asset.Texture),
-    displacement_map: Option(asset.Texture),
+    map: Option(texture.Texture),
+    normal_map: Option(texture.Texture),
+    ambient_oclusion_map: Option(texture.Texture),
+    displacement_map: Option(texture.Texture),
     displacement_scale: Float,
     displacement_bias: Float,
-    roughness_map: Option(asset.Texture),
-    metalness_map: Option(asset.Texture),
+    roughness_map: Option(texture.Texture),
+    metalness_map: Option(texture.Texture),
     metalness: Float,
     roughness: Float,
     transparent: Bool,
@@ -251,9 +251,9 @@ pub opaque type Material {
   /// Shiny material with specular highlights (like plastic or ceramic).
   PhongMaterial(
     color: Int,
-    map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
-    ambient_oclusion_map: Option(asset.Texture),
+    map: Option(texture.Texture),
+    normal_map: Option(texture.Texture),
+    ambient_oclusion_map: Option(texture.Texture),
     shininess: Float,
     transparent: Bool,
     opacity: Float,
@@ -262,9 +262,9 @@ pub opaque type Material {
   /// Matte material (like cloth or wood). Non-shiny diffuse lighting.
   LambertMaterial(
     color: Int,
-    map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
-    ambient_oclusion_map: Option(asset.Texture),
+    map: Option(texture.Texture),
+    normal_map: Option(texture.Texture),
+    ambient_oclusion_map: Option(texture.Texture),
     transparent: Bool,
     opacity: Float,
     alpha_test: Float,
@@ -272,9 +272,9 @@ pub opaque type Material {
   /// Cartoon-style material with banded shading.
   ToonMaterial(
     color: Int,
-    map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
-    ambient_oclusion_map: Option(asset.Texture),
+    map: Option(texture.Texture),
+    normal_map: Option(texture.Texture),
+    ambient_oclusion_map: Option(texture.Texture),
     transparent: Bool,
     opacity: Float,
     alpha_test: Float,
@@ -284,7 +284,7 @@ pub opaque type Material {
   /// Material for 2D sprites that always face the camera.
   SpriteMaterial(
     color: Int,
-    map: Option(asset.Texture),
+    map: Option(texture.Texture),
     transparent: Bool,
     opacity: Float,
   )
@@ -323,7 +323,7 @@ pub fn basic(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
-  map map: option.Option(asset.Texture),
+  map map: option.Option(texture.Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -355,14 +355,14 @@ pub fn standard(
   roughness roughness: Float,
   transparent transparent: Bool,
   opacity opacity: Float,
-  map map: option.Option(asset.Texture),
-  normal_map normal_map: option.Option(asset.Texture),
-  ambient_oclusion_map ambient_oclusion_map: option.Option(asset.Texture),
-  displacement_map displacement_map: option.Option(asset.Texture),
+  map map: option.Option(texture.Texture),
+  normal_map normal_map: option.Option(texture.Texture),
+  ambient_oclusion_map ambient_oclusion_map: option.Option(texture.Texture),
+  displacement_map displacement_map: option.Option(texture.Texture),
   displacement_scale displacement_scale: Float,
   displacement_bias displacement_bias: Float,
-  roughness_map roughness_map: option.Option(asset.Texture),
-  metalness_map metalness_map: option.Option(asset.Texture),
+  roughness_map roughness_map: option.Option(texture.Texture),
+  metalness_map metalness_map: option.Option(texture.Texture),
   emissive emissive: Int,
   emissive_intensity emissive_intensity: Float,
 ) -> Result(Material, MaterialError) {
@@ -443,7 +443,7 @@ pub fn sprite(
   color color: Int,
   transparent transparent: Bool,
   opacity opacity: Float,
-  map map: option.Option(asset.Texture),
+  map map: option.Option(texture.Texture),
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -489,9 +489,9 @@ pub fn sprite(
 /// ```
 pub fn lambert(
   color color: Int,
-  map map: Option(asset.Texture),
-  normal_map normal_map: Option(asset.Texture),
-  ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  map map: Option(texture.Texture),
+  normal_map normal_map: Option(texture.Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(texture.Texture),
   transparent transparent: Bool,
   opacity opacity: Float,
   alpha_test alpha_test: Float,
@@ -554,9 +554,9 @@ pub fn lambert(
 pub fn phong(
   color color: Int,
   shininess shininess: Float,
-  map map: Option(asset.Texture),
-  normal_map normal_map: Option(asset.Texture),
-  ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  map map: Option(texture.Texture),
+  normal_map normal_map: Option(texture.Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(texture.Texture),
   transparent transparent: Bool,
   opacity opacity: Float,
   alpha_test alpha_test: Float,
@@ -618,9 +618,9 @@ pub fn phong(
 /// ```
 pub fn toon(
   color color: Int,
-  map map: Option(asset.Texture),
-  normal_map normal_map: Option(asset.Texture),
-  ambient_oclusion_map ambient_oclusion_map: Option(asset.Texture),
+  map map: Option(texture.Texture),
+  normal_map normal_map: Option(texture.Texture),
+  ambient_oclusion_map ambient_oclusion_map: Option(texture.Texture),
   transparent transparent: Bool,
   opacity opacity: Float,
   alpha_test alpha_test: Float,
@@ -661,14 +661,14 @@ pub opaque type StandardMaterialBuilder {
     roughness: Float,
     transparent: Bool,
     opacity: Float,
-    map: Option(asset.Texture),
-    normal_map: Option(asset.Texture),
-    ambient_oclusion_map: Option(asset.Texture),
-    displacement_map: Option(asset.Texture),
+    map: Option(texture.Texture),
+    normal_map: Option(texture.Texture),
+    ambient_oclusion_map: Option(texture.Texture),
+    displacement_map: Option(texture.Texture),
     displacement_scale: Float,
     displacement_bias: Float,
-    roughness_map: Option(asset.Texture),
-    metalness_map: Option(asset.Texture),
+    roughness_map: Option(texture.Texture),
+    metalness_map: Option(texture.Texture),
     emissive: Int,
     emissive_intensity: Float,
   )
@@ -793,7 +793,7 @@ pub fn with_roughness(
 /// ```
 pub fn with_color_map(
   builder: StandardMaterialBuilder,
-  map: asset.Texture,
+  map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(..builder, map: option.Some(map))
 }
@@ -813,7 +813,7 @@ pub fn with_color_map(
 /// ```
 pub fn with_normal_map(
   builder: StandardMaterialBuilder,
-  normal_map: asset.Texture,
+  normal_map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(..builder, normal_map: option.Some(normal_map))
 }
@@ -833,7 +833,7 @@ pub fn with_normal_map(
 /// ```
 pub fn with_ambient_oclusion_map(
   builder: StandardMaterialBuilder,
-  ambient_oclusion_map: asset.Texture,
+  ambient_oclusion_map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(
     ..builder,
@@ -860,7 +860,7 @@ pub fn with_ambient_oclusion_map(
 /// ```
 pub fn with_displacement_map(
   builder: StandardMaterialBuilder,
-  displacement_map: asset.Texture,
+  displacement_map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(
     ..builder,
@@ -933,7 +933,7 @@ pub fn with_displacement_bias(
 /// ```
 pub fn with_roughness_map(
   builder: StandardMaterialBuilder,
-  roughness_map: asset.Texture,
+  roughness_map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(..builder, roughness_map: option.Some(roughness_map))
 }
@@ -953,7 +953,7 @@ pub fn with_roughness_map(
 /// ```
 pub fn with_metalness_map(
   builder: StandardMaterialBuilder,
-  metalness_map: asset.Texture,
+  metalness_map: texture.Texture,
 ) -> StandardMaterialBuilder {
   StandardMaterialBuilder(..builder, metalness_map: option.Some(metalness_map))
 }
@@ -1191,7 +1191,7 @@ fn create_basic_material(
   color: Int,
   transparent: Bool,
   opacity: Float,
-  map: Option(asset.Texture),
+  map: Option(texture.Texture),
 ) -> ThreeMaterial
 
 @external(javascript, "../threejs.ffi.mjs", "createStandardMaterial")
@@ -1201,14 +1201,14 @@ fn create_standard_material(
   roughness: Float,
   transparent: Bool,
   opacity: Float,
-  map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-  ao_map: Option(asset.Texture),
-  displacement_map: Option(asset.Texture),
+  map: Option(texture.Texture),
+  normal_map: Option(texture.Texture),
+  ao_map: Option(texture.Texture),
+  displacement_map: Option(texture.Texture),
   displacement_scale: Float,
   displacement_bias: Float,
-  roughness_map: Option(asset.Texture),
-  metalness_map: Option(asset.Texture),
+  roughness_map: Option(texture.Texture),
+  metalness_map: Option(texture.Texture),
   emissive: Int,
   emissive_intensity: Float,
 ) -> ThreeMaterial
@@ -1217,9 +1217,9 @@ fn create_standard_material(
 fn create_phong_material(
   color: Int,
   shininess: Float,
-  map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-  ao_map: Option(asset.Texture),
+  map: Option(texture.Texture),
+  normal_map: Option(texture.Texture),
+  ao_map: Option(texture.Texture),
   transparent: Bool,
   opacity: Float,
   alpha_test: Float,
@@ -1228,9 +1228,9 @@ fn create_phong_material(
 @external(javascript, "../threejs.ffi.mjs", "createLambertMaterial")
 fn create_lambert_material(
   color: Int,
-  map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-  ao_map: Option(asset.Texture),
+  map: Option(texture.Texture),
+  normal_map: Option(texture.Texture),
+  ao_map: Option(texture.Texture),
   transparent: Bool,
   opacity: Float,
   alpha_test: Float,
@@ -1239,9 +1239,9 @@ fn create_lambert_material(
 @external(javascript, "../threejs.ffi.mjs", "createToonMaterial")
 fn create_toon_material(
   color: Int,
-  map: Option(asset.Texture),
-  normal_map: Option(asset.Texture),
-  ao_map: Option(asset.Texture),
+  map: Option(texture.Texture),
+  normal_map: Option(texture.Texture),
+  ao_map: Option(texture.Texture),
   transparent: Bool,
   opacity: Float,
   alpha_test: Float,
@@ -1255,5 +1255,5 @@ fn create_sprite_material(
   color: Int,
   transparent: Bool,
   opacity: Float,
-  map: Option(asset.Texture),
+  map: Option(texture.Texture),
 ) -> ThreeMaterial

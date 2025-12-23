@@ -313,6 +313,47 @@ pub fn camera_2d_with_bounds(
   )
 }
 
+/// Viewport configuration for split-screen or picture-in-picture rendering.
+///
+/// Coordinates are in pixels from the top-left of the canvas.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/camera
+/// import tiramisu/scene
+///
+/// // Create a viewport in the top-right corner
+/// let minimap_viewport = camera.ViewPort(
+///   x: 650,
+///   y: 10,
+///   width: 150,
+///   height: 100,
+/// )
+///
+/// scene.camera(
+///   id: "minimap",
+///   camera: minimap_cam,
+///   transform: transform.identity,
+///   look_at: option.None,
+///   active: True,
+///   viewport: option.Some(minimap_viewport),
+///   postprocessing: option.None,
+/// )
+/// ```
+pub type ViewPort {
+  ViewPort(
+    /// X position from left edge in pixels
+    x: Int,
+    /// Y position from top edge in pixels
+    y: Int,
+    /// Width in pixels
+    width: Int,
+    /// Height in pixels
+    height: Int,
+  )
+}
+
 /// Internal function to get the camera projection
 ///
 /// Used by the internal renderer to create Three.js cameras

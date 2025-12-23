@@ -79,9 +79,7 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(
-  ctx: tiramisu.Context(String),
-) -> #(Model, Effect(Msg), option.Option(_)) {
+fn init(ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   let model =
     Model(
       cube_position: vec3.Vec3(0.0, 0.0, cube_depth),
@@ -96,7 +94,7 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
@@ -142,7 +140,7 @@ fn to_touch_sphere(touch: input.Touch) -> TouchSphere {
 /// Calculate cube position from single touch
 fn calculate_cube_position(
   touches: List(input.Touch),
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
   model: Model,
 ) -> vec3.Vec3(Float) {
   case touches {
@@ -182,7 +180,7 @@ fn calculate_pinch_scale(touches: List(input.Touch), model: Model) -> Float {
   }
 }
 
-fn view(model: Model, _) -> scene.Node(String) {
+fn view(model: Model, _) -> scene.Node {
   let camera_node = create_camera()
   let lights = create_lights()
   let main_cube = create_main_cube(model)
@@ -196,7 +194,7 @@ fn view(model: Model, _) -> scene.Node(String) {
 }
 
 /// Create the main camera
-fn create_camera() -> scene.Node(String) {
+fn create_camera() -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: camera_fov, near: 0.1, far: 1000.0)
 
@@ -212,7 +210,7 @@ fn create_camera() -> scene.Node(String) {
 }
 
 /// Create scene lights
-fn create_lights() -> List(scene.Node(String)) {
+fn create_lights() -> List(scene.Node) {
   let assert Ok(ambient) = light.ambient(color: 0xffffff, intensity: 0.6)
   let assert Ok(directional) =
     light.directional(color: 0xffffff, intensity: 0.8)
@@ -228,7 +226,7 @@ fn create_lights() -> List(scene.Node(String)) {
 }
 
 /// Create the main controllable cube
-fn create_main_cube(model: Model) -> List(scene.Node(String)) {
+fn create_main_cube(model: Model) -> List(scene.Node) {
   let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
   let assert Ok(cube_material) =
     material.new()
@@ -249,7 +247,7 @@ fn create_main_cube(model: Model) -> List(scene.Node(String)) {
 }
 
 /// Create visual indicators for touch points
-fn create_touch_indicators(model: Model) -> List(scene.Node(String)) {
+fn create_touch_indicators(model: Model) -> List(scene.Node) {
   list.map(model.touch_spheres, fn(touch) {
     create_touch_indicator(touch, model.canvas_width, model.canvas_height)
   })
@@ -260,7 +258,7 @@ fn create_touch_indicator(
   touch: TouchSphere,
   canvas_width: Float,
   canvas_height: Float,
-) -> scene.Node(String) {
+) -> scene.Node {
   let assert Ok(sphere) =
     geometry.sphere(radius: 0.3, width_segments: 16, height_segments: 16)
   let assert Ok(indicator_material) =

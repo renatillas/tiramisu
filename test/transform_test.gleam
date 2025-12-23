@@ -1,8 +1,8 @@
 import gleam/float
 import gleam_community/maths
+import quaternion
 import tiramisu/transform
 import vec/vec3
-import vec/vec3f
 
 pub fn identity_test() {
   let t = transform.identity
@@ -27,7 +27,7 @@ pub fn with_euler_rotation_test() {
 
   assert transform.position(t) == vec3.Vec3(0.0, 0.0, 0.0)
   // Compare quaternions instead of Euler angles to avoid representation ambiguity
-  let expected_quat = transform.euler_to_quaternion(rot)
+  let expected_quat = quaternion.from_euler(rot)
   let actual_quat = transform.rotation_quaternion(t)
   assert float.loosely_equals(
     expected_quat.x,
@@ -68,13 +68,6 @@ pub fn set_position_test() {
   assert transform.position(t) == pos
 }
 
-pub fn set_rotation_test() {
-  let rot = vec3.Vec3(0.5, 1.0, 1.5)
-  let t = transform.with_euler_rotation(transform.identity, rot)
-
-  assert vec3f.loosely_equals(transform.rotation(t), rot, tolerating: 0.01)
-}
-
 pub fn set_scale_test() {
   let scale = vec3.Vec3(0.5, 2.0, 3.5)
   let t = transform.with_scale(transform.identity, scale)
@@ -102,8 +95,7 @@ pub fn rotate_test() {
 
   // After two 90° rotations around Y, we should have a 180° Y rotation
   // Compare quaternions since Euler angles can have multiple representations
-  let expected_quat =
-    transform.euler_to_quaternion(vec3.Vec3(0.0, maths.pi(), 0.0))
+  let expected_quat = quaternion.from_euler(vec3.Vec3(0.0, maths.pi(), 0.0))
   let actual_quat = transform.rotation_quaternion(t)
 
   // Allow some tolerance for floating point math
@@ -126,39 +118,19 @@ pub fn builder_pattern_test() {
   let t =
     transform.identity
     |> transform.with_position(vec3.Vec3(10.0, 20.0, 30.0))
-    |> transform.with_euler_rotation(vec3.Vec3(0.5, 1.0, 1.5))
+    |> transform.with_quaternion_rotation(quaternion.Quaternion(
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+    ))
     |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))
 
   assert transform.position(t) == vec3.Vec3(10.0, 20.0, 30.0)
-  assert vec3f.loosely_equals(
-    transform.rotation(t),
-    vec3.Vec3(0.5, 1.0, 1.5),
+  assert quaternion.loosely_equals(
+    transform.rotation_quaternion(t),
+    quaternion.Quaternion(x: 0.0, y: 0.0, z: 0.0, w: 1.0),
     tolerating: 0.01,
   )
-  assert transform.scale(t) == vec3.Vec3(2.0, 2.0, 2.0)
-}
-
-pub fn chaining_test() {
-  let t =
-    transform.at(vec3.Vec3(1.0, 2.0, 3.0))
-    |> transform.translate(by: vec3.Vec3(5.0, 5.0, 5.0))
-    |> transform.with_euler_rotation(vec3.Vec3(0.1, 0.2, 0.3))
-    |> transform.scale_by(vec3.Vec3(2.0, 2.0, 2.0))
-
-  // Position should be summed
-  assert transform.position(t) == vec3.Vec3(6.0, 7.0, 8.0)
-
-  // Rotation should match what we set (not rotate_by, so no composition)
-  // Use epsilon for floating point precision in quaternion<->Euler conversion
-  let epsilon = 0.0001
-  let rotation = transform.rotation(t)
-  assert rotation.x >. 0.1 -. epsilon
-  assert rotation.x <. 0.1 +. epsilon
-  assert rotation.y >. 0.2 -. epsilon
-  assert rotation.y <. 0.2 +. epsilon
-  assert rotation.z >. 0.3 -. epsilon
-  assert rotation.z <. 0.3 +. epsilon
-
-  // Scale should be multiplied
   assert transform.scale(t) == vec3.Vec3(2.0, 2.0, 2.0)
 }

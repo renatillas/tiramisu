@@ -144,7 +144,61 @@
 //// ```
 
 import gleam/bool
-import tiramisu/asset
+
+/// Opaque type for Three.js BufferGeometry.
+///
+/// Represents custom geometry loaded from 3D model files (e.g., STL).
+/// Used with `custom_geometry()` to create geometry from loaded assets.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+/// import tiramisu/geometry
+///
+/// // Load STL file
+/// let load_effect = asset.load_stl("model.stl")
+///   |> promise.map(fn(result) {
+///     case result {
+///       Ok(buffer) -> GeometryLoaded(buffer)
+///       Error(err) -> LoadFailed(err)
+///     }
+///   })
+///
+/// // Use the loaded geometry
+/// let custom = geometry.custom_geometry(buffer)
+/// ```
+pub type BufferGeometry
+
+/// Opaque type for Three.js Font (for TextGeometry).
+///
+/// Fonts must be in Three.js typeface.json format.
+/// Used with `text_geometry()` to create 3D extruded text.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu/asset
+/// import tiramisu/geometry
+///
+/// // Load font
+/// let load_effect = asset.load_font("fonts/helvetiker_regular.typeface.json")
+///   |> promise.map(fn(result) {
+///     case result {
+///       Ok(font) -> FontLoaded(font)
+///       Error(err) -> LoadFailed(err)
+///     }
+///   })
+///
+/// // Use the font for 3D text
+/// let assert Ok(text) = geometry.text(
+///   text: "Hello World",
+///   font: font,
+///   size: 1.0,
+///   depth: 0.2,
+/// )
+/// ```
+pub type Font
 
 /// 3D geometry types supported by the engine.
 ///
@@ -175,10 +229,10 @@ pub opaque type Geometry {
   )
   TetrahedronGeometry(radius: Float, detail: Int)
   IcosahedronGeometry(radius: Float, detail: Int)
-  CustomGeometry(asset.BufferGeometry)
+  CustomGeometry(BufferGeometry)
   TextGeometry(
     text: String,
-    font: asset.Font,
+    font: Font,
     size: Float,
     depth: Float,
     curve_segments: Int,
@@ -310,7 +364,7 @@ pub fn circle(
   Ok(CircleGeometry(radius, segments))
 }
 
-pub fn custom_geometry(geometry geometry: asset.BufferGeometry) -> Geometry {
+pub fn custom_geometry(geometry geometry: BufferGeometry) -> Geometry {
   CustomGeometry(geometry)
 }
 
@@ -450,7 +504,7 @@ pub fn icosahedron(
 /// - `bevel_segments`: Smoothness of bevel (more = rounder)
 pub fn text(
   text text: String,
-  font font: asset.Font,
+  font font: Font,
   size size: Float,
   depth depth: Float,
   curve_segments curve_segments: Int,
@@ -548,7 +602,7 @@ pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
 // Note: Custom geometry is just a passthrough since the buffer is already created
 // Use identity function to return the buffer as-is
 @external(javascript, "../threejs.ffi.mjs", "identity")
-fn create_custom_geometry(buffer: asset.BufferGeometry) -> ThreeGeometry
+fn create_custom_geometry(buffer: BufferGeometry) -> ThreeGeometry
 
 @external(javascript, "../threejs.ffi.mjs", "createConeGeometry")
 fn create_cone_geometry(
@@ -607,7 +661,7 @@ fn create_torus_geometry(
 @external(javascript, "../threejs.ffi.mjs", "createTextGeometry")
 fn create_text_geometry(
   text: String,
-  font: asset.Font,
+  font: Font,
   size: Float,
   depth: Float,
   curve_segments: Int,

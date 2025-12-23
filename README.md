@@ -28,6 +28,7 @@ Tiramisu brings the power of functional programming and static type safety to ga
 
 ```gleam
 import gleam/option
+import gleam/time/duration
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -64,20 +65,22 @@ pub fn main() {
   )
 }
 
-fn init(_ctx: tiramisu.Context(Ids)) {
+fn init(_ctx: tiramisu.Context) {
   #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
-fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Ids)) {
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
+      // ctx.delta_time is a Duration type for type-safe time handling
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let new_rotation = model.rotation +. delta_seconds
       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
+fn view(model: Model, _ctx: tiramisu.Context) {
   let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let assert Ok(cube_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(cube_mat) =

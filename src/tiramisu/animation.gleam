@@ -1,21 +1,6 @@
 //// <script>
 //// const docs = [
 ////   {
-////     header: "Tweening",
-////     functions: [
-////       "ease",
-////       "tween",
-////       "update_tween",
-////       "get_tween_value",
-////       "is_tween_complete",
-////       "tween_vec3",
-////       "tween_float",
-////       "tween_transform",
-////       "reset_tween",
-////       "reverse_tween"
-////     ]
-////   },
-////   {
 ////     header: "Model animations",
 ////     functions: [
 ////       "new_animation",
@@ -76,403 +61,45 @@
 ////     callback,
 ////     { once: true }
 ////   )
-//// </script>//// Tiramisu game engine main module - immutable game loop with effect system.
+//// </script>
+//// Three.js model animation system.
 ////
-//// Animation and tweening system for smooth transitions and Three.js model animations.
+//// This module provides control over animations loaded from 3D model files (GLTF, FBX).
+//// For generic value tweening, see the `tiramisu/tween` module.
 ////
-//// This module provides two main systems:
-//// - **Tweening**: Interpolate values over time with easing functions (positions, rotations, etc.)
-//// - **Model Animations**: Play and blend Three.js animation clips loaded from GLTF models
-////
-//// ## Tweening Example
+//// ## Quick Example
 ////
 //// ```gleam
 //// import tiramisu/animation
-//// import vec/vec3
-////
-//// type Model {
-////   Model(position_tween: animation.Tween(vec3.Vec3))
-//// }
-////
-//// // Create a tween from one position to another over 2 seconds
-//// let tween = animation.tween_vec3(
-////   start: vec3.Vec3(0.0, 0.0, 0.0),
-////   end: vec3.Vec3(5.0, 10.0, 0.0),
-////   duration: 2000.0,  // milliseconds
-////   easing: animation.EaseInOutQuad,
-//// )
-////
-//// // Update each frame
-//// fn update(model: Model, ctx: Context) {
-////   let updated_tween = animation.update_tween(model.position_tween, ctx.delta_time)
-////   let current_position = animation.get_tween_value(updated_tween)
-////   Model(position_tween: updated_tween)
-//// }
-//// ```
-////
-//// ## Model Animation Example
-////
-//// ```gleam
-//// import tiramisu/animation
+//// import tiramisu/asset
 //// import tiramisu/scene
+//// import gleam/list
+//// import gleam/option
 ////
-//// // Assuming you loaded a GLTF model with animations
-//// let model = asset.get_model(assets, "character")
-//// let clips = asset.model_animations(model)
-//// let walk_clip = list.find(clips, fn(clip) { animation.clip_name(clip) == "Walk" })
+//// // Load a GLTF model with animations
+//// let assert Ok(model_data) = asset.get_model(cache, "character.glb")
+//// let clips = asset.model_animations(model_data)
 ////
-//// // Create animation and configure it
+//// // Find the walk animation
+//// let assert Ok(walk_clip) = list.find(clips, fn(clip) {
+////   animation.clip_name(clip) == "Walk"
+//// })
+////
+//// // Configure the animation
 //// let walk_anim = animation.new_animation(walk_clip)
 ////   |> animation.set_speed(1.5)  // 1.5x speed
 ////   |> animation.set_loop(animation.LoopRepeat)
 ////
 //// // Add to scene node
-//// scene.Model(
+//// scene.model_3d(
 ////   id: "character",
-////   model: model,
+////   object: model_data.scene,
 ////   transform: transform.identity,
 ////   animation: option.Some(animation.SingleAnimation(walk_anim)),
 ////   physics: option.None,
+////   material: option.None,
 //// )
 //// ```
-
-import gleam/float
-import gleam_community/maths
-import tiramisu/transform
-import vec/vec3
-
-/// Easing functions for smooth animations.
-///
-/// Easing functions control the rate of change over time, making animations
-/// feel more natural. Use `ease()` to apply an easing function to a value in [0, 1].
-pub type Easing {
-  Linear
-  EaseInQuad
-  EaseOutQuad
-  EaseInOutQuad
-  EaseInCubic
-  EaseOutCubic
-  EaseInOutCubic
-  EaseInSine
-  EaseOutSine
-  EaseInOutSine
-}
-
-/// Apply an easing function to a normalized value.
-///
-/// The value `t` is automatically clamped to the range [0, 1].
-///
-/// ## Example
-///
-/// ```gleam
-/// // Linear progression
-/// animation.ease(animation.Linear, 0.5)  // => 0.5
-///
-/// // Ease in quad - slow start, fast end
-/// animation.ease(animation.EaseInQuad, 0.5)  // => 0.25
-///
-/// // Ease out quad - fast start, slow end
-/// animation.ease(animation.EaseOutQuad, 0.5)  // => 0.75
-/// ```
-pub fn ease(easing: Easing, t: Float) -> Float {
-  // Clamp t to [0, 1]
-  let t = float.clamp(t, 0.0, 1.0)
-
-  case easing {
-    Linear -> t
-    EaseInQuad -> t *. t
-    EaseOutQuad -> t *. { 2.0 -. t }
-    EaseInOutQuad ->
-      case t <. 0.5 {
-        True -> 2.0 *. t *. t
-        False -> {
-          let t_adj = t -. 1.0
-          -1.0 *. { 2.0 *. t_adj *. t_adj -. 1.0 }
-        }
-      }
-    EaseInCubic -> t *. t *. t
-    EaseOutCubic -> {
-      let t_adj = t -. 1.0
-      t_adj *. t_adj *. t_adj +. 1.0
-    }
-    EaseInOutCubic ->
-      case t <. 0.5 {
-        True -> 4.0 *. t *. t *. t
-        False -> {
-          let t_adj = 2.0 *. t -. 2.0
-          { t_adj *. t_adj *. t_adj +. 2.0 } /. 2.0
-        }
-      }
-    EaseInSine -> {
-      let angle = t *. 1.5707963267948966
-      1.0 -. maths.cos(angle)
-    }
-    EaseOutSine -> {
-      let angle = t *. 1.5707963267948966
-      maths.sin(angle)
-    }
-    EaseInOutSine -> {
-      let angle = 3.141592653589793 *. t
-      { 1.0 -. maths.cos(angle) } /. 2.0
-    }
-  }
-}
-
-/// A tween that interpolates between two values over time.
-///
-/// Tweens are generic over any type `a` that can be interpolated (Float, Vec3, Transform, etc.).
-/// Use the convenience constructors like `tween_float()`, `tween_vec3()`, or `tween_transform()`
-/// for common types.
-///
-/// The `duration` is in **milliseconds**, and `elapsed` tracks the current progress.
-pub type Tween(a) {
-  Tween(
-    start_value: a,
-    end_value: a,
-    /// Duration of the tween in milliseconds
-    duration: Float,
-    /// Time elapsed since tween started in milliseconds
-    elapsed: Float,
-    easing: Easing,
-    lerp_fn: fn(a, a, Float) -> a,
-  )
-}
-
-/// Create a new tween with a custom interpolation function.
-///
-/// For most use cases, prefer `tween_float()`, `tween_vec3()`, or `tween_transform()`.
-///
-/// ## Example
-///
-/// ```gleam
-/// // Custom tween for a color value
-/// type Color {
-///   Color(r: Float, g: Float, b: Float)
-/// }
-///
-/// let color_tween = animation.tween(
-///   start: Color(1.0, 0.0, 0.0),  // Red
-///   end: Color(0.0, 0.0, 1.0),    // Blue
-///   duration: 1000.0,  // milliseconds
-///   easing: animation.EaseInOutQuad,
-///   lerp_fn: fn(a, b, t) {
-///     Color(
-///       r: a.r +. { b.r -. a.r } *. t,
-///       g: a.g +. { b.g -. a.g } *. t,
-///       b: a.b +. { b.b -. a.b } *. t,
-///     )
-///   },
-/// )
-/// ```
-pub fn tween(
-  start: a,
-  end: a,
-  duration duration: Float,
-  easing easing: Easing,
-  lerp_fn lerp_fn: fn(a, a, Float) -> a,
-) -> Tween(a) {
-  Tween(
-    start_value: start,
-    end_value: end,
-    duration: duration,
-    elapsed: 0.0,
-    easing: easing,
-    lerp_fn: lerp_fn,
-  )
-}
-
-/// Update a tween by advancing its elapsed time.
-///
-/// The `delta` parameter is in **milliseconds** (typically from `ctx.delta_time`).
-///
-/// ## Example
-///
-/// ```gleam
-/// fn update(model: Model, msg: Msg, ctx: Context) {
-///   // Advance the tween by the frame delta
-///   let updated_tween = animation.update_tween(model.tween, ctx.delta_time)
-///   Model(..model, tween: updated_tween)
-/// }
-/// ```
-pub fn update_tween(tween: Tween(a), delta delta: Float) -> Tween(a) {
-  Tween(..tween, elapsed: tween.elapsed +. delta)
-}
-
-/// Get the current interpolated value of a tween.
-///
-/// Applies the easing function and returns the value at the current elapsed time.
-/// Once the tween completes, this returns the end value.
-///
-/// ## Example
-///
-/// ```gleam
-/// let tween = animation.tween_float(0.0, 100.0, 1000.0, animation.Linear)
-///   |> animation.update_tween(500.0)  // Halfway through
-///
-/// let value = animation.get_tween_value(tween)  // => 50.0
-/// ```
-pub fn get_tween_value(tween: Tween(a)) -> a {
-  let t = case tween.elapsed >=. tween.duration {
-    True -> 1.0
-    False -> tween.elapsed /. tween.duration
-  }
-
-  let eased_t = ease(tween.easing, t)
-  tween.lerp_fn(tween.start_value, tween.end_value, eased_t)
-}
-
-/// Check if a tween has finished playing.
-///
-/// ## Example
-///
-/// ```gleam
-/// fn update(model: Model, msg: Msg, ctx: Context) {
-///   let updated_tween = animation.update_tween(model.tween, ctx.delta_time)
-///
-///   case animation.is_tween_complete(updated_tween) {
-///     True -> {
-///       // Tween finished, trigger next animation or event
-///       #(Model(..model, tween: animation.reset_tween(updated_tween)), effect.none())
-///     }
-///     False -> #(Model(..model, tween: updated_tween), effect.none())
-///   }
-/// }
-/// ```
-pub fn is_tween_complete(tween: Tween(a)) -> Bool {
-  tween.elapsed >=. tween.duration
-}
-
-// --- Convenience tween creators ---
-
-/// Create a tween that interpolates a Float value.
-///
-/// The `duration` is in **milliseconds**.
-///
-/// ## Example
-///
-/// ```gleam
-/// // Fade from 0.0 to 1.0 over 2 seconds
-/// let fade_tween = animation.tween_float(
-///   start: 0.0,
-///   end: 1.0,
-///   duration: 2000.0,  // milliseconds
-///   easing: animation.EaseInOutQuad,
-/// )
-/// ```
-pub fn tween_float(
-  start: Float,
-  end: Float,
-  duration duration: Float,
-  easing easing: Easing,
-) -> Tween(Float) {
-  tween(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
-    a +. { b -. a } *. t
-  })
-}
-
-/// Create a tween that interpolates a Vec3 value (useful for positions).
-///
-/// The `duration` is in **milliseconds**.
-///
-/// ## Example
-///
-/// ```gleam
-/// import vec/vec3
-///
-/// // Move from origin to (10, 5, 0) over 3 seconds
-/// let position_tween = animation.tween_vec3(
-///   start: vec3.Vec3(0.0, 0.0, 0.0),
-///   end: vec3.Vec3(10.0, 5.0, 0.0),
-///   duration: 3000.0,  // milliseconds
-///   easing: animation.EaseOutQuad,
-/// )
-/// ```
-pub fn tween_vec3(
-  start: vec3.Vec3(Float),
-  end: vec3.Vec3(Float),
-  duration duration: Float,
-  easing easing: Easing,
-) -> Tween(vec3.Vec3(Float)) {
-  tween(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
-    vec3.Vec3(
-      a.x +. { b.x -. a.x } *. t,
-      a.y +. { b.y -. a.y } *. t,
-      a.z +. { b.z -. a.z } *. t,
-    )
-  })
-}
-
-/// Create a tween that interpolates a Transform (position, rotation, and scale).
-///
-/// The `duration` is in **milliseconds**.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu/transform
-/// import vec/vec3
-///
-/// let start_transform = transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-///   |> transform.scale(1.0)
-///
-/// let end_transform = transform.at(position: vec3.Vec3(5.0, 0.0, 0.0))
-///   |> transform.scale(2.0)
-///   |> transform.rotate_y(3.14159)
-///
-/// let transform_tween = animation.tween_transform(
-///   start: start_transform,
-///   end: end_transform,
-///   duration: 1500.0,  // milliseconds
-///   easing: animation.EaseInOutCubic,
-/// )
-/// ```
-pub fn tween_transform(
-  start: transform.Transform,
-  end: transform.Transform,
-  duration duration: Float,
-  easing easing: Easing,
-) -> Tween(transform.Transform) {
-  tween(start, end, duration:, easing:, lerp_fn: transform.lerp)
-}
-
-/// Reset a tween back to the beginning (elapsed time = 0).
-///
-/// ## Example
-///
-/// ```gleam
-/// // Play the tween again from the start
-/// let reset = animation.reset_tween(completed_tween)
-/// ```
-pub fn reset_tween(tween: Tween(a)) -> Tween(a) {
-  Tween(..tween, elapsed: 0.0)
-}
-
-/// Reverse a tween by swapping its start and end values.
-///
-/// The elapsed time is preserved, so the tween continues from where it was
-/// but in the opposite direction.
-///
-/// ## Example
-///
-/// ```gleam
-/// // Create a bouncing animation
-/// fn update(model: Model, msg: Msg, ctx: Context) {
-///   let updated_tween = animation.update_tween(model.tween, ctx.delta_time)
-///
-///   case animation.is_tween_complete(updated_tween) {
-///     True -> {
-///       // Bounce back by reversing the tween
-///       let reversed = animation.reverse_tween(updated_tween)
-///         |> animation.reset_tween()
-///       Model(..model, tween: reversed)
-///     }
-///     False -> Model(..model, tween: updated_tween)
-///   }
-/// }
-/// ```
-pub fn reverse_tween(tween: Tween(a)) -> Tween(a) {
-  Tween(..tween, start_value: tween.end_value, end_value: tween.start_value)
-}
 
 /// An opaque reference to a Three.js AnimationClip.
 ///

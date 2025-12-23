@@ -1,6 +1,7 @@
 import gleam/float
 import gleam/javascript/promise
 import gleam/option
+import gleam/time/duration
 import gleam_community/maths
 import tiramisu
 import tiramisu/asset
@@ -43,9 +44,7 @@ pub fn main() -> Nil {
   )
 }
 
-fn init(
-  _ctx: tiramisu.Context(String),
-) -> #(Model, Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   // Define all textures to load
   let textures = [
     // Wood floor textures
@@ -94,11 +93,11 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
 
       // Request pointer lock on click or 'C' key (when not already locked)
       let should_request_lock = case model.pointer_locked {
@@ -127,7 +126,7 @@ fn update(
       }
 
       // Camera movement speed
-      let move_speed = 5.0 *. ctx.delta_time /. 1000.0
+      let move_speed = 5.0 *. duration.to_seconds(ctx.delta_time)
       let mouse_sensitivity = 0.003
 
       // Handle rotation input with mouse delta first
@@ -252,7 +251,7 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> scene.Node(String) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 

@@ -4,6 +4,7 @@
 ////
 
 import gleam/option.{type Option}
+import gleam/time/duration.{type Duration}
 import tiramisu/background.{type Background}
 import tiramisu/effect
 import tiramisu/input
@@ -29,16 +30,16 @@ pub type Dimensions {
 ///
 /// ## Fields
 ///
-/// - `delta_time`: Time elapsed since the last frame in **milliseconds** (e.g., 16.0 for 60 FPS). Use this for frame-rate independent movement and animations.
+/// - `delta_time`: Time elapsed since the last frame as a Duration. Use this for frame-rate independent movement and animations.
 /// - `input`: Current input state (keyboard, mouse, touch, gamepad)
 /// - `canvas_width`: Current canvas width in pixels
 /// - `canvas_height`: Current canvas height in pixels
 /// - `physics_world`: Optional physics world handle (if physics is enabled)
 ///
-pub type Context(id) {
+pub type Context {
   Context(
-    /// Time elapsed since the last frame in milliseconds (e.g., 16 for 60 FPS)
-    delta_time: Float,
+    /// Time elapsed since the last frame as a Duration
+    delta_time: Duration,
     /// Current input state (keyboard, mouse, touch, gamepad)
     input: input.InputState,
     /// Current canvas width in pixels
@@ -46,7 +47,7 @@ pub type Context(id) {
     /// Current canvas height in pixels
     canvas_height: Float,
     /// Physics world handle (if physics is enabled)
-    physics_world: Option(physics.PhysicsWorld(id)),
+    physics_world: Option(physics.PhysicsWorld),
   )
 }
 
@@ -66,11 +67,11 @@ pub type Context(id) {
 pub fn run(
   dimensions dimensions: Option(Dimensions),
   background background: Background,
-  init init: fn(Context(id)) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
-  update update: fn(state, msg, Context(id)) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
-  view view: fn(state, Context(id)) -> scene.Node(id),
+  init init: fn(Context) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  update update: fn(state, msg, Context) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view view: fn(state, Context) -> scene.Node,
 ) -> Nil {
   // Create renderer state (audio manager is initialized internally)
   let renderer_state =
@@ -98,7 +99,7 @@ pub fn run(
   // Initial context with empty input (no physics_world yet)
   let initial_context =
     Context(
-      delta_time: 0.0,
+      delta_time: duration.nanoseconds(0),
       input: input.new(),
       canvas_width: initial_width,
       canvas_height: initial_height,
@@ -111,7 +112,7 @@ pub fn run(
   // Create context with physics_world for the game loop
   let context_with_physics =
     Context(
-      delta_time: 0.0,
+      delta_time: duration.nanoseconds(0),
       input: input.new(),
       canvas_width: initial_width,
       canvas_height: initial_height,
@@ -160,12 +161,16 @@ pub fn run(
 
 /// Apply initial scene using renderer.gleam's patch system
 fn apply_initial_scene_gleam(
-  renderer_state: scene.RendererState(id),
-  node: scene.Node(id),
-) -> scene.RendererState(id) {
+  renderer_state: scene.RendererState,
+  node: scene.Node,
+) -> scene.RendererState {
   // Use diff with empty previous scene to generate proper patches
-  let patches = scene.diff(option.None, option.Some(node))
-  scene.apply_patches(renderer_state, patches)
+  // No cache available for first frame
+  let #(patches, new_dict) =
+    scene.diff(option.None, option.Some(node), option.None)
+  let renderer_state = scene.apply_patches(renderer_state, patches)
+  // Store the initial scene dict for next frame
+  scene.set_cached_scene_dict(renderer_state, option.Some(new_dict))
 }
 
 // --- FFI Declarations ---
@@ -182,11 +187,11 @@ fn set_background(scene: scene.Scene, background: Background) -> Nil
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
   state: state,
-  prev_node: scene.Node(id),
+  prev_node: scene.Node,
   effect: effect.Effect(msg),
-  context: Context(id),
-  renderer_state: scene.RendererState(id),
-  update: fn(state, msg, Context(id)) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld(id))),
-  view: fn(state, Context(id)) -> scene.Node(id),
+  context: Context,
+  renderer_state: scene.RendererState,
+  update: fn(state, msg, Context) ->
+    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view: fn(state, Context) -> scene.Node,
 ) -> Nil

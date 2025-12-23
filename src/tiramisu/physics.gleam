@@ -178,11 +178,13 @@
 ////
 
 import gleam/dict.{type Dict}
+import gleam/time/duration.{type Duration}
 import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
-import tiramisu/transform.{type Quaternion, type Transform}
+import quaternion
+import tiramisu/transform.{type Transform}
 import vec/vec3.{type Vec3}
 
 type RapierWorld
@@ -195,34 +197,34 @@ type RapierCharacterController
 
 /// Opaque handle to the Rapier physics world
 /// This is part of your Model and gets updated each frame
-pub opaque type PhysicsWorld(id) {
+pub opaque type PhysicsWorld {
   PhysicsWorld(
     world: RapierWorld,
     queue: RapierEventQueue,
     /// Declared rigid body configurations (from scene)
-    bodies: Dict(id, RigidBody),
+    bodies: Dict(String, RigidBody),
     /// Actual Rapier rigid body handles
-    rapier_bodies: Dict(id, RapierRigidBody),
+    rapier_bodies: Dict(String, RapierRigidBody),
     /// Commands to be applied during the next physics step
-    pending_commands: List(PhysicsCommand(id)),
+    pending_commands: List(PhysicsCommand),
     /// Mapping from collider handles to body string IDs
-    collider_to_body: Dict(Int, id),
+    collider_to_body: Dict(Int, String),
     /// Collision events from the last physics step
-    collision_events: List(CollisionEvent(id)),
+    collision_events: List(CollisionEvent),
     /// Character controllers for kinematic character movement (one per body)
-    character_controllers: Dict(id, RapierCharacterController),
+    character_controllers: Dict(String, RapierCharacterController),
   )
 }
 
 /// Physics commands that can be queued and applied during step
-type PhysicsCommand(body) {
-  ApplyForce(id: body, force: Vec3(Float))
-  ApplyImpulse(id: body, impulse: Vec3(Float))
-  SetVelocity(id: body, velocity: Vec3(Float))
-  SetAngularVelocity(id: body, velocity: Vec3(Float))
-  ApplyTorque(id: body, torque: Vec3(Float))
-  ApplyTorqueImpulse(id: body, impulse: Vec3(Float))
-  SetKinematicTranslation(id: body, position: Vec3(Float))
+type PhysicsCommand {
+  ApplyForce(id: String, force: Vec3(Float))
+  ApplyImpulse(id: String, impulse: Vec3(Float))
+  SetVelocity(id: String, velocity: Vec3(Float))
+  SetAngularVelocity(id: String, velocity: Vec3(Float))
+  ApplyTorque(id: String, torque: Vec3(Float))
+  ApplyTorqueImpulse(id: String, impulse: Vec3(Float))
+  SetKinematicTranslation(id: String, position: Vec3(Float))
 }
 
 // --- Public Types ---
@@ -363,7 +365,7 @@ pub opaque type RigidBody {
 }
 
 /// Physics world configuration
-pub type WorldConfig(id) {
+pub type WorldConfig {
   WorldConfig(
     /// Gravity vector (typically Vec3(0.0, -9.81, 0.0))
     gravity: Vec3(Float),
@@ -371,10 +373,10 @@ pub type WorldConfig(id) {
 }
 
 /// Result of a raycast hit
-pub type RaycastHit(id) {
+pub type RaycastHit {
   RaycastHit(
     /// ID of the body that was hit
-    id: id,
+    id: String,
     /// Point where the ray intersected the body
     point: Vec3(Float),
     /// Normal vector at the hit point
@@ -385,11 +387,11 @@ pub type RaycastHit(id) {
 }
 
 /// Collision events that occurred during the physics step
-pub type CollisionEvent(id) {
+pub type CollisionEvent {
   /// Two bodies started colliding
-  CollisionStarted(body_a: id, body_b: id)
+  CollisionStarted(body_a: String, body_b: String)
   /// Two bodies stopped colliding
-  CollisionEnded(body_a: id, body_b: id)
+  CollisionEnded(body_a: String, body_b: String)
 }
 
 // --- Constructor Functions ---
@@ -425,7 +427,7 @@ pub type CollisionEvent(id) {
 ///   )
 /// }
 /// ```
-pub fn new_world(config: WorldConfig(body)) -> PhysicsWorld(body) {
+pub fn new_world(config: WorldConfig) -> PhysicsWorld {
   // Initialize the Rapier world via physics_manager
   // Convert config to Dynamic for physics_manager
   let #(world, queue) = create_world(config)
@@ -860,8 +862,8 @@ pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
 
 /// Apply a single physics command via FFI
 fn apply_command(
-  command: PhysicsCommand(id),
-  rapier_bodies: Dict(id, RapierRigidBody),
+  command: PhysicsCommand,
+  rapier_bodies: Dict(String, RapierRigidBody),
 ) -> Result(Nil, Nil) {
   // Extract the ID and convert to string using BiMap, then get Rapier body
   case command {
@@ -918,7 +920,6 @@ fn apply_command(
 /// This should be called in your update function each frame
 ///
 /// **IMPORTANT**: Pass `ctx.delta_time` for frame-rate independent physics!
-/// Delta time should be in milliseconds (from Context), this function converts to seconds.
 ///
 /// ## Example
 /// ```gleam
@@ -929,7 +930,7 @@ fn apply_command(
 /// ```
 ///
 /// Returns updated world with new transforms for all bodies
-pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
+pub fn step(world: PhysicsWorld, delta_time: Duration) -> PhysicsWorld {
   // Apply all pending commands in the correct order
   // Commands are prepended (O(1)), so reverse once here before processing
   world.pending_commands
@@ -939,8 +940,8 @@ pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
     Nil
   })
 
-  // Convert delta time from milliseconds to seconds (Rapier expects seconds)
-  let delta_time_seconds = delta_time_ms /. 1000.0
+  // Convert delta time to seconds for Rapier (it expects Float seconds)
+  let delta_time_seconds = duration.to_seconds(delta_time)
 
   // Step the Rapier world with actual frame time (frame-rate independent!)
   step_world_ffi(world.world, world.queue, delta_time_seconds)
@@ -961,9 +962,9 @@ pub fn step(world: PhysicsWorld(id), delta_time_ms: Float) -> PhysicsWorld(id) {
 /// Drain collision events from the Rapier event queue
 /// Converts collider handles to body IDs using the collider_to_body mapping
 fn drain_collision_events(
-  world: PhysicsWorld(id),
-  collider_to_body: Dict(Int, id),
-) -> List(CollisionEvent(id)) {
+  world: PhysicsWorld,
+  collider_to_body: Dict(Int, String),
+) -> List(CollisionEvent) {
   // Call FFI to drain events and return them as a list
   let raw_events = drain_collision_events_ffi(world.queue)
 
@@ -1000,8 +1001,8 @@ fn drain_collision_events(
 /// }
 /// ```
 pub fn get_transform(
-  physics_world: PhysicsWorld(id),
-  id: id,
+  physics_world: PhysicsWorld,
+  id: String,
 ) -> Result(Transform, Nil) {
   use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, id))
   let translation = get_body_translation_ffi(rapier_body)
@@ -1037,9 +1038,9 @@ pub fn get_transform(
 /// ```
 @internal
 pub fn get_body_transform_raw(
-  physics_world: PhysicsWorld(id),
-  id: id,
-) -> Result(#(Vec3(Float), Quaternion), Nil) {
+  physics_world: PhysicsWorld,
+  id: String,
+) -> Result(#(Vec3(Float), quaternion.Quaternion), Nil) {
   use rapier_body <- result.try(dict.get(physics_world.rapier_bodies, id))
 
   // Get translation and rotation directly from Rapier body
@@ -1061,10 +1062,10 @@ pub fn get_body_transform_raw(
 /// let world = physics.step(world, ctx.delta_time)  // Force is applied here
 /// ```
 pub fn apply_force(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   force: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = ApplyForce(id:, force:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1083,10 +1084,10 @@ pub fn apply_force(
 /// let world = physics.apply_impulse(world, "player", vec3.Vec3(0.0, 10.0, 0.0))
 /// ```
 pub fn apply_impulse(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   impulse: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = ApplyImpulse(id:, impulse:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1098,10 +1099,10 @@ pub fn apply_impulse(
 /// Queue a velocity change for a rigid body during the next physics step.
 /// Returns updated world with the command queued.
 pub fn set_velocity(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   velocity: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = SetVelocity(id:, velocity:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1112,8 +1113,8 @@ pub fn set_velocity(
 
 /// Get the current velocity of a rigid body
 pub fn get_velocity(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
 ) -> Result(Vec3(Float), Nil) {
   use rapier_body <- result.try(dict.get(world.rapier_bodies, id))
   let vel = get_body_linvel_ffi(rapier_body)
@@ -1124,10 +1125,10 @@ pub fn get_velocity(
 /// This is the proper way to move kinematic bodies in Rapier.
 /// Returns updated world with the command queued.
 pub fn set_kinematic_translation(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   position: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = SetKinematicTranslation(id:, position:)
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
     command,
@@ -1139,8 +1140,8 @@ pub fn set_kinematic_translation(
 /// Returns the actual movement that can be safely applied without penetrating colliders.
 /// Must have created a character controller for this body first.
 pub fn compute_character_movement(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   desired_translation: Vec3(Float),
 ) -> Result(Vec3(Float), Nil) {
   // Get controller for this specific body
@@ -1192,8 +1193,8 @@ pub fn compute_character_movement(
 /// This uses the character controller's computed grounded state.
 /// Must have called compute_character_movement for this body first in this frame.
 pub fn is_character_grounded(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
 ) -> Result(Bool, Nil) {
   case dict.get(world.character_controllers, id) {
     Error(_) -> Error(Nil)
@@ -1207,10 +1208,10 @@ pub fn is_character_grounded(
 /// Queue an angular velocity change for a rigid body during the next physics step.
 /// Returns updated world with the command queued.
 pub fn set_angular_velocity(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   velocity: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = SetAngularVelocity(id:, velocity:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1221,8 +1222,8 @@ pub fn set_angular_velocity(
 
 /// Get the current angular velocity of a rigid body
 pub fn get_angular_velocity(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
 ) -> Result(Vec3(Float), Nil) {
   use rapier_body <- result.try(dict.get(world.rapier_bodies, id))
   let vel = get_body_angvel_ffi(rapier_body)
@@ -1232,10 +1233,10 @@ pub fn get_angular_velocity(
 /// Queue a torque to be applied to a rigid body during the next physics step.
 /// Returns updated world with the command queued.
 pub fn apply_torque(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   torque: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = ApplyTorque(id:, torque:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1247,10 +1248,10 @@ pub fn apply_torque(
 /// Queue a torque impulse to be applied to a rigid body during the next physics step.
 /// Returns updated world with the command queued.
 pub fn apply_torque_impulse(
-  world: PhysicsWorld(body),
-  id: body,
+  world: PhysicsWorld,
+  id: String,
   impulse: Vec3(Float),
-) -> PhysicsWorld(body) {
+) -> PhysicsWorld {
   let command = ApplyTorqueImpulse(id:, impulse:)
   // Prepend for O(1) insertion - reversed before execution in step()
   PhysicsWorld(..world, bodies: world.bodies, pending_commands: [
@@ -1283,11 +1284,11 @@ pub fn apply_torque_impulse(
 /// }
 /// ```
 pub fn raycast(
-  world: PhysicsWorld(id),
+  world: PhysicsWorld,
   origin origin: Vec3(Float),
   direction direction: Vec3(Float),
   max_distance max_distance: Float,
-) -> Result(RaycastHit(id), Nil) {
+) -> Result(RaycastHit, Nil) {
   // Create a ray using Rapier FFI
   let ray =
     create_ray_ffi(
@@ -1347,7 +1348,7 @@ pub fn raycast(
 ///   }
 /// })
 /// ```
-pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent(id)) {
+pub fn get_collision_events(world: PhysicsWorld) -> List(CollisionEvent) {
   world.collision_events
 }
 
@@ -1355,8 +1356,8 @@ pub fn get_collision_events(world: PhysicsWorld(id)) -> List(CollisionEvent(id))
 /// This keeps all internal field access within the physics module
 @internal
 pub fn for_each_body(
-  world: PhysicsWorld(id),
-  callback: fn(id, Transform) -> Nil,
+  world: PhysicsWorld,
+  callback: fn(String, Transform) -> Nil,
 ) -> Nil {
   // Access rapier_bodies directly - this ensures we're within the module where the opaque type is defined
   for_each_body_internal(world.rapier_bodies, world, callback)
@@ -1364,14 +1365,14 @@ pub fn for_each_body(
 
 // Internal helper that does the actual iteration
 fn for_each_body_internal(
-  rapier_bodies: dict.Dict(id, RapierRigidBody),
-  world: PhysicsWorld(id),
-  callback: fn(id, Transform) -> Nil,
+  rapier_bodies: dict.Dict(String, RapierRigidBody),
+  world: PhysicsWorld,
+  callback: fn(String, Transform) -> Nil,
 ) -> Nil {
   // Get all string IDs from rapier_bodies
   let ids = dict.keys(rapier_bodies)
 
-  // For each string ID, convert to typed ID and get transform
+  // For each string ID, get transform and call callback
   list.each(ids, fn(id) {
     // Get the transform for this body
     case get_transform(world, id) {
@@ -1387,8 +1388,8 @@ fn for_each_body_internal(
 /// quaternion-to-Euler conversion which can cause rotation errors.
 @internal
 pub fn for_each_body_raw(
-  world: PhysicsWorld(id),
-  callback: fn(id, Vec3(Float), Quaternion, Body) -> Nil,
+  world: PhysicsWorld,
+  callback: fn(String, Vec3(Float), quaternion.Quaternion, Body) -> Nil,
 ) -> Nil {
   let ids = dict.keys(world.rapier_bodies)
 
@@ -1521,7 +1522,7 @@ fn apply_body_torque_impulse_ffi(
 fn get_body_translation_ffi(body: RapierRigidBody) -> vec3.Vec3(Float)
 
 @external(javascript, "../rapier.ffi.mjs", "getBodyRotation")
-fn get_body_rotation_ffi(body: RapierRigidBody) -> Quaternion
+fn get_body_rotation_ffi(body: RapierRigidBody) -> quaternion.Quaternion
 
 // Raycasting FFI using Rapier
 type RapierRay
@@ -1565,7 +1566,7 @@ fn get_hit_normal_ffi(hit: RapierRayHit) -> vec3.Vec3(Float)
 
 /// Initialize the global physics world
 /// Takes a WorldConfig as Dynamic and extracts gravity
-fn create_world(config: WorldConfig(id)) -> #(RapierWorld, RapierEventQueue) {
+fn create_world(config: WorldConfig) -> #(RapierWorld, RapierEventQueue) {
   // Create Rapier world
   let world =
     create_world_ffi(config.gravity.x, config.gravity.y, config.gravity.z)
@@ -1603,11 +1604,11 @@ fn step_world_ffi(
 /// This is called by the renderer when a scene node with physics is added
 @internal
 pub fn create_body(
-  world: PhysicsWorld(id),
-  id: id,
+  world: PhysicsWorld,
+  id: String,
   config: RigidBody,
   transform: Transform,
-) -> PhysicsWorld(id) {
+) -> PhysicsWorld {
   // Create rigid body descriptor
   let body_desc = case config.kind {
     Dynamic -> create_dynamic_body_desc_ffi()
@@ -1743,10 +1744,10 @@ pub fn create_body(
 /// Primarily useful for Kinematic bodies that are controlled programmatically
 @internal
 pub fn update_body_transform(
-  world: PhysicsWorld(id),
-  id: id,
+  world: PhysicsWorld,
+  id: String,
   transform: Transform,
-) -> PhysicsWorld(id) {
+) -> PhysicsWorld {
   case dict.get(world.rapier_bodies, id) {
     Ok(rapier_body) -> {
       // Get position and rotation from transform
@@ -1780,14 +1781,14 @@ pub fn update_body_transform(
 /// Check if a rigid body exists in the physics world
 /// This is used by the renderer to determine if a body needs to be created or updated
 @internal
-pub fn has_body(world: PhysicsWorld(id), id: id) -> Bool {
+pub fn has_body(world: PhysicsWorld, id: String) -> Bool {
   dict.has_key(world.rapier_bodies, id)
 }
 
 /// Remove a rigid body from the physics world
 /// This is called by the renderer when a scene node with physics is removed
 @internal
-pub fn remove_body(world: PhysicsWorld(id), id: id) -> PhysicsWorld(id) {
+pub fn remove_body(world: PhysicsWorld, id: String) -> PhysicsWorld {
   case dict.get(world.rapier_bodies, id) {
     Ok(rapier_body) -> {
       // Get all collider handles for this body and remove them from mapping

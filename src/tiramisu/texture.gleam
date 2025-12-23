@@ -98,7 +98,12 @@
 //// texture.set_offset(texture, 0.5, 0.0)
 //// ```
 
-import tiramisu/asset
+/// Opaque type for Three.js textures.
+///
+/// Created via `asset.load_texture()` and used in materials.
+/// Manipulate with functions in this module to control UV mapping,
+/// wrapping, and filtering.
+pub type Texture
 
 /// Texture wrapping mode
 pub type WrapMode {
@@ -134,7 +139,7 @@ pub type FilterMode {
 /// texture.set_offset(player1_texture, 0.0, 0.0)  // Frame 0
 /// texture.set_offset(player2_texture, 0.25, 0.0) // Frame 1
 /// ```
-pub fn clone(texture: asset.Texture) -> asset.Texture {
+pub fn clone(texture: Texture) -> Texture {
   clone_ffi(texture)
 }
 
@@ -155,10 +160,10 @@ pub fn clone(texture: asset.Texture) -> asset.Texture {
 /// texture.set_offset(my_texture, 0.5, 0.0)
 /// ```
 pub fn set_offset(
-  texture: asset.Texture,
+  texture: Texture,
   x x: Float,
   y y: Float,
-) -> asset.Texture {
+) -> Texture {
   set_offset_ffi(texture, x, y)
   texture
 }
@@ -180,10 +185,10 @@ pub fn set_offset(
 /// texture.set_repeat(my_texture, 0.25, 1.0)
 /// ```
 pub fn set_repeat(
-  texture: asset.Texture,
+  texture: Texture,
   x x: Float,
   y y: Float,
-) -> asset.Texture {
+) -> Texture {
   set_repeat_ffi(texture, x, y)
   texture
 }
@@ -211,10 +216,10 @@ pub fn set_repeat(
 /// )
 /// ```
 pub fn set_wrap_mode(
-  texture: asset.Texture,
+  texture: Texture,
   wrap_s wrap_s: WrapMode,
   wrap_t wrap_t: WrapMode,
-) -> asset.Texture {
+) -> Texture {
   let s = wrap_mode_to_constant(wrap_s)
   let t = wrap_mode_to_constant(wrap_t)
   set_wrap_mode_ffi(texture, s, t)
@@ -241,10 +246,10 @@ pub fn set_wrap_mode(
 /// )
 /// ```
 pub fn set_filter_mode(
-  texture: asset.Texture,
+  texture: Texture,
   min_filter min_filter: FilterMode,
   mag_filter mag_filter: FilterMode,
-) -> asset.Texture {
+) -> Texture {
   let min = filter_mode_to_constant(min_filter)
   let mag = filter_mode_to_constant(mag_filter)
   set_filter_mode_ffi(texture, min, mag)
@@ -275,20 +280,20 @@ fn filter_mode_to_constant(mode: FilterMode) -> Int {
 // ============================================================================
 
 @external(javascript, "../threejs.ffi.mjs", "cloneTexture")
-fn clone_ffi(texture: asset.Texture) -> asset.Texture
+fn clone_ffi(texture: Texture) -> Texture
 
 @external(javascript, "../threejs.ffi.mjs", "setTextureOffset")
-fn set_offset_ffi(texture: asset.Texture, x: Float, y: Float) -> Nil
+fn set_offset_ffi(texture: Texture, x: Float, y: Float) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setTextureRepeat")
-fn set_repeat_ffi(texture: asset.Texture, x: Float, y: Float) -> Nil
+fn set_repeat_ffi(texture: Texture, x: Float, y: Float) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setTextureWrapMode")
-fn set_wrap_mode_ffi(texture: asset.Texture, wrap_s: Int, wrap_t: Int) -> Nil
+fn set_wrap_mode_ffi(texture: Texture, wrap_s: Int, wrap_t: Int) -> Nil
 
 @external(javascript, "../threejs.ffi.mjs", "setTextureFilterMode")
 fn set_filter_mode_ffi(
-  texture: asset.Texture,
+  texture: Texture,
   min_filter: Int,
   mag_filter: Int,
 ) -> Nil

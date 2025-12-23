@@ -6,7 +6,7 @@ A **scene graph** is a tree structure representing all objects in your game worl
 
 ### Scene Nodes
 
-Every object in your game is a `scene.Node(id)`. Nodes can be:
+Every object in your game is a `scene.Node`. Nodes can be:
 
 - **Mesh** - 3D object with geometry and material
 - **InstancedMesh** - Many identical objects (efficient!)
@@ -20,10 +20,10 @@ Every object in your game is a `scene.Node(id)`. Nodes can be:
 
 ### The View Function
 
-Your `view()` function returns a single root `scene.Node(id)` every frame. If you have multiple top-level nodes, wrap them in `scene.empty()`:
+Your `view()` function returns a single root `scene.Node` every frame. If you have multiple top-level nodes, wrap them in `scene.empty()`:
 
 ```gleam
-fn view(model: Model) -> scene.Node(id) {
+fn view(model: Model) -> scene.Node {
   scene.empty(
     id: "root",
     transform: transform.identity,

@@ -1,6 +1,108 @@
 # Changelog
 
-## Unreleased
+## v6.2.0 - 2025-12-23
+
+### 🎯 Major Changes
+
+#### Time Parameters Now Use Duration Type
+
+**Breaking Change**: All time-related parameters now use `gleam/time/duration.Duration` instead of implicit Float values for type-safe time handling.
+
+**Affected APIs:**
+- `tiramisu.Context.delta_time` - Now `Duration` instead of `Float`
+- `animation.Tween.duration` and `animation.Tween.elapsed` - Now `Duration`  
+- `animation.tween_*()` functions - `duration` parameter now `Duration`
+- `animation.update_tween()` - `delta` parameter now `Duration`
+- `physics.step()` - `delta_time` parameter now `Duration`
+- `spritesheet.Animation.frame_duration` - Now `Duration`
+- `spritesheet.AnimationState.elapsed_time` - Now `Duration`
+- `spritesheet.animation()` - `frame_duration` parameter now `Duration`
+- `spritesheet.update()` - `delta_time` parameter now `Duration`
+
+**Migration:**
+
+```gleam
+import gleam/time/duration
+
+// OLD - implicit milliseconds/seconds
+let tween = animation.tween_float(0.0, 1.0, 1000.0, animation.Linear)
+physics.step(world, 16.0)
+spritesheet.animation(name: "walk", frames: [0,1], frame_duration: 0.1, ...)
+fn update(model, msg, ctx) {
+  let movement = 5.0 *. ctx.delta_time *. 0.001  // Manual conversion
+}
+
+// NEW - type-safe Duration
+let tween = animation.tween_float(0.0, 1.0, duration.seconds(1), animation.Linear)
+physics.step(world, ctx.delta_time)
+spritesheet.animation(name: "walk", frames: [0,1], frame_duration: duration.milliseconds(100), ...)
+fn update(model, msg, ctx) {
+  let delta_seconds = duration.to_seconds(ctx.delta_time)
+  let movement = 5.0 *. delta_seconds  // Type-safe!
+}
+```
+
+**Benefits:**
+- **Type Safety**: Can't accidentally mix seconds and milliseconds
+- **Self-Documenting**: `duration.seconds(2)` is clearer than `2000.0`
+- **Standard Library**: Uses official Gleam time library
+- **IDE Support**: Better autocomplete and type checking
+
+### 🐛 Bug Fixes
+
+- Fixed infinite recursion in `spritesheet.advance_frame()` when using Duration type
+- Fixed `duration.difference()` parameter order for correct time calculations
+
+### 📚 Documentation Updates
+
+- Updated README.md with Duration examples
+- Updated getting-started.md with Duration usage
+- Updated physics-guide.md with Duration parameters
+- Updated CLAUDE.md migration guide with Duration section
+- Fixed all Context type references to remove generic type parameters
+
+---
+
+## v7.0.0 - 2025-12-24
+
+### 🎯 Major Breaking Changes
+
+#### Removed Generic ID System
+- **BREAKING**: All scene node IDs, physics body IDs, and audio source IDs are now plain `String` instead of generic types
+- Removed `tiramisu/internal/id` module (no longer needed)
+- Simplified type signatures across the entire API (no more `Node(id)`, `Context(id)`, etc.)
+- Migration: Convert custom ID types to strings (e.g., `Player` → `"player"`, `Enemy(5)` → `"enemy-5"`)
+
+#### Modules Extracted to Separate Packages
+- **BREAKING**: `tiramisu/state_machine` module moved to standalone `statemachine` package
+- **BREAKING**: `tiramisu/spatial` module moved to standalone `spatial` package
+- **BREAKING**: Removed `tiramisu/particle_emitter` module (~490 lines)
+- Install separately if needed: `gleam add statemachine` or `gleam add spatial`
+- Leaner core library focused on essential rendering and physics features
+- Removed ~24,000 lines from core, reducing bundle size and complexity
+
+#### Animation Module Restructure
+- **BREAKING**: Split animation functionality into `animation` and `tween` modules
+- `animation` module now focused on 3D model animations (GLTF/FBX)
+- New `tween` module for tweening operations (moved from animation)
+- All tween functions moved: `tween_float`, `tween_vec3`, `tween_quaternion`, etc.
+- Migration: Import `tiramisu/tween` instead of `tiramisu/animation` for tweening
+
+### Added
+
+- **Performance Optimization Guide**: Comprehensive documentation in `docs/performance-optimization.md`
+- **New Tween Module**: Dedicated module for value interpolation and tweening
+- **Enhanced Camera API**: New camera helper functions in the camera module
+
+### Changed
+
+- **Streamlined Core**: Focused on essential game engine features (rendering, physics, audio, assets)
+- **Example Reorganization**: Renumbered examples 0-26 (removed standalone asset loading example)
+- **Simplified Scene Graph**: Scene node construction simplified without generic IDs
+
+---
+
+## v6.1.0 - 2025-11-26
 
 ### Fixed
 

@@ -80,6 +80,7 @@ Replace the contents of `src/my_game.gleam` with:
 ```gleam
 import tiramisu/physics
 import gleam/option
+import gleam/time/duration
 import tiramisu
 import tiramisu/background
 import tiramisu/camera
@@ -112,7 +113,7 @@ pub fn main() {
 }
 
 // Initialize the game state
-fn init(_ctx: tiramisu.Context(String)) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
+fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld)) {
   #(Model(rotation: 0.0), effect.tick(Tick), option.None)
 }
 
@@ -120,19 +121,20 @@ fn init(_ctx: tiramisu.Context(String)) -> #(Model, effect.Effect(Msg), option.O
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
-) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld(String))) {
+  ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld)) {
   case msg {
     Tick -> {
-      // delta_time is in milliseconds, convert to seconds for smooth rotation
-      let new_rotation = model.rotation +. { ctx.delta_time *. 0.001 }
+      // ctx.delta_time is a Duration type - convert to seconds for rotation
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let new_rotation = model.rotation +. delta_seconds
       #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
     }
   }
 }
 
 // Render the scene
-fn view(model: Model, _ctx: tiramisu.Context(String)) -> scene.Node(String) {
+fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
   // Create camera
   let assert Ok(cam) = camera.perspective(
     field_of_view: 75.0,
@@ -259,10 +261,10 @@ effect.none()                         // No effects
 
 #### 3. Scene Nodes
 
-Your `view` function returns a single root `scene.Node(id)`. If you have multiple top-level nodes, wrap them in `scene.empty()`:
+Your `view` function returns a single root `scene.Node`. If you have multiple top-level nodes, wrap them in `scene.empty()`:
 
 ```gleam
-fn view(model: Model, _ctx: Context(id)) -> scene.Node(id) {
+fn view(model: Model, _ctx: Context) -> scene.Node {
   scene.empty(
     id: "root",
     transform: transform.identity,
