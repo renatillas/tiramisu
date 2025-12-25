@@ -128,10 +128,15 @@
 //// }
 //// ```
 
+import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}
 import gleam/list
+import gleam/time/duration
+import plinth/browser/document
 import plinth/browser/window
 import tiramisu/background.{type Background}
+import tiramisu/browser
+import tiramisu/internal/timer
 import tiramisu/texture
 
 /// Opaque effect type that can dispatch messages back to the application.
@@ -191,10 +196,7 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
 pub fn batch(effects: List(Effect(msg))) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     effects
-    |> list.each(fn(effect) {
-      let Effect(perform) = effect
-      perform(dispatch)
-    })
+    |> list.each(fn(effect) { effect.perform(dispatch) })
   })
 }
 
@@ -209,10 +211,7 @@ pub fn batch(effects: List(Effect(msg))) -> Effect(msg) {
 /// effect.map(player_effect, PlayerMsg)
 /// ```
 pub fn map(effect: Effect(a), f: fn(a) -> b) -> Effect(b) {
-  Effect(perform: fn(dispatch) {
-    let Effect(perform) = effect
-    perform(fn(msg) { dispatch(f(msg)) })
-  })
+  Effect(perform: fn(dispatch) { effect.perform(fn(msg) { dispatch(f(msg)) }) })
 }
 
 /// Create an effect from a JavaScript Promise.
@@ -234,8 +233,7 @@ pub fn from_promise(p: Promise(msg)) -> Effect(msg) {
 
 @internal
 pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
-  let Effect(perform) = effect
-  perform(dispatch)
+  effect.perform(dispatch)
 }
 
 /// Request the next animation frame and dispatch a message.
@@ -391,7 +389,7 @@ fn load_cube_texture_ffi(urls: List(String)) -> Promise(texture.Texture)
 /// ```
 pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    delay_ffi(milliseconds, fn() { dispatch(msg) })
+    timer.delay(milliseconds, fn() { dispatch(msg) })
     Nil
   })
 }
@@ -408,12 +406,12 @@ pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
 ///
 /// ```gleam
 /// type Model {
-///   Model(spawn_interval: option.Option(Int))
+///   Model(spawn_interval: option.Option(timer.TimerId))
 /// }
 ///
 /// type Msg {
 ///   StartSpawning
-///   IntervalCreated(Int)
+///   IntervalCreated(timer.TimerId)
 ///   SpawnEnemy
 ///   StopSpawning
 /// }
@@ -447,10 +445,10 @@ pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
 pub fn interval(
   ms milliseconds: Int,
   msg msg: msg,
-  on_created on_created: fn(Int) -> msg,
+  on_created on_created: fn(timer.TimerId) -> msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    let id = interval_ffi(milliseconds, fn() { dispatch(msg) })
+    let id = timer.interval(milliseconds, fn() { dispatch(msg) })
     dispatch(on_created(id))
     Nil
   })
@@ -468,9 +466,9 @@ pub fn interval(
 ///   option.None -> effect.none()
 /// }
 /// ```
-pub fn cancel_interval(id: Int) -> Effect(msg) {
+pub fn cancel_interval(id: timer.TimerId) -> Effect(msg) {
   Effect(perform: fn(_dispatch) {
-    cancel_interval_ffi(id)
+    timer.cancel_interval(id)
     Nil
   })
 }
@@ -499,7 +497,7 @@ pub fn cancel_interval(id: Int) -> Effect(msg) {
 ///       model,
 ///       effect.request_fullscreen(
 ///         on_success: FullscreenEntered,
-///         on_error: FullscreenFailed,
+///         on_error: FullscreenEnteredFailed,
 ///       ),
 ///     )
 ///     _ -> #(model, effect.none())
@@ -511,15 +509,19 @@ pub fn request_fullscreen(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    request_fullscreen_ffi()
-    |> promise.map(fn(result) {
-      case result {
-        Ok(_) -> dispatch(on_success)
-        Error(_) -> dispatch(on_error)
+    case document.query_selector("canvas") {
+      Error(_) -> dispatch(on_error)
+      Ok(canvas) -> {
+        browser.request_fullscreen(canvas)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(_) -> dispatch(on_success)
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
       }
-    })
-    |> promise.tap(fn(_) { Nil })
-    Nil
+    }
   })
 }
 
@@ -528,11 +530,23 @@ pub fn request_fullscreen(
 /// ## Example
 ///
 /// ```gleam
-/// effect.exit_fullscreen()
+/// effect.exit_fullscreen(
+///   on_success: FullScreenExited,
+///   on_error: FullScreenExitedFailed
+/// )
 /// ```
-pub fn exit_fullscreen() -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    exit_fullscreen_ffi()
+pub fn exit_fullscreen(
+  on_success on_success: msg,
+  on_error on_error: msg,
+) -> Effect(msg) {
+  Effect(perform: fn(dispatch) {
+    browser.exit_fullscreen()
+    |> promise.map(fn(result) {
+      case result {
+        Ok(_) -> dispatch(on_success)
+        Error(_) -> dispatch(on_error)
+      }
+    })
     Nil
   })
 }
@@ -570,15 +584,19 @@ pub fn request_pointer_lock(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    request_pointer_lock_ffi()
-    |> promise.map(fn(result) {
-      case result {
-        Ok(_) -> dispatch(on_success)
-        Error(_) -> dispatch(on_error)
+    case document.query_selector("canvas") {
+      Error(_) -> dispatch(on_error)
+      Ok(canvas) -> {
+        browser.request_pointer_lock(canvas)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(_) -> dispatch(on_success)
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
       }
-    })
-    |> promise.tap(fn(_) { Nil })
-    Nil
+    }
   })
 }
 
@@ -591,7 +609,7 @@ pub fn request_pointer_lock(
 /// ```
 pub fn exit_pointer_lock() -> Effect(msg) {
   Effect(perform: fn(_dispatch) {
-    exit_pointer_lock_ffi()
+    browser.exit_pointer_lock()
     Nil
   })
 }
@@ -619,10 +637,7 @@ pub fn exit_pointer_lock() -> Effect(msg) {
 /// }
 /// ```
 pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    vibrate_ffi(pattern)
-    Nil
-  })
+  Effect(perform: fn(_dispatch) { browser.vibrate(array.from_list(pattern)) })
 }
 
 /// Trigger haptic feedback on a gamepad.
@@ -644,7 +659,7 @@ pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
 ///       effect.gamepad_vibrate(
 ///         gamepad: 0,
 ///         intensity: 0.7,
-///         duration_ms: 500,
+///         duration: duration.milliseconds(500),
 ///       ),
 ///     )
 ///     _ -> #(model, effect.none())
@@ -654,10 +669,14 @@ pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
 pub fn gamepad_vibrate(
   gamepad gamepad: Int,
   intensity intensity: Float,
-  duration_ms duration_ms: Int,
+  duration duration: duration.Duration,
 ) -> Effect(msg) {
+  let #(duration_seconds, duration_nanoseconds) =
+    duration.to_seconds_and_nanoseconds(duration)
+  let duration_milliseconds =
+    duration_seconds * 1000 + duration_nanoseconds / 1_000_000
   Effect(perform: fn(_dispatch) {
-    gamepad_vibrate_ffi(gamepad, intensity, duration_ms)
+    browser.gamepad_vibrate(gamepad, intensity, duration_milliseconds)
     Nil
   })
 }
@@ -695,14 +714,13 @@ pub fn clipboard_write(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    clipboard_write_ffi(text)
+    browser.clipboard_write(text)
     |> promise.map(fn(result) {
       case result {
         Ok(_) -> dispatch(on_success)
         Error(_) -> dispatch(on_error)
       }
     })
-    |> promise.tap(fn(_) { Nil })
     Nil
   })
 }
@@ -742,53 +760,13 @@ pub fn clipboard_read(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    clipboard_read_ffi()
+    browser.clipboard_read()
     |> promise.map(fn(result) {
       case result {
         Ok(text) -> dispatch(on_success(text))
         Error(_) -> dispatch(on_error)
       }
     })
-    |> promise.tap(fn(_) { Nil })
     Nil
   })
 }
-
-// ============================================================================
-// FFI BINDINGS
-// ============================================================================
-
-// Time & Animation FFI
-@external(javascript, "../tiramisu.ffi.mjs", "delay")
-fn delay_ffi(milliseconds: Int, callback: fn() -> Nil) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "interval")
-fn interval_ffi(milliseconds: Int, callback: fn() -> Nil) -> Int
-
-@external(javascript, "../tiramisu.ffi.mjs", "cancelInterval")
-fn cancel_interval_ffi(id: Int) -> Nil
-
-// System & Browser FFI
-@external(javascript, "../tiramisu.ffi.mjs", "requestFullscreen")
-fn request_fullscreen_ffi() -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "exitFullscreen")
-fn exit_fullscreen_ffi() -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "requestPointerLock")
-fn request_pointer_lock_ffi() -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "exitPointerLock")
-fn exit_pointer_lock_ffi() -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "vibrate")
-fn vibrate_ffi(pattern: List(Int)) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "gamepadVibrate")
-fn gamepad_vibrate_ffi(gamepad: Int, intensity: Float, duration_ms: Int) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "clipboardWrite")
-fn clipboard_write_ffi(text: String) -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "clipboardRead")
-fn clipboard_read_ffi() -> Promise(Result(String, String))

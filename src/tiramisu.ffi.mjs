@@ -2942,7 +2942,7 @@ class TimerManager {
     this.isPaused = true;
 
     const now = performance.now();
-    for (const [id, timer] of this.timers.entries()) {
+    for (const [_, timer] of this.timers.entries()) {
       if (timer.timerId !== null) {
         // Clear the native timer
         if (timer.type === 'timeout') {
