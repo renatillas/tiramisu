@@ -8,6 +8,7 @@ import gleam/time/duration.{type Duration}
 import tiramisu/background.{type Background}
 import tiramisu/effect
 import tiramisu/input
+import tiramisu/internal/background_init
 import tiramisu/physics
 import tiramisu/scene
 
@@ -86,7 +87,7 @@ pub fn run(
 
   // Set background on the Three.js scene
   let scene_obj = scene.get_scene(renderer_state)
-  set_background(scene_obj, background)
+  background_init.set_initial_background(scene_obj, background)
 
   // Get canvas and append to DOM first (so dimensions are available)
   let webgl_renderer = scene.get_renderer(renderer_state)
@@ -180,9 +181,6 @@ fn append_to_dom(element: scene.DomElement) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "getCanvasDimensions")
 fn get_canvas_dimensions(renderer: scene.WebGLRenderer) -> #(Float, Float)
-
-@external(javascript, "./tiramisu.ffi.mjs", "setBackground")
-fn set_background(scene: scene.Scene, background: Background) -> Nil
 
 @external(javascript, "./tiramisu.ffi.mjs", "startLoop")
 fn start_loop(
