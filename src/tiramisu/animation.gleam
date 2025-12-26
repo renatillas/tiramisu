@@ -76,7 +76,8 @@
 ////     callback,
 ////     { once: true }
 ////   )
-//// </script>//// Tiramisu game engine main module - immutable game loop with effect system.
+//// </script>
+//// Tiramisu game engine main module - immutable game loop with effect system.
 ////
 //// Animation and tweening system for smooth transitions and Three.js model animations.
 ////
