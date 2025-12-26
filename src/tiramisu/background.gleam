@@ -3,59 +3,11 @@
 //// Defines what is rendered behind all scene objects. Can be either a solid color,
 //// a texture image, or a cube texture (skybox).
 
-/// Background type for the scene.
-///
-/// Defines what is rendered behind all scene objects. Can be either a solid color,
-/// a texture image, an equirectangular (360°) texture, or a cube texture (skybox).
-///
-/// ## Variants
-///
-/// - `Color(Int)`: Solid color background using hex color (e.g., 0x111111)
-/// - `Texture(String)`: 2D texture image loaded from a URL or path
-/// - `EquirectangularTexture(String)`: 360° spherical texture (equirectangular projection)
-/// - `CubeTexture(List(String))`: Cube texture (skybox) with 6 faces [px, nx, py, ny, pz, nz]
-///
-/// ## Examples
-///
-/// ```gleam
-/// import tiramisu
-/// import tiramisu/background
-///
-/// // Solid color background
-/// tiramisu.run(
-///   dimensions: None,
-///   background: background.Color(0x1a1a2e),
-///   // ...
-/// )
-///
-/// // Flat texture background
-/// tiramisu.run(
-///   dimensions: None,
-///   background: background.Texture("assets/sky.jpg"),
-///   // ...
-/// )
-///
-/// // Spherical 360° background (equirectangular)
-/// tiramisu.run(
-///   dimensions: None,
-///   background: background.EquirectangularTexture("assets/hdri/sunset.hdr"),
-///   // ...
-/// )
-///
-/// // Skybox with 6 faces
-/// tiramisu.run(
-///   dimensions: None,
-///   background: background.CubeTexture([
-///     "assets/skybox/px.jpg",  // positive x
-///     "assets/skybox/nx.jpg",  // negative x
-///     "assets/skybox/py.jpg",  // positive y
-///     "assets/skybox/ny.jpg",  // negative y
-///     "assets/skybox/pz.jpg",  // positive z
-///     "assets/skybox/nz.jpg",  // negative z
-///   ]),
-///   // ...
-/// )
-/// ```
+import gleam/javascript/promise
+import savoiardi
+import tiramisu/effect
+import tiramisu/texture
+
 pub type Background {
   /// Solid color background (hex color, e.g., 0x111111)
   Color(Int)
@@ -65,4 +17,88 @@ pub type Background {
   EquirectangularTexture(String)
   /// Cube texture (skybox) with 6 face images [px, nx, py, ny, pz, nz]
   CubeTexture(List(String))
+}
+
+/// Set the scene background dynamically.
+///
+/// Use `ctx.scene` from the game context to get the scene reference.
+///
+/// ## Example
+///
+/// ```gleam
+/// fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
+///   case msg {
+///     LoadSkybox -> {
+///       let effect = background.set(
+///         ctx.scene,
+///         background.CubeTexture(["px.jpg", "nx.jpg", "py.jpg", "ny.jpg", "pz.jpg", "nz.jpg"]),
+///         SkyboxLoaded,
+///         SkyboxFailed,
+///       )
+///       #(model, effect, ctx.physics_world)
+///     }
+///   }
+/// }
+/// ```
+pub fn set(
+  game_scene: savoiardi.Scene,
+  background: Background,
+  on_success: msg,
+  on_error: msg,
+) -> effect.Effect(msg) {
+  effect.from(fn(dispatch) {
+    case background {
+      Color(color) -> {
+        let _ = savoiardi.set_scene_background_color(game_scene, color)
+        dispatch(on_success)
+      }
+      Texture(url) -> {
+        texture.load(url)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(texture) -> {
+              let _ =
+                savoiardi.set_scene_background_texture(game_scene, texture)
+              dispatch(on_success)
+            }
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
+      }
+      EquirectangularTexture(url) -> {
+        // Load equirectangular texture asynchronously
+        texture.load_equirectangular(url)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(texture) -> {
+              let _ =
+                savoiardi.set_scene_background_texture(game_scene, texture)
+              dispatch(on_success)
+            }
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
+      }
+      CubeTexture(urls) -> {
+        // Load cube texture asynchronously
+        texture.load_cube(urls)
+        |> promise.tap(fn(result) {
+          case result {
+            Ok(cube_texture) -> {
+              let _ =
+                savoiardi.set_scene_background_cube_texture(
+                  game_scene,
+                  cube_texture,
+                )
+              dispatch(on_success)
+            }
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
+      }
+    }
+  })
 }

@@ -1,204 +1,12 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Basic shapes",
-////     functions: [
-////       "box",
-////       "sphere",
-////       "plane",
-////       "sheet",
-////       "circle",
-////       "cone",
-////       "cylinder"
-////     ]
-////   },
-////   {
-////     header: "Advanced shapes",
-////     functions: [
-////       "torus",
-////       "tetrahedron",
-////       "icosahedron",
-////       "text"
-////     ]
-////   },
-////   {
-////     header: "Custom geometry",
-////     functions: [
-////       "custom_geometry"
-////     ]
-////   }
-//// ]
-////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
-////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Geometry module - validated 3D shapes and primitives.
-////
-//// Provides validated constructors for geometric primitives used in 3D rendering.
-//// All geometry functions return `Result` to catch invalid parameters at construction time.
-////
-//// ## Core Concepts
-////
-//// - **Validation**: Geometry constructors validate dimensions (positive sizes, valid segment counts)
-//// - **Primitives**: Built-in shapes like boxes, spheres, planes, cylinders, toruses
-//// - **Custom Geometry**: Support for loading external geometry via asset system
-//// - **Text Geometry**: 3D text rendering with loaded fonts
-////
-//// ## Quick Example
-////
-//// ```gleam
-//// import tiramisu/geometry
-//// import tiramisu/scene
-//// import tiramisu/material
-////
-//// // Create validated geometries
-//// let assert Ok(cube) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-//// let assert Ok(ball) = geometry.sphere(radius: 0.5, width_segments: 32, height_segments: 16)
-//// let assert Ok(ground) = geometry.plane(width: 100.0, height: 100.0)
-////
-//// // Use in scene
-//// scene.Mesh(
-////   id: "player",
-////   geometry: cube,
-////   material: my_material,
-////   transform: transform.identity,
-////   physics: option.None,
-//// )
-//// ```
-////
-//// ## Available Primitives
-////
-//// - **box**: Rectangular cuboid (e.g., walls, buildings, crates)
-//// - **sphere**: Perfect sphere (e.g., balls, planets, bubbles)
-//// - **plane**: Flat 2D rectangle (e.g., ground, walls, billboards)
-//// - **circle**: Flat circle (e.g., coins, targets, platforms)
-//// - **cylinder**: Cylinder with configurable top/bottom radius (e.g., pillars, trees, pipes)
-//// - **cone**: Cone shape (e.g., traffic cones, party hats)
-//// - **capsule**: Cylinder with rounded caps (e.g., character colliders)
-//// - **torus**: Donut shape (e.g., rings, hoops)
-//// - **tetrahedron**: 4-sided polyhedron (e.g., low-poly crystals)
-//// - **icosahedron**: 20-sided polyhedron (e.g., smooth low-poly spheres, dice)
-//// - **text**: 3D extruded text with beveling (e.g., logos, titles, signs)
-////
-//// ## Validation
-////
-//// All geometry constructors validate their parameters:
-////
-//// ```gleam
-//// // Valid
-//// let assert Ok(cube) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-////
-//// // Invalid - negative dimensions
-//// let assert Error(geometry.NonPositiveWidth(-1.0)) =
-////   geometry.box(width: -1.0, height: 1.0, depth: 1.0)
-////
-//// // Invalid - too few segments
-//// let assert Error(geometry.LessThanThreeSegmentCountWidth(2)) =
-////   geometry.sphere(radius: 1.0, width_segments: 2, height_segments: 16)
-//// ```
-
 import gleam/bool
+import gleam/javascript/promise
+import savoiardi
 
-/// Opaque type for Three.js BufferGeometry.
-///
-/// Represents custom geometry loaded from 3D model files (e.g., STL).
-/// Used with `custom_geometry()` to create geometry from loaded assets.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu/asset
-/// import tiramisu/geometry
-///
-/// // Load STL file
-/// let load_effect = asset.load_stl("model.stl")
-///   |> promise.map(fn(result) {
-///     case result {
-///       Ok(buffer) -> GeometryLoaded(buffer)
-///       Error(err) -> LoadFailed(err)
-///     }
-///   })
-///
-/// // Use the loaded geometry
-/// let custom = geometry.custom_geometry(buffer)
-/// ```
-pub type BufferGeometry
+pub type CustomGeometry =
+  savoiardi.Geometry
 
-/// Opaque type for Three.js Font (for TextGeometry).
-///
-/// Fonts must be in Three.js typeface.json format.
-/// Used with `text_geometry()` to create 3D extruded text.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu/asset
-/// import tiramisu/geometry
-///
-/// // Load font
-/// let load_effect = asset.load_font("fonts/helvetiker_regular.typeface.json")
-///   |> promise.map(fn(result) {
-///     case result {
-///       Ok(font) -> FontLoaded(font)
-///       Error(err) -> LoadFailed(err)
-///     }
-///   })
-///
-/// // Use the font for 3D text
-/// let assert Ok(text) = geometry.text(
-///   text: "Hello World",
-///   font: font,
-///   size: 1.0,
-///   depth: 0.2,
-/// )
-/// ```
-pub type Font
+pub type Font =
+  savoiardi.Font
 
 /// 3D geometry types supported by the engine.
 ///
@@ -229,10 +37,10 @@ pub opaque type Geometry {
   )
   TetrahedronGeometry(radius: Float, detail: Int)
   IcosahedronGeometry(radius: Float, detail: Int)
-  CustomGeometry(BufferGeometry)
+  CustomGeometry(CustomGeometry)
   TextGeometry(
     text: String,
-    font: Font,
+    font: savoiardi.Font,
     size: Float,
     depth: Float,
     curve_segments: Int,
@@ -258,9 +66,6 @@ pub type GeometryError {
   NegativeBevelThickness(thickness: Float)
   NegativeBevelSize(size: Float)
 }
-
-@internal
-pub type ThreeGeometry
 
 // --- Validated Geometry Constructors ---
 
@@ -364,7 +169,7 @@ pub fn circle(
   Ok(CircleGeometry(radius, segments))
 }
 
-pub fn custom_geometry(geometry geometry: BufferGeometry) -> Geometry {
+pub fn custom_geometry(geometry geometry: savoiardi.Geometry) -> Geometry {
   CustomGeometry(geometry)
 }
 
@@ -504,7 +309,7 @@ pub fn icosahedron(
 /// - `bevel_segments`: Smoothness of bevel (more = rounder)
 pub fn text(
   text text: String,
-  font font: Font,
+  font font: savoiardi.Font,
   size size: Float,
   depth depth: Float,
   curve_segments curve_segments: Int,
@@ -546,30 +351,35 @@ pub fn text(
 }
 
 @internal
-pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
+pub fn create_geometry(geometry: Geometry) -> savoiardi.Geometry {
   case geometry {
     BoxGeometry(width:, height:, depth:) ->
-      create_box_geometry(width, height, depth)
+      savoiardi.create_box_geometry(width, height, depth)
     CircleGeometry(radius:, segments:) ->
-      create_circle_geometry(radius, segments)
+      savoiardi.create_circle_geometry(radius, segments)
     ConeGeometry(radius:, height:, segments:) ->
-      create_cone_geometry(radius, height, segments)
-    CustomGeometry(buffer) -> create_custom_geometry(buffer)
+      savoiardi.create_cone_geometry(radius, height, segments)
+    CustomGeometry(buffer) -> buffer
     CylinderGeometry(radius_top:, radius_bottom:, height:, radial_segments:) ->
-      create_cylinder_geometry(
+      savoiardi.create_cylinder_geometry(
         radius_top,
         radius_bottom,
         height,
         radial_segments,
       )
     IcosahedronGeometry(radius:, detail:) ->
-      create_icosahedron_geometry(radius, detail)
+      savoiardi.create_icosahedron_geometry(radius, detail)
     PlaneGeometry(width:, height:, width_segments:, height_segments:) ->
-      create_plane_geometry(width, height, width_segments, height_segments)
+      savoiardi.create_plane_geometry(
+        width,
+        height,
+        width_segments,
+        height_segments,
+      )
     SphereGeometry(radius:, width_segments:, height_segments:) ->
-      create_sphere_geometry(radius, width_segments, height_segments)
+      savoiardi.create_sphere_geometry(radius, width_segments, height_segments)
     TetrahedronGeometry(radius:, detail:) ->
-      create_tetrahedron_geometry(radius, detail)
+      savoiardi.create_tetrahedron_geometry(radius, detail)
     TextGeometry(
       text:,
       font:,
@@ -582,7 +392,7 @@ pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
       bevel_offset:,
       bevel_segments:,
     ) ->
-      create_text_geometry(
+      savoiardi.create_text_geometry(
         text,
         font,
         size,
@@ -595,79 +405,19 @@ pub fn create_geometry(geometry: Geometry) -> ThreeGeometry {
         bevel_segments,
       )
     TorusGeometry(radius:, tube:, radial_segments:, tubular_segments:) ->
-      create_torus_geometry(radius, tube, radial_segments, tubular_segments)
+      savoiardi.create_torus_geometry(
+        radius,
+        tube,
+        radial_segments,
+        tubular_segments,
+      )
   }
 }
 
-// Note: Custom geometry is just a passthrough since the buffer is already created
-// Use identity function to return the buffer as-is
-@external(javascript, "../threejs.ffi.mjs", "identity")
-fn create_custom_geometry(buffer: BufferGeometry) -> ThreeGeometry
+pub fn load_font(url url: String) -> promise.Promise(Result(Font, Nil)) {
+  savoiardi.load_font(url)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "createConeGeometry")
-fn create_cone_geometry(
-  radius: Float,
-  height: Float,
-  segments: Int,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createCircleGeometry")
-fn create_circle_geometry(radius: Float, segments: Int) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createBoxGeometry")
-fn create_box_geometry(
-  width: Float,
-  height: Float,
-  depth: Float,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createCylinderGeometry")
-fn create_cylinder_geometry(
-  radius_top: Float,
-  radius_bottom: Float,
-  height: Float,
-  radial_segments: Int,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createIcosahedronGeometry")
-fn create_icosahedron_geometry(radius: Float, detail: Int) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createPlaneGeometry")
-fn create_plane_geometry(
-  width: Float,
-  height: Float,
-  width_segments: Int,
-  height_segments: Int,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createSphereGeometry")
-fn create_sphere_geometry(
-  radius: Float,
-  width_segments: Int,
-  height_segments: Int,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createTetrahedronGeometry")
-fn create_tetrahedron_geometry(radius: Float, detail: Int) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createTorusGeometry")
-fn create_torus_geometry(
-  radius: Float,
-  tube: Float,
-  radial_segments: Int,
-  tubular_segments: Int,
-) -> ThreeGeometry
-
-@external(javascript, "../threejs.ffi.mjs", "createTextGeometry")
-fn create_text_geometry(
-  text: String,
-  font: Font,
-  size: Float,
-  depth: Float,
-  curve_segments: Int,
-  bevel_enabled: Bool,
-  bevel_thickness: Float,
-  bevel_size: Float,
-  bevel_offset: Float,
-  bevel_segments: Int,
-) -> ThreeGeometry
+pub fn load_stl(url url: String) -> promise.Promise(Result(CustomGeometry, Nil)) {
+  savoiardi.load_stl(url)
+}

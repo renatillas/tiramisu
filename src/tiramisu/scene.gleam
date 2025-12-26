@@ -1,176 +1,16 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Basic scene nodes",
-////     functions: [
-////       "mesh",
-////       "empty",
-////       "with_children"
-////     ]
-////   },
-////   {
-////     header: "3D models",
-////     functions: [
-////       "model_3d",
-////       "instanced_model"
-////     ]
-////   },
-////   {
-////     header: "Instancing",
-////     functions: [
-////       "instanced_mesh"
-////     ]
-////   },
-////   {
-////     header: "Lighting and cameras",
-////     functions: [
-////       "light",
-////       "camera"
-////     ]
-////   },
-////   {
-////     header: "Level of detail (LOD)",
-////     functions: [
-////       "lod",
-////       "lod_level"
-////     ]
-////   },
-////   {
-////     header: "Audio and particles",
-////     functions: [
-////       "audio",
-////       "particles"
-////     ]
-////   },
-////   {
-////     header: "Sprites",
-////     functions: [
-////       "animated_sprite"
-////     ]
-////   },
-////   {
-////     header: "UI labels",
-////     functions: [
-////       "css2d_label",
-////       "css3d_label",
-////       "canvas"
-////     ]
-////   },
-////   {
-////     header: "Debug visualization",
-////     functions: [
-////       "debug_box",
-////       "debug_sphere",
-////       "debug_line",
-////       "debug_axes",
-////       "debug_grid",
-////       "debug_point"
-////     ]
-////   }
-//// ]
-////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
-////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Scene graph module - declarative 3D scene construction.
-////
-//// This module provides types and functions for building 3D scenes declaratively.
-//// Scenes are composed of `SceneNode` values that describe meshes, lights, cameras, and groups.
-////
-//// ## Core Concepts
-////
-//// - **Immutability**: Scene nodes are immutable values. Updates create new nodes.
-//// - **Hierarchy**: Use `Group` nodes to create parent-child relationships.
-//// - **Validation**: Geometry and material constructors return `Result` to catch invalid parameters.
-//// - **Performance**: Use `InstancedMesh` for many identical objects (1 draw call instead of thousands).
-////
-//// ## Quick Example
-////
-//// ```gleam
-//// import tiramisu/scene
-//// import tiramisu/transform
-//// import gleam/option
-//// import vec/vec3
-////
-//// pub fn view(model: Model) {
-////   let assert Ok(geometry) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-////   let assert Ok(material) = scene.basic_material(color: 0xff0000, transparent: False, opacity: 1.0)
-////
-////   [
-////     scene.Mesh(
-////       id: "player",
-////       geometry: geometry,
-////       material: material,
-////       transform: transform.at(vec3.Vec3(0.0, 1.0, 0.0)),
-////       physics: option.None,
-////     ),
-////     scene.Light(
-////       id: "sun",
-////       light: scene.DirectionalLight(color: 0xffffff, intensity: 1.0),
-////       transform: transform.identity,
-////     ),
-////   ]
-//// }
-//// ```
-
 import gleam/dict
-import gleam/float
 import gleam/int
+import gleam/javascript/array
 import gleam/list
 import gleam/option.{type Option}
 import gleam/order
 import gleam/time/duration.{type Duration}
 import paint
 import paint/encode as paint_encode
-import quaternion
+import plinth/browser/element
+import plinth/browser/window
+import savoiardi
 import tiramisu/animation.{type AnimationPlayback}
-import tiramisu/asset
 import tiramisu/audio
 import tiramisu/camera
 import tiramisu/geometry
@@ -179,11 +19,11 @@ import tiramisu/internal/object_cache
 import tiramisu/light
 import tiramisu/material
 import tiramisu/physics
-import tiramisu/postprocessing
 import tiramisu/spritesheet
 import tiramisu/texture
 import tiramisu/transform
 import vec/vec3.{type Vec3}
+import vec/vec3f
 
 /// Level of Detail (LOD) configuration.
 ///
@@ -254,7 +94,7 @@ pub opaque type Node {
     look_at: Option(vec3.Vec3(Float)),
     active: Bool,
     viewport: Option(#(Int, Int, Int, Int)),
-    postprocessing: Option(postprocessing.PostProcessing),
+    postprocessing: Option(camera.PostProcessing),
   )
   LOD(
     id: String,
@@ -265,7 +105,7 @@ pub opaque type Node {
   Model3D(
     id: String,
     children: List(Node),
-    object: asset.Object3D,
+    object: savoiardi.Object3D,
     transform: transform.Transform,
     animation: Option(AnimationPlayback),
     physics: Option(physics.RigidBody),
@@ -274,7 +114,7 @@ pub opaque type Node {
   InstancedModel(
     id: String,
     children: List(Node),
-    object: asset.Object3D,
+    object: savoiardi.Object3D,
     instances: List(transform.Transform),
     physics: Option(physics.RigidBody),
     material: Option(material.Material),
@@ -564,7 +404,7 @@ pub fn camera(
   look_at look_at: Option(vec3.Vec3(Float)),
   active active: Bool,
   viewport viewport: Option(camera.ViewPort),
-  postprocessing postprocessing: Option(postprocessing.PostProcessing),
+  postprocessing postprocessing: Option(camera.PostProcessing),
 ) -> Node {
   Camera(
     id:,
@@ -672,9 +512,9 @@ pub fn lod(
 ///   physics: option.None,
 /// )
 /// ```
-pub fn model_3d(
+pub fn object_3d(
   id id: String,
-  object object: asset.Object3D,
+  object object: savoiardi.Object3D,
   transform transform: transform.Transform,
   animation animation: Option(AnimationPlayback),
   physics physics: Option(physics.RigidBody),
@@ -728,7 +568,7 @@ pub fn model_3d(
 /// ```
 pub fn instanced_model(
   id id: String,
-  object object: asset.Object3D,
+  object object: savoiardi.Object3D,
   instances instances: List(transform.Transform),
   physics physics: Option(physics.RigidBody),
   material material: Option(material.Material),
@@ -1271,7 +1111,7 @@ pub type Patch {
   SetActiveCamera(id: String)
   UpdateCameraPostprocessing(
     id: String,
-    postprocessing: Option(postprocessing.PostProcessing),
+    postprocessing: Option(camera.PostProcessing),
   )
   UpdateCSS2DLabel(id: String, html: String, transform: transform.Transform)
   UpdateCSS3DLabel(id: String, html: String, transform: transform.Transform)
@@ -1860,6 +1700,213 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         current_physics:,
       )
 
+    // Debug nodes: if properties changed, remove and re-add
+    DebugBox(
+      id: _,
+      children: _,
+      min: prev_min,
+      max: prev_max,
+      color: prev_color,
+    ),
+      DebugBox(
+        id: _,
+        children: curr_children,
+        min: curr_min,
+        max: curr_max,
+        color: curr_color,
+      )
+    ->
+      case
+        prev_min != curr_min || prev_max != curr_max || prev_color != curr_color
+      {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugBox(
+              id:,
+              children: curr_children,
+              min: curr_min,
+              max: curr_max,
+              color: curr_color,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
+    DebugSphere(
+      id: _,
+      children: _,
+      center: prev_center,
+      radius: prev_radius,
+      color: prev_color,
+    ),
+      DebugSphere(
+        id: _,
+        children: curr_children,
+        center: curr_center,
+        radius: curr_radius,
+        color: curr_color,
+      )
+    ->
+      case
+        prev_center != curr_center
+        || prev_radius != curr_radius
+        || prev_color != curr_color
+      {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugSphere(
+              id:,
+              children: curr_children,
+              center: curr_center,
+              radius: curr_radius,
+              color: curr_color,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
+    DebugLine(
+      id: _,
+      children: _,
+      from: prev_from,
+      to: prev_to,
+      color: prev_color,
+    ),
+      DebugLine(
+        id: _,
+        children: curr_children,
+        from: curr_from,
+        to: curr_to,
+        color: curr_color,
+      )
+    ->
+      case
+        prev_from != curr_from || prev_to != curr_to || prev_color != curr_color
+      {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugLine(
+              id:,
+              children: curr_children,
+              from: curr_from,
+              to: curr_to,
+              color: curr_color,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
+    DebugAxes(id: _, children: _, origin: prev_origin, size: prev_size),
+      DebugAxes(
+        id: _,
+        children: curr_children,
+        origin: curr_origin,
+        size: curr_size,
+      )
+    ->
+      case prev_origin != curr_origin || prev_size != curr_size {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugAxes(
+              id:,
+              children: curr_children,
+              origin: curr_origin,
+              size: curr_size,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
+    DebugGrid(
+      id: _,
+      children: _,
+      size: prev_size,
+      divisions: prev_divisions,
+      color: prev_color,
+    ),
+      DebugGrid(
+        id: _,
+        children: curr_children,
+        size: curr_size,
+        divisions: curr_divisions,
+        color: curr_color,
+      )
+    ->
+      case
+        prev_size != curr_size
+        || prev_divisions != curr_divisions
+        || prev_color != curr_color
+      {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugGrid(
+              id:,
+              children: curr_children,
+              size: curr_size,
+              divisions: curr_divisions,
+              color: curr_color,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
+    DebugPoint(
+      id: _,
+      children: _,
+      position: prev_position,
+      size: prev_size,
+      color: prev_color,
+    ),
+      DebugPoint(
+        id: _,
+        children: curr_children,
+        position: curr_position,
+        size: curr_size,
+        color: curr_color,
+      )
+    ->
+      case
+        prev_position != curr_position
+        || prev_size != curr_size
+        || prev_color != curr_color
+      {
+        True -> [
+          RemoveNode(id),
+          AddNode(
+            id,
+            DebugPoint(
+              id:,
+              children: curr_children,
+              position: curr_position,
+              size: curr_size,
+              color: curr_color,
+            ),
+            option.None,
+          ),
+        ]
+        False -> []
+      }
+
     _, _ -> []
   }
 }
@@ -1985,13 +2032,13 @@ fn compare_camera_fields(
   previous_look_at prev_look_at: Option(vec3.Vec3(Float)),
   previous_active prev_active: Bool,
   previous_viewport prev_viewport: Option(#(Int, Int, Int, Int)),
-  previous_postprocessing prev_pp: Option(postprocessing.PostProcessing),
+  previous_postprocessing prev_pp: Option(camera.PostProcessing),
   current_camera curr_cam: camera.Camera,
   current_transform curr_trans: transform.Transform,
   current_look_at curr_look_at: Option(vec3.Vec3(Float)),
   current_active curr_active: Bool,
   current_viewport curr_viewport: Option(#(Int, Int, Int, Int)),
-  current_postprocessing curr_pp: Option(postprocessing.PostProcessing),
+  current_postprocessing curr_pp: Option(camera.PostProcessing),
 ) -> List(Patch) {
   let patches = []
 
@@ -2145,26 +2192,20 @@ fn compare_animated_sprite_fields(
 }
 
 @internal
-pub type Scene
+pub type Scene =
+  savoiardi.Scene
+
+/// Opaque type for the WebGL renderer
+pub type WebGLRenderer =
+  savoiardi.Renderer
 
 @internal
-pub type ThreeCamera
+pub type DomElement =
+  savoiardi.Canvas
 
 @internal
-pub type WebGLRenderer
-
-@internal
-pub type DomElement
-
-@internal
-pub type Dimensions {
-  Dimensions(width: Float, height: Float)
-}
-
-@internal
-pub type RendererOptions {
-  RendererOptions(antialias: Bool, alpha: Bool, dimensions: Option(Dimensions))
-}
+pub type Dimensions =
+  savoiardi.Dimensions
 
 @internal
 pub type RendererState {
@@ -2180,311 +2221,21 @@ pub type RendererState {
     /// Audio manager state (Gleam-managed)
     audio_manager: audio_manager.AudioManagerState,
     /// Audio listener (singleton, attached to camera)
-    audio_listener: audio_manager.AudioListener,
+    audio_listener: savoiardi.AudioListener,
     /// Cached flattened scene dictionary from previous frame (optimization)
     cached_scene_dict: Option(dict.Dict(String, NodeWithParent)),
   )
 }
 
-@external(javascript, "../threejs.ffi.mjs", "createRenderer")
-fn create_renderer_ffi(options: RendererOptions) -> WebGLRenderer
-
-@external(javascript, "../threejs.ffi.mjs", "getRendererDomElement")
 @internal
-pub fn get_dom_element(renderer: WebGLRenderer) -> DomElement
-
-@external(javascript, "../threejs.ffi.mjs", "setCanvas")
-@internal
-pub fn set_canvas(canvas: DomElement) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "createScene")
-fn create_scene_ffi() -> Scene
-
-@external(javascript, "../threejs.ffi.mjs", "render")
-@internal
-pub fn render(renderer: WebGLRenderer, scene: Scene, camera: ThreeCamera) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "addToScene")
-fn add_to_scene_ffi(scene: Scene, object: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "removeFromScene")
-fn remove_from_scene_ffi(scene: Scene, object: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "addChild")
-fn add_child_ffi(parent: asset.Object3D, child: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "applyTransform")
-fn apply_transform_ffi(
-  object: asset.Object3D,
-  transform: transform.Transform,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "applyTransformWithQuaternion")
-fn apply_transform_with_quaternion_ffi(
-  object: asset.Object3D,
-  position: vec3.Vec3(Float),
-  quaternion: quaternion.Quaternion,
-  scale: vec3.Vec3(Float),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "updateMatrixWorld")
-fn update_matrix_world_ffi(object: asset.Object3D, force: Bool) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "applyCameraLookAt")
-fn apply_camera_look_at_ffi(camera: asset.Object3D, target: Vec3(Float)) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "createMesh")
-fn create_mesh_ffi(
-  geometry: geometry.ThreeGeometry,
-  material: material.ThreeMaterial,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createInstancedMesh")
-fn create_instanced_mesh_ffi(
-  geometry: geometry.ThreeGeometry,
-  material: material.ThreeMaterial,
-  count: Int,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createGroup")
-fn create_group_ffi() -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createLOD")
-fn create_lod_ffi() -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "cloneObject3D")
-fn clone_object_ffi(object: asset.Object3D) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "extractMeshMaterialPairs")
-fn extract_mesh_material_pairs_ffi(object: asset.Object3D) -> MeshMaterialPairs
-
-type MeshMaterialPairs
-
-@external(javascript, "../tiramisu.ffi.mjs", "getPairsGeometries")
-fn get_pairs_geometries_ffi(
-  pairs: MeshMaterialPairs,
-) -> List(geometry.ThreeGeometry)
-
-@external(javascript, "../tiramisu.ffi.mjs", "getPairsMaterials")
-fn get_pairs_materials_ffi(
-  pairs: MeshMaterialPairs,
-) -> List(material.ThreeMaterial)
-
-@external(javascript, "../threejs.ffi.mjs", "setObjectGeometry")
-fn set_object_geometry_ffi(
-  object: asset.Object3D,
-  geometry: geometry.ThreeGeometry,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setObjectMaterial")
-fn set_object_material_ffi(
-  object: asset.Object3D,
-  material: material.ThreeMaterial,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "getObjectGeometry")
-fn get_object_geometry_ffi(object: asset.Object3D) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "getObjectMaterial")
-fn get_object_material_ffi(object: asset.Object3D) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "setShadowProperties")
-fn set_shadow_properties_ffi(
-  object: asset.Object3D,
-  cast_shadow: Bool,
-  receive_shadow: Bool,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "isPerspectiveCamera")
-fn is_perspective_camera_ffi(object: asset.Object3D) -> Bool
-
-@external(javascript, "../threejs.ffi.mjs", "isOrthographicCamera")
-fn is_orthographic_camera_ffi(object: asset.Object3D) -> Bool
-
-@external(javascript, "../threejs.ffi.mjs", "updateCameraProjectionMatrix")
-fn update_camera_projection_matrix_ffi(camera: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setPerspectiveCameraParams")
-fn set_perspective_camera_params_ffi(
-  camera: asset.Object3D,
-  fov: Float,
-  aspect: Float,
-  near: Float,
-  far: Float,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setOrthographicCameraParams")
-fn set_orthographic_camera_params_ffi(
-  camera: asset.Object3D,
-  left: Float,
-  right: Float,
-  top: Float,
-  bottom: Float,
-  near: Float,
-  far: Float,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setCameraUserData")
-fn set_camera_user_data_vec3_ffi(
-  camera: asset.Object3D,
-  key: String,
-  value: Vec3(Float),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "getCameraUserData")
-fn get_camera_user_data_vec3_ffi(
-  camera: asset.Object3D,
-  key: String,
-) -> Vec3(Float)
-
-@external(javascript, "../threejs.ffi.mjs", "setCameraUserData")
-fn set_camera_user_data_bool_ffi(
-  camera: asset.Object3D,
-  key: String,
-  value: Bool,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "hasCameraUserData")
-fn has_camera_user_data_ffi(camera: asset.Object3D, key: String) -> Bool
-
-@external(javascript, "../threejs.ffi.mjs", "deleteCameraUserData")
-fn delete_camera_user_data_ffi(camera: asset.Object3D, key: String) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "createPerspectiveCamera")
-fn create_perspective_camera_ffi(
-  fov: Float,
-  aspect: Float,
-  near: Float,
-  far: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createOrthographicCamera")
-fn create_orthographic_camera_ffi(
-  left: Float,
-  right: Float,
-  top: Float,
-  bottom: Float,
-  near: Float,
-  far: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "setActiveCamera")
-fn set_active_camera_ffi(camera: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "getCanvasClientWidth")
-fn get_canvas_client_width_ffi(canvas: DomElement) -> Float
-
-@external(javascript, "../threejs.ffi.mjs", "getCanvasClientHeight")
-fn get_canvas_client_height_ffi(canvas: DomElement) -> Float
-
-@external(javascript, "../threejs.ffi.mjs", "getWindowWidth")
-fn get_window_width_ffi() -> Float
-
-@external(javascript, "../threejs.ffi.mjs", "getWindowHeight")
-fn get_window_height_ffi() -> Float
-
-@external(javascript, "../threejs.ffi.mjs", "createAnimationMixer")
-fn create_animation_mixer_ffi(
-  object: asset.Object3D,
-) -> object_cache.AnimationMixer
-
-@external(javascript, "../threejs.ffi.mjs", "updateMixer")
-fn update_animation_mixer_ffi(
-  mixer: object_cache.AnimationMixer,
-  delta_time: Float,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "isInstancedMesh")
-fn is_instanced_mesh_ffi(object: asset.Object3D) -> Bool
-
-@external(javascript, "../threejs.ffi.mjs", "updateInstancedMeshTransforms")
-fn update_instanced_mesh_transforms_ffi(
-  mesh: asset.Object3D,
-  instances: List(transform.Transform),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "updateGroupInstancedMeshes")
-fn update_group_instanced_meshes_ffi(
-  group: asset.Object3D,
-  instances: List(transform.Transform),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "isLOD")
-fn is_lod_ffi(object: asset.Object3D) -> Bool
-
-@external(javascript, "../threejs.ffi.mjs", "addLODLevel")
-fn add_lod_level_ffi(
-  lod: asset.Object3D,
-  object: asset.Object3D,
-  distance: Float,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "clearLODLevels")
-fn clear_lod_levels_ffi(lod: asset.Object3D) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "createAudioListener")
-fn create_audio_listener_ffi() -> audio_manager.AudioListener
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugBox")
-fn create_debug_box_ffi(
-  min: Vec3(Float),
-  max: Vec3(Float),
-  color: Int,
-) -> asset.Object3D
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugSphere")
-fn create_debug_sphere_ffi(
-  center: Vec3(Float),
-  radius: Float,
-  color: Int,
-) -> asset.Object3D
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugLine")
-fn create_debug_line_ffi(
-  from: Vec3(Float),
-  to: Vec3(Float),
-  color: Int,
-) -> asset.Object3D
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugAxes")
-fn create_debug_axes_ffi(origin: Vec3(Float), size: Float) -> asset.Object3D
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugGrid")
-fn create_debug_grid_ffi(
-  size: Float,
-  divisions: Int,
-  color: Int,
-) -> asset.Object3D
-
-@external(javascript, "../tiramisu.ffi.mjs", "createDebugPoint")
-fn create_debug_point_ffi(
-  position: Vec3(Float),
-  size: Float,
-  color: Int,
-) -> asset.Object3D
-
-// ============================================================================
-// FFI DECLARATIONS - RESOURCE DISPOSAL
-// ============================================================================
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeGeometry")
-fn dispose_geometry_ffi(geometry: asset.Object3D) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeMaterial")
-fn dispose_material_ffi(material: asset.Object3D) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "disposeObject3D")
-fn dispose_object_3d_ffi(object: asset.Object3D) -> Nil
-
-@internal
-pub fn create(options: RendererOptions) -> RendererState {
-  let renderer = create_renderer_ffi(options)
-  let scene = create_scene_ffi()
-  let canvas = get_dom_element(renderer)
-  set_canvas(canvas)
+pub fn new_render_state(options: savoiardi.RendererOptions) -> RendererState {
+  let renderer = savoiardi.create_renderer(options)
+  let scene = savoiardi.create_scene()
+  let canvas = savoiardi.get_renderer_dom_element(renderer)
+  savoiardi.set_canvas(canvas)
 
   // Create audio listener (singleton)
-  let audio_listener = create_audio_listener_ffi()
+  let audio_listener = savoiardi.create_audio_listener()
 
   RendererState(
     renderer: renderer,
@@ -2838,17 +2589,17 @@ fn handle_add_node(
 // Helper: Add object to scene or parent
 fn add_to_scene_or_parent(
   state: RendererState,
-  object: asset.Object3D,
+  object: savoiardi.Object3D,
   parent_id: Option(String),
 ) -> Nil {
   case parent_id {
     option.Some(pid) -> {
       case object_cache.get_object(state.cache, pid) {
-        option.Some(parent_obj) -> add_child_ffi(parent_obj, object)
-        option.None -> add_to_scene_ffi(state.scene, object)
+        Ok(parent_obj) -> savoiardi.add_child(parent: parent_obj, child: object)
+        Error(Nil) -> savoiardi.add_to_scene(scene: state.scene, object: object)
       }
     }
-    option.None -> add_to_scene_ffi(state.scene, object)
+    option.None -> savoiardi.add_to_scene(scene: state.scene, object: object)
   }
 }
 
@@ -2863,10 +2614,19 @@ fn handle_add_mesh(
 ) -> RendererState {
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
-  let mesh = create_mesh_ffi(geometry_three, material_three)
+  let mesh = savoiardi.create_mesh(geometry_three, material_three)
 
-  apply_transform_ffi(mesh, transform)
-  set_shadow_properties_ffi(mesh, True, True)
+  savoiardi.apply_transform_with_quaternion(
+    object: mesh,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
+  savoiardi.set_shadow_properties(
+    object: mesh,
+    cast_shadow: True,
+    receive_shadow: True,
+  )
 
   add_to_scene_or_parent(state, mesh, parent_id)
 
@@ -2877,16 +2637,11 @@ fn handle_add_mesh(
   case physics, new_state.physics_world {
     option.Some(physics_config), option.Some(world) -> {
       // Get world position and rotation from the Three.js object (includes parent transforms)
-      let world_pos = get_world_position_ffi(mesh)
-      let #(x, y, z, w) = get_world_quaternion_ffi(mesh)
+      let world_position = savoiardi.get_world_position(mesh)
+      let world_rotation = savoiardi.get_world_quaternion(mesh)
       let world_transform =
-        transform.at(world_pos)
-        |> transform.with_quaternion_rotation(quaternion.Quaternion(
-          x:,
-          y:,
-          z:,
-          w:,
-        ))
+        transform.at(world_position)
+        |> transform.with_quaternion_rotation(world_rotation)
       let new_world =
         physics.create_body(world, id, physics_config, world_transform)
       RendererState(..new_state, physics_world: option.Some(new_world))
@@ -2906,54 +2661,61 @@ fn handle_add_instanced_mesh(
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
   let count = list.length(instances)
-  let mesh = create_instanced_mesh_ffi(geometry_three, material_three, count)
+  let mesh =
+    savoiardi.create_instanced_mesh(geometry_three, material_three, count)
 
-  update_instanced_mesh_transforms_ffi(mesh, instances)
+  savoiardi.update_instanced_mesh_transforms(
+    mesh,
+    transforms_to_tuples(instances),
+  )
 
-  add_to_scene_or_parent(state, mesh, parent_id)
+  add_to_scene_or_parent(state, mesh |> coerce, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, mesh)
+  let new_cache = object_cache.add_object(state.cache, id, mesh |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
 fn handle_add_instanced_model(
   state: RendererState,
   id: String,
-  object: asset.Object3D,
+  object: savoiardi.Object3D,
   instances: List(transform.Transform),
   physics: Option(physics.RigidBody),
   material: Option(material.Material),
   parent_id: Option(String),
 ) -> RendererState {
   // Extract all mesh/material pairs from the loaded model
-  let pairs = extract_mesh_material_pairs_ffi(object)
-  let geometries = get_pairs_geometries_ffi(pairs)
+  let #(geometries, materials) = savoiardi.extract_mesh_material_pairs(object)
   let materials = case material {
     option.Some(mat) -> {
       // Create Material for each geometry if material override is provided
       let three_mat = material.create_material(mat)
-      list.repeat(three_mat, list.length(geometries))
+      list.repeat(three_mat, array.size(geometries))
     }
-    option.None -> get_pairs_materials_ffi(pairs)
+    option.None -> array.to_list(materials)
   }
 
   // Create a group to hold all the instanced meshes
-  let group = create_group_ffi()
+  let group = savoiardi.create_group()
 
   // For each unique mesh/material combination, create an InstancedMesh
   let count = list.length(instances)
 
   // Zip geometries and materials together and iterate
-  list.zip(geometries, materials)
+  list.zip(array.to_list(geometries), materials)
   |> list.each(fn(pair) {
     let #(geometry, material) = pair
-    let instanced_mesh = create_instanced_mesh_ffi(geometry, material, count)
+    let instanced_mesh =
+      savoiardi.create_instanced_mesh(geometry, material, count)
 
     // Update all instance transforms
-    update_instanced_mesh_transforms_ffi(instanced_mesh, instances)
+    savoiardi.update_instanced_mesh_transforms(
+      instanced_mesh,
+      transforms_to_tuples(instances),
+    )
 
     // Add the instanced mesh to the group
-    add_child_ffi(group, instanced_mesh)
+    savoiardi.add_child(parent: group, child: coerce(instanced_mesh))
   })
 
   // Add the group to the scene or parent
@@ -2988,8 +2750,9 @@ fn handle_add_instanced_model(
 }
 
 // Helper to generate unique IDs for instance physics bodies
-@external(javascript, "../tiramisu.ffi.mjs", "generateInstanceId")
-fn generate_instance_id(base_id: String, index: Int) -> String
+fn generate_instance_id(base_id: String, index: Int) -> String {
+  base_id <> "[" <> int.to_string(index) <> "]"
+}
 
 fn handle_add_light(
   state: RendererState,
@@ -2999,11 +2762,16 @@ fn handle_add_light(
   parent_id: Option(String),
 ) -> RendererState {
   let light = light.create_light(light)
-  apply_transform_ffi(light, transform)
+  savoiardi.apply_transform_with_quaternion(
+    object: light |> coerce,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
-  add_to_scene_or_parent(state, light, parent_id)
+  add_to_scene_or_parent(state, light |> coerce, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, light)
+  let new_cache = object_cache.add_object(state.cache, id, light |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3013,8 +2781,13 @@ fn handle_add_group(
   transform: transform.Transform,
   parent_id: Option(String),
 ) -> RendererState {
-  let group = create_group_ffi()
-  apply_transform_ffi(group, transform)
+  let group = savoiardi.create_group()
+  savoiardi.apply_transform_with_quaternion(
+    object: group,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   add_to_scene_or_parent(state, group, parent_id)
 
@@ -3029,23 +2802,32 @@ fn handle_add_lod(
   levels: List(LODLevel),
   parent_id: Option(String),
 ) -> RendererState {
-  let lod = create_lod_ffi()
-  apply_transform_ffi(lod, transform)
+  let lod = savoiardi.create_lod()
+  savoiardi.apply_transform_with_quaternion(
+    object: lod |> coerce,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   // Add LOD levels
   list.each(levels, fn(level) {
     let level_obj = create_lod_level_object(level.node)
-    add_lod_level_ffi(lod, level_obj, level.distance)
+    savoiardi.add_lod_level(
+      lod: lod,
+      object: level_obj,
+      distance: level.distance,
+    )
   })
 
-  add_to_scene_or_parent(state, lod, parent_id)
+  add_to_scene_or_parent(state, lod |> coerce, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, lod)
+  let new_cache = object_cache.add_object(state.cache, id, lod |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
 // Helper: Create Three.js object for LOD level
-fn create_lod_level_object(node: Node) -> asset.Object3D {
+fn create_lod_level_object(node: Node) -> savoiardi.Object3D {
   case node {
     Mesh(
       id: _,
@@ -3057,13 +2839,23 @@ fn create_lod_level_object(node: Node) -> asset.Object3D {
     ) -> {
       let geometry_three = geometry.create_geometry(geometry)
       let material_three = material.create_material(material)
-      let mesh = create_mesh_ffi(geometry_three, material_three)
-      apply_transform_ffi(mesh, transform)
+      let mesh = savoiardi.create_mesh(geometry_three, material_three)
+      savoiardi.apply_transform_with_quaternion(
+        object: mesh,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
       mesh
     }
     Empty(id: _, children: _, transform: transform) -> {
-      let group = create_group_ffi()
-      apply_transform_ffi(group, transform)
+      let group = savoiardi.create_group()
+      savoiardi.apply_transform_with_quaternion(
+        object: group,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
       group
     }
     Model3D(
@@ -3075,18 +2867,27 @@ fn create_lod_level_object(node: Node) -> asset.Object3D {
       physics: _,
       material: material,
     ) -> {
-      let cloned = clone_object_ffi(object)
-      apply_transform_ffi(cloned, transform)
+      let cloned = savoiardi.clone_object(object)
+      savoiardi.apply_transform_with_quaternion(
+        object: cloned,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
       // Apply material if provided
       case material {
-        option.Some(mat) -> apply_material_to_object_ffi(cloned, mat)
+        option.Some(material) ->
+          savoiardi.apply_material_to_object(
+            cloned,
+            material.create_material(material),
+          )
         option.None -> Nil
       }
       cloned
     }
     _ -> {
       // Unsupported node type for LOD level, create empty group
-      create_group_ffi()
+      savoiardi.create_group()
     }
   }
 }
@@ -3094,7 +2895,7 @@ fn create_lod_level_object(node: Node) -> asset.Object3D {
 fn handle_add_model3d(
   state: RendererState,
   id: String,
-  object: asset.Object3D,
+  object: savoiardi.Object3D,
   transform: transform.Transform,
   animation: Option(AnimationPlayback),
   physics: Option(physics.RigidBody),
@@ -3106,19 +2907,28 @@ fn handle_add_model3d(
   // For models without animations, we can clone to avoid modifying shared assets.
   let model_object = case animation {
     option.Some(_) -> object
-    option.None -> clone_object_ffi(object)
+    option.None -> savoiardi.clone_object(object)
   }
 
-  apply_transform_ffi(model_object, transform)
+  savoiardi.apply_transform_with_quaternion(
+    object: model_object,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   // Apply material if provided
   case material {
-    option.Some(mat) -> apply_material_to_object_ffi(model_object, mat)
+    option.Some(mat) ->
+      savoiardi.apply_material_to_object(
+        model_object,
+        material.create_material(mat),
+      )
     option.None -> Nil
   }
 
   // Create animation mixer
-  let mixer = create_animation_mixer_ffi(model_object)
+  let mixer = savoiardi.create_animation_mixer(model_object)
   let cache_with_mixer = object_cache.add_mixer(state.cache, id, mixer)
 
   // Setup animation if provided
@@ -3174,7 +2984,7 @@ fn handle_add_audio(
     )
 
   // Create placeholder group to track in cache
-  let placeholder = create_group_ffi()
+  let placeholder = savoiardi.create_group()
   add_to_scene_or_parent(state, placeholder, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, placeholder)
@@ -3185,7 +2995,7 @@ fn handle_add_audio(
 // Uses viewport dimensions if specified, otherwise canvas or window dimensions
 fn calculate_aspect_ratio(
   viewport: Option(#(Int, Int, Int, Int)),
-  canvas: DomElement,
+  canvas: element.Element,
 ) -> Float {
   case viewport {
     option.Some(#(_x, _y, width, height)) -> {
@@ -3193,16 +3003,16 @@ fn calculate_aspect_ratio(
     }
     option.None -> {
       // Try canvas first
-      let canvas_width = get_canvas_client_width_ffi(canvas)
-      let canvas_height = get_canvas_client_height_ffi(canvas)
+      let canvas_width = savoiardi.get_canvas_client_width(canvas |> coerce)
+      let canvas_height = savoiardi.get_canvas_client_height(canvas |> coerce)
 
       case canvas_width >. 0.0 && canvas_height >. 0.0 {
         True -> canvas_width /. canvas_height
         False -> {
           // Fallback to window dimensions
-          let window_width = get_window_width_ffi()
-          let window_height = get_window_height_ffi()
-          window_width /. window_height
+          let window_width = window.outer_width(window.self())
+          let window_height = window.outer_height(window.self())
+          int.to_float(window_width) /. int.to_float(window_height)
         }
       }
     }
@@ -3217,19 +3027,19 @@ fn handle_add_camera(
   look_at: Option(Vec3(Float)),
   active: Bool,
   viewport: Option(#(Int, Int, Int, Int)),
-  postprocessing: Option(postprocessing.PostProcessing),
+  postprocessing: Option(camera.PostProcessing),
   parent_id: Option(String),
 ) -> RendererState {
-  let canvas = get_dom_element(state.renderer)
+  let canvas = savoiardi.get_renderer_dom_element(state.renderer)
 
   // Calculate aspect ratio for perspective cameras
-  let aspect = calculate_aspect_ratio(viewport, canvas)
+  let aspect = calculate_aspect_ratio(viewport, canvas |> coerce)
 
   // Get projection and create camera based on type
   let projection = camera.get_projection(camera_type)
   let camera = case projection {
     camera.Perspective(fov: fov, aspect: _, near: near, far: far) ->
-      create_perspective_camera_ffi(fov, aspect, near, far)
+      savoiardi.create_perspective_camera(fov, aspect, near, far)
     camera.Orthographic(
       left: left,
       right: right,
@@ -3237,35 +3047,51 @@ fn handle_add_camera(
       bottom: bottom,
       near: near,
       far: far,
-    ) -> create_orthographic_camera_ffi(left, right, top, bottom, near, far)
+    ) ->
+      savoiardi.create_orthographic_camera(left, right, top, bottom, near, far)
   }
 
   // Add audio listener to camera
-  add_child_ffi(
-    camera,
-    audio_manager.audio_listener_to_object3d(state.audio_listener),
+  savoiardi.add_child(
+    parent: camera |> coerce,
+    child: state.audio_listener |> coerce,
   )
 
-  apply_transform_ffi(camera, transform)
+  savoiardi.apply_transform_with_quaternion(
+    object: camera |> coerce,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   // Store lookAt target if provided (will apply after adding to scene)
   case look_at {
     option.Some(target) -> {
-      set_camera_user_data_vec3_ffi(camera, "lookAtTarget", target)
-      set_camera_user_data_bool_ffi(camera, "needsLookAtUpdate", True)
+      savoiardi.set_camera_user_data(camera, "lookAtTarget", target)
+      savoiardi.set_camera_user_data(camera, "needsLookAtUpdate", True)
     }
     option.None -> Nil
   }
 
-  update_camera_projection_matrix_ffi(camera)
+  savoiardi.update_camera_projection_matrix(camera)
 
-  add_to_scene_or_parent(state, camera, parent_id)
+  case parent_id {
+    option.None ->
+      savoiardi.add_to_scene(scene: state.scene, object: camera |> coerce)
+    option.Some(parent_id) ->
+      case object_cache.get_object(state.cache, parent_id) {
+        Error(Nil) ->
+          savoiardi.add_to_scene(scene: state.scene, object: camera |> coerce)
+        Ok(parent_obj) ->
+          savoiardi.add_child(parent: parent_obj, child: camera |> coerce)
+      }
+  }
 
   // Apply lookAt after adding to scene
   case look_at {
     option.Some(target) -> {
-      apply_camera_look_at_ffi(camera, target)
-      delete_camera_user_data_ffi(camera, "needsLookAtUpdate")
+      savoiardi.set_camera_look_at(camera: camera, target: target)
+      savoiardi.delete_camera_user_data(camera, "needsLookAtUpdate")
     }
     option.None -> Nil
   }
@@ -3273,13 +3099,7 @@ fn handle_add_camera(
   // Store viewport if specified
   let cache_with_viewport = case viewport {
     option.Some(#(x, y, width, height)) -> {
-      let vp =
-        object_cache.Viewport(
-          x: int.to_float(x),
-          y: int.to_float(y),
-          width: int.to_float(width),
-          height: int.to_float(height),
-        )
+      let vp = camera.ViewPort(x: x, y: y, width: width, height: height)
       object_cache.set_viewport(state.cache, id, vp)
     }
     option.None -> state.cache
@@ -3295,13 +3115,17 @@ fn handle_add_camera(
   // Mark this ID as a camera in the cache
   let cache_with_camera = object_cache.add_camera(cache_with_postprocessing, id)
 
-  // Set as active camera if specified
-  case active {
-    True -> set_active_camera_ffi(camera)
-    False -> Nil
+  // Set as active camera if specified (both FFI and cache)
+  let cache_with_active = case active {
+    True -> {
+      savoiardi.set_active_camera(camera)
+      object_cache.set_active_camera(cache_with_camera, id)
+    }
+    False -> cache_with_camera
   }
 
-  let new_cache = object_cache.add_object(cache_with_camera, id, camera)
+  let new_cache =
+    object_cache.add_object(cache_with_active, id, camera |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3313,7 +3137,7 @@ fn handle_add_debug_box(
   color: Int,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_box_ffi(min, max, color)
+  let debug = savoiardi.create_debug_box(min, max, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3328,7 +3152,7 @@ fn handle_add_debug_sphere(
   color: Int,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_sphere_ffi(center, radius, color)
+  let debug = savoiardi.create_debug_sphere(center, radius, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3343,7 +3167,7 @@ fn handle_add_debug_line(
   color: Int,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_line_ffi(from, to, color)
+  let debug = savoiardi.create_debug_line(from, to, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3357,7 +3181,7 @@ fn handle_add_debug_axes(
   size: Float,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_axes_ffi(origin, size)
+  let debug = savoiardi.create_debug_axes(origin, size)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3372,7 +3196,7 @@ fn handle_add_debug_grid(
   color: Int,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_grid_ffi(size, divisions, color)
+  let debug = savoiardi.create_debug_grid(size, divisions, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3387,7 +3211,7 @@ fn handle_add_debug_point(
   color: Int,
   parent_id: Option(String),
 ) -> RendererState {
-  let debug = create_debug_point_ffi(position, size, color)
+  let debug = savoiardi.create_debug_point(position, size, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3400,12 +3224,12 @@ fn handle_add_debug_point(
 
 fn handle_remove_node(state: RendererState, id: String) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
+    Ok(obj) -> {
       // Remove from scene
-      remove_from_scene_ffi(state.scene, obj)
+      savoiardi.remove_from_scene(scene: state.scene, object: obj)
 
       // Dispose object recursively (geometry, materials, textures, children)
-      dispose_object_3d_ffi(obj)
+      savoiardi.dispose_object(obj)
 
       // Stop audio if it's an audio node (using Gleam audio manager)
       let new_audio_manager =
@@ -3429,7 +3253,7 @@ fn handle_remove_node(state: RendererState, id: String) -> RendererState {
         option.None -> new_state
       }
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3443,20 +3267,32 @@ fn handle_update_transform(
   transform: transform.Transform,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      apply_transform_ffi(object, transform)
-      update_matrix_world_ffi(object, True)
+    Ok(object) -> {
+      savoiardi.apply_transform_with_quaternion(
+        object: object,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
+      savoiardi.update_matrix_world_force(object, True)
 
       // If this is a camera with lookAt, reapply it after transform update
       let is_camera =
-        is_perspective_camera_ffi(object) || is_orthographic_camera_ffi(object)
+        savoiardi.is_perspective_camera(object)
+        || savoiardi.is_orthographic_camera(object)
 
       case is_camera {
         True -> {
-          case has_camera_user_data_ffi(object, "lookAtTarget") {
+          case
+            savoiardi.has_camera_user_data(object |> coerce, "lookAtTarget")
+          {
             True -> {
-              let target = get_camera_user_data_vec3_ffi(object, "lookAtTarget")
-              apply_camera_look_at_ffi(object, target)
+              let target =
+                savoiardi.get_camera_user_data(object |> coerce, "lookAtTarget")
+              savoiardi.set_camera_look_at(
+                camera: object |> coerce,
+                target: target,
+              )
             }
             False -> Nil
           }
@@ -3475,7 +3311,7 @@ fn handle_update_transform(
 
       new_state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3485,22 +3321,21 @@ fn handle_update_material(
   material: Option(material.Material),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      // Only update if material is provided
+    Ok(object) -> {
       case material {
         option.Some(mat) -> {
-          let old_material = get_object_material_ffi(object)
-          dispose_material_ffi(old_material)
+          let old_material = savoiardi.get_object_material(object)
+          savoiardi.dispose_material(old_material)
 
           let new_material = material.create_material(mat)
-          set_object_material_ffi(object, new_material)
+          savoiardi.set_object_material(object, new_material)
         }
         option.None -> Nil
       }
 
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3510,16 +3345,16 @@ fn handle_update_geometry(
   geometry: geometry.Geometry,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      let old_geometry = get_object_geometry_ffi(object)
-      dispose_geometry_ffi(old_geometry)
+    Ok(object) -> {
+      let old_geometry = savoiardi.get_object_geometry(object)
+      savoiardi.dispose_geometry(old_geometry)
 
       let new_geometry = geometry.create_geometry(geometry)
-      set_object_geometry_ffi(object, new_geometry)
+      savoiardi.set_object_geometry(object, new_geometry)
 
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3529,59 +3364,33 @@ fn handle_update_light(
   light: light.Light,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(old_object) -> {
+    Ok(old_object) -> {
       // Get old transform
-      let position = get_object_position_ffi(old_object)
-      let rotation = get_object_rotation_ffi(old_object)
-      let scale = get_object_scale_ffi(old_object)
+      let position = savoiardi.get_object_position(old_object)
+      let rotation = savoiardi.get_object_rotation(old_object)
+      let scale = savoiardi.get_object_scale(old_object)
 
       // Create new light
       let new_light = light.create_light(light)
+      let new_light_obj: savoiardi.Object3D = coerce(new_light)
 
       // Copy transform
-      set_object_position_ffi(new_light, position)
-      set_object_rotation_ffi(new_light, rotation)
-      set_object_scale_ffi(new_light, scale)
+      savoiardi.set_object_position(new_light_obj, position)
+      savoiardi.set_object_rotation(new_light_obj, rotation)
+      savoiardi.set_object_scale(new_light_obj, scale)
 
       // Replace in scene
-      remove_from_scene_ffi(state.scene, old_object)
-      add_to_scene_ffi(state.scene, new_light)
+      savoiardi.remove_from_scene(scene: state.scene, object: old_object)
+      savoiardi.add_to_scene(scene: state.scene, object: new_light |> coerce)
 
       // Update cache
-      let new_cache = object_cache.add_object(state.cache, id, new_light)
+      let new_cache =
+        object_cache.add_object(state.cache, id, new_light |> coerce)
       RendererState(..state, cache: new_cache)
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
-
-// FFI declarations for get/set position/rotation/scale
-@external(javascript, "../threejs.ffi.mjs", "getObjectPosition")
-fn get_object_position_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
-
-@external(javascript, "../threejs.ffi.mjs", "getObjectRotation")
-fn get_object_rotation_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
-
-@external(javascript, "../threejs.ffi.mjs", "getObjectScale")
-fn get_object_scale_ffi(object: asset.Object3D) -> vec3.Vec3(Float)
-
-@external(javascript, "../threejs.ffi.mjs", "getObjectQuaternion")
-fn get_object_quaternion_ffi(object: asset.Object3D) -> quaternion.Quaternion
-
-@external(javascript, "../threejs.ffi.mjs", "setObjectPosition")
-fn set_object_position_ffi(
-  object: asset.Object3D,
-  position: vec3.Vec3(Float),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setObjectRotation")
-fn set_object_rotation_ffi(
-  object: asset.Object3D,
-  rotation: vec3.Vec3(Float),
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setObjectScale")
-fn set_object_scale_ffi(object: asset.Object3D, scale: vec3.Vec3(Float)) -> Nil
 
 fn handle_update_animation(
   state: RendererState,
@@ -3629,7 +3438,7 @@ fn handle_update_physics(
         True, option.Some(_physics_config) -> {
           // Get current transform from Three.js object
           case object_cache.get_object(state.cache, id) {
-            option.Some(object) -> {
+            Ok(object) -> {
               let object_transform = object_to_transform(object)
 
               // Just update the transform (preserves velocity!)
@@ -3638,7 +3447,7 @@ fn handle_update_physics(
 
               RendererState(..state, physics_world: option.Some(new_world))
             }
-            option.None -> state
+            Error(Nil) -> state
           }
         }
 
@@ -3651,7 +3460,7 @@ fn handle_update_physics(
         // No body, config provided -> CREATE it
         False, option.Some(physics_config) -> {
           case object_cache.get_object(state.cache, id) {
-            option.Some(object) -> {
+            Ok(object) -> {
               let object_transform = object_to_transform(object)
 
               let new_world =
@@ -3659,7 +3468,7 @@ fn handle_update_physics(
 
               RendererState(..state, physics_world: option.Some(new_world))
             }
-            option.None -> state
+            Error(Nil) -> state
           }
         }
 
@@ -3672,10 +3481,10 @@ fn handle_update_physics(
 }
 
 // Helper to build Transform from Three.js object's position/quaternion/scale
-fn object_to_transform(object: asset.Object3D) -> transform.Transform {
-  let position = get_object_position_ffi(object)
-  let quaternion = get_object_quaternion_ffi(object)
-  let scale = get_object_scale_ffi(object)
+fn object_to_transform(object: savoiardi.Object3D) -> transform.Transform {
+  let position = savoiardi.get_object_position(object)
+  let quaternion = savoiardi.get_object_quaternion(object)
+  let scale = savoiardi.get_object_scale(object)
 
   transform.identity
   |> transform.with_position(position)
@@ -3713,22 +3522,28 @@ fn handle_update_instances(
   instances: List(transform.Transform),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      case is_instanced_mesh_ffi(object) {
+    Ok(object) -> {
+      case savoiardi.is_instanced_mesh(object) {
         True -> {
           // Single InstancedMesh node
-          update_instanced_mesh_transforms_ffi(object, instances)
+          savoiardi.update_instanced_mesh_transforms(
+            coerce(object),
+            transforms_to_tuples(instances),
+          )
           state
         }
         False -> {
           // Could be a Group containing InstancedMeshes (InstancedModel)
           // This will recursively update all InstancedMesh children
-          update_group_instanced_meshes_ffi(object, instances)
+          savoiardi.update_group_instanced_meshes(
+            object,
+            transforms_to_tuples(instances),
+          )
           state
         }
       }
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3738,16 +3553,20 @@ fn handle_update_lod_levels(
   levels: List(LODLevel),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      case is_lod_ffi(object) {
+    Ok(object) -> {
+      case savoiardi.is_lod(object) {
         True -> {
           // Clear existing levels
-          clear_lod_levels_ffi(object)
+          savoiardi.clear_lod_levels(object |> coerce)
 
           // Add new levels
           list.each(levels, fn(level) {
             let level_obj = create_lod_level_object(level.node)
-            add_lod_level_ffi(object, level_obj, level.distance)
+            savoiardi.add_lod_level(
+              lod: object |> coerce,
+              object: level_obj,
+              distance: level.distance,
+            )
           })
 
           state
@@ -3755,7 +3574,7 @@ fn handle_update_lod_levels(
         False -> state
       }
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3766,9 +3585,10 @@ fn handle_update_camera(
   look_at: Option(Vec3(Float)),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
+    Ok(object) -> {
       let is_camera =
-        is_perspective_camera_ffi(object) || is_orthographic_camera_ffi(object)
+        savoiardi.is_perspective_camera(object)
+        || savoiardi.is_orthographic_camera(object)
 
       case is_camera {
         True -> {
@@ -3777,24 +3597,19 @@ fn handle_update_camera(
           case projection {
             camera.Perspective(fov:, aspect: _, near:, far:) -> {
               // Calculate the correct aspect ratio instead of using placeholder
-              let canvas = get_dom_element(state.renderer)
+              let canvas = savoiardi.get_renderer_dom_element(state.renderer)
               let viewport = object_cache.get_viewport(state.cache, id)
               // Convert Viewport to tuple format for calculate_aspect_ratio
               let viewport_tuple = case viewport {
-                option.Some(object_cache.Viewport(x:, y:, width:, height:)) ->
-                  option.Some(#(
-                    float.round(x),
-                    float.round(y),
-                    float.round(width),
-                    float.round(height),
-                  ))
+                option.Some(camera.ViewPort(x:, y:, width:, height:)) ->
+                  option.Some(#(x, y, width, height))
                 option.None -> option.None
               }
               let calculated_aspect =
-                calculate_aspect_ratio(viewport_tuple, canvas)
+                calculate_aspect_ratio(viewport_tuple, canvas |> coerce)
 
-              set_perspective_camera_params_ffi(
-                object,
+              savoiardi.set_perspective_camera_params(
+                object |> coerce,
                 fov,
                 calculated_aspect,
                 near,
@@ -3802,8 +3617,8 @@ fn handle_update_camera(
               )
             }
             camera.Orthographic(left:, right:, top:, bottom:, near:, far:) -> {
-              set_orthographic_camera_params_ffi(
-                object,
+              savoiardi.set_orthographic_camera_params(
+                object |> coerce,
                 left,
                 right,
                 top,
@@ -3813,18 +3628,28 @@ fn handle_update_camera(
               )
             }
           }
-          update_camera_projection_matrix_ffi(object)
+          savoiardi.update_camera_projection_matrix(object |> coerce)
 
           // Apply lookAt if provided and update stored target
           case look_at {
             option.Some(target) -> {
-              apply_camera_look_at_ffi(object, target)
+              savoiardi.set_camera_look_at(
+                camera: object |> coerce,
+                target: target,
+              )
               // Update the stored lookAtTarget so it's used in future transform updates
-              set_camera_user_data_vec3_ffi(object, "lookAtTarget", target)
+              savoiardi.set_camera_user_data(
+                object |> coerce,
+                "lookAtTarget",
+                target,
+              )
             }
             option.None -> {
               // If None, remove the stored lookAtTarget so the camera can rotate freely
-              delete_camera_user_data_ffi(object, "lookAtTarget")
+              savoiardi.delete_camera_user_data(
+                object |> coerce,
+                "lookAtTarget",
+              )
             }
           }
 
@@ -3833,24 +3658,26 @@ fn handle_update_camera(
         False -> state
       }
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
 fn handle_set_active_camera(state: RendererState, id: String) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      set_active_camera_ffi(object)
-      state
+    Ok(object) -> {
+      savoiardi.set_active_camera(object |> coerce)
+      // Also update the cache to track which camera is active
+      let new_cache = object_cache.set_active_camera(state.cache, id)
+      RendererState(..state, cache: new_cache)
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
 fn handle_update_camera_postprocessing(
   state: RendererState,
   id: String,
-  pp: Option(postprocessing.PostProcessing),
+  pp: Option(camera.PostProcessing),
 ) -> RendererState {
   // Update the postprocessing config in the cache
   let new_cache = case pp {
@@ -3866,14 +3693,20 @@ fn handle_add_css2d_label(
   state: RendererState,
   id: String,
   html: String,
-  trans: transform.Transform,
+  transform: transform.Transform,
   parent_id: Option(String),
 ) -> RendererState {
-  let css2d_object = create_css2d_object_ffi(html)
-  apply_transform_ffi(css2d_object, trans)
-  add_to_scene_or_parent(state, css2d_object, parent_id)
+  let css2d_object = savoiardi.create_css2d_object(html)
+  savoiardi.apply_transform_with_quaternion(
+    object: css2d_object |> coerce,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
+  add_to_scene_or_parent(state, css2d_object |> coerce, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, css2d_object)
+  let new_cache =
+    object_cache.add_object(state.cache, id, css2d_object |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3881,15 +3714,21 @@ fn handle_update_css2d_label(
   state: RendererState,
   id: String,
   html: String,
-  trans: transform.Transform,
+  transform: transform.Transform,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      update_css2d_object_html_ffi(object, html)
-      apply_transform_ffi(object, trans)
+    Ok(object) -> {
+      // TODO:  I don't like this, this should be typesafe
+      savoiardi.update_css2d_object_html(object |> coerce, html)
+      savoiardi.apply_transform_with_quaternion(
+        object: object,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3897,14 +3736,20 @@ fn handle_add_css3d_label(
   state: RendererState,
   id: String,
   html: String,
-  trans: transform.Transform,
+  transform: transform.Transform,
   parent_id: Option(String),
 ) -> RendererState {
-  let css3d_object = create_css3d_object_ffi(html)
-  apply_transform_ffi(css3d_object, trans)
-  add_to_scene_or_parent(state, css3d_object, parent_id)
+  let css3d_object = savoiardi.create_css3d_object(html)
+  savoiardi.apply_transform_with_quaternion(
+    object: css3d_object |> coerce,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
+  add_to_scene_or_parent(state, css3d_object |> coerce, parent_id)
 
-  let new_cache = object_cache.add_object(state.cache, id, css3d_object)
+  let new_cache =
+    object_cache.add_object(state.cache, id, css3d_object |> coerce)
   RendererState(..state, cache: new_cache)
 }
 
@@ -3912,15 +3757,20 @@ fn handle_update_css3d_label(
   state: RendererState,
   id: String,
   html: String,
-  trans: transform.Transform,
+  transform: transform.Transform,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
-      update_css3d_object_html_ffi(object, html)
-      apply_transform_ffi(object, trans)
+    Ok(object) -> {
+      savoiardi.update_css3d_object_html(object |> coerce, html)
+      savoiardi.apply_transform_with_quaternion(
+        object: object,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -3932,25 +3782,30 @@ fn handle_add_canvas(
   texture_height: Int,
   width: Float,
   height: Float,
-  trans: transform.Transform,
+  transform: transform.Transform,
   parent_id: Option(String),
 ) -> RendererState {
   // Picture is already encoded, use it directly
   let texture =
-    create_canvas_texture_from_picture_ffi(
+    savoiardi.create_canvas_texture_from_picture(
       encoded_picture,
       texture_width,
       texture_height,
     )
 
   // Create plane mesh with the texture
-  let canvas_mesh = create_canvas_plane_ffi(texture, width, height)
+  let canvas_mesh = savoiardi.create_canvas_plane(texture, width, height)
 
   // Apply transform
-  apply_transform_ffi(canvas_mesh, trans)
+  savoiardi.apply_transform_with_quaternion(
+    object: canvas_mesh,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   // Cache the encoded picture to avoid recreating texture on first update
-  set_canvas_cached_picture_ffi(canvas_mesh, encoded_picture)
+  savoiardi.set_canvas_cached_picture(canvas_mesh, encoded_picture)
 
   add_to_scene_or_parent(state, canvas_mesh, parent_id)
 
@@ -3966,26 +3821,26 @@ fn handle_update_canvas(
   texture_height: Int,
   width: Float,
   height: Float,
-  trans: transform.Transform,
+  transform: transform.Transform,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(object) -> {
+    Ok(object) -> {
       // Performance optimization: Only create new texture if picture changed
       // Check if encoded_picture differs from cached value
-      let cached_picture = get_canvas_cached_picture_ffi(object)
+      let cached_picture = savoiardi.get_canvas_cached_picture(object)
       let picture_changed = cached_picture != encoded_picture
 
       case picture_changed {
         True -> {
           // Picture changed - create new texture and cache the picture data
           let texture =
-            create_canvas_texture_from_picture_ffi(
+            savoiardi.create_canvas_texture_from_picture(
               encoded_picture,
               texture_width,
               texture_height,
             )
-          update_canvas_texture_ffi(object, texture)
-          set_canvas_cached_picture_ffi(object, encoded_picture)
+          savoiardi.update_canvas_texture(object, texture)
+          savoiardi.set_canvas_cached_picture(object, encoded_picture)
         }
         False -> {
           // Picture unchanged - skip expensive texture creation
@@ -3994,12 +3849,17 @@ fn handle_update_canvas(
       }
 
       // Always update size and transform (cheap operations)
-      update_canvas_size_ffi(object, width, height)
-      apply_transform_ffi(object, trans)
+      savoiardi.update_canvas_size(object, width, height)
+      savoiardi.apply_transform_with_quaternion(
+        object: object,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
 
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -4011,7 +3871,7 @@ fn handle_add_animated_sprite(
   anim_state: spritesheet.AnimationState,
   width: Float,
   height: Float,
-  trans: transform.Transform,
+  transform: transform.Transform,
   pixel_art: Bool,
   physics: Option(physics.RigidBody),
   parent_id: Option(String),
@@ -4041,10 +3901,15 @@ fn handle_add_animated_sprite(
   |> texture.set_offset(offset_x, offset_y)
 
   // Create plane mesh with the animated texture
-  let sprite_mesh = create_canvas_plane_ffi(sprite_texture, width, height)
+  let sprite_mesh = savoiardi.create_canvas_plane(sprite_texture, width, height)
 
   // Apply transform
-  apply_transform_ffi(sprite_mesh, trans)
+  savoiardi.apply_transform_with_quaternion(
+    object: sprite_mesh,
+    position: transform.position(transform),
+    quaternion: transform.rotation_quaternion(transform),
+    scale: transform.scale(transform),
+  )
 
   add_to_scene_or_parent(state, sprite_mesh, parent_id)
 
@@ -4054,7 +3919,7 @@ fn handle_add_animated_sprite(
   let new_state = RendererState(..state, cache: new_cache)
   case physics, new_state.physics_world {
     option.Some(physics_config), option.Some(world) -> {
-      let new_world = physics.create_body(world, id, physics_config, trans)
+      let new_world = physics.create_body(world, id, physics_config, transform)
       RendererState(..new_state, physics_world: option.Some(new_world))
     }
     _, _ -> new_state
@@ -4069,11 +3934,11 @@ fn handle_update_animated_sprite(
   anim_state: spritesheet.AnimationState,
   width: Float,
   height: Float,
-  trans: transform.Transform,
+  transform: transform.Transform,
   pixel_art: Bool,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    option.Some(obj) -> {
+    Ok(obj) -> {
       // Get the base texture and clone it for independent animation
       let base_texture = spritesheet.texture(sheet)
       let sprite_texture = texture.clone(base_texture)
@@ -4102,17 +3967,22 @@ fn handle_update_animated_sprite(
       |> texture.set_offset(offset_x, offset_y)
 
       // Update the mesh texture
-      update_canvas_texture_ffi(obj, sprite_texture)
+      savoiardi.update_canvas_texture(obj, sprite_texture)
 
       // Update size
-      update_canvas_size_ffi(obj, width, height)
+      savoiardi.update_canvas_size(obj, width, height)
 
       // Update transform
-      apply_transform_ffi(obj, trans)
+      savoiardi.apply_transform_with_quaternion(
+        object: obj,
+        position: transform.position(transform),
+        quaternion: transform.rotation_quaternion(transform),
+        scale: transform.scale(transform),
+      )
 
       state
     }
-    option.None -> state
+    Error(Nil) -> state
   }
 }
 
@@ -4189,44 +4059,50 @@ fn stop_actions(actions: object_cache.AnimationActions) -> Nil {
   }
 }
 
-// Animation FFI declarations
-@external(javascript, "../threejs.ffi.mjs", "clipAction")
+// Animation wrapper functions
 fn create_animation_action_ffi(
   mixer: object_cache.AnimationMixer,
-  clip: animation.AnimationClip,
-) -> object_cache.AnimationAction
+  clip: savoiardi.AnimationClip,
+) -> object_cache.AnimationAction {
+  savoiardi.clip_action(mixer, clip)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "setActionLoop")
 fn set_animation_loop_ffi(
   action: object_cache.AnimationAction,
-  loop_mode: Loop,
-) -> Nil
+  loop_mode: Int,
+) -> Nil {
+  savoiardi.set_action_loop(action, loop_mode)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "setActionTimeScale")
 fn set_animation_time_scale_ffi(
   action: object_cache.AnimationAction,
   time_scale: Float,
-) -> Nil
+) -> Nil {
+  savoiardi.set_action_time_scale(action, time_scale)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "setActionWeight")
 fn set_animation_weight_ffi(
   action: object_cache.AnimationAction,
   weight: Float,
-) -> Nil
+) -> Nil {
+  savoiardi.set_action_weight(action, weight)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "playAction")
-fn play_animation_action_ffi(action: object_cache.AnimationAction) -> Nil
+fn play_animation_action_ffi(action: object_cache.AnimationAction) -> Nil {
+  savoiardi.play_action(action)
+}
 
-@external(javascript, "../threejs.ffi.mjs", "stopAction")
-fn stop_animation_action_ffi(action: object_cache.AnimationAction) -> Nil
+fn stop_animation_action_ffi(action: object_cache.AnimationAction) -> Nil {
+  savoiardi.stop_action(action)
+}
 
-type Loop
+fn loop_repeat() -> Int {
+  savoiardi.get_loop_repeat()
+}
 
-@external(javascript, "../threejs.ffi.mjs", "getLoopRepeat")
-fn loop_repeat() -> Loop
-
-@external(javascript, "../threejs.ffi.mjs", "getLoopOnce")
-fn loop_once() -> Loop
+fn loop_once() -> Int {
+  savoiardi.get_loop_once()
+}
 
 @internal
 pub fn update_mixers(state: RendererState, delta_time: Duration) -> Nil {
@@ -4236,7 +4112,7 @@ pub fn update_mixers(state: RendererState, delta_time: Duration) -> Nil {
   list.each(mixers, fn(entry) {
     let #(_id, mixer) = entry
     // Three.js AnimationMixer.update expects seconds
-    update_animation_mixer_ffi(mixer, delta_time_seconds)
+    savoiardi.update_mixer(mixer, delta_time_seconds)
   })
 }
 
@@ -4251,19 +4127,17 @@ pub fn sync_physics_transforms(state: RendererState) -> Nil {
           physics.Dynamic -> {
             // Get the Three.js object for this body
             case object_cache.get_object(state.cache, id) {
-              option.Some(obj) -> {
-                // Use identity scale since physics doesn't affect scale
-                let scale = vec3.Vec3(1.0, 1.0, 1.0)
+              Ok(obj) -> {
                 // Apply transform using quaternion directly (no Euler conversion)
-                apply_transform_with_quaternion_ffi(
-                  obj,
-                  position,
-                  quaternion,
-                  scale,
+                savoiardi.apply_transform_with_quaternion(
+                  object: obj,
+                  position: position,
+                  quaternion: quaternion,
+                  scale: vec3f.one,
                 )
-                update_matrix_world_ffi(obj, True)
+                savoiardi.update_matrix_world_force(obj, True)
               }
-              option.None -> Nil
+              Error(Nil) -> Nil
             }
           }
           physics.Kinematic | physics.Fixed -> Nil
@@ -4280,17 +4154,16 @@ pub fn clear_cache(state: RendererState) -> RendererState {
   let objects = object_cache.get_all_objects(state.cache)
   list.each(objects, fn(entry) {
     let #(_id, obj) = entry
-    dispose_object_3d_ffi(obj)
+    savoiardi.dispose_object(obj)
   })
 
-  let new_cache = object_cache.clear(state.cache)
-  RendererState(..state, cache: new_cache)
+  RendererState(..state, cache: object_cache.init())
 }
 
 @internal
 pub fn get_cameras_with_viewports(
   state: RendererState,
-) -> List(#(asset.Object3D, object_cache.Viewport)) {
+) -> List(#(savoiardi.Object3D, camera.ViewPort)) {
   object_cache.get_cameras_with_viewports(state.cache)
   |> list.map(fn(entry) {
     let #(camera_obj, viewport) = entry
@@ -4299,96 +4172,34 @@ pub fn get_cameras_with_viewports(
 }
 
 /// Get all cameras with their viewport and postprocessing configurations
-/// Returns: List of (camera_id_string, camera_object, Option(viewport), Option(postprocessing))
+/// Returns: List of (camera_id_string, camera_object, Option(viewport), Option(postprocessing), is_active)
 @internal
 pub fn get_all_cameras_with_info(
   state: RendererState,
 ) -> List(
   #(
     String,
-    asset.Object3D,
-    Option(object_cache.Viewport),
-    Option(postprocessing.PostProcessing),
+    savoiardi.Object3D,
+    Option(camera.ViewPort),
+    Option(camera.PostProcessing),
+    Bool,
   ),
 ) {
   object_cache.get_all_cameras_with_info(state.cache)
   |> list.map(fn(entry) {
-    let #(id_string, camera_obj, viewport_opt, pp_opt) = entry
-    #(id_string, camera_obj, viewport_opt, pp_opt)
+    let #(id_string, camera_obj, viewport_opt, pp_opt, is_active) = entry
+    #(id_string, camera_obj, viewport_opt, pp_opt, is_active)
   })
 }
 
-// ============================================================================
-// CSS2D FFI DECLARATIONS
-// ============================================================================
+@external(javascript, "../../gleam_stdlib/gleam/function.mjs", "identity")
+fn coerce(a: a) -> b
 
-@external(javascript, "../threejs.ffi.mjs", "createCSS2DObject")
-fn create_css2d_object_ffi(html: String) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "updateCSS2DObjectHTML")
-fn update_css2d_object_html_ffi(object: asset.Object3D, html: String) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "createCSS3DObject")
-fn create_css3d_object_ffi(html: String) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "updateCSS3DObjectHTML")
-fn update_css3d_object_html_ffi(object: asset.Object3D, html: String) -> Nil
-
-// ============================================================================
-// SPRITE FFI DECLARATIONS
-// ============================================================================
-
-@external(javascript, "../threejs.ffi.mjs", "createCanvasTextureFromPicture")
-fn create_canvas_texture_from_picture_ffi(
-  encoded_picture: String,
-  width: Int,
-  height: Int,
-) -> texture.Texture
-
-@external(javascript, "../threejs.ffi.mjs", "createCanvasPlane")
-fn create_canvas_plane_ffi(
-  texture: texture.Texture,
-  width: Float,
-  height: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "updateCanvasTexture")
-fn update_canvas_texture_ffi(
-  object: asset.Object3D,
-  texture: texture.Texture,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "updateCanvasSize")
-fn update_canvas_size_ffi(
-  object: asset.Object3D,
-  width: Float,
-  height: Float,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "getCanvasCachedPicture")
-fn get_canvas_cached_picture_ffi(object: asset.Object3D) -> String
-
-@external(javascript, "../threejs.ffi.mjs", "setCanvasCachedPicture")
-fn set_canvas_cached_picture_ffi(object: asset.Object3D, picture: String) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "applyMaterialToObject")
-fn apply_material_to_object_ffi_raw(
-  object: asset.Object3D,
-  three_material: material.ThreeMaterial,
-) -> Nil
-
-fn apply_material_to_object_ffi(
-  object: asset.Object3D,
-  material: material.Material,
-) -> Nil {
-  let three_material = material.create_material(material)
-  apply_material_to_object_ffi_raw(object, three_material)
+/// Convert a list of Transforms to the tuple format expected by savoiardi
+fn transforms_to_tuples(
+  transforms: List(transform.Transform),
+) -> List(#(Vec3(Float), Vec3(Float), Vec3(Float))) {
+  list.map(transforms, fn(t) {
+    #(transform.position(t), transform.rotation(t), transform.scale(t))
+  })
 }
-
-@external(javascript, "../threejs.ffi.mjs", "getWorldPosition")
-fn get_world_position_ffi(object: asset.Object3D) -> Vec3(Float)
-
-@external(javascript, "../threejs.ffi.mjs", "getWorldQuaternion")
-fn get_world_quaternion_ffi(
-  object: asset.Object3D,
-) -> #(Float, Float, Float, Float)

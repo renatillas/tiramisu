@@ -227,7 +227,8 @@ pub fn canvas_encoding_consistency_test() {
     )
 
   // If encoding is consistent, diff should produce no patches
-  let #(patches, _) = scene.diff(option.Some(canvas1), option.Some(canvas2), option.None)
+  let #(patches, _) =
+    scene.diff(option.Some(canvas1), option.Some(canvas2), option.None)
 
   let assert Error(Nil) = list.first(patches)
 }

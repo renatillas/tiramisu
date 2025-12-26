@@ -184,7 +184,9 @@ pub fn benchmark_deep_hierarchy() {
 // ============================================================================
 
 pub fn benchmark_with_cache() {
-  io.println("Measures: Realistic consecutive frames with cached previous scene")
+  io.println(
+    "Measures: Realistic consecutive frames with cached previous scene",
+  )
   io.println("Expected: ~50% faster than without cache")
   io.println("")
 
@@ -236,8 +238,7 @@ pub fn benchmark_with_cache() {
       }),
     [
       bench.Function("diff (cached)", fn(input: CachedBenchmarkInput) {
-        scene.diff(input.prev_scene, input.curr_scene, option.Some(input.cache))
-          .0
+        scene.diff(input.prev_scene, input.curr_scene, option.Some(input.cache)).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
@@ -501,8 +502,7 @@ fn create_cached_benchmark_input(
 
   // Create frame 2 (current frame) - only change a few nodes
   let changed_count_int =
-    int.to_float(count)
-    *. change_percent
+    int.to_float(count) *. change_percent
     |> float.round
   let curr_children =
     list.range(0, count - 1)

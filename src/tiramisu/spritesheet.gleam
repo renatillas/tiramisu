@@ -1,150 +1,8 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Creating spritesheets",
-////     functions: [
-////       "from_grid",
-////       "from_grid_with_count"
-////     ]
-////   },
-////   {
-////     header: "Spritesheet properties",
-////     functions: [
-////       "texture",
-////       "columns",
-////       "rows",
-////       "frame_count"
-////     ]
-////   },
-////   {
-////     header: "Animation definitions",
-////     functions: [
-////       "animation"
-////     ]
-////   },
-////   {
-////     header: "Animation state",
-////     functions: [
-////       "initial_state",
-////       "update",
-////       "play",
-////       "pause",
-////       "stop",
-////       "change_animation"
-////     ]
-////   },
-////   {
-////     header: "Animation queries",
-////     functions: [
-////       "is_playing",
-////       "current_animation",
-////       "current_frame_index",
-////       "current_frame"
-////     ]
-////   },
-////   {
-////     header: "Frame utilities",
-////     functions: [
-////       "frame_offset",
-////       "frame_repeat",
-////       "apply_frame"
-////     ]
-////   }
-//// ]
-////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
-////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Spritesheet animation system for texture-based sprites.
-////
-//// This module provides a functional approach to spritesheet animation,
-//// allowing you to define sprite atlases and animate through frames over time.
-////
-//// ## Quick Start
-////
-//// ```gleam
-//// import tiramisu/spritesheet
-//// import tiramisu/asset
-////
-//// // 1. Define your spritesheet (8 frames in a horizontal strip)
-//// let assert Ok(sheet) = spritesheet.from_grid(
-////   texture: my_texture,
-////   columns: 8,
-////   rows: 1,
-//// )
-////
-//// // 2. Define an animation sequence
-//// let walk_animation = spritesheet.animation(
-////   name: "walk",
-////   frames: [0, 1, 2, 3, 4, 5, 6, 7],
-////   frame_duration: 0.1,  // 10 FPS
-////   loop: spritesheet.Repeat,
-//// )
-////
-//// // 3. Create initial animation state
-//// let state = spritesheet.initial_state("walk")
-////
-//// // 4. Update in your game loop
-//// fn update(model, msg, ctx) {
-////   let new_state = spritesheet.update(
-////     state: model.anim_state,
-////     animation: walk_animation,
-////     delta_time: ctx.delta_time,
-////   )
-////   Model(..model, anim_state: new_state)
-//// }
-//// ```
-
 import gleam/int
 import gleam/order
 import gleam/time/duration.{type Duration}
 import iv.{type Array}
+import savoiardi
 import tiramisu/texture
 
 // ============================================================================
@@ -157,7 +15,12 @@ import tiramisu/texture
 /// Each frame has equal dimensions determined by dividing the texture
 /// by the number of columns and rows.
 pub opaque type Spritesheet {
-  Spritesheet(texture: texture.Texture, columns: Int, rows: Int, frame_count: Int)
+  Spritesheet(
+    texture: savoiardi.Texture,
+    columns: Int,
+    rows: Int,
+    frame_count: Int,
+  )
 }
 
 /// An animation sequence with frame indices and timing.
@@ -233,7 +96,7 @@ pub type SpritesheetError {
 /// )
 /// ```
 pub fn from_grid(
-  texture texture: texture.Texture,
+  texture texture: savoiardi.Texture,
   columns columns: Int,
   rows rows: Int,
 ) -> Result(Spritesheet, SpritesheetError) {
@@ -256,7 +119,7 @@ pub fn from_grid(
 /// )
 /// ```
 pub fn from_grid_with_count(
-  texture texture: texture.Texture,
+  texture texture: savoiardi.Texture,
   columns columns: Int,
   rows rows: Int,
   frame_count frame_count: Int,
@@ -284,7 +147,7 @@ pub fn from_grid_with_count(
 ///
 /// **Note**: This returns the original texture. For animated sprites,
 /// you should clone this texture so each sprite can animate independently.
-pub fn texture(sheet: Spritesheet) -> texture.Texture {
+pub fn texture(sheet: Spritesheet) -> savoiardi.Texture {
   sheet.texture
 }
 
@@ -406,7 +269,8 @@ pub fn update(
         order.Eq | order.Gt -> {
           // difference(left, right) = right - left
           // We want: new_elapsed - frame_duration
-          let remaining = duration.difference(animation.frame_duration, new_elapsed)
+          let remaining =
+            duration.difference(animation.frame_duration, new_elapsed)
           advance_frame(state, animation, remaining)
         }
       }
@@ -506,7 +370,10 @@ fn advance_frame(
         order.Gt -> {
           // Have time left over, subtract frame duration and recurse
           let remaining =
-            duration.difference(animation.frame_duration, new_state.elapsed_time)
+            duration.difference(
+              animation.frame_duration,
+              new_state.elapsed_time,
+            )
           advance_frame(new_state, animation, remaining)
         }
       }
@@ -668,9 +535,9 @@ pub fn frame_repeat(sheet: Spritesheet) -> #(Float, Float) {
 /// ```
 pub fn apply_frame(
   sheet: Spritesheet,
-  tex: texture.Texture,
+  tex: savoiardi.Texture,
   frame_index: Int,
-) -> texture.Texture {
+) -> savoiardi.Texture {
   let #(offset_x, offset_y) = frame_offset(sheet, frame_index)
   let #(repeat_x, repeat_y) = frame_repeat(sheet)
 

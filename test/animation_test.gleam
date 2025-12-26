@@ -1,13 +1,14 @@
 import gleam/function
 import gleam/time/duration
-import tiramisu/tween
 import tiramisu/transform
+import tiramisu/tween
 import vec/vec3
 
 // --- Float Tween Tests ---
 
 pub fn tween_float_start_test() {
-  let my_tween = tween.tween_float(0.0, 100.0, duration.seconds(2), function.identity)
+  let my_tween =
+    tween.tween_float(0.0, 100.0, duration.seconds(2), function.identity)
   let value = tween.get_value(my_tween)
   assert value == 0.0
 }
@@ -40,7 +41,8 @@ pub fn tween_float_past_end_test() {
 }
 
 pub fn tween_float_complete_check_test() {
-  let my_tween = tween.tween_float(0.0, 100.0, duration.seconds(2), function.identity)
+  let my_tween =
+    tween.tween_float(0.0, 100.0, duration.seconds(2), function.identity)
   assert tween.is_complete(my_tween) == False
 
   let my_tween = tween.update(my_tween, duration.seconds(2))

@@ -1,137 +1,5 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Light types",
-////     functions: [
-////       "ambient",
-////       "directional",
-////       "point",
-////       "spot",
-////       "hemisphere"
-////     ]
-////   },
-////   {
-////     header: "Shadow configuration",
-////     functions: [
-////       "with_shadows",
-////       "with_shadow_resolution",
-////       "with_shadow_bias"
-////     ]
-////   }
-//// ]
-////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
-////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Lighting system for illuminating 3D scenes.
-////
-//// Provides various light types with different characteristics and performance trade-offs.
-//// Lights are validated at creation time to ensure proper values.
-////
-//// ## Light Types
-////
-//// - **Ambient**: Global illumination with no direction (cheapest, always use for base lighting)
-//// - **Directional**: Parallel rays like the sun (outdoor scenes, can cast shadows)
-//// - **Point**: Radiates in all directions like a light bulb (indoor scenes, can cast shadows)
-//// - **Spot**: Cone-shaped beam like a flashlight (focused lighting, can cast shadows)
-//// - **Hemisphere**: Sky/ground colors for outdoor ambient (more realistic than pure ambient)
-////
-//// ## Typical Lighting Setups
-////
-//// ### Outdoor Scene
-//// ```gleam
-//// import tiramisu/light
-//// import tiramisu/scene
-//// import tiramisu/transform
-//// import vec/vec3
-////
-//// // Sun as directional light with shadows
-//// let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
-////   |> light.with_shadows(True)
-////   |> light.with_shadow_resolution(2048)
-////
-//// scene.Light(
-////   id: "sun",
-////   light: sun,
-////   transform: transform.identity
-////     |> transform.with_euler_rotation(vec3.Vec3(-0.5, 0.3, 0.0)),
-//// )
-////
-//// // Hemisphere for sky/ground ambient
-//// let assert Ok(sky) = light.hemisphere(
-////   intensity: 0.3,
-////   sky_color: 0x87ceeb,    // Sky blue
-////   ground_color: 0x8b7355,  // Brown earth
-//// )
-//// ```
-////
-//// ### Indoor Scene
-//// ```gleam
-//// // Base ambient
-//// let assert Ok(ambient) = light.ambient(intensity: 0.2, color: 0x404040)
-////
-//// // Ceiling lights
-//// let assert Ok(ceiling_light) = light.point(
-////   intensity: 1.0,
-////   color: 0xfff5e1,
-////   distance: 10.0,
-//// ) |> light.with_shadows(True)
-////
-//// scene.Light(
-////   id: "ceiling-light-1",
-////   light: ceiling_light,
-////   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 0.0)),
-//// )
-//// ```
-
 import gleam/bool
-import tiramisu/asset
+import savoiardi
 
 /// Light types for illuminating the scene.
 ///
@@ -609,9 +477,10 @@ pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) 
 }
 
 @internal
-pub fn create_light(light: Light) -> asset.Object3D {
+pub fn create_light(light: Light) -> savoiardi.Light {
   case light {
-    Ambient(intensity:, color:) -> create_ambient_light(color, intensity)
+    Ambient(intensity:, color:) ->
+      savoiardi.create_ambient_light(color, intensity)
     Directional(
       intensity:,
       color:,
@@ -619,7 +488,7 @@ pub fn create_light(light: Light) -> asset.Object3D {
       shadow_resolution:,
       shadow_bias:,
     ) ->
-      create_directional_light(
+      savoiardi.create_directional_light(
         color,
         intensity,
         cast_shadow,
@@ -634,7 +503,7 @@ pub fn create_light(light: Light) -> asset.Object3D {
       shadow_resolution:,
       shadow_bias:,
     ) ->
-      create_point_light(
+      savoiardi.create_point_light(
         color,
         intensity,
         distance,
@@ -652,7 +521,7 @@ pub fn create_light(light: Light) -> asset.Object3D {
       shadow_resolution:,
       shadow_bias:,
     ) ->
-      create_spot_light(
+      savoiardi.create_spot_light(
         color,
         intensity,
         distance,
@@ -663,47 +532,6 @@ pub fn create_light(light: Light) -> asset.Object3D {
         shadow_bias,
       )
     Hemisphere(intensity:, sky_color:, ground_color:) ->
-      create_hemisphere_light(sky_color, ground_color, intensity)
+      savoiardi.create_hemisphere_light(sky_color, ground_color, intensity)
   }
 }
-
-@external(javascript, "../threejs.ffi.mjs", "createAmbientLight")
-fn create_ambient_light(color: Int, intensity: Float) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createDirectionalLight")
-fn create_directional_light(
-  color: Int,
-  intensity: Float,
-  cast_shadow: Bool,
-  shadow_resolution: Int,
-  shadow_bias: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createPointLight")
-fn create_point_light(
-  color: Int,
-  intensity: Float,
-  distance: Float,
-  cast_shadow: Bool,
-  shadow_resolution: Int,
-  shadow_bias: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createSpotLight")
-fn create_spot_light(
-  color: Int,
-  intensity: Float,
-  distance: Float,
-  angle: Float,
-  penumbra: Float,
-  cast_shadow: Bool,
-  shadow_resolution: Int,
-  shadow_bias: Float,
-) -> asset.Object3D
-
-@external(javascript, "../threejs.ffi.mjs", "createHemisphereLight")
-fn create_hemisphere_light(
-  sky_color: Int,
-  ground_color: Int,
-  intensity: Float,
-) -> asset.Object3D

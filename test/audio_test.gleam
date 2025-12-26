@@ -1,4 +1,5 @@
 import gleam/option
+import gleam/time/duration
 import gleeunit
 import tiramisu/audio
 
@@ -53,15 +54,15 @@ pub fn with_paused_test() {
 }
 
 pub fn with_fade_test() {
-  let cfg = audio.config() |> audio.with_fade(500)
+  let cfg = audio.config() |> audio.with_fade(duration.milliseconds(500))
   let assert audio.Fade(duration) = cfg.fade
-  assert duration == 500
+  assert duration == duration.milliseconds(500)
 }
 
 pub fn with_no_fade_test() {
   let cfg =
     audio.config()
-    |> audio.with_fade(500)
+    |> audio.with_fade(duration.milliseconds(500))
     |> audio.with_no_fade()
 
   assert cfg.fade == audio.NoFade

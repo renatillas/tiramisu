@@ -77,15 +77,15 @@ pub fn is_pointer_locked() -> Bool {
   is_pointer_locked_ffi()
 }
 
-@external(javascript, "../../browser.ffi.mjs", "requestPointerLock")
+@external(javascript, "../browser.ffi.mjs", "requestPointerLock")
 fn request_pointer_lock_ffi(
   elem: element.Element,
 ) -> Promise(Result(Nil, String))
 
-@external(javascript, "../../browser.ffi.mjs", "exitPointerLock")
+@external(javascript, "../browser.ffi.mjs", "exitPointerLock")
 fn exit_pointer_lock_ffi() -> Nil
 
-@external(javascript, "../../browser.ffi.mjs", "isPointerLocked")
+@external(javascript, "../browser.ffi.mjs", "isPointerLocked")
 fn is_pointer_locked_ffi() -> Bool
 
 // ============================================================================
@@ -100,7 +100,7 @@ pub fn cancel_vibrate() -> Nil {
 /// Trigger haptic feedback on mobile devices
 /// Pattern is a list of vibration durations in milliseconds
 /// Example: [200, 100, 200] vibrates 200ms, pauses 100ms, vibrates 200ms
-@external(javascript, "../../browser.ffi.mjs", "vibrate")
+@external(javascript, "../browser.ffi.mjs", "vibrate")
 pub fn vibrate(pattern: array.Array(Int)) -> Nil
 
 // ============================================================================
@@ -111,5 +111,5 @@ pub fn vibrate(pattern: array.Array(Int)) -> Nil
 /// - gamepad: Gamepad index (0-3)
 /// - intensity: Vibration intensity (0.0 to 1.0)
 /// - duration_ms: Duration in milliseconds
-@external(javascript, "../../browser.ffi.mjs", "gamepadVibrate")
+@external(javascript, "../browser.ffi.mjs", "gamepadVibrate")
 pub fn gamepad_vibrate(gamepad: Int, intensity: Float, duration_ms: Int) -> Nil
