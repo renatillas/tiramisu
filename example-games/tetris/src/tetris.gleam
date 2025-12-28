@@ -1,8 +1,8 @@
 import gleam/int
-import gleam/javascript/promise
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/set
+import gleam/time/duration
 import lustre
 import lustre/attribute
 import lustre/effect as lustre_effect
@@ -13,7 +13,6 @@ import tetris/piece
 import tetris/position
 import tetris/ui
 import tiramisu
-import tiramisu/asset
 import tiramisu/audio
 import tiramisu/background
 import tiramisu/camera
@@ -37,6 +36,7 @@ const grid_height = 20
 // Model
 pub type Model {
   Model(
+    bridge: tiramisu_ui.Bridge(UiMsg, Msg),
     player_moved: Bool,
     game_state: game.GameState,
     drop_timer: Float,
@@ -44,46 +44,41 @@ pub type Model {
     last_move_time: Float,
     last_rotate_time: Float,
     previous_piece_shape: piece.Shape,
-    assets_cache: option.Option(asset.AssetCache),
+    move_sound: option.Option(audio.Buffer),
   )
-}
-
-pub type Id {
-  MoveSfx
-  AmbientLight
-  DirectionalLight
-  MainCamera
-  LockedBlock(Int)
-  CurrentBlock(Int)
-  GridOutLine
-  Scene
 }
 
 // Messages
 pub type Msg {
   Tick
   Restart
-  LoadedAssets(asset.BatchLoadResult)
+  MoveSoundLoaded(audio.Buffer)
+  AudioLoadFailed
+  BackgroundSet
+  BackgroundFailed
 }
 
 // Initialize
 pub fn init(
-  _ctx: tiramisu.Context(Id),
-) -> #(Model, effect.Effect(Msg), option.Option(_)) {
-  let assets = [
-    asset.AudioAsset("wav/Select-1-(Saw).wav"),
-    asset.AudioAsset("wav/Cursor-1-(Saw).wav"),
-    asset.AudioAsset("wav/Error-2-(Saw).wav"),
-  ]
+  bridge: tiramisu_ui.Bridge(UiMsg, Msg),
+  ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg), option.Option(a)) {
+  // Load move sound
+  let load_move_sound =
+    audio.load_audio(
+      url: "wav/Select-1-(Saw).wav",
+      on_success: MoveSoundLoaded,
+      on_error: AudioLoadFailed,
+    )
 
-  let effects =
-    effect.batch([
-      effect.from_promise(promise.map(
-        asset.load_batch_simple(assets),
-        LoadedAssets,
-      )),
-      effect.tick(Tick),
-    ])
+  // Set background color
+  let set_background =
+    background.set(
+      ctx.scene,
+      background.Color(0x1a1a2e),
+      BackgroundSet,
+      BackgroundFailed,
+    )
 
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -92,6 +87,7 @@ pub fn init(
 
   let model =
     Model(
+      bridge:,
       player_moved: False,
       game_state: initial_game,
       drop_timer: 0.0,
@@ -99,32 +95,39 @@ pub fn init(
       last_move_time: 0.0,
       last_rotate_time: 0.0,
       previous_piece_shape: initial_game.current_piece.piece_type,
-      assets_cache: option.None,
+      move_sound: option.None,
     )
 
-  #(model, effects, option.None)
+  #(
+    model,
+    effect.batch([effect.tick(Tick), load_move_sound, set_background]),
+    option.None,
+  )
 }
 
 // Update
 pub fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
-) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+  ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg), option.Option(a)) {
   case msg {
-    LoadedAssets(batch_result) -> {
-      #(
-        Model(..model, assets_cache: option.Some(batch_result.cache)),
-        effect.none(),
-        option.None,
-      )
+    MoveSoundLoaded(buffer) -> {
+      #(Model(..model, move_sound: Some(buffer)), effect.none(), option.None)
+    }
+    AudioLoadFailed | BackgroundSet | BackgroundFailed -> {
+      #(model, effect.none(), option.None)
     }
     Restart -> {
-      let #(new_model, _, _) = init(ctx)
+      let #(new_model, _, _) = init(model.bridge, ctx)
+      // Preserve loaded audio
+      let new_model = Model(..new_model, move_sound: model.move_sound)
       #(
         new_model,
         effect.batch([
-          tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(new_model.game_state)),
+          tiramisu_ui.to_lustre(model.bridge, UiUpdateGameState(
+            new_model.game_state,
+          )),
         ]),
         option.None,
       )
@@ -194,7 +197,8 @@ pub fn update(
       }
 
       // Accumulate drop timer
-      let updated_drop_timer = model.drop_timer +. ctx.delta_time /. 1000.0
+      let updated_drop_timer =
+        model.drop_timer +. duration.to_seconds(ctx.delta_time)
       let drop_interval = game.drop_interval(new_state.level)
 
       // Auto-drop if timer reached
@@ -217,8 +221,9 @@ pub fn update(
       }
 
       // Update cooldown timers
-      let updated_move_time = new_move_time +. ctx.delta_time /. 1000.0
-      let updated_rotate_time = new_rotate_time +. ctx.delta_time /. 1000.0
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let updated_move_time = new_move_time +. delta_seconds
+      let updated_rotate_time = new_rotate_time +. delta_seconds
 
       let updated_model =
         Model(
@@ -236,9 +241,10 @@ pub fn update(
         updated_model,
         effect.batch([
           effect.tick(Tick),
-          tiramisu_ui.dispatch_to_lustre(UiUpdateGameState(
-            updated_model.game_state,
-          )),
+          tiramisu_ui.to_lustre(
+            model.bridge,
+            UiUpdateGameState(updated_model.game_state),
+          ),
         ]),
         option.None,
       )
@@ -247,28 +253,25 @@ pub fn update(
 }
 
 // View
-pub fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
+pub fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
   // Only add audio node when player actually moved (for one-shot sound effect)
-  let move_audio_node = case model.assets_cache, model.player_moved {
-    option.Some(cache), True ->
-      case asset.get_audio(cache, "wav/Select-1-(Saw).wav") {
-        Ok(buffer) -> [
-          scene.audio(
-            id: MoveSfx,
-            audio: audio.GlobalAudio(
-              buffer:,
-              config: audio.config() |> audio.with_state(audio.Playing),
-            ),
-          ),
-        ]
-        Error(_) -> []
-      }
+  let move_audio_node = case model.move_sound, model.player_moved {
+    Some(buffer), True -> [
+      scene.audio(
+        id: "move-sfx",
+        audio: audio.GlobalAudio(
+          buffer:,
+          config: audio.config() |> audio.with_state(audio.Playing),
+        ),
+      ),
+    ]
     _, _ -> []
   }
+
   // Camera
   let camera_node =
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: model.camera,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
       look_at: Some(vec3.Vec3(5.0, 10.0, 0.0)),
@@ -280,7 +283,7 @@ pub fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
   // Lights
   let ambient_light =
     scene.light(
-      id: AmbientLight,
+      id: "ambient-light",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -290,7 +293,7 @@ pub fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   let directional_light =
     scene.light(
-      id: DirectionalLight,
+      id: "directional-light",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.8)
         light
@@ -319,7 +322,7 @@ pub fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   // Combine all scene nodes
   scene.empty(
-    id: Scene,
+    id: "scene",
     transform: transform.identity,
     children: list.flatten([
       [camera_node],
@@ -338,10 +341,10 @@ fn create_block(
   pos: position.Position,
   index: Int,
   color: Int,
-) -> scene.Node(Id) {
-  let assert Ok(geometry) =
-    geometry.box(width: block_size, height: block_size, depth: block_size)
-  let assert Ok(material) =
+) -> scene.Node {
+  let assert Ok(geom) =
+    geometry.box(size: vec3.Vec3(block_size, block_size, block_size))
+  let assert Ok(mat) =
     material.new()
     |> material.with_color(color)
     |> material.with_metalness(0.3)
@@ -352,19 +355,19 @@ fn create_block(
   let y = int.to_float(pos.y) *. block_size
 
   scene.mesh(
-    id: CurrentBlock(index),
-    geometry: geometry,
-    material: material,
+    id: "current-block-" <> int.to_string(index),
+    geometry: geom,
+    material: mat,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
     physics: None,
   )
 }
 
 // Helper: Create a locked block
-fn create_locked_block(pos: position.Position, index: Int) -> scene.Node(Id) {
-  let assert Ok(geometry) =
-    geometry.box(width: block_size, height: block_size, depth: block_size)
-  let assert Ok(material) =
+fn create_locked_block(pos: position.Position, index: Int) -> scene.Node {
+  let assert Ok(geom) =
+    geometry.box(size: vec3.Vec3(block_size, block_size, block_size))
+  let assert Ok(mat) =
     material.new()
     |> material.with_color(0x808080)
     |> material.build()
@@ -373,31 +376,31 @@ fn create_locked_block(pos: position.Position, index: Int) -> scene.Node(Id) {
   let y = int.to_float(pos.y) *. block_size
 
   scene.mesh(
-    id: LockedBlock(index),
-    geometry: geometry,
-    material: material,
+    id: "locked-block-" <> int.to_string(index),
+    geometry: geom,
+    material: mat,
     transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
     physics: None,
   )
 }
 
 // Helper: Create grid outline
-fn create_grid_outline() -> scene.Node(Id) {
-  let assert Ok(geometry) =
-    geometry.box(
-      width: int.to_float(grid_width) *. block_size +. 0.2,
-      height: int.to_float(grid_height) *. block_size +. 0.2,
-      depth: 0.1,
-    )
-  let assert Ok(material) =
+fn create_grid_outline() -> scene.Node {
+  let assert Ok(geom) =
+    geometry.box(size: vec3.Vec3(
+      int.to_float(grid_width) *. block_size +. 0.2,
+      int.to_float(grid_height) *. block_size +. 0.2,
+      0.1,
+    ))
+  let assert Ok(mat) =
     material.new()
     |> material.with_color(0x333333)
     |> material.build()
 
   scene.mesh(
-    id: GridOutLine,
-    geometry: geometry,
-    material: material,
+    id: "grid-outline",
+    geometry: geom,
+    material: mat,
     transform: transform.at(position: vec3.Vec3(
       int.to_float(grid_width) /. 2.0 -. 0.5,
       int.to_float(grid_height) /. 2.0 -. 0.5,
@@ -407,49 +410,58 @@ fn create_grid_outline() -> scene.Node(Id) {
   )
 }
 
-// Main entry point
-pub fn main() {
-  // Start the UI overlay
-  let assert Ok(_) =
-    lustre.application(ui_init, ui_update, ui_view)
-    |> lustre.start("#app", Nil)
-
-  // Start the game
-  tiramisu.run(
-    dimensions: None,
-    background: background.Color(0x1a1a2e),
-    init: init,
-    update: update,
-    view: view,
-  )
-}
-
 // UI overlay state management
-type UiModel {
-  UiModel(game_state: game.GameState)
+pub type UiModel {
+  UiModel(bridge: tiramisu_ui.Bridge(UiMsg, Msg), game_state: game.GameState)
 }
 
-type UiMsg {
+pub type UiMsg {
   UiUpdateGameState(game.GameState)
   UiRestart
 }
 
-fn ui_init(_flags) -> #(UiModel, lustre_effect.Effect(UiMsg)) {
-  #(UiModel(game_state: game.new()), tiramisu_ui.register_lustre())
+// Main entry point
+pub fn main() {
+  // Create a bridge for communication
+  let bridge = tiramisu_ui.new_bridge()
+
+  // Start the UI overlay
+  let assert Ok(_) =
+    lustre.application(ui_init, ui_update, ui_view)
+    |> lustre.start("#app", bridge)
+
+  // Start the game
+  let assert Ok(_) =
+    tiramisu.run(
+      selector: "#game",
+      dimensions: None,
+      bridge: Some(bridge),
+      init: init(bridge, _),
+      update:,
+      view:,
+    )
+  Nil
+}
+
+fn ui_init(bridge) {
+  #(
+    UiModel(bridge:, game_state: game.new()),
+    tiramisu_ui.register_lustre(bridge),
+  )
 }
 
 fn ui_update(
-  _model: UiModel,
+  model: UiModel,
   msg: UiMsg,
 ) -> #(UiModel, lustre_effect.Effect(UiMsg)) {
   case msg {
     UiUpdateGameState(new_state) -> #(
-      UiModel(game_state: new_state),
+      UiModel(..model, game_state: new_state),
       lustre_effect.none(),
     )
     UiRestart -> #(
-      UiModel(game_state: game.new()),
-      tiramisu_ui.dispatch_to_tiramisu(Restart),
+      UiModel(..model, game_state: game.new()),
+      tiramisu_ui.to_tiramisu(model.bridge, Restart),
     )
   }
 }

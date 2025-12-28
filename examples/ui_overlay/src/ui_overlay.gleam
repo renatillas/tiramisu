@@ -1,18 +1,7 @@
-/// Example: Lustre UI Overlay with Tiramisu
-///
-/// This example demonstrates how to build UI overlays using Lustre
-/// on top of a Tiramisu 3D game. Both systems run independently:
-/// - Tiramisu manages the 3D game loop and rendering
-/// - Lustre manages the UI overlay state
-/// - Communication happens through tiramisu/ui module
-///
-/// Controls:
-/// - Click "Start Game" to begin
-/// - WASD: Move cube (increases score)
-/// - Space: Pause game
 import gleam/float
 import gleam/int
-import gleam/option.{None}
+import gleam/option.{None, Some}
+import gleam/time/duration
 import lustre
 import lustre/attribute.{attribute, class}
 import lustre/effect
@@ -20,7 +9,6 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect as game_effect
 import tiramisu/geometry
@@ -32,7 +20,9 @@ import tiramisu/transform
 import tiramisu/ui
 import vec/vec3
 
-// --- State ---
+// =============================================================================
+// Lustre UI Types
+// =============================================================================
 
 pub type GameState {
   Menu
@@ -40,10 +30,17 @@ pub type GameState {
   Paused
 }
 
+/// Lustre model - stores UI state and the bridge
 pub type UIModel {
-  UIModel(state: GameState, score: Int, health: Float)
+  UIModel(
+    bridge: ui.Bridge(UIMsg, GameMsg),
+    state: GameState,
+    score: Int,
+    health: Float,
+  )
 }
 
+/// Messages for the Lustre UI
 pub type UIMsg {
   StartGame
   PauseGame
@@ -52,46 +49,85 @@ pub type UIMsg {
   UpdateHealth(Float)
 }
 
-// --- Main ---
+// =============================================================================
+// Tiramisu Game Types
+// =============================================================================
 
-pub fn main() {
-  // Start Lustre UI overlay
-  let assert Ok(_) =
-    lustre.application(init, update, view)
-    |> lustre.start("#app", Nil)
-
-  // Start Tiramisu game (in paused state initially)
-  start_game()
+pub type GameModel {
+  GameModel(
+    bridge: ui.Bridge(UIMsg, GameMsg),
+    rotation: Float,
+    position: vec3.Vec3(Float),
+    score: Int,
+    health: Float,
+    paused: Bool,
+  )
 }
 
-// --- Init/Update/View ---
+/// Messages for the Tiramisu game
+pub type GameMsg {
+  Tick
+  Pause
+  Resume
+}
 
-fn init(_flags) {
-  // Register with Tiramisu to receive game state updates
-  #(UIModel(Menu, 0, 100.0), ui.register_lustre())
+// =============================================================================
+// Main Entry Point
+// =============================================================================
+
+pub fn main() {
+  // 1. Create a bridge for Tiramisu-Lustre communication
+  let bridge = ui.new_bridge()
+
+  // 2. Start Lustre UI with the bridge in flags
+  let assert Ok(_) =
+    lustre.application(init, update, view)
+    |> lustre.start("#app", bridge)
+
+  // 3. Start Tiramisu game with the same bridge
+  let assert Ok(_) =
+    tiramisu.run(
+      selector: "#game",
+      dimensions: None,
+      bridge: Some(bridge),
+      init: game_init(bridge, _),
+      update: game_update,
+      view: game_view,
+    )
+}
+
+// =============================================================================
+// Lustre Init/Update/View
+// =============================================================================
+
+fn init(bridge: ui.Bridge(UIMsg, GameMsg)) -> #(UIModel, effect.Effect(UIMsg)) {
+  #(
+    UIModel(bridge: bridge, state: Menu, score: 0, health: 100.0),
+    // Register Lustre's dispatch with the bridge
+    ui.register_lustre(bridge),
+  )
 }
 
 fn update(model: UIModel, msg: UIMsg) {
   case msg {
     StartGame -> #(
       UIModel(..model, state: Playing),
-      ui.dispatch_to_tiramisu(Resume),
+      ui.to_tiramisu(model.bridge, Resume),
     )
     PauseGame -> #(
       UIModel(..model, state: Paused),
-      ui.dispatch_to_tiramisu(Pause),
+      ui.to_tiramisu(model.bridge, Pause),
     )
     ResumeGame -> #(
       UIModel(..model, state: Playing),
-      ui.dispatch_to_tiramisu(Resume),
+      ui.to_tiramisu(model.bridge, Resume),
     )
-    UpdateScore(score) -> #(UIModel(..model, score: score), effect.none())
-    UpdateHealth(health) -> #(UIModel(..model, health: health), effect.none())
+    UpdateScore(score) -> #(UIModel(..model, score:), effect.none())
+    UpdateHealth(health) -> #(UIModel(..model, health:), effect.none())
   }
 }
 
 fn view(model: UIModel) -> Element(UIMsg) {
-  // UI overlay - positioned fixed to cover entire viewport and overlay Tiramisu canvas
   html.div([class("fixed top-0 left-0 w-full h-full pointer-events-none")], [
     case model.state {
       Menu -> menu_overlay()
@@ -101,7 +137,9 @@ fn view(model: UIModel) -> Element(UIMsg) {
   ])
 }
 
-// --- UI Components ---
+// =============================================================================
+// UI Components
+// =============================================================================
 
 fn menu_overlay() -> Element(UIMsg) {
   html.div(
@@ -192,8 +230,6 @@ fn pause_overlay(model: UIModel) -> Element(UIMsg) {
   ])
 }
 
-// --- Helpers ---
-
 fn progress_bar(current: Float, max: Float, color: String) -> Element(UIMsg) {
   let percentage = { current /. max } *. 100.0
   let percentage_str = float.to_string(percentage)
@@ -220,45 +256,14 @@ fn health_color(health: Float) -> String {
   }
 }
 
-// --- Tiramisu Game ---
+// =============================================================================
+// Tiramisu Game Init/Update/View
+// =============================================================================
 
-pub type Id {
-  Scene
-  MainCamera
-  Ambient
-  Directional
-  Cube
-}
-
-pub type GameModel {
-  GameModel(
-    rotation: Float,
-    position: vec3.Vec3(Float),
-    score: Int,
-    health: Float,
-    paused: Bool,
-  )
-}
-
-pub type GameMsg {
-  Tick
-  Pause
-  Resume
-}
-
-fn start_game() -> Nil {
-  tiramisu.run(
-    dimensions: option.None,
-    background: background.Color(0x1a1a2e),
-    init: game_init,
-    update: game_update,
-    view: game_view,
-  )
-}
-
-fn game_init(_ctx: tiramisu.Context(Id)) {
+fn game_init(bridge: ui.Bridge(UIMsg, GameMsg), _ctx: tiramisu.Context) {
   #(
     GameModel(
+      bridge:,
       rotation: 0.0,
       position: vec3.Vec3(0.0, 0.0, 0.0),
       score: 0,
@@ -266,31 +271,24 @@ fn game_init(_ctx: tiramisu.Context(Id)) {
       paused: True,
     ),
     game_effect.tick(Tick),
-    option.None,
+    None,
   )
 }
 
-fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
+fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
   case msg {
-    Pause -> #(
-      GameModel(..model, paused: True),
-      game_effect.none(),
-      option.None,
-    )
+    Pause -> #(GameModel(..model, paused: True), game_effect.none(), None)
 
-    Resume -> #(
-      GameModel(..model, paused: False),
-      game_effect.none(),
-      option.None,
-    )
+    Resume -> #(GameModel(..model, paused: False), game_effect.none(), None)
 
     Tick -> {
-      // Skip updates if paused
       case model.paused {
-        True -> #(model, game_effect.tick(Tick), option.None)
+        True -> #(model, game_effect.tick(Tick), None)
         False -> {
-          // Update rotation (delta_time is in milliseconds)
-          let new_rotation = model.rotation +. ctx.delta_time *. 0.001
+          let delta_seconds = duration.to_seconds(ctx.delta_time)
+
+          // Update rotation
+          let new_rotation = model.rotation +. delta_seconds
 
           // Handle WASD movement
           let move_speed = 3.0
@@ -298,8 +296,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
             input.is_key_pressed(ctx.input, input.KeyD),
             input.is_key_pressed(ctx.input, input.KeyA)
           {
-            True, False -> move_speed *. ctx.delta_time /. 1000.0
-            False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
+            True, False -> move_speed *. delta_seconds
+            False, True -> 0.0 -. move_speed *. delta_seconds
             _, _ -> 0.0
           }
 
@@ -307,8 +305,8 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
             input.is_key_pressed(ctx.input, input.KeyW),
             input.is_key_pressed(ctx.input, input.KeyS)
           {
-            True, False -> move_speed *. ctx.delta_time /. 1000.0
-            False, True -> 0.0 -. move_speed *. ctx.delta_time /. 1000.0
+            True, False -> move_speed *. delta_seconds
+            False, True -> 0.0 -. move_speed *. delta_seconds
             _, _ -> 0.0
           }
 
@@ -330,40 +328,39 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context(Id)) {
 
           let new_model =
             GameModel(
+              ..model,
               rotation: new_rotation,
               position: new_position,
               score: new_score,
-              health: model.health,
-              paused: False,
             )
 
-          // Send updates to Lustre UI
+          // Build effects - always tick, always update UI, optionally pause
           let effects = case should_pause {
             True -> [
               game_effect.tick(Tick),
-              ui.dispatch_to_lustre(UpdateScore(new_score)),
-              ui.dispatch_to_lustre(UpdateHealth(model.health)),
-              ui.dispatch_to_lustre(PauseGame),
+              ui.to_lustre(model.bridge, UpdateScore(new_score)),
+              ui.to_lustre(model.bridge, UpdateHealth(model.health)),
+              ui.to_lustre(model.bridge, PauseGame),
             ]
             False -> [
               game_effect.tick(Tick),
-              ui.dispatch_to_lustre(UpdateScore(new_score)),
-              ui.dispatch_to_lustre(UpdateHealth(model.health)),
+              ui.to_lustre(model.bridge, UpdateScore(new_score)),
+              ui.to_lustre(model.bridge, UpdateHealth(model.health)),
             ]
           }
 
-          #(new_model, game_effect.batch(effects), option.None)
+          #(new_model, game_effect.batch(effects), None)
         }
       }
     }
   }
 }
 
-fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
-  scene.empty(id: Scene, transform: transform.identity, children: [
+fn game_view(model: GameModel, _ctx: tiramisu.Context) -> scene.Node {
+  scene.empty(id: "root", transform: transform.identity, children: [
     // Camera
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: {
         let assert Ok(cam) =
           camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -371,42 +368,40 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
       },
       transform: transform.at(vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
-      look_at: option.None,
+      look_at: None,
       viewport: None,
-      postprocessing: option.None,
+      postprocessing: None,
     ),
     // Lights
     scene.light(
-      id: Ambient,
+      id: "ambient",
       light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
-        light
+        let assert Ok(l) = light.ambient(color: 0xffffff, intensity: 0.5)
+        l
       },
       transform: transform.identity,
     ),
     scene.light(
-      id: Directional,
+      id: "directional",
       light: {
-        let assert Ok(light) =
-          light.directional(color: 0xffffff, intensity: 0.8)
-        light
+        let assert Ok(l) = light.directional(color: 0xffffff, intensity: 0.8)
+        l
       },
       transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Rotating cube
     scene.mesh(
-      id: Cube,
+      id: "cube",
       geometry: {
-        let assert Ok(geometry) =
-          geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-        geometry
+        let assert Ok(g) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+        g
       },
       material: {
-        let assert Ok(material) =
+        let assert Ok(m) =
           material.new()
           |> material.with_color(0x4ecdc4)
           |> material.build()
-        material
+        m
       },
       transform: transform.identity
         |> transform.with_position(model.position)

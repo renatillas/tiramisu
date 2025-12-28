@@ -12,6 +12,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 pub type Model {
@@ -26,6 +27,7 @@ pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
       dimensions: option.None,
+      bridge: option.None,
       init: init,
       update: update,
       view: view,
@@ -44,25 +46,19 @@ fn update(
   ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
-    Tick -> {
-      let new_time = duration.add(model.time, ctx.delta_time)
-      #(Model(time: new_time), effect.tick(Tick), option.None)
-    }
+    Tick -> #(
+      Model(time: duration.add(model.time, ctx.delta_time)),
+      effect.tick(Tick),
+      option.None,
+    )
   }
 }
 
 fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
-  // Use actual canvas dimensions for proper aspect ratio on all devices
-  let cam =
-    camera.camera_2d(
-      width: float.round(ctx.canvas_width),
-      height: float.round(ctx.canvas_height),
-    )
-
   scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
       id: "camera",
-      camera: cam,
+      camera: camera.camera_2d(ctx.canvas_size |> vec2.map(float.round)),
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
       look_at: option.None,
@@ -77,11 +73,10 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       },
       transform: transform.identity,
     ),
-    // Center square
     scene.mesh(
       id: "center",
       geometry: {
-        let assert Ok(geom) = geometry.plane(width: 50.0, height: 50.0)
+        let assert Ok(geom) = geometry.plane(vec2.Vec2(50.0, 50.0))
         geom
       },
       material: {
@@ -101,7 +96,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "top-left",
       geometry: {
-        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -125,7 +120,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "top-right",
       geometry: {
-        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -149,7 +144,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "bottom-left",
       geometry: {
-        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -173,7 +168,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "bottom-right",
       geometry: {
-        let assert Ok(geom) = geometry.plane(width: 30.0, height: 30.0)
+        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {

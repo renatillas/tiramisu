@@ -1,12 +1,9 @@
-import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
-import tiramisu/debug
 import tiramisu/effect
 import tiramisu/geometry
 import tiramisu/input
@@ -14,23 +11,11 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
-pub type Id {
-  Scene
-  MainCamera
-  Ambient
-  Directional
-  Ground
-  High(Int)
-  Medium(Int)
-  Low(Int)
-  Billboard(Int)
-  LOD(Int)
-}
-
 pub type Model {
-  Model(camera_position: vec3.Vec3(Float), show_performance: Bool)
+  Model(camera_position: vec3.Vec3(Float))
 }
 
 pub type Msg {
@@ -38,17 +23,20 @@ pub type Msg {
 }
 
 pub fn main() -> Nil {
-  tiramisu.run(
-    dimensions: option.None,
-    background: background.Color(0x0a0a1a),
-    init: init,
-    update: update,
-    view: view,
-  )
+  let assert Ok(Nil) =
+    tiramisu.run(
+      bridge: option.None,
+      dimensions: option.None,
+      selector: "body",
+      init: init,
+      update: update,
+      view: view,
+    )
+  Nil
 }
 
 fn init(
-  _ctx: tiramisu.Context(Id),
+  _ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   io.println("=== Level of Detail (LOD) Demo ===")
   io.println("")
@@ -61,13 +49,9 @@ fn init(
   io.println("")
   io.println("Controls:")
   io.println("  W/S - Move camera forward/backward")
-  io.println("  P - Toggle performance stats")
-  io.println("")
-  io.println("Watch triangle count drop as you move away!")
-  io.println("")
 
   #(
-    Model(camera_position: vec3.Vec3(0.0, 20.0, 30.0), show_performance: True),
+    Model(camera_position: vec3.Vec3(0.0, 20.0, 30.0)),
     effect.tick(Tick),
     option.None,
   )
@@ -76,7 +60,7 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
@@ -97,47 +81,10 @@ fn update(
       let new_camera_position = vec3.Vec3(x, y, new_z)
 
       // Toggle performance stats
-      let p_pressed = input.is_key_just_pressed(ctx.input, input.Custom("KeyP"))
-      let show_performance = case p_pressed {
-        True -> {
-          io.println(
-            "Performance stats: "
-            <> case !model.show_performance {
-              True -> "ON"
-              False -> "OFF"
-            },
-          )
-          !model.show_performance
-        }
-        False -> model.show_performance
-      }
-
       // Show performance stats
-      case show_performance {
-        True -> {
-          let stats = debug.get_performance_stats()
-          io.println(
-            "FPS: "
-            <> float.to_string(stats.fps)
-            <> " | Frame: "
-            <> float.to_string(stats.frame_time)
-            <> "ms"
-            <> " | Draw Calls: "
-            <> int.to_string(stats.draw_calls)
-            <> " | Tris: "
-            <> int.to_string(stats.triangles)
-            <> " | Camera Z: "
-            <> float.to_string(new_z),
-          )
-        }
-        False -> Nil
-      }
 
       #(
-        Model(
-          camera_position: new_camera_position,
-          show_performance: show_performance,
-        ),
+        Model(camera_position: new_camera_position),
         effect.tick(Tick),
         option.None,
       )
@@ -145,14 +92,14 @@ fn update(
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
   // Camera setup
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 500.0)
 
   let camera_node =
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera:,
       transform: transform.at(model.camera_position),
       look_at: option.None,
@@ -163,7 +110,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   let lights = [
     scene.light(
-      id: Ambient,
+      id: "ambient",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -171,7 +118,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
       transform: transform.identity,
     ),
     scene.light(
-      id: Directional,
+      id: "directional",
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.7)
@@ -191,7 +138,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
       // Create different detail level meshes
       let high_detail =
         scene.mesh(
-          id: High(i),
+          id: "high-detail" <> int.to_string(i),
           geometry: {
             let assert Ok(geometry) =
               geometry.icosahedron(radius: 5.0, detail: 3)
@@ -212,7 +159,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
       let medium_detail =
         scene.mesh(
-          id: Medium(i),
+          id: "medium-detail" <> int.to_string(i),
           geometry: {
             let assert Ok(geometry) =
               geometry.icosahedron(radius: 5.0, detail: 2)
@@ -233,7 +180,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
       let low_detail =
         scene.mesh(
-          id: Low(i),
+          id: "low-detail" <> int.to_string(i),
           geometry: {
             let assert Ok(geometry) =
               geometry.icosahedron(radius: 5.0, detail: 1)
@@ -254,9 +201,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
       let billboard =
         scene.mesh(
-          id: Billboard(i),
+          id: "billboard" <> int.to_string(i),
           geometry: {
-            let assert Ok(geometry) = geometry.plane(width: 8.0, height: 8.0)
+            let assert Ok(geometry) =
+              geometry.plane(size: vec2.Vec2(10.0, 10.0))
             geometry
           },
           material: {
@@ -275,7 +223,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
       // Create LOD with distance thresholds
       scene.lod(
-        id: LOD(i),
+        id: "lod" <> int.to_string(i),
         levels: [
           scene.LODLevel(distance: 0.0, node: high_detail),
           // 0-20 units
@@ -292,10 +240,10 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   // Add ground grid for reference
   let ground =
-    scene.debug_grid(id: Ground, size: 400.0, divisions: 40, color: 0x444444)
+    scene.debug_grid(id: "ground", size: 400.0, divisions: 40, color: 0x444444)
 
   scene.empty(
-    id: Scene,
+    id: "scene",
     transform: transform.identity,
     children: list.flatten([[camera_node], lights, lod_objects, [ground]]),
   )

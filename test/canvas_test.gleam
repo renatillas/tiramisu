@@ -3,6 +3,7 @@ import gleam/option
 import paint as p
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 /// Test that adding a canvas generates an AddNode patch
@@ -14,10 +15,8 @@ pub fn diff_add_canvas_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
 
@@ -35,10 +34,8 @@ pub fn diff_remove_canvas_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next = option.None
@@ -56,20 +53,16 @@ pub fn diff_canvas_no_change_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next =
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
 
@@ -87,20 +80,16 @@ pub fn diff_canvas_picture_change_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture1,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next =
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture2,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
 
@@ -117,20 +106,16 @@ pub fn diff_canvas_dimensions_change_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next =
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 512,
-      texture_height: 128,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(512, 128),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
 
@@ -147,20 +132,16 @@ pub fn diff_canvas_size_change_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next =
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 4.0,
-      height: 1.0,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(4.0, 1.0),
       transform: transform.identity,
     ))
 
@@ -177,20 +158,16 @@ pub fn diff_canvas_transform_change_test() {
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     ))
   let next =
     option.Some(scene.canvas(
       id: "canvas1",
       picture: picture,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.at(vec3.Vec3(5.0, 10.0, 0.0)),
     ))
 
@@ -208,10 +185,8 @@ pub fn canvas_encoding_consistency_test() {
     scene.canvas(
       id: "canvas1",
       picture: picture1,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     )
 
@@ -219,10 +194,8 @@ pub fn canvas_encoding_consistency_test() {
     scene.canvas(
       id: "canvas1",
       picture: picture2,
-      texture_width: 256,
-      texture_height: 64,
-      width: 2.0,
-      height: 0.5,
+      texture_size: vec2.Vec2(256, 64),
+      size: vec2.Vec2(2.0, 0.5),
       transform: transform.identity,
     )
 
@@ -243,10 +216,8 @@ pub fn diff_multiple_canvas_test() {
         scene.canvas(
           id: "canvas1",
           picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
+          texture_size: vec2.Vec2(256, 64),
+          size: vec2.Vec2(2.0, 0.5),
           transform: transform.identity,
         ),
       ]),
@@ -257,19 +228,15 @@ pub fn diff_multiple_canvas_test() {
         scene.canvas(
           id: "canvas1",
           picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
+          texture_size: vec2.Vec2(256, 64),
+          size: vec2.Vec2(2.0, 0.5),
           transform: transform.identity,
         ),
         scene.canvas(
           id: "canvas2",
           picture: picture,
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
+          texture_size: vec2.Vec2(256, 64),
+          size: vec2.Vec2(2.0, 0.5),
           transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
         ),
       ]),

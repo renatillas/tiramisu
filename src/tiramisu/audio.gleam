@@ -2,6 +2,7 @@ import gleam/javascript/promise
 import gleam/option
 import gleam/time/duration
 import savoiardi
+import tiramisu/effect
 
 // --- Public Types ---
 
@@ -242,6 +243,17 @@ pub fn with_max_distance(audio: Audio, distance: Float) -> Audio {
 /// Load an audio file from URL
 pub fn load_audio(
   url url: String,
-) -> promise.Promise(Result(savoiardi.AudioBuffer, Nil)) {
-  savoiardi.load_audio(url)
+  on_success on_success: fn(savoiardi.AudioBuffer) -> msg,
+  on_error on_error: msg,
+) -> effect.Effect(msg) {
+  let promise =
+    savoiardi.load_audio(url)
+    |> promise.map(fn(result) {
+      case result {
+        Ok(data) -> on_success(data)
+        Error(Nil) -> on_error
+      }
+    })
+
+  effect.from_promise(promise)
 }

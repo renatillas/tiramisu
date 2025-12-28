@@ -84,7 +84,7 @@ fn wrap_in_group(
 }
 
 fn create_flat_scene(count: Int) -> List(scene.Node) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,
@@ -109,7 +109,7 @@ fn create_flat_scene(count: Int) -> List(scene.Node) {
 }
 
 fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,
@@ -138,7 +138,7 @@ fn create_nested_scene(depth: Int) -> List(scene.Node) {
 }
 
 fn create_nested_group(depth: Int, current: Int) -> scene.Node {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,

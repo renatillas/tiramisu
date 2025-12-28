@@ -13,6 +13,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 import vec/vec3f
 
@@ -36,6 +37,7 @@ pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
       dimensions: option.None,
+      bridge: option.None,
       selector: "body",
       init: init,
       update: update,
@@ -174,8 +176,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "cube-1",
       geometry: {
-        let assert Ok(geometry) =
-          geometry.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(geometry) = geometry.box(vec3f.one |> vec3f.scale(2.0))
         geometry
       },
       material: {
@@ -199,7 +200,7 @@ fn view(model: Model, _) -> scene.Node {
       id: "sphere-1",
       geometry: {
         let assert Ok(geometry) =
-          geometry.sphere(radius: 1.5, width_segments: 32, height_segments: 32)
+          geometry.sphere(radius: 1.5, segments: vec2.Vec2(32, 32))
         geometry
       },
       material: {

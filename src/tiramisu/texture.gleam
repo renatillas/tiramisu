@@ -1,11 +1,10 @@
 import gleam/javascript/promise
 import savoiardi
+import tiramisu/effect
+import vec/vec2.{type Vec2}
 
 pub type Texture =
   savoiardi.Texture
-
-pub type CubeTexture =
-  savoiardi.CubeTexture
 
 /// Texture wrapping mode
 pub type WrapMode {
@@ -52,21 +51,21 @@ pub fn clone(texture: savoiardi.Texture) -> savoiardi.Texture {
 ///
 /// ## Parameters
 ///
-/// - `x`: Horizontal offset (0.0 = left edge, 1.0 = right edge)
-/// - `y`: Vertical offset (0.0 = bottom edge, 1.0 = top edge)
+/// - `offset`: Offset as Vec2 (x = horizontal, y = vertical)
+///   - x: 0.0 = left edge, 1.0 = right edge
+///   - y: 0.0 = bottom edge, 1.0 = top edge
 ///
 /// ## Example
 ///
 /// ```gleam
 /// // Show the right half of the texture
-/// texture.set_offset(my_texture, 0.5, 0.0)
+/// texture.set_offset(my_texture, vec2.Vec2(0.5, 0.0))
 /// ```
 pub fn set_offset(
   texture: savoiardi.Texture,
-  x x: Float,
-  y y: Float,
+  offset offset: Vec2(Float),
 ) -> savoiardi.Texture {
-  savoiardi.set_texture_offset(texture, x, y)
+  savoiardi.set_texture_offset(texture, offset.x, offset.y)
   texture
 }
 
@@ -77,21 +76,21 @@ pub fn set_offset(
 ///
 /// ## Parameters
 ///
-/// - `x`: Horizontal repeat (0.5 = show half width, 2.0 = tile twice)
-/// - `y`: Vertical repeat (0.5 = show half height, 2.0 = tile twice)
+/// - `repeat`: Repeat as Vec2 (x = horizontal, y = vertical)
+///   - x: 0.5 = show half width, 2.0 = tile twice
+///   - y: 0.5 = show half height, 2.0 = tile twice
 ///
 /// ## Example
 ///
 /// ```gleam
 /// // Show only 1/4 of texture width (for 4-frame horizontal sprite)
-/// texture.set_repeat(my_texture, 0.25, 1.0)
+/// texture.set_repeat(my_texture, vec2.Vec2(0.25, 1.0))
 /// ```
 pub fn set_repeat(
   texture: savoiardi.Texture,
-  x x: Float,
-  y y: Float,
+  repeat repeat: Vec2(Float),
 ) -> savoiardi.Texture {
-  savoiardi.set_texture_repeat(texture, x, y)
+  savoiardi.set_texture_repeat(texture, repeat.x, repeat.y)
   texture
 }
 
@@ -178,20 +177,19 @@ fn filter_mode_to_constant(mode: FilterMode) -> Int {
 }
 
 /// Load a texture from URL
-pub fn load(from_url url: String) -> promise.Promise(Result(Texture, Nil)) {
-  savoiardi.load_texture(url)
-}
+pub fn load(
+  from_url url: String,
+  on_success on_success: fn(Texture) -> msg,
+  on_error on_error: msg,
+) -> effect.Effect(msg) {
+  let promise =
+    savoiardi.load_texture(url)
+    |> promise.map(fn(result) {
+      case result {
+        Ok(data) -> on_success(data)
+        Error(Nil) -> on_error
+      }
+    })
 
-/// Load an equirectangular (360°) texture from URL
-pub fn load_equirectangular(
-  url: String,
-) -> promise.Promise(Result(Texture, Nil)) {
-  savoiardi.load_equirectangular_texture(url)
-}
-
-/// Load a cube texture (skybox) from 6 URLs
-pub fn load_cube(
-  urls: List(String),
-) -> promise.Promise(Result(CubeTexture, Nil)) {
-  savoiardi.load_cube_texture(urls)
+  effect.from_promise(promise)
 }

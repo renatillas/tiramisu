@@ -1,3 +1,4 @@
+import gleam/float
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}
 import gleam/list
@@ -6,6 +7,9 @@ import plinth/browser/document
 import plinth/browser/window
 import tiramisu/browser
 import tiramisu/internal/timer
+
+pub type TimerId =
+  timer.TimerId
 
 /// Opaque effect type that can dispatch messages back to the application.
 ///
@@ -46,6 +50,14 @@ pub fn none() -> Effect(msg) {
 /// ```
 pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
   Effect(perform: effect)
+}
+
+// TODO: Document
+pub fn dispatch(msg msg: msg) -> Effect(msg) {
+  Effect(perform: fn(dispatch) {
+    dispatch(msg)
+    Nil
+  })
 }
 
 /// Batch multiple effects to run them together.
@@ -160,9 +172,12 @@ pub fn tick(msg: msg) -> Effect(msg) {
 ///   }
 /// }
 /// ```
-pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
+pub fn delay(duration duration: duration.Duration, msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    timer.delay(milliseconds, fn() { dispatch(msg) })
+    timer.delay(
+      duration |> duration.to_seconds |> float.multiply(1000.0) |> float.round,
+      fn() { dispatch(msg) },
+    )
     Nil
   })
 }
@@ -218,7 +233,7 @@ pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
 pub fn interval(
   ms milliseconds: Int,
   msg msg: msg,
-  on_created on_created: fn(timer.TimerId) -> msg,
+  on_created on_created: fn(TimerId) -> msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     let id = timer.interval(milliseconds, fn() { dispatch(msg) })
@@ -239,7 +254,7 @@ pub fn interval(
 ///   option.None -> effect.none()
 /// }
 /// ```
-pub fn cancel_interval(id: timer.TimerId) -> Effect(msg) {
+pub fn cancel_interval(id: TimerId) -> Effect(msg) {
   Effect(perform: fn(_dispatch) {
     timer.cancel_interval(id)
     Nil

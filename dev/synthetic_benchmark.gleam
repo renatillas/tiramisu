@@ -274,7 +274,7 @@ pub type ScenePair(id) {
 
 /// Create a scene with N meshes in a flat hierarchy
 fn create_scene(count: Int) -> option.Option(scene.Node) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
@@ -307,7 +307,7 @@ fn create_scene(count: Int) -> option.Option(scene.Node) {
 
 /// Create a pair of scenes (previous and current) with offset positions
 fn create_scene_pair(count: Int, offset: Float) -> ScenePair(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
@@ -365,7 +365,7 @@ fn create_scene_with_partial_changes(
   total_count: Int,
   percent_changed: Int,
 ) -> ScenePair(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
@@ -434,7 +434,7 @@ fn create_nested_scene_pair(depth: Int) -> ScenePair(String) {
 }
 
 fn create_nested_group(depth: Int, current: Int, offset: Float) -> scene.Node {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
@@ -468,7 +468,7 @@ fn create_cached_benchmark_input(
   count: Int,
   change_percent: Float,
 ) -> CachedBenchmarkInput {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,

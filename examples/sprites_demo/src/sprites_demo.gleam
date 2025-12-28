@@ -1,13 +1,11 @@
 /// Sprites Demo Example
 ///
 /// Demonstrates loading sprite textures from the internet and displaying them
-import gleam/javascript/promise
 import gleam/option.{type Option}
 import gleam/result
 import gleam/time/duration
 import gleam_community/maths
 import tiramisu
-import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -16,6 +14,7 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/texture
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 pub type Model {
@@ -33,6 +32,7 @@ pub fn main() -> Nil {
     tiramisu.run(
       dimensions: option.None,
       selector: "body",
+      bridge: option.None,
       init: init,
       update: update,
       view: view,
@@ -43,19 +43,8 @@ pub fn main() -> Nil {
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), Option(_)) {
   let model = Model(rotation: 0.0, texture: option.None)
 
-  // Load textures from the internet
-  // Using placeholder images for demonstration
-  let sprite_url = "star-struck.png"
-
   let load_effect =
-    effect.from_promise(
-      promise.map(asset.load_texture(sprite_url), fn(result) {
-        case result {
-          Ok(tex) -> TextureLoaded(tex)
-          Error(_) -> TextureLoadError
-        }
-      }),
-    )
+    texture.load("star-struck.png", TextureLoaded, TextureLoadError)
 
   #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
 }
@@ -121,7 +110,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-1",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(width: 2.0, height: 2.0)
+              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -146,7 +135,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-2",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(width: 2.0, height: 2.0)
+              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -169,7 +158,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-3",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(width: 1.5, height: 1.5)
+              let assert Ok(geometry) = geometry.plane(vec2.Vec2(1.5, 1.5))
               geometry
             },
             material: {
@@ -198,7 +187,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-4",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(width: 2.0, height: 2.0)
+              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {

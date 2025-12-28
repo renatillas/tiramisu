@@ -62,8 +62,8 @@ pub type Body {
 
 /// Collider shape
 pub type ColliderShape {
-  /// Box collider with half-extents
-  Box(offset: transform.Transform, width: Float, height: Float, depth: Float)
+  /// Box collider with size (width, height, depth)
+  Box(offset: transform.Transform, size: Vec3(Float))
   /// Sphere collider with radius
   Sphere(offset: transform.Transform, radius: Float)
   /// Capsule collider (cylinder with rounded caps)
@@ -343,22 +343,6 @@ pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
   )
 }
 
-/// Set the collider shape (required).
-///
-/// **Shapes:** Box, Sphere, Capsule, Cylinder
-/// **Offset**: Position relative to object center (usually `transform.identity`)
-///
-/// ## Example
-///
-/// ```gleam
-/// // Character capsule (best for characters)
-/// physics.new_rigid_body(physics.Dynamic)
-///   |> physics.with_collider(physics.Capsule(
-///     offset: transform.identity,
-///     half_height: 0.9,  // Total height = 1.8
-///     radius: 0.3,
-///   ))
-/// ```
 pub fn with_collider(
   builder: RigidBodyBuilder(_),
   collider: ColliderShape,
@@ -1473,8 +1457,12 @@ pub fn create_body(
 
   // Create collider descriptor and extract offset
   let #(collider_desc, offset) = case config.collider {
-    Box(offset, width, height, depth) -> #(
-      create_cuboid_collider_desc_ffi(width /. 2.0, height /. 2.0, depth /. 2.0),
+    Box(offset, size) -> #(
+      create_cuboid_collider_desc_ffi(
+        size.x /. 2.0,
+        size.y /. 2.0,
+        size.z /. 2.0,
+      ),
       offset,
     )
     Sphere(offset, radius) -> #(create_ball_collider_desc_ffi(radius), offset)

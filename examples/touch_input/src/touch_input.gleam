@@ -13,6 +13,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 // Camera field of view in degrees
@@ -28,14 +29,10 @@ pub type Model {
   Model(
     cube_position: vec3.Vec3(Float),
     cube_scale: Float,
-    touch_spheres: List(TouchSphere),
+    touches: List(input.Touch),
     canvas_width: Float,
     canvas_height: Float,
   )
-}
-
-pub type TouchSphere {
-  TouchSphere(id: Int, x: Float, y: Float)
 }
 
 pub type Msg {
@@ -45,10 +42,8 @@ pub type Msg {
 /// Convert screen coordinates to world coordinates at a given depth.
 /// Uses perspective projection with the camera's FOV.
 fn screen_to_world(
-  screen_x: Float,
-  screen_y: Float,
-  canvas_width: Float,
-  canvas_height: Float,
+  screen: vec2.Vec2(Float),
+  canvas_size: vec2.Vec2(Float),
   z_depth: Float,
 ) -> #(Float, Float) {
   // Calculate visible world dimensions at the given depth
@@ -56,14 +51,14 @@ fn screen_to_world(
   let tan_half_fov = maths.tan(fov_radians /. 2.0)
   let object_distance = float.absolute_value(z_depth)
   let visible_height = 2.0 *. object_distance *. tan_half_fov
-  let aspect = canvas_width /. canvas_height
+  let aspect = canvas_size.x /. canvas_size.y
   let visible_width = visible_height *. aspect
 
   // Convert screen pixels to world units
   let world_x =
-    { screen_x -. canvas_width /. 2.0 } *. visible_width /. canvas_width
+    { screen.x -. canvas_size.x /. 2.0 } *. visible_width /. canvas_size.x
   let world_y =
-    { canvas_height /. 2.0 -. screen_y } *. visible_height /. canvas_height
+    { canvas_size.y /. 2.0 -. screen.y } *. visible_height /. canvas_size.y
 
   #(world_x, world_y)
 }
@@ -76,6 +71,7 @@ pub fn main() -> Nil {
       update: update,
       view: view,
       selector: "body",
+      bridge: option.None,
     )
   Nil
 }
@@ -85,9 +81,9 @@ fn init(ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
     Model(
       cube_position: vec3.Vec3(0.0, 0.0, cube_depth),
       cube_scale: 1.0,
-      touch_spheres: [],
-      canvas_width: ctx.canvas_width,
-      canvas_height: ctx.canvas_height,
+      touches: [],
+      canvas_width: ctx.canvas_size.x,
+      canvas_height: ctx.canvas_size.y,
     )
   #(model, effect.tick(Tick), option.None)
 }
@@ -100,7 +96,6 @@ fn update(
   case msg {
     Tick -> {
       let touches = get_touches_or_mouse(ctx.input)
-      let spheres = list.map(touches, to_touch_sphere)
       let new_position = calculate_cube_position(touches, ctx, model)
       let new_scale = calculate_pinch_scale(touches, model)
 
@@ -108,9 +103,9 @@ fn update(
         Model(
           cube_position: new_position,
           cube_scale: new_scale,
-          touch_spheres: spheres,
-          canvas_width: ctx.canvas_width,
-          canvas_height: ctx.canvas_height,
+          touches:,
+          canvas_width: ctx.canvas_size.x,
+          canvas_height: ctx.canvas_size.y,
         )
 
       #(new_model, effect.tick(Tick), option.None)
@@ -125,17 +120,12 @@ fn get_touches_or_mouse(input: input.InputState) -> List(input.Touch) {
       case input.is_left_button_just_pressed(input) {
         True -> {
           let mouse = input.mouse_position(input)
-          [input.Touch(id: 0, x: mouse.0, y: mouse.1)]
+          [input.Touch(id: 0, position: mouse)]
         }
         False -> []
       }
     touches -> touches
   }
-}
-
-/// Convert touch to TouchSphere for visual indicators
-fn to_touch_sphere(touch: input.Touch) -> TouchSphere {
-  TouchSphere(id: touch.id, x: touch.x, y: touch.y)
 }
 
 /// Calculate cube position from single touch
@@ -146,14 +136,7 @@ fn calculate_cube_position(
 ) -> vec3.Vec3(Float) {
   case touches {
     [first, ..] -> {
-      let #(x, y) =
-        screen_to_world(
-          first.x,
-          first.y,
-          ctx.canvas_width,
-          ctx.canvas_height,
-          cube_depth,
-        )
+      let #(x, y) = screen_to_world(first.position, ctx.canvas_size, cube_depth)
       vec3.Vec3(x, y, cube_depth)
     }
     [] -> model.cube_position
@@ -164,8 +147,8 @@ fn calculate_cube_position(
 fn calculate_pinch_scale(touches: List(input.Touch), model: Model) -> Float {
   case touches {
     [first, second, ..] -> {
-      let dx = first.x -. second.x
-      let dy = first.y -. second.y
+      let dx = first.position.x -. second.position.x
+      let dy = first.position.y -. second.position.y
       let distance =
         float.square_root({ dx *. dx } +. { dy *. dy })
         |> result.unwrap(200.0)
@@ -181,11 +164,11 @@ fn calculate_pinch_scale(touches: List(input.Touch), model: Model) -> Float {
   }
 }
 
-fn view(model: Model, _) -> scene.Node {
+fn view(model: Model, ctx) -> scene.Node {
   let camera_node = create_camera()
   let lights = create_lights()
   let main_cube = create_main_cube(model)
-  let touch_indicators = create_touch_indicators(model)
+  let touch_indicators = create_touch_indicators(model, ctx)
 
   scene.empty(
     id: "scene",
@@ -228,7 +211,7 @@ fn create_lights() -> List(scene.Node) {
 
 /// Create the main controllable cube
 fn create_main_cube(model: Model) -> List(scene.Node) {
-  let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
+  let assert Ok(box) = geometry.box(vec3.Vec3(2.0, 2.0, 2.0))
   let assert Ok(cube_material) =
     material.new()
     |> material.with_color(0x4ecdc4)
@@ -248,20 +231,22 @@ fn create_main_cube(model: Model) -> List(scene.Node) {
 }
 
 /// Create visual indicators for touch points
-fn create_touch_indicators(model: Model) -> List(scene.Node) {
-  list.map(model.touch_spheres, fn(touch) {
-    create_touch_indicator(touch, model.canvas_width, model.canvas_height)
+fn create_touch_indicators(
+  model: Model,
+  ctx: tiramisu.Context,
+) -> List(scene.Node) {
+  list.map(model.touches, fn(touch) {
+    create_touch_indicator(touch, ctx.canvas_size)
   })
 }
 
 /// Create a single touch indicator sphere
 fn create_touch_indicator(
-  touch: TouchSphere,
-  canvas_width: Float,
-  canvas_height: Float,
+  touch: input.Touch,
+  canvas_size: vec2.Vec2(Float),
 ) -> scene.Node {
   let assert Ok(sphere) =
-    geometry.sphere(radius: 0.3, width_segments: 16, height_segments: 16)
+    geometry.sphere(radius: 0.3, segments: vec2.Vec2(16, 16))
   let assert Ok(indicator_material) =
     material.basic(
       color: 0xff00ff,
@@ -271,13 +256,7 @@ fn create_touch_indicator(
     )
 
   let #(x, y) =
-    screen_to_world(
-      touch.x,
-      touch.y,
-      canvas_width,
-      canvas_height,
-      touch_indicator_depth,
-    )
+    screen_to_world(touch.position, canvas_size, touch_indicator_depth)
 
   scene.mesh(
     id: "touch-" <> int.to_string(touch.id),

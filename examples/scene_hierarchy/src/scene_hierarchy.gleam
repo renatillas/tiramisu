@@ -10,6 +10,7 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+import vec/vec3f
 
 pub type Model {
   Model(rotation: Float, show_planets: Bool)
@@ -23,6 +24,7 @@ pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
       dimensions: option.None,
+      bridge: option.None,
       selector: "body",
       init: init,
       update: update,
@@ -81,8 +83,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "sun",
       geometry: {
-        let assert Ok(geometry) =
-          geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+        let assert Ok(geometry) = geometry.box(vec3.Vec3(2.0, 2.0, 2.0))
         geometry
       },
       material: {
@@ -104,8 +105,7 @@ fn view(model: Model, _) -> scene.Node {
       scene.mesh(
         id: "planet-1",
         geometry: {
-          let assert Ok(geometry) =
-            geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+          let assert Ok(geometry) = geometry.box(vec3f.one)
           geometry
         },
         material: {
@@ -127,8 +127,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "planet-1-moon",
             geometry: {
-              let assert Ok(geometry) =
-                geometry.box(width: 0.5, height: 0.5, depth: 0.5)
+              let assert Ok(geometry) = geometry.box(vec3.Vec3(0.5, 0.5, 0.5))
               geometry
             },
             material: {
@@ -150,8 +149,7 @@ fn view(model: Model, _) -> scene.Node {
       scene.mesh(
         id: "planet-2",
         geometry: {
-          let assert Ok(geometry) =
-            geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+          let assert Ok(geometry) = geometry.box(vec3f.one)
           geometry
         },
         material: {

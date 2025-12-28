@@ -1,8 +1,7 @@
 import gleam/javascript/promise
 import gleam/option
+import gleam/time/duration
 import tiramisu
-import tiramisu/asset
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -28,7 +27,7 @@ pub type Id {
 
 pub type LoadState {
   Loading
-  Loaded(asset.BufferGeometry)
+  Loaded(geometry.CustomGeometry)
   Failed
 }
 
@@ -38,37 +37,29 @@ pub type Model {
 
 pub type Msg {
   Tick
-  ModelLoaded(asset.BufferGeometry)
+  ModelLoaded(geometry.CustomGeometry)
   LoadingFailed
 }
 
 pub fn main() -> Nil {
-  tiramisu.run(
-    dimensions: option.None,
-    background: background.Color(0x1a1a2e),
-    init: init,
-    update: update,
-    view: view,
-  )
+  let assert Ok(Nil) =
+    tiramisu.run(
+      bridge: option.None,
+      dimensions: option.None,
+      selector: "body",
+      init: init,
+      update: update,
+      view: view,
+    )
+  Nil
 }
 
-fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   let model = Model(rotation: 0.0, load_state: Loading)
 
   // Load an STL file from the asset directory
   // Place your STL file in the Lustre asset folder
-  let load_effect =
-    effect.from_promise(
-      promise.map(asset.load_stl("model.stl"), fn(result) {
-        case result {
-          Ok(geom) -> ModelLoaded(geom)
-          Error(error) -> {
-            echo error
-            LoadingFailed
-          }
-        }
-      }),
-    )
+  let load_effect = geometry.load_stl("model.stl", ModelLoaded, LoadingFailed)
 
   #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
 }
@@ -76,16 +67,22 @@ fn init(_ctx: tiramisu.Context(Id)) -> #(Model, Effect(Msg), option.Option(_)) {
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
       #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
     ModelLoaded(geom) -> {
-      #(Model(..model, load_state: Loaded(geom)), effect.none(), option.None)
+      // Center the geometry so it rotates around its geometric center
+      let centered_geom = geometry.center(geom)
+      #(
+        Model(..model, load_state: Loaded(centered_geom)),
+        effect.none(),
+        option.None,
+      )
     }
 
     LoadingFailed -> {
@@ -94,13 +91,13 @@ fn update(
   }
 }
 
-fn view(model: Model, _) -> scene.Node(Id) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
   let camera_node =
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
       look_at: option.None,
@@ -110,9 +107,9 @@ fn view(model: Model, _) -> scene.Node(Id) {
     )
 
   let lights =
-    scene.empty(id: Lights, transform: transform.identity, children: [
+    scene.empty(id: "lights", transform: transform.identity, children: [
       scene.light(
-        id: Ambient,
+        id: "ambient",
         light: {
           let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
           light
@@ -120,7 +117,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
         transform: transform.identity,
       ),
       scene.light(
-        id: Directional,
+        id: "directional",
         light: {
           let assert Ok(light) =
             light.directional(color: 0xffffff, intensity: 10.5)
@@ -135,10 +132,9 @@ fn view(model: Model, _) -> scene.Node(Id) {
       // Show a spinning cube while loading
       let loading_cube =
         scene.mesh(
-          id: LoadingCube,
+          id: "loading-cube",
           geometry: {
-            let assert Ok(geometry) =
-              geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+            let assert Ok(geometry) = geometry.box(vec3f.one)
             geometry
           },
           material: {
@@ -163,7 +159,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
             )),
           physics: option.None,
         )
-      scene.empty(id: Scene, transform: transform.identity, children: [
+      scene.empty(id: "scene", transform: transform.identity, children: [
         camera_node,
         loading_cube,
         lights,
@@ -174,10 +170,9 @@ fn view(model: Model, _) -> scene.Node(Id) {
       // Show a red cube to indicate error
       let error_cube =
         scene.mesh(
-          id: ErrorCube,
+          id: "error-cube",
           geometry: {
-            let assert Ok(geometry) =
-              geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+            let assert Ok(geometry) = geometry.box(vec3f.one)
             geometry
           },
           material: {
@@ -193,7 +188,7 @@ fn view(model: Model, _) -> scene.Node(Id) {
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
           physics: option.None,
         )
-      scene.empty(id: Scene, transform: transform.identity, children: [
+      scene.empty(id: "scene", transform: transform.identity, children: [
         camera_node,
         error_cube,
         lights,
@@ -203,55 +198,24 @@ fn view(model: Model, _) -> scene.Node(Id) {
     Loaded(geom) -> {
       // Show the loaded STL model
       let model_node =
-        scene.empty(id: StlGroup, transform: transform.identity, children: [
-          scene.mesh(
-            id: Standard,
-            geometry: {
-              let assert Ok(geometry) =
-                geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-              geometry
-            },
-            material: {
-              let assert Ok(material) =
-                material.new()
-                |> material.with_color(0x4ecdc4)
-                |> material.with_metalness(0.8)
-                |> material.with_roughness(0.2)
-                |> material.build()
-              material
-            },
-            transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
-              |> transform.with_euler_rotation(vec3.Vec3(
-                0.0,
-                model.rotation,
-                0.0,
-              )),
-            physics: option.None,
-          ),
-          scene.mesh(
-            id: StlModel,
-            geometry: geometry.custom_geometry(geom),
-            material: {
-              let assert Ok(material) =
-                material.new()
-                |> material.with_color(0x4ecdc4)
-                |> material.with_metalness(0.8)
-                |> material.with_roughness(0.2)
-                |> material.build()
-              material
-            },
-            transform: transform.at(position: vec3f.zero)
-              |> transform.with_euler_rotation(vec3.Vec3(
-                0.0,
-                model.rotation,
-                0.0,
-              ))
-              |> transform.with_scale(vec3.Vec3(0.1, 0.1, 0.1)),
-            physics: option.None,
-          ),
-        ])
-
-      scene.empty(id: Scene, transform: transform.identity, children: [
+        scene.mesh(
+          id: "stl-model",
+          geometry: geometry.custom_geometry(geom),
+          material: {
+            let assert Ok(material) =
+              material.new()
+              |> material.with_color(0x4ecdc4)
+              |> material.with_metalness(0.8)
+              |> material.with_roughness(0.2)
+              |> material.build()
+            material
+          },
+          transform: transform.at(position: vec3f.zero)
+            |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0))
+            |> transform.with_scale(vec3.Vec3(0.1, 0.1, 0.1)),
+          physics: option.None,
+        )
+      scene.empty(id: "scene", transform: transform.identity, children: [
         camera_node,
         model_node,
         lights,

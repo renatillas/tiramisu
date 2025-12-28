@@ -6,11 +6,9 @@
 /// - Creating flat 2D text (depth = 0)
 /// - Animating text rotation
 import gleam/io
-import gleam/javascript/promise
 import gleam/option
+import gleam/time/duration
 import tiramisu
-import tiramisu/asset
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -21,40 +19,36 @@ import tiramisu/transform
 import vec/vec3
 
 pub type Model {
-  Model(rotation: Float, font: option.Option(asset.Font))
+  Model(rotation: Float, font: option.Option(geometry.Font))
 }
 
 pub type Msg {
   Tick
-  FontLoaded(asset.Font)
-  FontLoadError(asset.LoadError)
+  FontLoaded(geometry.Font)
+  FontLoadError
 }
 
 pub fn main() -> Nil {
-  tiramisu.run(
-    dimensions: option.None,
-    background: background.Color(0x0a0a1a),
-    init: init,
-    update: update,
-    view: view,
-  )
+  let assert Ok(Nil) =
+    tiramisu.run(
+      bridge: option.None,
+      dimensions: option.None,
+      selector: "body",
+      init: init,
+      update: update,
+      view: view,
+    )
+  Nil
 }
 
-fn init(
-  _ctx: tiramisu.Context(String),
-) -> #(Model, Effect(Msg), option.Option(_)) {
+fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   // Load Helvetiker font from Three.js CDN
   let load_effect =
-    asset.load_font(
+    geometry.load_font(
       "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/fonts/helvetiker_regular.typeface.json",
+      FontLoaded,
+      FontLoadError,
     )
-    |> promise.map(fn(result) {
-      case result {
-        Ok(font) -> FontLoaded(font)
-        Error(err) -> FontLoadError(err)
-      }
-    })
-    |> effect.from_promise
 
   #(Model(rotation: 0.0, font: option.None), load_effect, option.None)
 }
@@ -62,11 +56,11 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(String),
+  ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.0003
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
       #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
     }
 
@@ -75,14 +69,14 @@ fn update(
       #(Model(..model, font: option.Some(font)), effect.tick(Tick), option.None)
     }
 
-    FontLoadError(_err) -> {
+    FontLoadError -> {
       io.println("Failed to load font!")
       #(model, effect.none(), option.None)
     }
   }
 }
 
-fn view(model: Model, _) -> scene.Node(String) {
+fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -151,13 +145,13 @@ fn view(model: Model, _) -> scene.Node(String) {
 /// Create 3D text with depth and optional beveling
 fn create_3d_text(
   text: String,
-  font: asset.Font,
+  font: geometry.Font,
   x: Float,
   y: Float,
   rotation: Float,
   color: Int,
   bevel: Bool,
-) -> scene.Node(String) {
+) -> scene.Node {
   let assert Ok(text_geom) =
     geometry.text(
       text: text,
@@ -192,12 +186,12 @@ fn create_3d_text(
 /// Create flat 2D text (no depth)
 fn create_flat_text(
   text: String,
-  font: asset.Font,
+  font: geometry.Font,
   x: Float,
   y: Float,
   rotation: Float,
   color: Int,
-) -> scene.Node(String) {
+) -> scene.Node {
   let assert Ok(text_geom) =
     geometry.text(
       text: text,

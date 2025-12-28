@@ -19,19 +19,17 @@ import tiramisu/internal/input_init
 import tiramisu/internal/input_manager
 import tiramisu/physics
 import tiramisu/scene
+import tiramisu/ui
+import vec/vec2.{type Vec2}
 
-/// Canvas dimensions for the game window.
+/// Canvas dimensions type alias for the game window.
 ///
 /// Used with `tiramisu.run()` to specify the size of the game canvas.
 /// If not provided (None), the game will run in fullscreen mode.
+/// Vec2(x, y) where x is width and y is height.
 ///
-pub type Dimensions {
-  Dimensions(width: Float, height: Float)
-}
-
-/// Opaque type for the WebGL renderer (for performance stats)
-pub type Renderer =
-  scene.WebGLRenderer
+pub type Dimensions =
+  Vec2(Float)
 
 /// Game context passed to init and update functions.
 ///
@@ -41,8 +39,7 @@ pub type Renderer =
 ///
 /// - `delta_time`: Time elapsed since the last frame as a Duration. Use this for frame-rate independent movement and animations.
 /// - `input`: Current input state (keyboard, mouse, touch, gamepad)
-/// - `canvas_width`: Current canvas width in pixels
-/// - `canvas_height`: Current canvas height in pixels
+/// - `canvas_size`: Current canvas size in pixels as Vec2(width, height)
 /// - `physics_world`: Optional physics world handle (if physics is enabled)
 /// - `scene`: The Three.js scene instance (for background changes, etc.)
 /// - `renderer`: The WebGL renderer (for performance stats)
@@ -53,16 +50,31 @@ pub type Context {
     delta_time: Duration,
     /// Current input state (keyboard, mouse, touch, gamepad)
     input: input.InputState,
-    /// Current canvas width in pixels
-    canvas_width: Float,
-    /// Current canvas height in pixels
-    canvas_height: Float,
+    /// Current canvas size in pixels as Vec2(width, height)
+    canvas_size: Vec2(Float),
     /// Physics world handle (if physics is enabled)
     physics_world: Option(physics.PhysicsWorld),
     /// The Three.js scene instance
     scene: scene.Scene,
     /// The WebGL renderer (for performance stats)
-    renderer: Renderer,
+    renderer: scene.Renderer,
+  )
+}
+
+// Opaque type for the game runtime instance
+type GameRuntime
+
+@internal
+pub type FrameData(state, msg) {
+  FrameData(
+    messages: List(msg),
+    state: state,
+    prev_node: scene.Node,
+    context: Context,
+    renderer_state: scene.RendererState,
+    delta_time_ms: Float,
+    input_state: input.InputState,
+    canvas_size: Vec2(Float),
   )
 }
 
@@ -75,19 +87,44 @@ pub type Context {
 ///
 /// - `selector`: CSS selector for the container element (e.g., "#app", ".game-container")
 /// - `dimensions`: Canvas dimensions (width and height). Use `None` for fullscreen mode.
+/// - `bridge`: Optional UI bridge for Lustre integration. Use `None` for standalone games,
+///   or `Some(bridge)` to enable bidirectional communication with Lustre.
 /// - `init`: Function to create initial game state and effect
 /// - `update`: Function to update state based on messages
 /// - `view`: Function to render your game state as scene nodes
 ///
-/// ## Example
+/// ## Example (standalone game)
 ///
 /// ```gleam
 /// import tiramisu
-/// 
+///
 /// pub fn main() {
 ///   tiramisu.run(
 ///     selector: "#game",
 ///     dimensions: None,
+///     bridge: None,
+///     init: init,
+///     update: update,
+///     view: view,
+///   )
+/// }
+/// ```
+///
+/// ## Example (with Lustre UI)
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/ui
+///
+/// pub fn main() {
+///   let bridge = ui.new_bridge()
+///
+///   // Start Lustre first with bridge in flags...
+///
+///   tiramisu.run(
+///     selector: "#game",
+///     dimensions: None,
+///     bridge: Some(bridge),
 ///     init: init,
 ///     update: update,
 ///     view: view,
@@ -98,6 +135,7 @@ pub type Context {
 pub fn run(
   selector selector: String,
   dimensions dimensions: Option(Dimensions),
+  bridge bridge: Option(ui.Bridge(lustre_msg, msg)),
   init init: fn(Context) ->
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
   update update: fn(state, msg, Context) ->
@@ -112,40 +150,35 @@ pub fn run(
     scene.new_render_state(savoiardi.RendererOptions(
       antialias: True,
       alpha: False,
-      dimensions: dimensions
-        |> option.map(fn(dimensions) {
-          savoiardi.Dimensions(
-            height: dimensions.height,
-            width: dimensions.width,
-          )
-        }),
+      dimensions: dimensions,
     ))
 
   // Get canvas and append to container (so dimensions are available)
-  let webgl_renderer = scene.get_renderer(renderer_state)
-  let canvas = savoiardi.get_renderer_dom_element(webgl_renderer)
+  let renderer = scene.get_renderer(renderer_state)
+  let canvas = savoiardi.get_renderer_dom_element(renderer)
   element.append_child(container, canvas |> coerce)
+
+  // Initialize CSS2D renderer for HTML overlay labels
+  let renderer_state = scene.init_css2d_renderer(renderer_state, container)
 
   // Create input manager (will be initialized with listeners in game_loop)
   let input_mgr = input_manager.new()
 
   // Now get canvas dimensions (after it's in the DOM)
-  let #(initial_width, initial_height) =
-    savoiardi.get_canvas_dimensions(webgl_renderer)
+  let canvas_size = savoiardi.get_canvas_dimensions(renderer)
 
   // Get the Three.js scene from renderer state
-  let three_scene = scene.get_scene(renderer_state)
+  let scene = scene.get_scene(renderer_state)
 
   // Initial context with empty input (no physics_world yet)
   let initial_context =
     Context(
       delta_time: duration.nanoseconds(0),
       input: input.new(),
-      canvas_width: initial_width,
-      canvas_height: initial_height,
+      canvas_size:,
       physics_world: option.None,
-      scene: three_scene,
-      renderer: webgl_renderer,
+      scene:,
+      renderer:,
     )
 
   // Initialize game state
@@ -156,11 +189,10 @@ pub fn run(
     Context(
       delta_time: duration.nanoseconds(0),
       input: input.new(),
-      canvas_width: initial_width,
-      canvas_height: initial_height,
-      physics_world: physics_world,
-      scene: three_scene,
-      renderer: webgl_renderer,
+      canvas_size:,
+      physics_world:,
+      scene:,
+      renderer:,
     )
 
   // Set physics world in renderer state if provided
@@ -191,12 +223,12 @@ pub fn run(
 
   // Start game loop (now in pure Gleam!)
   game_loop(
+    bridge: bridge |> option.map(ui.get_internal),
     state: initial_state,
     prev_node: initial_root,
     pending_effect: initial_effect,
     context: updated_context,
     renderer_state: renderer_state_after_init,
-    message_queue: [],
     input_manager: input_mgr,
     canvas: canvas |> coerce,
     update: update,
@@ -212,12 +244,12 @@ pub fn run(
 
 /// Start the game loop
 fn game_loop(
+  bridge bridge: Option(ui.BridgeInternal),
   state state: state,
   prev_node prev_node: scene.Node,
   pending_effect pending_effect: effect.Effect(msg),
   context context: Context,
   renderer_state renderer_state: scene.RendererState,
-  message_queue message_queue: List(msg),
   input_manager input_manager: input_manager.InputManager,
   canvas canvas: element.Element,
   update update: fn(state, msg, Context) ->
@@ -227,11 +259,11 @@ fn game_loop(
   // Create the runtime instance that holds all mutable state (no globals!)
   let runtime =
     create_runtime_ffi(
+      bridge,
       state,
       prev_node,
       context,
       renderer_state,
-      message_queue,
       input_manager,
     )
 
@@ -276,9 +308,16 @@ fn schedule_frame_with_runtime(
         ..frame_data.context,
         delta_time: duration.milliseconds(float.round(frame_data.delta_time_ms)),
         input: frame_data.input_state,
-        canvas_width: frame_data.canvas_width,
-        canvas_height: frame_data.canvas_height,
+        canvas_size: frame_data.canvas_size,
       )
+
+    // Resume audio context on user interaction (browser autoplay policy)
+    let renderer_state_with_audio = case
+      input.has_user_interaction(frame_data.input_state)
+    {
+      True -> scene.resume_audio_context(frame_data.renderer_state)
+      False -> frame_data.renderer_state
+    }
 
     // Process all queued messages
     let #(new_state, combined_effect, final_physics_world) =
@@ -305,23 +344,34 @@ fn schedule_frame_with_runtime(
       scene.diff(
         option.Some(frame_data.prev_node),
         option.Some(new_node),
-        frame_data.renderer_state.cached_scene_dict,
+        renderer_state_with_audio.cached_scene_dict,
       )
 
     let new_renderer_state =
-      frame_data.renderer_state
+      renderer_state_with_audio
       |> scene.apply_patches(patches)
       |> scene.set_cached_scene_dict(option.Some(new_dict))
 
+    // Update animation mixers
+    scene.update_mixers(new_renderer_state, new_context.delta_time)
+
     // Render the scene to the canvas
     render_scene(new_renderer_state)
+
+    // Sync physics world from renderer state back to context
+    // This is necessary because apply_patches may create new physics bodies
+    let final_context = case scene.get_physics_world(new_renderer_state) {
+      option.Some(world) ->
+        Context(..new_context, physics_world: option.Some(world))
+      option.None -> new_context
+    }
 
     // Update runtime state
     update_runtime_state_ffi(
       runtime,
       new_state,
       new_node,
-      new_context,
+      final_context,
       new_renderer_state,
     )
 
@@ -339,24 +389,6 @@ fn schedule_frame_with_runtime(
     schedule_frame_with_runtime(runtime, update, view)
   })
   Nil
-}
-
-// Opaque type for the game runtime instance
-pub type GameRuntime
-
-// Type for frame data returned from FFI
-pub type FrameData(state, msg) {
-  FrameData(
-    messages: List(msg),
-    state: state,
-    prev_node: scene.Node,
-    context: Context,
-    renderer_state: scene.RendererState,
-    delta_time_ms: Float,
-    input_state: input.InputState,
-    canvas_width: Float,
-    canvas_height: Float,
-  )
 }
 
 /// Process all queued messages through the update function
@@ -483,14 +515,14 @@ fn apply_initial_scene_gleam(
 
 // --- FFI Declarations ---
 
-// Game runtime FFI 
+// Game runtime FFI
 @external(javascript, "./game_runtime.ffi.mjs", "createRuntime")
 fn create_runtime_ffi(
+  bridge: Option(ui.BridgeInternal),
   state: state,
   prev_node: scene.Node,
   context: Context,
   renderer_state: scene.RendererState,
-  message_queue: List(msg),
   input_manager: input_manager.InputManager,
 ) -> GameRuntime
 
@@ -557,5 +589,5 @@ fn render_cameras_ffi(
   ),
 ) -> Nil
 
-@external(javascript, "../../gleam_stdlib/gleam/function.mjs", "identity")
+@external(javascript, "../gleam_stdlib/gleam/function.mjs", "identity")
 fn coerce(a: a) -> b

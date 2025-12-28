@@ -6,7 +6,6 @@ import gleam/option
 import gleam/time/duration
 import gleam_community/maths
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/debug
 import tiramisu/effect
@@ -16,6 +15,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 pub type CameraView {
@@ -37,6 +37,7 @@ pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
       dimensions: option.None,
+      bridge: option.None,
       selector: "body",
       init: init,
       update: update,
@@ -156,15 +157,6 @@ fn update(
         option.None,
       )
     }
-  }
-}
-
-fn camera_view_to_string(view: CameraView) -> String {
-  case view {
-    TopDown -> "Top-down"
-    Side -> "Side"
-    FirstPerson -> "First-person"
-    Orbiting -> "Orbiting"
   }
 }
 
@@ -303,7 +295,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
   let overlay_size = 250
   let overlay_margin = 30
   let overlay_x =
-    float.round(ctx.canvas_width -. int.to_float(overlay_size + overlay_margin))
+    float.round(
+      ctx.canvas_size.x -. int.to_float(overlay_size + overlay_margin),
+    )
   let overlay_y = overlay_margin
 
   let camera_overlay =
@@ -314,10 +308,8 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: False,
       viewport: option.Some(camera.ViewPort(
-        overlay_x,
-        overlay_y,
-        overlay_size,
-        overlay_size,
+        position: vec2.Vec2(overlay_x, overlay_y),
+        size: vec2.Vec2(overlay_size, overlay_size),
       )),
       postprocessing: option.Some(
         camera.new_postprocessing()
@@ -356,8 +348,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "RotatingCube",
       geometry: {
-        let assert Ok(geometry) =
-          geometry.box(width: 4.0, height: 4.0, depth: 4.0)
+        let assert Ok(geometry) = geometry.box(vec3.Vec3(6.0, 6.0, 6.0))
         geometry
       },
       material: {
@@ -383,7 +374,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "Ground",
       geometry: {
-        let assert Ok(geometry) = geometry.plane(width: 100.0, height: 100.0)
+        let assert Ok(geometry) = geometry.plane(vec2.Vec2(100.0, 100.0))
         geometry
       },
       material: {
@@ -395,7 +386,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       },
       // -90 degrees to make it horizontal
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
-        |> transform.with_euler_rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
+        |> transform.with_euler_rotation(vec3.Vec3(
+          maths.pi() |> float.multiply(-0.5),
+          0.0,
+          0.0,
+        )),
       physics: option.None,
     )
 
@@ -413,11 +408,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
         id: "Sphere" <> int.to_string(i),
         geometry: {
           let assert Ok(geometry) =
-            geometry.sphere(
-              radius: 2.0,
-              width_segments: 16,
-              height_segments: 16,
-            )
+            geometry.sphere(radius: 2.0, segments: vec2.Vec2(16, 16))
           geometry
         },
         material: {

@@ -1,12 +1,10 @@
+import gleam/bool
 import gleam/dict
 import gleam/float
-import gleam/javascript/promise
-import gleam/list
 import gleam/option
 import gleam/time/duration
 import gleam_community/maths
 import tiramisu
-import tiramisu/asset
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -16,32 +14,32 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/texture
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
-pub type LoadedTextures {
-  LoadedTextures(
-    wood_color: texture.Texture,
-    wood_normal: texture.Texture,
-    wood_ao: texture.Texture,
-    wood_roughness: texture.Texture,
-    wood_displacement: texture.Texture,
-    paving_color: texture.Texture,
-    paving_normal: texture.Texture,
-    paving_ao: texture.Texture,
-    paving_roughness: texture.Texture,
-    onyx_color: texture.Texture,
-    onyx_normal: texture.Texture,
-    snow_color: texture.Texture,
-    snow_normal: texture.Texture,
-    snow_ao: texture.Texture,
-  )
+pub type Texture {
+  WoodColor
+  WoodNormal
+  WoodAmbientOcclusion
+  WoodRoughness
+  WoodDisplacement
+  PavingColor
+  PavingNormal
+  PavingAo
+  PavingRoughness
+  OnyxColor
+  OnyxNormal
+  SnowNormal
+  SnowColor
+  SnowAo
 }
 
 pub type Model {
   Model(
     rotation: Float,
     light_intensity: Float,
-    textures: option.Option(LoadedTextures),
+    textures: dict.Dict(Texture, texture.Texture),
+    all_textures_loaded: Bool,
     camera_position: vec3.Vec3(Float),
     camera_rotation: vec3.Vec3(Float),
     pointer_locked: Bool,
@@ -50,7 +48,8 @@ pub type Model {
 
 pub type Msg {
   Tick
-  TexturesLoaded(dict.Dict(String, Result(texture.Texture, Nil)))
+  TextureLoaded(Texture, texture.Texture)
+  TextureLoadError
   PointerLocked
   PointerLockFailed
 }
@@ -58,6 +57,7 @@ pub type Msg {
 pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
+      bridge: option.None,
       selector: "body",
       init: init,
       update: update,
@@ -70,63 +70,90 @@ pub fn main() -> Nil {
 fn init(
   _ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
-  // Load all textures in parallel
-  let keys = [
-    "wood_color",
-    "wood_normal",
-    "wood_ao",
-    "wood_roughness",
-    "wood_displacement",
-    "paving_color",
-    "paving_normal",
-    "paving_ao",
-    "paving_roughness",
-    "onyx_color",
-    "onyx_normal",
-    "snow_color",
-    "snow_normal",
-    "snow_ao",
-  ]
-
-  let texture_promises = [
-    asset.load_texture("wood-floor/WoodFloor041_1K-JPG_Color.jpg"),
-    asset.load_texture("wood-floor/WoodFloor041_1K-JPG_NormalGL.jpg"),
-    asset.load_texture("wood-floor/WoodFloor041_1K-JPG_AmbientOcclusion.jpg"),
-    asset.load_texture("wood-floor/WoodFloor041_1K-JPG_Roughness.jpg"),
-    asset.load_texture("wood-floor/WoodFloor041_1K-JPG_Displacement.jpg"),
-    asset.load_texture("paving-stones/PavingStones142_1K-JPG_Color.jpg"),
-    asset.load_texture("paving-stones/PavingStones142_1K-JPG_NormalGL.jpg"),
-    asset.load_texture(
-      "paving-stones/PavingStones142_1K-JPG_AmbientOcclusion.jpg",
+  let texture_loader_effects = [
+    texture.load(
+      "wood-floor/WoodFloor041_1K-JPG_Color.jpg",
+      TextureLoaded(WoodColor, _),
+      TextureLoadError,
     ),
-    asset.load_texture("paving-stones/PavingStones142_1K-JPG_Roughness.jpg"),
-    asset.load_texture("onyx/Onyx010_1K-JPG_Color.jpg"),
-    asset.load_texture("onyx/Onyx010_1K-JPG_NormalGL.jpg"),
-    asset.load_texture("snow/Snow008A_1K-JPG_Color.jpg"),
-    asset.load_texture("snow/Snow008A_1K-JPG_NormalGL.jpg"),
-    asset.load_texture("snow/Snow008A_1K-JPG_AmbientOcclusion.jpg"),
+    texture.load(
+      "wood-floor/WoodFloor041_1K-JPG_NormalGL.jpg",
+      TextureLoaded(WoodNormal, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "wood-floor/WoodFloor041_1K-JPG_AmbientOcclusion.jpg",
+      TextureLoaded(WoodAmbientOcclusion, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "wood-floor/WoodFloor041_1K-JPG_Roughness.jpg",
+      TextureLoaded(WoodRoughness, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "wood-floor/WoodFloor041_1K-JPG_Displacement.jpg",
+      TextureLoaded(WoodDisplacement, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "paving-stones/PavingStones142_1K-JPG_Color.jpg",
+      TextureLoaded(PavingColor, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "paving-stones/PavingStones142_1K-JPG_NormalGL.jpg",
+      TextureLoaded(PavingNormal, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "paving-stones/PavingStones142_1K-JPG_AmbientOcclusion.jpg",
+      TextureLoaded(PavingAo, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "paving-stones/PavingStones142_1K-JPG_Roughness.jpg",
+      TextureLoaded(PavingRoughness, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "onyx/Onyx010_1K-JPG_Color.jpg",
+      TextureLoaded(OnyxColor, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "onyx/Onyx010_1K-JPG_NormalGL.jpg",
+      TextureLoaded(OnyxNormal, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "snow/Snow008A_1K-JPG_Color.jpg",
+      TextureLoaded(SnowColor, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "snow/Snow008A_1K-JPG_NormalGL.jpg",
+      TextureLoaded(SnowNormal, _),
+      TextureLoadError,
+    ),
+    texture.load(
+      "snow/Snow008A_1K-JPG_AmbientOcclusion.jpg",
+      TextureLoaded(SnowAo, _),
+      TextureLoadError,
+    ),
   ]
-
-  let load_effect =
-    texture_promises
-    |> promise.await_list
-    |> promise.map(fn(results) {
-      list.zip(keys, results)
-      |> dict.from_list
-    })
-    |> promise.map(TexturesLoaded)
-    |> effect.from_promise
 
   #(
     Model(
       rotation: 0.0,
       light_intensity: 1.0,
-      textures: option.None,
+      textures: dict.new(),
+      all_textures_loaded: False,
       camera_position: vec3.Vec3(0.0, 2.0, 10.0),
       camera_rotation: vec3.Vec3(0.0, 0.0, 0.0),
       pointer_locked: False,
     ),
-    effect.batch([effect.tick(Tick), load_effect]),
+    effect.batch([effect.tick(Tick), ..texture_loader_effects]),
     option.None,
   )
 }
@@ -172,7 +199,7 @@ fn update(
 
       // Handle rotation input with mouse delta first
       let vec3.Vec3(cam_pitch, cam_yaw, cam_roll) = model.camera_rotation
-      let #(mouse_dx, mouse_dy) = input.mouse_delta(ctx.input)
+      let vec2.Vec2(mouse_dx, mouse_dy) = input.mouse_delta(ctx.input)
 
       let #(cam_yaw, cam_pitch) = case model.pointer_locked {
         True -> {
@@ -271,59 +298,17 @@ fn update(
       )
     }
 
-    TexturesLoaded(texture_dict) -> {
-      // Extract all textures from the dict
-      let textures = case
-        dict.get(texture_dict, "wood_color"),
-        dict.get(texture_dict, "wood_normal"),
-        dict.get(texture_dict, "wood_ao"),
-        dict.get(texture_dict, "wood_roughness"),
-        dict.get(texture_dict, "wood_displacement"),
-        dict.get(texture_dict, "paving_color"),
-        dict.get(texture_dict, "paving_normal"),
-        dict.get(texture_dict, "paving_ao"),
-        dict.get(texture_dict, "paving_roughness"),
-        dict.get(texture_dict, "onyx_color"),
-        dict.get(texture_dict, "onyx_normal"),
-        dict.get(texture_dict, "snow_color"),
-        dict.get(texture_dict, "snow_normal"),
-        dict.get(texture_dict, "snow_ao")
-      {
-        Ok(Ok(wood_color)),
-          Ok(Ok(wood_normal)),
-          Ok(Ok(wood_ao)),
-          Ok(Ok(wood_roughness)),
-          Ok(Ok(wood_displacement)),
-          Ok(Ok(paving_color)),
-          Ok(Ok(paving_normal)),
-          Ok(Ok(paving_ao)),
-          Ok(Ok(paving_roughness)),
-          Ok(Ok(onyx_color)),
-          Ok(Ok(onyx_normal)),
-          Ok(Ok(snow_color)),
-          Ok(Ok(snow_normal)),
-          Ok(Ok(snow_ao))
-        ->
-          option.Some(LoadedTextures(
-            wood_color:,
-            wood_normal:,
-            wood_ao:,
-            wood_roughness:,
-            wood_displacement:,
-            paving_color:,
-            paving_normal:,
-            paving_ao:,
-            paving_roughness:,
-            onyx_color:,
-            onyx_normal:,
-            snow_color:,
-            snow_normal:,
-            snow_ao:,
-          ))
-        _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> option.None
-      }
-
-      #(Model(..model, textures:), effect.none(), option.None)
+    TextureLoaded(constructor, texture) -> {
+      let all_textures_loaded = dict.size(model.textures) == 13
+      #(
+        Model(
+          ..model,
+          all_textures_loaded:,
+          textures: dict.insert(model.textures, constructor, texture),
+        ),
+        effect.none(),
+        option.None,
+      )
     }
 
     PointerLocked -> {
@@ -335,6 +320,7 @@ fn update(
       // Pointer lock failed (user might have denied it)
       #(Model(..model, pointer_locked: False), effect.none(), option.None)
     }
+    TextureLoadError -> panic
   }
 }
 
@@ -414,29 +400,8 @@ fn view(model: Model, _) -> scene.Node {
       ),
     ])
 
-  let assert Ok(box_geom) =
-    geometry.sphere(radius: 1.0, width_segments: 100, height_segments: 100)
-
-  // Get textures from model if loaded
-  let wood_color = option.map(model.textures, fn(t) { t.wood_color })
-  let wood_normal = option.map(model.textures, fn(t) { t.wood_normal })
-  let wood_ambient_oclusion = option.map(model.textures, fn(t) { t.wood_ao })
-  let wood_roughness = option.map(model.textures, fn(t) { t.wood_roughness })
-  let wood_displacement =
-    option.map(model.textures, fn(t) { t.wood_displacement })
-
-  let paving_color = option.map(model.textures, fn(t) { t.paving_color })
-  let paving_normal = option.map(model.textures, fn(t) { t.paving_normal })
-  let paving_ao = option.map(model.textures, fn(t) { t.paving_ao })
-  let paving_roughness =
-    option.map(model.textures, fn(t) { t.paving_roughness })
-
-  let onyx_color = option.map(model.textures, fn(t) { t.onyx_color })
-  let onyx_normal = option.map(model.textures, fn(t) { t.onyx_normal })
-
-  let snow_color = option.map(model.textures, fn(t) { t.snow_color })
-  let snow_normal = option.map(model.textures, fn(t) { t.snow_normal })
-  let snow_ao = option.map(model.textures, fn(t) { t.snow_ao })
+  let assert Ok(box_geometry) =
+    geometry.sphere(radius: 1.0, segments: vec2.Vec2(100, 100))
 
   // Create materials with textures
   let assert Ok(basic_mat) =
@@ -447,48 +412,52 @@ fn view(model: Model, _) -> scene.Node {
       map: option.None,
     )
 
-  let standard_material = case
-    wood_color,
-    wood_normal,
-    wood_ambient_oclusion,
-    wood_roughness,
-    wood_displacement
-  {
-    option.Some(color),
-      option.Some(normal),
-      option.Some(ambient_oclusion),
-      option.Some(roughness),
-      option.Some(displacement)
-    -> {
-      let assert Ok(standard_mat) =
-        material.new()
-        |> material.with_color(0xffffff)
-        |> material.with_metalness(0.0)
-        |> material.with_roughness(1.0)
-        |> material.with_color_map(color)
-        |> material.with_normal_map(normal)
-        |> material.with_ambient_oclusion_map(ambient_oclusion)
-        |> material.with_displacement_map(displacement)
-        |> material.with_displacement_scale(0.3)
-        |> material.with_displacement_bias(-0.15)
-        |> material.with_roughness_map(roughness)
-        |> material.build()
-      standard_mat
-    }
-    _, _, _, _, _ -> {
-      let assert Ok(standard_mat) =
-        material.new()
-        |> material.build()
-      standard_mat
-    }
-  }
+  use <- bool.guard(
+    !model.all_textures_loaded,
+    scene.empty(id: "loading", transform: transform.identity, children: []),
+  )
+
+  let assert Ok(standard_material) =
+    material.new()
+    |> material.with_color(0xffffff)
+    |> material.with_metalness(0.0)
+    |> material.with_roughness(1.0)
+    |> material.with_color_map({
+      let assert Ok(color) = dict.get(model.textures, WoodColor)
+      color
+    })
+    |> material.with_normal_map({
+      let assert Ok(normal) = dict.get(model.textures, WoodNormal)
+      normal
+    })
+    |> material.with_ambient_oclusion_map({
+      let assert Ok(ao) = dict.get(model.textures, WoodAmbientOcclusion)
+      ao
+    })
+    |> material.with_displacement_map({
+      let assert Ok(displacement) = dict.get(model.textures, WoodDisplacement)
+      displacement
+    })
+    |> material.with_displacement_scale(0.3)
+    |> material.with_displacement_bias(-0.15)
+    |> material.with_roughness_map({
+      let assert Ok(roughness) = dict.get(model.textures, WoodRoughness)
+      roughness
+    })
+    |> material.build()
 
   let assert Ok(phong_mat) =
     material.phong(
       color: 0xffffff,
       shininess: 100.0,
-      map: onyx_color,
-      normal_map: onyx_normal,
+      map: {
+        let assert Ok(onyx_color) = dict.get(model.textures, OnyxColor)
+        option.Some(onyx_color)
+      },
+      normal_map: {
+        let assert Ok(onyx_normal) = dict.get(model.textures, OnyxNormal)
+        option.Some(onyx_normal)
+      },
       ambient_oclusion_map: option.None,
       transparent: False,
       opacity: 1.0,
@@ -497,9 +466,18 @@ fn view(model: Model, _) -> scene.Node {
   let assert Ok(lambert_mat) =
     material.lambert(
       color: 0xffffff,
-      map: snow_color,
-      normal_map: snow_normal,
-      ambient_oclusion_map: snow_ao,
+      map: {
+        let assert Ok(snow_color) = dict.get(model.textures, SnowColor)
+        option.Some(snow_color)
+      },
+      normal_map: {
+        let assert Ok(snow_normal) = dict.get(model.textures, SnowNormal)
+        option.Some(snow_normal)
+      },
+      ambient_oclusion_map: {
+        let assert Ok(snow_ao) = dict.get(model.textures, SnowAo)
+        option.Some(snow_ao)
+      },
       transparent: False,
       opacity: 1.0,
       alpha_test: 0.0,
@@ -519,7 +497,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.empty(id: "spheres", transform: transform.identity, children: [
       scene.mesh(
         id: "basic",
-        geometry: box_geom,
+        geometry: box_geometry,
         material: basic_mat,
         transform: transform.at(position: vec3.Vec3(-6.0, 2.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
@@ -527,7 +505,7 @@ fn view(model: Model, _) -> scene.Node {
       ),
       scene.mesh(
         id: "standard",
-        geometry: box_geom,
+        geometry: box_geometry,
         material: standard_material,
         transform: transform.at(position: vec3.Vec3(-3.0, 2.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
@@ -535,7 +513,7 @@ fn view(model: Model, _) -> scene.Node {
       ),
       scene.mesh(
         id: "phong",
-        geometry: box_geom,
+        geometry: box_geometry,
         material: phong_mat,
         transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
@@ -543,7 +521,7 @@ fn view(model: Model, _) -> scene.Node {
       ),
       scene.mesh(
         id: "lambert",
-        geometry: box_geom,
+        geometry: box_geometry,
         material: lambert_mat,
         transform: transform.at(position: vec3.Vec3(3.0, 2.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
@@ -551,7 +529,7 @@ fn view(model: Model, _) -> scene.Node {
       ),
       scene.mesh(
         id: "toon",
-        geometry: box_geom,
+        geometry: box_geometry,
         material: toon_mat,
         transform: transform.at(position: vec3.Vec3(6.0, 2.0, 0.0))
           |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
@@ -559,37 +537,29 @@ fn view(model: Model, _) -> scene.Node {
       ),
     ])
 
-  let assert Ok(plane_geom) = geometry.plane(width: 20.0, height: 20.0)
-  let ground_material = case
-    paving_color,
-    paving_normal,
-    paving_ao,
-    paving_roughness
-  {
-    option.Some(color),
-      option.Some(normal),
-      option.Some(ao),
-      option.Some(roughness)
-    -> {
-      let assert Ok(ground_mat) =
-        material.new()
-        |> material.with_color(0xffffff)
-        |> material.with_metalness(0.0)
-        |> material.with_roughness(1.0)
-        |> material.with_color_map(color)
-        |> material.with_normal_map(normal)
-        |> material.with_ambient_oclusion_map(ao)
-        |> material.with_roughness_map(roughness)
-        |> material.build()
-      ground_mat
-    }
-    _, _, _, _ -> {
-      let assert Ok(ground_mat) =
-        material.new()
-        |> material.build()
-      ground_mat
-    }
-  }
+  let assert Ok(plane_geom) = geometry.plane(vec2.Vec2(20.0, 20.0))
+  let assert Ok(ground_material) =
+    material.new()
+    |> material.with_color(0xffffff)
+    |> material.with_metalness(0.0)
+    |> material.with_roughness(1.0)
+    |> material.with_color_map({
+      let assert Ok(color) = dict.get(model.textures, PavingColor)
+      color
+    })
+    |> material.with_normal_map({
+      let assert Ok(normal) = dict.get(model.textures, PavingNormal)
+      normal
+    })
+    |> material.with_ambient_oclusion_map({
+      let assert Ok(ao) = dict.get(model.textures, PavingAo)
+      ao
+    })
+    |> material.with_roughness_map({
+      let assert Ok(roughness) = dict.get(model.textures, PavingRoughness)
+      roughness
+    })
+    |> material.build()
 
   let ground =
     scene.mesh(

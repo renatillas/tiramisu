@@ -43,7 +43,7 @@ pub type Easing =
 ///   Color(r: Float, g: Float, b: Float)
 /// }
 ///
-/// let color_tween = tween.tween(
+/// let color_tween = tween.new(
 ///   start: Color(1.0, 0.0, 0.0),  // Red
 ///   end: Color(0.0, 0.0, 1.0),    // Blue
 ///   duration: duration.seconds(1),
@@ -57,7 +57,7 @@ pub type Easing =
 ///   },
 /// )
 /// ```
-pub fn tween(
+pub fn new(
   start: a,
   end: a,
   duration duration: Duration,
@@ -167,7 +167,7 @@ pub fn tween_float(
   duration duration: Duration,
   easing easing: Easing,
 ) -> Tween(Float) {
-  tween(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
+  new(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
     a +. { b -. a } *. t
   })
 }
@@ -195,7 +195,7 @@ pub fn tween_vec3(
   duration duration: Duration,
   easing easing: Easing,
 ) -> Tween(vec3.Vec3(Float)) {
-  tween(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
+  new(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
     vec3.Vec3(
       a.x +. { b.x -. a.x } *. t,
       a.y +. { b.y -. a.y } *. t,
@@ -230,7 +230,7 @@ pub fn tween_quaternion(
   duration duration: Duration,
   easing easing: Easing,
 ) -> Tween(quaternion.Quaternion) {
-  tween(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
+  new(start, end, duration:, easing:, lerp_fn: fn(a, b, t) {
     quaternion.spherical_linear_interpolation(from: a, to: b, t: t)
   })
 }
@@ -265,7 +265,7 @@ pub fn tween_transform(
   duration duration: Duration,
   easing easing: Easing,
 ) -> Tween(transform.Transform) {
-  tween(start, end, duration:, easing:, lerp_fn: transform.lerp)
+  new(start, end, duration:, easing:, lerp_fn: transform.lerp)
 }
 
 /// Reset a tween back to the beginning (elapsed time = 0).

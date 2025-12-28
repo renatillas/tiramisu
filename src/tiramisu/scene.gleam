@@ -1,16 +1,16 @@
 import gleam/dict
+import gleam/float
 import gleam/int
 import gleam/javascript/array
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option
 import gleam/order
-import gleam/time/duration.{type Duration}
+import gleam/time/duration
 import paint
 import paint/encode as paint_encode
-import plinth/browser/element
 import plinth/browser/window
 import savoiardi
-import tiramisu/animation.{type AnimationPlayback}
+import tiramisu/animation
 import tiramisu/audio
 import tiramisu/camera
 import tiramisu/geometry
@@ -22,8 +22,12 @@ import tiramisu/physics
 import tiramisu/spritesheet
 import tiramisu/texture
 import tiramisu/transform
-import vec/vec3.{type Vec3}
+import vec/vec2
+import vec/vec3
 import vec/vec3f
+
+pub type Object3D =
+  savoiardi.Object3D
 
 /// Level of Detail (LOD) configuration.
 ///
@@ -71,7 +75,7 @@ pub opaque type Node {
     transform: transform.Transform,
     geometry: geometry.Geometry,
     material: material.Material,
-    physics: Option(physics.RigidBody),
+    physics: option.Option(physics.RigidBody),
   )
   InstancedMesh(
     id: String,
@@ -91,10 +95,10 @@ pub opaque type Node {
     children: List(Node),
     camera: camera.Camera,
     transform: transform.Transform,
-    look_at: Option(vec3.Vec3(Float)),
+    look_at: option.Option(vec3.Vec3(Float)),
     active: Bool,
-    viewport: Option(#(Int, Int, Int, Int)),
-    postprocessing: Option(camera.PostProcessing),
+    viewport: option.Option(#(Int, Int, Int, Int)),
+    postprocessing: option.Option(camera.PostProcessing),
   )
   LOD(
     id: String,
@@ -105,19 +109,19 @@ pub opaque type Node {
   Model3D(
     id: String,
     children: List(Node),
-    object: savoiardi.Object3D,
+    object: Object3D,
     transform: transform.Transform,
-    animation: Option(AnimationPlayback),
-    physics: Option(physics.RigidBody),
-    material: Option(material.Material),
+    animation: option.Option(animation.AnimationPlayback),
+    physics: option.Option(physics.RigidBody),
+    material: option.Option(material.Material),
   )
   InstancedModel(
     id: String,
     children: List(Node),
-    object: savoiardi.Object3D,
+    object: Object3D,
     instances: List(transform.Transform),
-    physics: Option(physics.RigidBody),
-    material: Option(material.Material),
+    physics: option.Option(physics.RigidBody),
+    material: option.Option(material.Material),
   )
   Audio(id: String, children: List(Node), audio: audio.Audio)
   // UI overlay nodes
@@ -148,38 +152,40 @@ pub opaque type Node {
   AnimatedSprite(
     id: String,
     children: List(Node),
-    spritesheet: spritesheet.Spritesheet,
-    animation: spritesheet.Animation,
-    state: spritesheet.AnimationState,
+    sprite: spritesheet.Sprite,
     width: Float,
     height: Float,
     transform: transform.Transform,
-    pixel_art: Bool,
-    physics: Option(physics.RigidBody),
+    physics: option.Option(physics.RigidBody),
   )
   // Debug visualization nodes
   DebugBox(
     id: String,
     children: List(Node),
-    min: Vec3(Float),
-    max: Vec3(Float),
+    min: vec3.Vec3(Float),
+    max: vec3.Vec3(Float),
     color: Int,
   )
   DebugSphere(
     id: String,
     children: List(Node),
-    center: Vec3(Float),
+    center: vec3.Vec3(Float),
     radius: Float,
     color: Int,
   )
   DebugLine(
     id: String,
     children: List(Node),
-    from: Vec3(Float),
-    to: Vec3(Float),
+    from: vec3.Vec3(Float),
+    to: vec3.Vec3(Float),
     color: Int,
   )
-  DebugAxes(id: String, children: List(Node), origin: Vec3(Float), size: Float)
+  DebugAxes(
+    id: String,
+    children: List(Node),
+    origin: vec3.Vec3(Float),
+    size: Float,
+  )
   DebugGrid(
     id: String,
     children: List(Node),
@@ -190,7 +196,7 @@ pub opaque type Node {
   DebugPoint(
     id: String,
     children: List(Node),
-    position: Vec3(Float),
+    position: vec3.Vec3(Float),
     size: Float,
     color: Int,
   )
@@ -233,7 +239,7 @@ pub fn mesh(
   geometry geometry: geometry.Geometry,
   material material: material.Material,
   transform transform: transform.Transform,
-  physics physics: Option(physics.RigidBody),
+  physics physics: option.Option(physics.RigidBody),
 ) -> Node {
   Mesh(id:, children: [], transform:, geometry:, material:, physics:)
 }
@@ -394,17 +400,17 @@ pub fn light(
 ///     |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
 ///   look_at: option.None,
 ///   active: True,
-///   viewport: option.Some(camera.ViewPort(x: 10, y: 10, width: 200, height: 200)),
+///   viewport: option.Some(camera.ViewPort(position: vec2.Vec2(10, 10), size: vec2.Vec2(200, 200))),
 /// )
 /// ```
 pub fn camera(
   id id: String,
   camera camera: camera.Camera,
   transform transform: transform.Transform,
-  look_at look_at: Option(vec3.Vec3(Float)),
+  look_at look_at: option.Option(vec3.Vec3(Float)),
   active active: Bool,
-  viewport viewport: Option(camera.ViewPort),
-  postprocessing postprocessing: Option(camera.PostProcessing),
+  viewport viewport: option.Option(camera.ViewPort),
+  postprocessing postprocessing: option.Option(camera.PostProcessing),
 ) -> Node {
   Camera(
     id:,
@@ -414,7 +420,12 @@ pub fn camera(
     look_at:,
     active:,
     viewport: option.map(viewport, fn(viewport) {
-      #(viewport.x, viewport.y, viewport.width, viewport.height)
+      #(
+        viewport.position.x,
+        viewport.position.y,
+        viewport.size.x,
+        viewport.size.y,
+      )
     }),
     postprocessing:,
   )
@@ -476,7 +487,7 @@ pub fn lod(
 
 /// Create a 3D model node from a loaded asset (GLTF, FBX, OBJ).
 ///
-/// Use this for models loaded via the `asset` module. Supports animations and physics.
+/// Use this for models loaded via the `model` module. Supports animations and physics.
 ///
 /// **Animation**: Optional animation playback (single or blended). See `animation` module.
 /// **Physics**: Optional rigid body for physics simulation.
@@ -485,18 +496,19 @@ pub fn lod(
 ///
 /// ```gleam
 /// import tiramisu/scene
-/// import tiramisu/asset
+/// import tiramisu/model
 /// import tiramisu/animation
 /// import tiramisu/transform
 /// import vec/vec3
 /// import gleam/option
 /// import gleam/list
 ///
-/// // Load model from cache
-/// let assert Ok(gltf_data) = asset.get_model(cache, "character.glb")
+/// // After loading a GLTF model
+/// let scene_object = model.get_scene(gltf_data)
+/// let clips = model.get_animations(gltf_data)
 ///
 /// // Find walk animation
-/// let walk_clip = list.find(gltf_data.animations, fn(clip) {
+/// let walk_clip = list.find(clips, fn(clip) {
 ///   animation.clip_name(clip) == "Walk"
 /// })
 ///
@@ -504,21 +516,22 @@ pub fn lod(
 ///   |> animation.set_speed(1.2)
 ///   |> animation.set_loop(animation.LoopRepeat)
 ///
-/// scene.Model3D(
+/// scene.object_3d(
 ///   id: "player",
-///   object: gltf_data.scene,
+///   object: scene_object,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
 ///   animation: option.Some(animation.SingleAnimation(walk_anim)),
 ///   physics: option.None,
+///   material: option.None,
 /// )
 /// ```
 pub fn object_3d(
   id id: String,
-  object object: savoiardi.Object3D,
+  object object: Object3D,
   transform transform: transform.Transform,
-  animation animation: Option(AnimationPlayback),
-  physics physics: Option(physics.RigidBody),
-  material material: Option(material.Material),
+  animation animation: option.Option(animation.AnimationPlayback),
+  physics physics: option.Option(physics.RigidBody),
+  material material: option.Option(material.Material),
 ) -> Node {
   Model3D(
     id:,
@@ -540,38 +553,39 @@ pub fn object_3d(
 ///
 /// ```gleam
 /// import tiramisu/scene
-/// import tiramisu/asset
+/// import tiramisu/model
 /// import tiramisu/transform
 /// import vec/vec3
 /// import gleam/option
 /// import gleam/list
 ///
-/// // Load rock model
-/// let assert Ok(rock_data) = asset.get_model(cache, "rock.glb")
+/// // After loading a GLTF model
+/// let rock_scene = model.get_scene(rock_gltf)
 ///
 /// // Place 50 rocks around the scene
 /// let rock_positions = list.range(0, 49)
 ///   |> list.map(fn(i) {
 ///     let angle = int.to_float(i) *. 0.125
 ///     let radius = 20.0
-///     let x = radius *. gleam_community.maths.cos(angle)
-///     let z = radius *. gleam_community.maths.sin(angle)
+///     let x = radius *. float.cos(angle)
+///     let z = radius *. float.sin(angle)
 ///     transform.at(position: vec3.Vec3(x, 0.0, z))
 ///   })
 ///
 /// scene.instanced_model(
 ///   id: "rock-field",
-///   object: rock_data.scene,
+///   object: rock_scene,
 ///   instances: rock_positions,
 ///   physics: option.None,
+///   material: option.None,
 /// )
 /// ```
 pub fn instanced_model(
   id id: String,
-  object object: savoiardi.Object3D,
+  object object: Object3D,
   instances instances: List(transform.Transform),
-  physics physics: Option(physics.RigidBody),
-  material material: Option(material.Material),
+  physics physics: option.Option(physics.RigidBody),
+  material material: option.Option(material.Material),
 ) -> Node {
   InstancedModel(id:, object:, instances:, physics:, material:, children: [])
 }
@@ -688,8 +702,8 @@ pub fn css3d_label(
 /// Uses the `paint` library for canvas drawing operations.
 ///
 /// **Picture**: A paint.Picture created using paint's drawing API
-/// **Texture Width/Height**: Canvas texture resolution in pixels (higher = sharper but more memory)
-/// **Width/Height**: World space size of the canvas plane
+/// **Texture Size**: Canvas texture resolution in pixels as Vec2(width, height) (higher = sharper but more memory)
+/// **Size**: World space size of the canvas plane as Vec2(width, height)
 /// **Transform**: Position, rotation, scale
 ///
 /// ## Example
@@ -697,6 +711,7 @@ pub fn css3d_label(
 /// ```gleam
 /// import tiramisu/scene
 /// import tiramisu/transform
+/// import vec/vec2
 /// import vec/vec3
 /// import paint as p
 ///
@@ -718,20 +733,16 @@ pub fn css3d_label(
 /// scene.canvas(
 ///   id: "health",
 ///   picture: health_bar,
-///   texture_width: 256,
-///   texture_height: 64,
-///   width: 2.0,
-///   height: 0.5,
+///   texture_size: vec2.Vec2(256, 64),
+///   size: vec2.Vec2(2.0, 0.5),
 ///   transform: transform.at(position: vec3.Vec3(0.0, 2.0, 0.0)),
 /// )
 /// ```
 pub fn canvas(
   id id: String,
   picture picture: paint.Picture,
-  texture_width texture_width: Int,
-  texture_height texture_height: Int,
-  width width: Float,
-  height height: Float,
+  texture_size texture_size: vec2.Vec2(Int),
+  size size: vec2.Vec2(Float),
   transform transform: transform.Transform,
 ) -> Node {
   // Encode picture to string for efficient comparison and storage
@@ -740,10 +751,10 @@ pub fn canvas(
   Canvas(
     id:,
     encoded_picture:,
-    texture_width:,
-    texture_height:,
-    width:,
-    height:,
+    texture_width: texture_size.x,
+    texture_height: texture_size.y,
+    width: size.x,
+    height: size.y,
     transform:,
     children: [],
   )
@@ -752,56 +763,48 @@ pub fn canvas(
 /// Create an animated sprite node with spritesheet animation.
 ///
 /// Animated sprites display a textured plane that cycles through frames
-/// from a spritesheet. The animation state is managed in your model and
-/// updated each frame.
+/// from a spritesheet. The animation is managed by an AnimationMachine
+/// which handles frame advancement and animation state transitions.
 ///
 /// ## Parameters
 ///
 /// - `id`: Unique identifier for this sprite
-/// - `spritesheet`: The spritesheet definition
-/// - `animation`: The animation sequence to play
-/// - `state`: Current animation state (from your model)
-/// - `width`: World space width of the sprite plane
-/// - `height`: World space height of the sprite plane
+/// - `sprite`: The current sprite state from your animation machine
+/// - `size`: World space size of the sprite plane as Vec2(width, height)
 /// - `transform`: Position, rotation, and scale
-/// - `pixel_art`: If True, uses nearest-neighbor filtering for crisp pixels
+/// - `physics`: Optional physics body configuration
 ///
 /// ## Example
 ///
 /// ```gleam
-/// import iv
+/// import gleam/option
+/// import gleam/result
+/// import gleam/time/duration
 /// import tiramisu/scene
 /// import tiramisu/spritesheet
+/// import vec/vec2
 ///
 /// // In your init()
-/// let assert Ok(sheet) = spritesheet.from_grid(
-///   texture: player_texture,
-///   columns: 8,
-///   rows: 1,
-/// )
+/// let assert Ok(machine) =
+///   spritesheet.new(texture: player_texture, columns: 8, rows: 4)
+///   |> result.map(spritesheet.with_animation(
+///     _,
+///     name: "idle",
+///     frames: [0, 1, 2, 3],
+///     frame_duration: duration.milliseconds(100),
+///     loop: spritesheet.Repeat,
+///   ))
+///   |> result.map(spritesheet.with_pixel_art(_, True))
 ///
-/// let walk_anim = spritesheet.animation(
-///   name: "walk",
-///   frames: iv.from_list([0, 1, 2, 3, 4, 5, 6, 7]),
-///   frame_duration: 0.1,
-///   loop: spritesheet.Repeat,
-/// )
-///
-/// let model = Model(
-///   player_state: spritesheet.initial_state("walk"),
-///   // ...
-/// )
+/// let model = Model(machine: machine, ..)
 ///
 /// // In your update()
 /// fn update(model, msg, ctx) {
 ///   case msg {
 ///     Tick -> {
-///       let new_state = spritesheet.update(
-///         state: model.player_state,
-///         animation: walk_anim,
-///         delta_time: ctx.delta_time,
-///       )
-///       Model(..model, player_state: new_state)
+///       let #(new_machine, _) =
+///         spritesheet.update(model.machine, model.context, ctx.delta_time)
+///       Model(..model, machine: new_machine)
 ///     }
 ///   }
 /// }
@@ -810,14 +813,10 @@ pub fn canvas(
 /// fn view(model, _ctx) {
 ///   [
 ///     scene.animated_sprite(
-///       id: Player,
-///       spritesheet: sheet,
-///       animation: walk_anim,
-///       state: model.player_state,
-///       width: 2.0,
-///       height: 2.0,
-///       transform: transform.at(vec3.Vec3(0.0, 0.0, 0.0)),
-///       pixel_art: True,
+///       id: "player",
+///       sprite: spritesheet.to_sprite(model.machine),
+///       size: vec2.Vec2(2.0, 2.0),
+///       transform: transform.identity,
 ///       physics: option.None,
 ///     ),
 ///   ]
@@ -825,24 +824,17 @@ pub fn canvas(
 /// ```
 pub fn animated_sprite(
   id id: String,
-  spritesheet spritesheet: spritesheet.Spritesheet,
-  animation animation: spritesheet.Animation,
-  state state: spritesheet.AnimationState,
-  width width: Float,
-  height height: Float,
+  sprite sprite: spritesheet.Sprite,
+  size size: vec2.Vec2(Float),
   transform transform: transform.Transform,
-  pixel_art pixel_art: Bool,
-  physics physics: Option(physics.RigidBody),
+  physics physics: option.Option(physics.RigidBody),
 ) -> Node {
   AnimatedSprite(
     id:,
-    spritesheet:,
-    animation:,
-    state:,
-    width:,
-    height:,
+    sprite:,
+    width: size.x,
+    height: size.y,
     transform:,
-    pixel_art:,
     physics:,
     children: [],
   )
@@ -868,8 +860,8 @@ pub fn animated_sprite(
 /// ```
 pub fn debug_box(
   id id: String,
-  min min: Vec3(Float),
-  max max: Vec3(Float),
+  min min: vec3.Vec3(Float),
+  max max: vec3.Vec3(Float),
   color color: Int,
 ) -> Node {
   DebugBox(id:, min:, max:, color:, children: [])
@@ -897,7 +889,7 @@ pub fn debug_box(
 /// ```
 pub fn debug_sphere(
   id id: String,
-  center center: Vec3(Float),
+  center center: vec3.Vec3(Float),
   radius radius: Float,
   color color: Int,
 ) -> Node {
@@ -925,8 +917,8 @@ pub fn debug_sphere(
 /// ```
 pub fn debug_line(
   id id: String,
-  from from: Vec3(Float),
-  to to: Vec3(Float),
+  from from: vec3.Vec3(Float),
+  to to: vec3.Vec3(Float),
   color color: Int,
 ) -> Node {
   DebugLine(id:, from:, to:, color:, children: [])
@@ -959,7 +951,7 @@ pub fn debug_line(
 /// ```
 pub fn debug_axes(
   id id: String,
-  origin origin: Vec3(Float),
+  origin origin: vec3.Vec3(Float),
   size size: Float,
 ) -> Node {
   DebugAxes(id:, origin:, size:, children: [])
@@ -1024,7 +1016,7 @@ pub fn debug_grid(
 /// ```
 pub fn debug_point(
   id id: String,
-  position position: Vec3(Float),
+  position position: vec3.Vec3(Float),
   size size: Float,
   color color: Int,
 ) -> Node {
@@ -1092,26 +1084,29 @@ pub fn with_children(node: Node, children children: List(Node)) {
 /// ```
 @internal
 pub type Patch {
-  AddNode(id: String, node: Node, parent_id: Option(String))
+  AddNode(id: String, node: Node, parent_id: option.Option(String))
   RemoveNode(id: String)
   UpdateTransform(id: String, transform: transform.Transform)
-  UpdateMaterial(id: String, material: Option(material.Material))
+  UpdateMaterial(id: String, material: option.Option(material.Material))
   UpdateGeometry(id: String, geometry: geometry.Geometry)
   UpdateLight(id: String, light: light.Light)
-  UpdateAnimation(id: String, animation: Option(AnimationPlayback))
-  UpdatePhysics(id: String, physics: Option(physics.RigidBody))
+  UpdateAnimation(
+    id: String,
+    animation: option.Option(animation.AnimationPlayback),
+  )
+  UpdatePhysics(id: String, physics: option.Option(physics.RigidBody))
   UpdateAudio(id: String, audio: audio.Audio)
   UpdateInstances(id: String, instances: List(transform.Transform))
   UpdateLODLevels(id: String, levels: List(LODLevel))
   UpdateCamera(
     id: String,
     camera_type: camera.Camera,
-    look_at: Option(vec3.Vec3(Float)),
+    look_at: option.Option(vec3.Vec3(Float)),
   )
   SetActiveCamera(id: String)
   UpdateCameraPostprocessing(
     id: String,
-    postprocessing: Option(camera.PostProcessing),
+    postprocessing: option.Option(camera.PostProcessing),
   )
   UpdateCSS2DLabel(id: String, html: String, transform: transform.Transform)
   UpdateCSS3DLabel(id: String, html: String, transform: transform.Transform)
@@ -1126,20 +1121,17 @@ pub type Patch {
   )
   UpdateAnimatedSprite(
     id: String,
-    spritesheet: spritesheet.Spritesheet,
-    animation: spritesheet.Animation,
-    state: spritesheet.AnimationState,
+    sprite: spritesheet.Sprite,
     width: Float,
     height: Float,
     transform: transform.Transform,
-    pixel_art: Bool,
   )
 }
 
 /// Internal cache type for flattened scene nodes (used for optimization)
 @internal
 pub opaque type NodeWithParent {
-  NodeWithParent(node: Node, parent_id: Option(String), depth: Int)
+  NodeWithParent(node: Node, parent_id: option.Option(String), depth: Int)
 }
 
 fn flatten_scene(nodes: List(Node)) -> dict.Dict(String, NodeWithParent) {
@@ -1148,7 +1140,7 @@ fn flatten_scene(nodes: List(Node)) -> dict.Dict(String, NodeWithParent) {
 
 fn flatten_scene_helper(
   nodes: List(Node),
-  parent_id: Option(String),
+  parent_id: option.Option(String),
   current_depth: Int,
   acc: dict.Dict(String, NodeWithParent),
 ) -> dict.Dict(String, NodeWithParent) {
@@ -1166,9 +1158,9 @@ fn flatten_scene_helper(
 
 @internal
 pub fn diff(
-  previous: Option(Node),
-  current: Option(Node),
-  cached_prev_dict: Option(dict.Dict(String, NodeWithParent)),
+  previous: option.Option(Node),
+  current: option.Option(Node),
+  cached_prev_dict: option.Option(dict.Dict(String, NodeWithParent)),
 ) -> #(List(Patch), dict.Dict(String, NodeWithParent)) {
   // Early exit: if scenes are identical by reference, no work needed
   case previous == current {
@@ -1658,45 +1650,33 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
     AnimatedSprite(
       id: _,
       children: _,
-      spritesheet: previous_spritesheet,
-      animation: previous_animation,
-      state: previous_state,
+      sprite: previous_sprite,
       width: previous_width,
       height: previous_height,
       transform: previous_transform,
-      pixel_art: previous_pixel_art,
       physics: previous_physics,
     ),
       AnimatedSprite(
         id: _,
         children: _,
-        spritesheet: current_spritesheet,
-        animation: current_animation,
-        state: current_state,
+        sprite: current_sprite,
         width: current_width,
         height: current_height,
         transform: current_transform,
-        pixel_art: current_pixel_art,
         physics: current_physics,
       )
     ->
       compare_animated_sprite_fields(
         id:,
-        previous_spritesheet:,
-        previous_animation:,
-        previous_state:,
+        previous_sprite:,
         previous_width:,
         previous_height:,
         previous_transform:,
-        previous_pixel_art:,
         previous_physics:,
-        current_spritesheet:,
-        current_animation:,
-        current_state:,
+        current_sprite:,
         current_width:,
         current_height:,
         current_transform:,
-        current_pixel_art:,
         current_physics:,
       )
 
@@ -1917,11 +1897,11 @@ fn compare_mesh_fields(
   previous_geometry prev_geom: geometry.Geometry,
   previous_material prev_mat: material.Material,
   previous_transform prev_trans: transform.Transform,
-  previous_physics prev_phys: Option(physics.RigidBody),
+  previous_physics prev_phys: option.Option(physics.RigidBody),
   current_geometry curr_geom: geometry.Geometry,
   current_material curr_mat: material.Material,
   current_transform curr_trans: transform.Transform,
-  current_physics curr_phys: Option(physics.RigidBody),
+  current_physics curr_phys: option.Option(physics.RigidBody),
 ) -> List(Patch) {
   let patches = []
 
@@ -2029,16 +2009,16 @@ fn compare_camera_fields(
   id: String,
   previous_camera prev_cam: camera.Camera,
   previous_transform prev_trans: transform.Transform,
-  previous_look_at prev_look_at: Option(vec3.Vec3(Float)),
+  previous_look_at prev_look_at: option.Option(vec3.Vec3(Float)),
   previous_active prev_active: Bool,
-  previous_viewport prev_viewport: Option(#(Int, Int, Int, Int)),
-  previous_postprocessing prev_pp: Option(camera.PostProcessing),
+  previous_viewport prev_viewport: option.Option(#(Int, Int, Int, Int)),
+  previous_postprocessing prev_pp: option.Option(camera.PostProcessing),
   current_camera curr_cam: camera.Camera,
   current_transform curr_trans: transform.Transform,
-  current_look_at curr_look_at: Option(vec3.Vec3(Float)),
+  current_look_at curr_look_at: option.Option(vec3.Vec3(Float)),
   current_active curr_active: Bool,
-  current_viewport curr_viewport: Option(#(Int, Int, Int, Int)),
-  current_postprocessing curr_pp: Option(camera.PostProcessing),
+  current_viewport curr_viewport: option.Option(#(Int, Int, Int, Int)),
+  current_postprocessing curr_pp: option.Option(camera.PostProcessing),
 ) -> List(Patch) {
   let patches = []
 
@@ -2075,13 +2055,13 @@ fn compare_camera_fields(
 fn compare_model3d_fields(
   id: String,
   previous_transform prev_trans: transform.Transform,
-  previous_animation prev_anim: Option(AnimationPlayback),
-  previous_physics prev_phys: Option(physics.RigidBody),
-  previous_material prev_mat: Option(material.Material),
+  previous_animation prev_anim: option.Option(animation.AnimationPlayback),
+  previous_physics prev_phys: option.Option(physics.RigidBody),
+  previous_material prev_mat: option.Option(material.Material),
   current_transform curr_trans: transform.Transform,
-  current_animation curr_anim: Option(AnimationPlayback),
-  current_physics curr_phys: Option(physics.RigidBody),
-  current_material curr_mat: Option(material.Material),
+  current_animation curr_anim: option.Option(animation.AnimationPlayback),
+  current_physics curr_phys: option.Option(physics.RigidBody),
+  current_material curr_mat: option.Option(material.Material),
 ) -> List(Patch) {
   let patches = []
 
@@ -2112,11 +2092,11 @@ fn compare_model3d_fields(
 fn compare_instanced_model_fields(
   id id: String,
   previous_instances previous_instances: List(transform.Transform),
-  previous_physics previous_physics: Option(physics.RigidBody),
-  previous_material previous_material: Option(material.Material),
+  previous_physics previous_physics: option.Option(physics.RigidBody),
+  previous_material previous_material: option.Option(material.Material),
   current_instances current_instances: List(transform.Transform),
-  current_physics current_physics: Option(physics.RigidBody),
-  current_material current_material: Option(material.Material),
+  current_physics current_physics: option.Option(physics.RigidBody),
+  current_material current_material: option.Option(material.Material),
 ) -> List(Patch) {
   let patches = []
 
@@ -2141,22 +2121,16 @@ fn compare_instanced_model_fields(
 /// Compare AnimatedSprite fields using accumulator pattern
 fn compare_animated_sprite_fields(
   id id: String,
-  previous_spritesheet previous_spritesheet: spritesheet.Spritesheet,
-  previous_animation previous_animation: spritesheet.Animation,
-  previous_state previous_state: spritesheet.AnimationState,
+  previous_sprite previous_sprite: spritesheet.Sprite,
   previous_width previous_width: Float,
   previous_height previous_height: Float,
   previous_transform previous_transform: transform.Transform,
-  previous_pixel_art previous_pixel_art: Bool,
-  previous_physics previous_physics: Option(physics.RigidBody),
-  current_spritesheet current_spritesheet: spritesheet.Spritesheet,
-  current_animation current_animation: spritesheet.Animation,
-  current_state current_state: spritesheet.AnimationState,
+  previous_physics previous_physics: option.Option(physics.RigidBody),
+  current_sprite current_sprite: spritesheet.Sprite,
   current_width current_width: Float,
   current_height current_height: Float,
   current_transform current_transform: transform.Transform,
-  current_pixel_art current_pixel_art: Bool,
-  current_physics current_physics: Option(physics.RigidBody),
+  current_physics current_physics: option.Option(physics.RigidBody),
 ) -> List(Patch) {
   let patches = []
 
@@ -2166,24 +2140,18 @@ fn compare_animated_sprite_fields(
   }
 
   case
-    previous_spritesheet != current_spritesheet
-    || previous_animation != current_animation
-    || previous_state != current_state
+    previous_sprite != current_sprite
     || previous_width != current_width
     || previous_height != current_height
     || previous_transform != current_transform
-    || previous_pixel_art != current_pixel_art
   {
     True -> [
       UpdateAnimatedSprite(
         id,
-        current_spritesheet,
-        current_animation,
-        current_state,
+        current_sprite,
         current_width,
         current_height,
         current_transform,
-        current_pixel_art,
       ),
       ..patches
     ]
@@ -2196,7 +2164,7 @@ pub type Scene =
   savoiardi.Scene
 
 /// Opaque type for the WebGL renderer
-pub type WebGLRenderer =
+pub type Renderer =
   savoiardi.Renderer
 
 @internal
@@ -2204,26 +2172,24 @@ pub type DomElement =
   savoiardi.Canvas
 
 @internal
-pub type Dimensions =
-  savoiardi.Dimensions
-
-@internal
 pub type RendererState {
   RendererState(
     /// Three.js renderer instance
-    renderer: WebGLRenderer,
+    renderer: Renderer,
     /// Three.js scene instance
     scene: Scene,
     /// Object cache (Three.js objects, mixers, actions, etc.)
     cache: object_cache.CacheState,
     /// Optional physics world
-    physics_world: Option(physics.PhysicsWorld),
+    physics_world: option.Option(physics.PhysicsWorld),
     /// Audio manager state (Gleam-managed)
     audio_manager: audio_manager.AudioManagerState,
     /// Audio listener (singleton, attached to camera)
     audio_listener: savoiardi.AudioListener,
     /// Cached flattened scene dictionary from previous frame (optimization)
-    cached_scene_dict: Option(dict.Dict(String, NodeWithParent)),
+    cached_scene_dict: option.Option(dict.Dict(String, NodeWithParent)),
+    /// CSS2D renderer for HTML overlay labels
+    css2d_renderer: option.Option(savoiardi.CSS2DRenderer),
   )
 }
 
@@ -2231,8 +2197,6 @@ pub type RendererState {
 pub fn new_render_state(options: savoiardi.RendererOptions) -> RendererState {
   let renderer = savoiardi.create_renderer(options)
   let scene = savoiardi.create_scene()
-  let canvas = savoiardi.get_renderer_dom_element(renderer)
-  savoiardi.set_canvas(canvas)
 
   // Create audio listener (singleton)
   let audio_listener = savoiardi.create_audio_listener()
@@ -2245,11 +2209,12 @@ pub fn new_render_state(options: savoiardi.RendererOptions) -> RendererState {
     audio_manager: audio_manager.init(),
     audio_listener: audio_listener,
     cached_scene_dict: option.None,
+    css2d_renderer: option.None,
   )
 }
 
 @internal
-pub fn get_renderer(state: RendererState) -> WebGLRenderer {
+pub fn get_renderer(state: RendererState) -> Renderer {
   state.renderer
 }
 
@@ -2261,27 +2226,29 @@ pub fn get_scene(state: RendererState) -> Scene {
 @internal
 pub fn set_physics_world(
   state: RendererState,
-  world: Option(physics.PhysicsWorld),
+  world: option.Option(physics.PhysicsWorld),
 ) -> RendererState {
   RendererState(..state, physics_world: world)
 }
 
 @internal
-pub fn get_physics_world(state: RendererState) -> Option(physics.PhysicsWorld) {
+pub fn get_physics_world(
+  state: RendererState,
+) -> option.Option(physics.PhysicsWorld) {
   state.physics_world
 }
 
 @internal
 pub fn get_cached_scene_dict(
   state: RendererState,
-) -> Option(dict.Dict(String, NodeWithParent)) {
+) -> option.Option(dict.Dict(String, NodeWithParent)) {
   state.cached_scene_dict
 }
 
 @internal
 pub fn set_cached_scene_dict(
   state: RendererState,
-  cache: Option(dict.Dict(String, NodeWithParent)),
+  cache: option.Option(dict.Dict(String, NodeWithParent)),
 ) -> RendererState {
   RendererState(..state, cached_scene_dict: cache)
 }
@@ -2289,8 +2256,62 @@ pub fn set_cached_scene_dict(
 @internal
 pub fn resume_audio_context(state: RendererState) -> RendererState {
   let new_audio_manager =
-    audio_manager.resume_audio_context(state.audio_manager)
+    audio_manager.resume_audio_context(
+      state.audio_manager,
+      state.audio_listener,
+    )
   RendererState(..state, audio_manager: new_audio_manager)
+}
+
+/// Initialize CSS2D renderer and append to container
+/// Must be called after the main canvas is appended to the container
+@internal
+pub fn init_css2d_renderer(state: RendererState, container: a) -> RendererState {
+  let css2d_renderer = savoiardi.create_css2d_renderer()
+
+  // Get initial size from the WebGL renderer
+  let vec2.Vec2(width, height) = savoiardi.get_canvas_dimensions(state.renderer)
+  savoiardi.set_css2d_renderer_size(
+    css2d_renderer,
+    float.round(width),
+    float.round(height),
+  )
+
+  // Append CSS2D renderer element to container
+  let css2d_element = savoiardi.get_css2d_renderer_dom_element(css2d_renderer)
+  append_element_to_container(container, css2d_element)
+
+  RendererState(..state, css2d_renderer: option.Some(css2d_renderer))
+}
+
+@external(javascript, "../tiramisu.ffi.mjs", "appendElementToContainer")
+fn append_element_to_container(container: a, element: b) -> Nil
+
+/// Render CSS2D labels (call after main render)
+@internal
+pub fn render_css2d(state: RendererState, camera: savoiardi.Camera) -> Nil {
+  case state.css2d_renderer {
+    option.Some(css2d_renderer) ->
+      savoiardi.render_css2d(css2d_renderer, state.scene, camera)
+    option.None -> Nil
+  }
+}
+
+/// Update CSS2D renderer size (call on window resize)
+@internal
+pub fn update_css2d_renderer_size(state: RendererState) -> Nil {
+  case state.css2d_renderer {
+    option.Some(css2d_renderer) -> {
+      let vec2.Vec2(width, height) =
+        savoiardi.get_canvas_dimensions(state.renderer)
+      savoiardi.set_css2d_renderer_size(
+        css2d_renderer,
+        float.round(width),
+        float.round(height),
+      )
+    }
+    option.None -> Nil
+  }
 }
 
 @internal
@@ -2363,25 +2384,11 @@ pub fn apply_patch(state: RendererState, patch: Patch) -> RendererState {
 
     UpdateAnimatedSprite(
       id: id_val,
-      spritesheet: sheet,
-      animation: anim,
-      state: anim_state,
+      sprite: spr,
       width: w,
       height: h,
       transform: trans,
-      pixel_art: pixel_art,
-    ) ->
-      handle_update_animated_sprite(
-        state,
-        id_val,
-        sheet,
-        anim,
-        anim_state,
-        w,
-        h,
-        trans,
-        pixel_art,
-      )
+    ) -> handle_update_animated_sprite(state, id_val, spr, w, h, trans)
   }
 }
 
@@ -2393,7 +2400,7 @@ fn handle_add_node(
   state: RendererState,
   id: String,
   node: Node,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   case node {
     Mesh(
@@ -2561,25 +2568,19 @@ fn handle_add_node(
     AnimatedSprite(
       id: _,
       children: _,
-      spritesheet: sheet,
-      animation: anim,
-      state: anim_state,
+      sprite: spr,
       width: w,
       height: h,
       transform: trans,
-      pixel_art: pixel_art,
       physics: physics,
     ) ->
       handle_add_animated_sprite(
         state,
         id,
-        sheet,
-        anim,
-        anim_state,
+        spr,
         w,
         h,
         trans,
-        pixel_art,
         physics,
         parent_id,
       )
@@ -2589,8 +2590,8 @@ fn handle_add_node(
 // Helper: Add object to scene or parent
 fn add_to_scene_or_parent(
   state: RendererState,
-  object: savoiardi.Object3D,
-  parent_id: Option(String),
+  object: Object3D,
+  parent_id: option.Option(String),
 ) -> Nil {
   case parent_id {
     option.Some(pid) -> {
@@ -2609,8 +2610,8 @@ fn handle_add_mesh(
   geometry: geometry.Geometry,
   material: material.Material,
   transform: transform.Transform,
-  physics: Option(physics.RigidBody),
-  parent_id: Option(String),
+  physics: option.Option(physics.RigidBody),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
@@ -2656,7 +2657,7 @@ fn handle_add_instanced_mesh(
   geometry: geometry.Geometry,
   material: material.Material,
   instances: List(transform.Transform),
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let geometry_three = geometry.create_geometry(geometry)
   let material_three = material.create_material(material)
@@ -2678,11 +2679,11 @@ fn handle_add_instanced_mesh(
 fn handle_add_instanced_model(
   state: RendererState,
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   instances: List(transform.Transform),
-  physics: Option(physics.RigidBody),
-  material: Option(material.Material),
-  parent_id: Option(String),
+  physics: option.Option(physics.RigidBody),
+  material: option.Option(material.Material),
+  parent_id: option.Option(String),
 ) -> RendererState {
   // Extract all mesh/material pairs from the loaded model
   let #(geometries, materials) = savoiardi.extract_mesh_material_pairs(object)
@@ -2759,7 +2760,7 @@ fn handle_add_light(
   id: String,
   light: light.Light,
   transform: transform.Transform,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let light = light.create_light(light)
   savoiardi.apply_transform_with_quaternion(
@@ -2779,7 +2780,7 @@ fn handle_add_group(
   state: RendererState,
   id: String,
   transform: transform.Transform,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let group = savoiardi.create_group()
   savoiardi.apply_transform_with_quaternion(
@@ -2800,7 +2801,7 @@ fn handle_add_lod(
   id: String,
   transform: transform.Transform,
   levels: List(LODLevel),
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let lod = savoiardi.create_lod()
   savoiardi.apply_transform_with_quaternion(
@@ -2827,7 +2828,7 @@ fn handle_add_lod(
 }
 
 // Helper: Create Three.js object for LOD level
-fn create_lod_level_object(node: Node) -> savoiardi.Object3D {
+fn create_lod_level_object(node: Node) -> Object3D {
   case node {
     Mesh(
       id: _,
@@ -2895,12 +2896,12 @@ fn create_lod_level_object(node: Node) -> savoiardi.Object3D {
 fn handle_add_model3d(
   state: RendererState,
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   transform: transform.Transform,
-  animation: Option(AnimationPlayback),
-  physics: Option(physics.RigidBody),
-  material: Option(material.Material),
-  parent_id: Option(String),
+  animation: option.Option(animation.AnimationPlayback),
+  physics: option.Option(physics.RigidBody),
+  material: option.Option(material.Material),
+  parent_id: option.Option(String),
 ) -> RendererState {
   // For models with animations, we cannot clone because the animation clips
   // reference the original skeleton. Cloning would break the bone references.
@@ -2958,7 +2959,7 @@ fn handle_add_audio(
   state: RendererState,
   id: String,
   audio: audio.Audio,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   // Extract buffer and config from Audio type
   let #(buffer, config) = case audio {
@@ -2994,8 +2995,8 @@ fn handle_add_audio(
 // Helper: Calculate aspect ratio for camera
 // Uses viewport dimensions if specified, otherwise canvas or window dimensions
 fn calculate_aspect_ratio(
-  viewport: Option(#(Int, Int, Int, Int)),
-  canvas: element.Element,
+  viewport: option.Option(#(Int, Int, Int, Int)),
+  renderer: Renderer,
 ) -> Float {
   case viewport {
     option.Some(#(_x, _y, width, height)) -> {
@@ -3003,8 +3004,8 @@ fn calculate_aspect_ratio(
     }
     option.None -> {
       // Try canvas first
-      let canvas_width = savoiardi.get_canvas_client_width(canvas |> coerce)
-      let canvas_height = savoiardi.get_canvas_client_height(canvas |> coerce)
+      let vec2.Vec2(canvas_width, canvas_height) =
+        savoiardi.get_canvas_dimensions(renderer)
 
       case canvas_width >. 0.0 && canvas_height >. 0.0 {
         True -> canvas_width /. canvas_height
@@ -3024,16 +3025,13 @@ fn handle_add_camera(
   id: String,
   camera_type: camera.Camera,
   transform: transform.Transform,
-  look_at: Option(Vec3(Float)),
+  look_at: option.Option(vec3.Vec3(Float)),
   active: Bool,
-  viewport: Option(#(Int, Int, Int, Int)),
-  postprocessing: Option(camera.PostProcessing),
-  parent_id: Option(String),
+  viewport: option.Option(#(Int, Int, Int, Int)),
+  postprocessing: option.Option(camera.PostProcessing),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let canvas = savoiardi.get_renderer_dom_element(state.renderer)
-
-  // Calculate aspect ratio for perspective cameras
-  let aspect = calculate_aspect_ratio(viewport, canvas |> coerce)
+  let aspect = calculate_aspect_ratio(viewport, state.renderer)
 
   // Get projection and create camera based on type
   let projection = camera.get_projection(camera_type)
@@ -3099,7 +3097,11 @@ fn handle_add_camera(
   // Store viewport if specified
   let cache_with_viewport = case viewport {
     option.Some(#(x, y, width, height)) -> {
-      let vp = camera.ViewPort(x: x, y: y, width: width, height: height)
+      let vp =
+        camera.ViewPort(
+          position: vec2.Vec2(x, y),
+          size: vec2.Vec2(width, height),
+        )
       object_cache.set_viewport(state.cache, id, vp)
     }
     option.None -> state.cache
@@ -3115,12 +3117,9 @@ fn handle_add_camera(
   // Mark this ID as a camera in the cache
   let cache_with_camera = object_cache.add_camera(cache_with_postprocessing, id)
 
-  // Set as active camera if specified (both FFI and cache)
+  // Set as active camera if specified
   let cache_with_active = case active {
-    True -> {
-      savoiardi.set_active_camera(camera)
-      object_cache.set_active_camera(cache_with_camera, id)
-    }
+    True -> object_cache.set_active_camera(cache_with_camera, id)
     False -> cache_with_camera
   }
 
@@ -3132,12 +3131,12 @@ fn handle_add_camera(
 fn handle_add_debug_box(
   state: RendererState,
   id: String,
-  min: Vec3(Float),
-  max: Vec3(Float),
+  min: vec3.Vec3(Float),
+  max: vec3.Vec3(Float),
   color: Int,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_box(min, max, color)
+  let debug = create_debug_box(min, max, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3147,12 +3146,12 @@ fn handle_add_debug_box(
 fn handle_add_debug_sphere(
   state: RendererState,
   id: String,
-  center: Vec3(Float),
+  center: vec3.Vec3(Float),
   radius: Float,
   color: Int,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_sphere(center, radius, color)
+  let debug = create_debug_sphere(center, radius, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3162,12 +3161,12 @@ fn handle_add_debug_sphere(
 fn handle_add_debug_line(
   state: RendererState,
   id: String,
-  from: Vec3(Float),
-  to: Vec3(Float),
+  from: vec3.Vec3(Float),
+  to: vec3.Vec3(Float),
   color: Int,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_line(from, to, color)
+  let debug = create_debug_line(from, to, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3177,11 +3176,11 @@ fn handle_add_debug_line(
 fn handle_add_debug_axes(
   state: RendererState,
   id: String,
-  origin: Vec3(Float),
+  origin: vec3.Vec3(Float),
   size: Float,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_axes(origin, size)
+  let debug = create_debug_axes(origin, size)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3194,9 +3193,9 @@ fn handle_add_debug_grid(
   size: Float,
   divisions: Int,
   color: Int,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_grid(size, divisions, color)
+  let debug = create_debug_grid(size, divisions, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3206,12 +3205,12 @@ fn handle_add_debug_grid(
 fn handle_add_debug_point(
   state: RendererState,
   id: String,
-  position: Vec3(Float),
+  position: vec3.Vec3(Float),
   size: Float,
   color: Int,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  let debug = savoiardi.create_debug_point(position, size, color)
+  let debug = create_debug_point(position, size, color)
   add_to_scene_or_parent(state, debug, parent_id)
 
   let new_cache = object_cache.add_object(state.cache, id, debug)
@@ -3318,7 +3317,7 @@ fn handle_update_transform(
 fn handle_update_material(
   state: RendererState,
   id: String,
-  material: Option(material.Material),
+  material: option.Option(material.Material),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(object) -> {
@@ -3372,7 +3371,7 @@ fn handle_update_light(
 
       // Create new light
       let new_light = light.create_light(light)
-      let new_light_obj: savoiardi.Object3D = coerce(new_light)
+      let new_light_obj: Object3D = coerce(new_light)
 
       // Copy transform
       savoiardi.set_object_position(new_light_obj, position)
@@ -3395,7 +3394,7 @@ fn handle_update_light(
 fn handle_update_animation(
   state: RendererState,
   id: String,
-  animation: Option(AnimationPlayback),
+  animation: option.Option(animation.AnimationPlayback),
 ) -> RendererState {
   case object_cache.get_mixer(state.cache, id) {
     option.Some(mixer) -> {
@@ -3424,7 +3423,7 @@ fn handle_update_animation(
 fn handle_update_physics(
   state: RendererState,
   id: String,
-  new_physics: Option(physics.RigidBody),
+  new_physics: option.Option(physics.RigidBody),
 ) -> RendererState {
   case state.physics_world {
     option.Some(world) -> {
@@ -3481,7 +3480,7 @@ fn handle_update_physics(
 }
 
 // Helper to build Transform from Three.js object's position/quaternion/scale
-fn object_to_transform(object: savoiardi.Object3D) -> transform.Transform {
+fn object_to_transform(object: Object3D) -> transform.Transform {
   let position = savoiardi.get_object_position(object)
   let quaternion = savoiardi.get_object_quaternion(object)
   let scale = savoiardi.get_object_scale(object)
@@ -3511,7 +3510,13 @@ fn handle_update_audio(
 
   // Update audio config using Gleam audio manager
   let new_audio_manager =
-    audio_manager.update_audio_config(state.audio_manager, id, buffer, config)
+    audio_manager.update_audio_config(
+      state.audio_manager,
+      id,
+      buffer,
+      config,
+      state.audio_listener,
+    )
 
   RendererState(..state, audio_manager: new_audio_manager)
 }
@@ -3582,7 +3587,7 @@ fn handle_update_camera(
   state: RendererState,
   id: String,
   camera_type: camera.Camera,
-  look_at: Option(Vec3(Float)),
+  look_at: option.Option(vec3.Vec3(Float)),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(object) -> {
@@ -3597,16 +3602,15 @@ fn handle_update_camera(
           case projection {
             camera.Perspective(fov:, aspect: _, near:, far:) -> {
               // Calculate the correct aspect ratio instead of using placeholder
-              let canvas = savoiardi.get_renderer_dom_element(state.renderer)
               let viewport = object_cache.get_viewport(state.cache, id)
               // Convert Viewport to tuple format for calculate_aspect_ratio
               let viewport_tuple = case viewport {
-                option.Some(camera.ViewPort(x:, y:, width:, height:)) ->
-                  option.Some(#(x, y, width, height))
+                option.Some(camera.ViewPort(position:, size:)) ->
+                  option.Some(#(position.x, position.y, size.x, size.y))
                 option.None -> option.None
               }
               let calculated_aspect =
-                calculate_aspect_ratio(viewport_tuple, canvas |> coerce)
+                calculate_aspect_ratio(viewport_tuple, state.renderer)
 
               savoiardi.set_perspective_camera_params(
                 object |> coerce,
@@ -3664,9 +3668,8 @@ fn handle_update_camera(
 
 fn handle_set_active_camera(state: RendererState, id: String) -> RendererState {
   case object_cache.get_object(state.cache, id) {
-    Ok(object) -> {
-      savoiardi.set_active_camera(object |> coerce)
-      // Also update the cache to track which camera is active
+    Ok(_object) -> {
+      // Update the cache to track which camera is active
       let new_cache = object_cache.set_active_camera(state.cache, id)
       RendererState(..state, cache: new_cache)
     }
@@ -3677,7 +3680,7 @@ fn handle_set_active_camera(state: RendererState, id: String) -> RendererState {
 fn handle_update_camera_postprocessing(
   state: RendererState,
   id: String,
-  pp: Option(camera.PostProcessing),
+  pp: option.Option(camera.PostProcessing),
 ) -> RendererState {
   // Update the postprocessing config in the cache
   let new_cache = case pp {
@@ -3694,7 +3697,7 @@ fn handle_add_css2d_label(
   id: String,
   html: String,
   transform: transform.Transform,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let css2d_object = savoiardi.create_css2d_object(html)
   savoiardi.apply_transform_with_quaternion(
@@ -3737,7 +3740,7 @@ fn handle_add_css3d_label(
   id: String,
   html: String,
   transform: transform.Transform,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   let css3d_object = savoiardi.create_css3d_object(html)
   savoiardi.apply_transform_with_quaternion(
@@ -3783,18 +3786,18 @@ fn handle_add_canvas(
   width: Float,
   height: Float,
   transform: transform.Transform,
-  parent_id: Option(String),
+  parent_id: option.Option(String),
 ) -> RendererState {
   // Picture is already encoded, use it directly
   let texture =
-    savoiardi.create_canvas_texture_from_picture(
+    create_canvas_texture_from_picture(
       encoded_picture,
       texture_width,
       texture_height,
     )
 
   // Create plane mesh with the texture
-  let canvas_mesh = savoiardi.create_canvas_plane(texture, width, height)
+  let canvas_mesh = create_canvas_plane(texture, width, height)
 
   // Apply transform
   savoiardi.apply_transform_with_quaternion(
@@ -3805,7 +3808,7 @@ fn handle_add_canvas(
   )
 
   // Cache the encoded picture to avoid recreating texture on first update
-  savoiardi.set_canvas_cached_picture(canvas_mesh, encoded_picture)
+  set_canvas_cached_picture(canvas_mesh, encoded_picture)
 
   add_to_scene_or_parent(state, canvas_mesh, parent_id)
 
@@ -3827,20 +3830,20 @@ fn handle_update_canvas(
     Ok(object) -> {
       // Performance optimization: Only create new texture if picture changed
       // Check if encoded_picture differs from cached value
-      let cached_picture = savoiardi.get_canvas_cached_picture(object)
+      let cached_picture = get_canvas_cached_picture(object)
       let picture_changed = cached_picture != encoded_picture
 
       case picture_changed {
         True -> {
           // Picture changed - create new texture and cache the picture data
           let texture =
-            savoiardi.create_canvas_texture_from_picture(
+            create_canvas_texture_from_picture(
               encoded_picture,
               texture_width,
               texture_height,
             )
-          savoiardi.update_canvas_texture(object, texture)
-          savoiardi.set_canvas_cached_picture(object, encoded_picture)
+          update_canvas_texture(object, texture)
+          set_canvas_cached_picture(object, encoded_picture)
         }
         False -> {
           // Picture unchanged - skip expensive texture creation
@@ -3849,7 +3852,7 @@ fn handle_update_canvas(
       }
 
       // Always update size and transform (cheap operations)
-      savoiardi.update_canvas_size(object, width, height)
+      update_canvas_size(object, width, height)
       savoiardi.apply_transform_with_quaternion(
         object: object,
         position: transform.position(transform),
@@ -3866,49 +3869,45 @@ fn handle_update_canvas(
 fn handle_add_animated_sprite(
   state: RendererState,
   id: String,
-  sheet: spritesheet.Spritesheet,
-  anim: spritesheet.Animation,
-  anim_state: spritesheet.AnimationState,
+  sprite: spritesheet.Sprite,
   width: Float,
   height: Float,
-  transform: transform.Transform,
-  pixel_art: Bool,
-  physics: Option(physics.RigidBody),
-  parent_id: Option(String),
+  trans: transform.Transform,
+  physics: option.Option(physics.RigidBody),
+  parent_id: option.Option(String),
 ) -> RendererState {
-  // Get the base texture and clone it for independent animation
-  let base_texture = spritesheet.texture(sheet)
+  // Get the texture and clone it for independent animation
+  let base_texture = spritesheet.sprite_texture(sprite)
   let sprite_texture = texture.clone(base_texture)
 
   // Setup texture for spritesheet animation
-  let #(repeat_x, repeat_y) = spritesheet.frame_repeat(sheet)
+  let #(repeat_x, repeat_y) = spritesheet.sprite_frame_repeat(sprite)
   sprite_texture
-  |> texture.set_repeat(repeat_x, repeat_y)
+  |> texture.set_repeat(repeat: vec2.Vec2(repeat_x, repeat_y))
   |> texture.set_wrap_mode(texture.RepeatWrapping, texture.RepeatWrapping)
 
   // Apply pixel art filtering if requested
-  case pixel_art {
+  case spritesheet.sprite_pixel_art(sprite) {
     True ->
       sprite_texture
       |> texture.set_filter_mode(texture.NearestFilter, texture.NearestFilter)
     False -> sprite_texture
   }
 
-  // Get current frame and apply offset
-  let assert Ok(frame) = spritesheet.current_frame(anim_state, anim)
-  let #(offset_x, offset_y) = spritesheet.frame_offset(sheet, frame)
+  // Apply frame offset
+  let #(offset_x, offset_y) = spritesheet.sprite_frame_offset(sprite)
   sprite_texture
-  |> texture.set_offset(offset_x, offset_y)
+  |> texture.set_offset(offset: vec2.Vec2(offset_x, offset_y))
 
   // Create plane mesh with the animated texture
-  let sprite_mesh = savoiardi.create_canvas_plane(sprite_texture, width, height)
+  let sprite_mesh = create_canvas_plane(sprite_texture, width, height)
 
   // Apply transform
   savoiardi.apply_transform_with_quaternion(
     object: sprite_mesh,
-    position: transform.position(transform),
-    quaternion: transform.rotation_quaternion(transform),
-    scale: transform.scale(transform),
+    position: transform.position(trans),
+    quaternion: transform.rotation_quaternion(trans),
+    scale: transform.scale(trans),
   )
 
   add_to_scene_or_parent(state, sprite_mesh, parent_id)
@@ -3919,7 +3918,7 @@ fn handle_add_animated_sprite(
   let new_state = RendererState(..state, cache: new_cache)
   case physics, new_state.physics_world {
     option.Some(physics_config), option.Some(world) -> {
-      let new_world = physics.create_body(world, id, physics_config, transform)
+      let new_world = physics.create_body(world, id, physics_config, trans)
       RendererState(..new_state, physics_world: option.Some(new_world))
     }
     _, _ -> new_state
@@ -3929,28 +3928,25 @@ fn handle_add_animated_sprite(
 fn handle_update_animated_sprite(
   state: RendererState,
   id: String,
-  sheet: spritesheet.Spritesheet,
-  anim: spritesheet.Animation,
-  anim_state: spritesheet.AnimationState,
+  sprite: spritesheet.Sprite,
   width: Float,
   height: Float,
-  transform: transform.Transform,
-  pixel_art: Bool,
+  trans: transform.Transform,
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(obj) -> {
-      // Get the base texture and clone it for independent animation
-      let base_texture = spritesheet.texture(sheet)
+      // Get the texture and clone it for independent animation
+      let base_texture = spritesheet.sprite_texture(sprite)
       let sprite_texture = texture.clone(base_texture)
 
       // Setup texture for spritesheet animation
-      let #(repeat_x, repeat_y) = spritesheet.frame_repeat(sheet)
+      let #(repeat_x, repeat_y) = spritesheet.sprite_frame_repeat(sprite)
       sprite_texture
-      |> texture.set_repeat(repeat_x, repeat_y)
+      |> texture.set_repeat(repeat: vec2.Vec2(repeat_x, repeat_y))
       |> texture.set_wrap_mode(texture.RepeatWrapping, texture.RepeatWrapping)
 
       // Apply pixel art filtering if requested
-      case pixel_art {
+      case spritesheet.sprite_pixel_art(sprite) {
         True ->
           sprite_texture
           |> texture.set_filter_mode(
@@ -3960,24 +3956,23 @@ fn handle_update_animated_sprite(
         False -> sprite_texture
       }
 
-      // Get current frame and apply offset
-      let assert Ok(frame) = spritesheet.current_frame(anim_state, anim)
-      let #(offset_x, offset_y) = spritesheet.frame_offset(sheet, frame)
+      // Apply frame offset
+      let #(offset_x, offset_y) = spritesheet.sprite_frame_offset(sprite)
       sprite_texture
-      |> texture.set_offset(offset_x, offset_y)
+      |> texture.set_offset(offset: vec2.Vec2(offset_x, offset_y))
 
       // Update the mesh texture
-      savoiardi.update_canvas_texture(obj, sprite_texture)
+      update_canvas_texture(obj, sprite_texture)
 
       // Update size
-      savoiardi.update_canvas_size(obj, width, height)
+      update_canvas_size(obj, width, height)
 
       // Update transform
       savoiardi.apply_transform_with_quaternion(
         object: obj,
-        position: transform.position(transform),
-        quaternion: transform.rotation_quaternion(transform),
-        scale: transform.scale(transform),
+        position: transform.position(trans),
+        quaternion: transform.rotation_quaternion(trans),
+        scale: transform.scale(trans),
       )
 
       state
@@ -3990,19 +3985,41 @@ fn setup_animation(
   cache: object_cache.CacheState,
   id: String,
   mixer: object_cache.AnimationMixer,
-  playback: AnimationPlayback,
+  playback: animation.AnimationPlayback,
 ) -> object_cache.CacheState {
-  // Stop existing animations
-  case object_cache.get_actions(cache, id) {
-    option.Some(actions) -> stop_actions(actions)
-    option.None -> Nil
-  }
+  // Get current animation state to compare clip names
+  let current_state = object_cache.get_animation_state(cache, id)
 
   case playback {
     animation.SingleAnimation(anim) -> {
-      let action = create_animation_action(mixer, anim)
-      let actions = object_cache.SingleAction(action)
-      object_cache.set_actions(cache, id, actions)
+      let new_clip_name = animation.clip_name(anim.clip)
+      let new_state = object_cache.SingleState(new_clip_name)
+
+      // Check if we can just update existing action
+      case current_state, object_cache.get_actions(cache, id) {
+        option.Some(object_cache.SingleState(current_clip_name)),
+          option.Some(object_cache.SingleAction(existing_action))
+          if current_clip_name == new_clip_name
+        -> {
+          // Same clip - just update weight/speed on existing action
+          set_animation_weight_ffi(existing_action, anim.weight)
+          set_animation_time_scale_ffi(existing_action, anim.speed)
+          // Update state but keep same actions
+          object_cache.set_animation_state(cache, id, new_state)
+        }
+        _, _ -> {
+          // Different clip or no existing action - recreate
+          case object_cache.get_actions(cache, id) {
+            option.Some(actions) -> stop_actions(actions)
+            option.None -> Nil
+          }
+          let action = create_animation_action(mixer, anim)
+          let actions = object_cache.SingleAction(action)
+          cache
+          |> object_cache.set_actions(id, actions)
+          |> object_cache.set_animation_state(id, new_state)
+        }
+      }
     }
 
     animation.BlendedAnimations(
@@ -4010,19 +4027,54 @@ fn setup_animation(
       to: to_anim,
       blend_factor: blend_factor,
     ) -> {
-      let from_action = create_animation_action(mixer, from_anim)
-      let to_action = create_animation_action(mixer, to_anim)
+      let from_clip_name = animation.clip_name(from_anim.clip)
+      let to_clip_name = animation.clip_name(to_anim.clip)
+      let new_state = object_cache.BlendedState(from_clip_name, to_clip_name)
 
-      // Adjust weights based on blend factor
-      set_animation_weight_ffi(
-        from_action,
-        { 1.0 -. blend_factor } *. from_anim.weight,
-      )
-      set_animation_weight_ffi(to_action, blend_factor *. to_anim.weight)
+      // Check if we can just update weights on existing actions
+      case current_state, object_cache.get_actions(cache, id) {
+        option.Some(object_cache.BlendedState(current_from, current_to)),
+          option.Some(object_cache.BlendedActions(
+            from: existing_from_action,
+            to: existing_to_action,
+          ))
+          if current_from == from_clip_name && current_to == to_clip_name
+        -> {
+          // Same clips - just update weights on existing actions (preserves playback time!)
+          set_animation_weight_ffi(
+            existing_from_action,
+            { 1.0 -. blend_factor } *. from_anim.weight,
+          )
+          set_animation_weight_ffi(
+            existing_to_action,
+            blend_factor *. to_anim.weight,
+          )
+          // Update state but keep same actions
+          object_cache.set_animation_state(cache, id, new_state)
+        }
+        _, _ -> {
+          // Different clips or no existing actions - recreate
+          case object_cache.get_actions(cache, id) {
+            option.Some(actions) -> stop_actions(actions)
+            option.None -> Nil
+          }
+          let from_action = create_animation_action(mixer, from_anim)
+          let to_action = create_animation_action(mixer, to_anim)
 
-      let actions =
-        object_cache.BlendedActions(from: from_action, to: to_action)
-      object_cache.set_actions(cache, id, actions)
+          // Adjust weights based on blend factor
+          set_animation_weight_ffi(
+            from_action,
+            { 1.0 -. blend_factor } *. from_anim.weight,
+          )
+          set_animation_weight_ffi(to_action, blend_factor *. to_anim.weight)
+
+          let actions =
+            object_cache.BlendedActions(from: from_action, to: to_action)
+          cache
+          |> object_cache.set_actions(id, actions)
+          |> object_cache.set_animation_state(id, new_state)
+        }
+      }
     }
   }
 }
@@ -4105,7 +4157,7 @@ fn loop_once() -> Int {
 }
 
 @internal
-pub fn update_mixers(state: RendererState, delta_time: Duration) -> Nil {
+pub fn update_mixers(state: RendererState, delta_time: duration.Duration) -> Nil {
   let delta_time_seconds = duration.to_seconds(delta_time)
 
   let mixers = object_cache.get_all_mixers(state.cache)
@@ -4163,7 +4215,7 @@ pub fn clear_cache(state: RendererState) -> RendererState {
 @internal
 pub fn get_cameras_with_viewports(
   state: RendererState,
-) -> List(#(savoiardi.Object3D, camera.ViewPort)) {
+) -> List(#(Object3D, camera.ViewPort)) {
   object_cache.get_cameras_with_viewports(state.cache)
   |> list.map(fn(entry) {
     let #(camera_obj, viewport) = entry
@@ -4179,9 +4231,9 @@ pub fn get_all_cameras_with_info(
 ) -> List(
   #(
     String,
-    savoiardi.Object3D,
-    Option(camera.ViewPort),
-    Option(camera.PostProcessing),
+    Object3D,
+    option.Option(camera.ViewPort),
+    option.Option(camera.PostProcessing),
     Bool,
   ),
 ) {
@@ -4195,10 +4247,72 @@ pub fn get_all_cameras_with_info(
 @external(javascript, "../../gleam_stdlib/gleam/function.mjs", "identity")
 fn coerce(a: a) -> b
 
+// Canvas/Paint integration functions - tiramisu-specific, not pure Three.js bindings
+@external(javascript, "../tiramisu.ffi.mjs", "createCanvasTextureFromPicture")
+fn create_canvas_texture_from_picture(
+  encoded_picture: String,
+  width: Int,
+  height: Int,
+) -> texture.Texture
+
+@external(javascript, "../tiramisu.ffi.mjs", "createCanvasPlane")
+fn create_canvas_plane(
+  texture: texture.Texture,
+  width: Float,
+  height: Float,
+) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "updateCanvasTexture")
+fn update_canvas_texture(object: Object3D, texture: texture.Texture) -> Nil
+
+@external(javascript, "../tiramisu.ffi.mjs", "updateCanvasSize")
+fn update_canvas_size(object: Object3D, width: Float, height: Float) -> Nil
+
+@external(javascript, "../tiramisu.ffi.mjs", "getCanvasCachedPicture")
+fn get_canvas_cached_picture(object: Object3D) -> String
+
+@external(javascript, "../tiramisu.ffi.mjs", "setCanvasCachedPicture")
+fn set_canvas_cached_picture(object: Object3D, encoded_picture: String) -> Nil
+
+// Debug visualization helpers - tiramisu-specific, not pure Three.js bindings
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugBox")
+fn create_debug_box(
+  min: vec3.Vec3(Float),
+  max: vec3.Vec3(Float),
+  color: Int,
+) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugSphere")
+fn create_debug_sphere(
+  center: vec3.Vec3(Float),
+  radius: Float,
+  color: Int,
+) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugLine")
+fn create_debug_line(
+  from: vec3.Vec3(Float),
+  to: vec3.Vec3(Float),
+  color: Int,
+) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugAxes")
+fn create_debug_axes(origin: vec3.Vec3(Float), size: Float) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugGrid")
+fn create_debug_grid(size: Float, divisions: Int, color: Int) -> Object3D
+
+@external(javascript, "../tiramisu.ffi.mjs", "createDebugPoint")
+fn create_debug_point(
+  position: vec3.Vec3(Float),
+  size: Float,
+  color: Int,
+) -> Object3D
+
 /// Convert a list of Transforms to the tuple format expected by savoiardi
 fn transforms_to_tuples(
   transforms: List(transform.Transform),
-) -> List(#(Vec3(Float), Vec3(Float), Vec3(Float))) {
+) -> List(#(vec3.Vec3(Float), vec3.Vec3(Float), vec3.Vec3(Float))) {
   list.map(transforms, fn(t) {
     #(transform.position(t), transform.rotation(t), transform.scale(t))
   })

@@ -15,7 +15,9 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
+import vec/vec3f
 
 pub type Model {
   Model(rotation: Float)
@@ -28,6 +30,7 @@ pub type Msg {
 pub fn main() -> Nil {
   let assert Ok(Nil) =
     tiramisu.run(
+      bridge: option.None,
       dimensions: option.None,
       init: init,
       update: update,
@@ -91,12 +94,12 @@ fn view(model: Model, _) -> scene.Node {
     ])
 
   // Grid layout: 3 rows x 3 columns
-  let assert Ok(box_geom) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
+  let assert Ok(box_geom) = geometry.box(vec3f.one |> vec3f.scale(2.0))
   let assert Ok(sphere_geom) =
-    geometry.sphere(radius: 1.2, width_segments: 32, height_segments: 32)
+    geometry.sphere(radius: 1.2, segments: vec2.Vec2(32, 32))
   let assert Ok(cone_geom) =
     geometry.cone(radius: 1.0, height: 2.0, segments: 32)
-  let assert Ok(plane_geom) = geometry.plane(width: 2.5, height: 2.5)
+  let assert Ok(plane_geom) = geometry.plane(vec2.Vec2(2.5, 2.5))
   let assert Ok(circle_geom) = geometry.circle(radius: 1.3, segments: 32)
   let assert Ok(cylinder_geom) =
     geometry.cylinder(

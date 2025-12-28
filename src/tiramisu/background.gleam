@@ -6,7 +6,6 @@
 import gleam/javascript/promise
 import savoiardi
 import tiramisu/effect
-import tiramisu/texture
 
 pub type Background {
   /// Solid color background (hex color, e.g., 0x111111)
@@ -15,6 +14,7 @@ pub type Background {
   Texture(String)
   /// Equirectangular (360° spherical) texture background
   EquirectangularTexture(String)
+  /// TODO: This should be a type instead of a list of strings
   /// Cube texture (skybox) with 6 face images [px, nx, py, ny, pz, nz]
   CubeTexture(List(String))
 }
@@ -53,7 +53,7 @@ pub fn set(
         dispatch(on_success)
       }
       Texture(url) -> {
-        texture.load(url)
+        savoiardi.load_texture(url)
         |> promise.map(fn(result) {
           case result {
             Ok(texture) -> {
@@ -67,8 +67,7 @@ pub fn set(
         Nil
       }
       EquirectangularTexture(url) -> {
-        // Load equirectangular texture asynchronously
-        texture.load_equirectangular(url)
+        savoiardi.load_equirectangular_texture(url)
         |> promise.map(fn(result) {
           case result {
             Ok(texture) -> {
@@ -82,8 +81,7 @@ pub fn set(
         Nil
       }
       CubeTexture(urls) -> {
-        // Load cube texture asynchronously
-        texture.load_cube(urls)
+        savoiardi.load_cube_texture(urls)
         |> promise.tap(fn(result) {
           case result {
             Ok(cube_texture) -> {

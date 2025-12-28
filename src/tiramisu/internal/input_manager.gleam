@@ -9,6 +9,7 @@ import gleam/dict.{type Dict}
 import gleam/list
 import gleam/set.{type Set}
 import tiramisu/input
+import vec/vec2
 
 // ============================================================================
 // TYPES
@@ -115,21 +116,21 @@ pub fn capture_state(manager: InputManager) -> input.InputState {
     dict.to_list(manager.touch_active)
     |> list.map(fn(entry) {
       let #(id, #(x, y)) = entry
-      input.build_touch(id: id, x: x, y: y)
+      input.build_touch(id: id, position: vec2.Vec2(x, y))
     })
 
   let just_started_touches =
     dict.to_list(manager.touch_just_started)
     |> list.map(fn(entry) {
       let #(id, #(x, y)) = entry
-      input.build_touch(id: id, x: x, y: y)
+      input.build_touch(id: id, position: vec2.Vec2(x, y))
     })
 
   let just_ended_touches =
     dict.to_list(manager.touch_just_ended)
     |> list.map(fn(entry) {
       let #(id, #(x, y)) = entry
-      input.build_touch(id: id, x: x, y: y)
+      input.build_touch(id: id, position: vec2.Vec2(x, y))
     })
 
   let touch_state =

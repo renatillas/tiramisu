@@ -16,16 +16,12 @@ import gleam/io
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
+import gleam/time/duration
 import tiramisu
-import tiramisu/asset
 import tiramisu/audio
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
-import tiramisu/geometry
 import tiramisu/input
-import tiramisu/light
-import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
@@ -44,13 +40,16 @@ pub type Id {
 }
 
 pub fn main() {
-  tiramisu.run(
-    dimensions: option.None,
-    background: background.Color(0x1a1a2e),
-    init: init,
-    update: update,
-    view: view,
-  )
+  let assert Ok(Nil) =
+    tiramisu.run(
+      bridge: option.None,
+      selector: "body",
+      dimensions: option.None,
+      init: init,
+      update: update,
+      view: view,
+    )
+  Nil
 }
 
 // --- Model ---
@@ -65,8 +64,8 @@ pub type Model {
     sfx_instances: Dict(Int, audio.AudioState),
     next_sfx_id: Int,
     // Audio buffers loaded from assets
-    music_buffer: option.Option(audio.AudioBuffer),
-    sfx_buffer: option.Option(audio.AudioBuffer),
+    music_buffer: option.Option(audio.Buffer),
+    sfx_buffer: option.Option(audio.Buffer),
     loading: Bool,
     // Individual volume controls (0.0 to 1.0)
     music_volume: Float,
@@ -76,15 +75,15 @@ pub type Model {
 
 pub type Msg {
   Tick
-  MusicLoaded(audio.AudioBuffer)
-  SfxLoaded(audio.AudioBuffer)
-  LoadError(String)
+  MusicLoaded(audio.Buffer)
+  SfxLoaded(audio.Buffer)
+  LoadError
 }
 
 // --- Init ---
 
 fn init(
-  _ctx: tiramisu.Context(Id),
+  _ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   io.println("🎵 Declarative Audio Demo")
   io.println("========================")
@@ -108,24 +107,20 @@ fn init(
       effect.tick(Tick),
       // Load audio assets
       effect.from_promise(
-        asset.load_audio("music.ogg")
+        audio.load_audio("music.ogg")
         |> promise.map(fn(result) {
           case result {
             Ok(buffer) -> MusicLoaded(buffer)
-            Error(asset.LoadError(msg)) -> LoadError("Music: " <> msg)
-            Error(asset.InvalidUrl(msg)) -> LoadError("Music: " <> msg)
-            Error(asset.ParseError(msg)) -> LoadError("Music: " <> msg)
+            Error(Nil) -> LoadError
           }
         }),
       ),
       effect.from_promise(
-        asset.load_audio("sfx.wav")
+        audio.load_audio("sfx.wav")
         |> promise.map(fn(result) {
           case result {
             Ok(buffer) -> SfxLoaded(buffer)
-            Error(asset.LoadError(msg)) -> LoadError("SFX: " <> msg)
-            Error(asset.InvalidUrl(msg)) -> LoadError("SFX: " <> msg)
-            Error(asset.ParseError(msg)) -> LoadError("SFX: " <> msg)
+            Error(Nil) -> LoadError
           }
         }),
       ),
@@ -139,11 +134,11 @@ fn init(
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
+  ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time *. 0.0005
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
 
       // Keep a maximum of 10 recent SFX instances to prevent unbounded growth
       // Since the audio is short (0.139s), keeping 10 instances is plenty
@@ -286,8 +281,8 @@ fn update(
       )
     }
 
-    LoadError(msg) -> {
-      io.println("❌ Failed to load audio: " <> msg)
+    LoadError -> {
+      io.println("❌ Failed to load audio")
       #(Model(..model, loading: False), effect.none(), option.None)
     }
   }
@@ -320,7 +315,7 @@ fn float_to_percentage(value: Float) -> String {
 
 // --- View ---
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
+fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
@@ -332,47 +327,21 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
     |> audio.with_loop(True)
     |> audio.with_group(audio.Music)
     |> audio.with_state(model.music_state)
-    |> audio.with_fade(1000)
-  // Fade duration for transitions
-
-  // Geometries and materials
-  let assert Ok(cube_geo) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
-  let assert Ok(music_mat) =
-    material.new() |> material.with_color(0x4ecca3) |> material.build()
-  let assert Ok(sfx_mat) =
-    material.new() |> material.with_color(0xff6b9d) |> material.build()
-
-  let assert Ok(ambient_light) = light.ambient(color: 0xffffff, intensity: 0.4)
-
-  let assert Ok(directional_light) =
-    light.directional(color: 0xffffff, intensity: 0.8)
+    |> audio.with_fade(duration.seconds(1))
 
   // Build scene nodes based on loaded assets
   let music_nodes = case model.music_buffer {
     option.Some(buffer) -> [
-      scene.mesh(
-        id: MusicCube,
-        geometry: cube_geo,
-        material: music_mat,
-        transform: transform.identity,
-        physics: option.None,
-      ),
-      // Audio node - state is declarative!
-      scene.audio(id: MusicBg, audio: audio.global(buffer, music_config)),
-    ]
-    option.None -> [
-      scene.mesh(
-        id: MusicCube,
-        geometry: cube_geo,
-        material: music_mat,
-        transform: transform.identity,
-        physics: option.None,
+      scene.audio(
+        id: "music_background",
+        audio: audio.global(buffer, music_config),
       ),
     ]
+    option.None -> []
   }
 
   // Create audio nodes for all active SFX instances
-  let sfx_audio_nodes = case model.sfx_buffer {
+  let sfx_audio = case model.sfx_buffer {
     option.Some(buffer) -> {
       model.sfx_instances
       |> dict.to_list
@@ -386,27 +355,18 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
           |> audio.with_state(state)
           |> audio.with_no_fade()
 
-        scene.audio(id: SfxBeep(id), audio: audio.global(buffer, sfx_config))
+        scene.audio(
+          id: "beep" <> int.to_string(id),
+          audio: audio.global(buffer, sfx_config),
+        )
       })
     }
     option.None -> []
   }
 
-  let sfx_nodes =
-    [
-      scene.mesh(
-        id: SfxCube,
-        geometry: cube_geo,
-        material: sfx_mat,
-        transform: transform.identity,
-        physics: option.None,
-      ),
-    ]
-    |> list.append(sfx_audio_nodes)
-
-  scene.empty(id: Scene, transform: transform.identity, children: [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
-      id: Main,
+      id: "main",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -414,9 +374,8 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
       viewport: option.None,
       postprocessing: option.None,
     ),
-    // Music cube (left) - state determines if it plays
     scene.empty(
-      id: MusicGroup,
+      id: "music-group",
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(-3.0, 0.0, 0.0))
         |> transform.rotate_y(model.rotation),
@@ -424,22 +383,11 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
     ),
     // SFX cube (right) - one-shot sounds
     scene.empty(
-      id: SfxGroup,
+      id: "sfx-group",
       transform: transform.identity
         |> transform.translate(by: vec3.Vec3(3.0, 0.0, 0.0))
         |> transform.rotate_y(model.rotation *. -1.5),
-      children: sfx_nodes,
-    ),
-    // Lights
-    scene.light(
-      id: Ambient,
-      light: ambient_light,
-      transform: transform.identity,
-    ),
-    scene.light(
-      id: Sun,
-      light: directional_light,
-      transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
+      children: sfx_audio,
     ),
   ])
 }

@@ -11,6 +11,7 @@
 /// All business logic lives in Gleam. Only pure Three.js audio API calls
 /// cross the FFI boundary via savoiardi.
 import gleam/dict.{type Dict}
+import gleam/float
 import gleam/list
 import gleam/option.{type Option}
 import gleam/order
@@ -209,7 +210,7 @@ pub fn create_audio_source(
     }
     audio.Playing -> {
       // Apply playing state
-      apply_audio_state(state, id, source_data, buffer, config)
+      apply_audio_state(state, id, source_data, buffer, config, audio_listener)
     }
   }
 
@@ -230,6 +231,7 @@ pub fn apply_audio_state(
   source_data: AudioSourceData,
   buffer: audio.Buffer,
   config: audio.Config,
+  audio_listener: savoiardi.AudioListener,
 ) -> #(AudioManagerState, AudioSourceData) {
   let three_source = source_data.three_source
 
@@ -260,8 +262,9 @@ pub fn apply_audio_state(
             True -> Nil
           }
 
-          // Check AudioContext state
-          let context_state = savoiardi.get_audio_context_state()
+          // Check AudioContext state using the game's actual AudioListener
+          let context_state =
+            get_audio_context_state_from_listener(audio_listener)
 
           case context_state == "suspended" {
             True -> {
@@ -397,6 +400,7 @@ pub fn update_audio_config(
   id: String,
   buffer: audio.Buffer,
   config: audio.Config,
+  audio_listener: savoiardi.AudioListener,
 ) -> AudioManagerState {
   case get_audio_source(state, id) {
     option.None -> state
@@ -421,7 +425,14 @@ pub fn update_audio_config(
 
       // Apply state transitions
       let #(state, updated_source_data) =
-        apply_audio_state(state, id, updated_source_data, buffer, config)
+        apply_audio_state(
+          state,
+          id,
+          updated_source_data,
+          buffer,
+          config,
+          audio_listener,
+        )
 
       // Update registry
       AudioManagerState(
@@ -442,15 +453,17 @@ fn play_source_with_fade(
   fade_duration: duration.Duration,
   target_volume: Float,
 ) -> Nil {
+  let fade_ms =
+    fade_duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+
   case source {
     GlobalSource(audio) ->
-      savoiardi.play_audio_with_fade_in(audio, fade_duration, target_volume)
+      play_audio_with_fade_in_ffi(audio, fade_ms, target_volume)
     PositionalSource(audio) ->
-      savoiardi.play_positional_audio_with_fade_in(
-        audio,
-        fade_duration,
-        target_volume,
-      )
+      play_positional_audio_with_fade_in_ffi(audio, fade_ms, target_volume)
   }
 }
 
@@ -460,17 +473,19 @@ fn stop_source_with_fade(
   fade_duration: duration.Duration,
   pause_instead_of_stop: Bool,
 ) -> Nil {
+  let fade_ms =
+    fade_duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+
   case source {
     GlobalSource(audio) ->
-      savoiardi.stop_audio_with_fade_out(
-        audio,
-        fade_duration,
-        pause_instead_of_stop,
-      )
+      stop_audio_with_fade_out_ffi(audio, fade_ms, pause_instead_of_stop)
     PositionalSource(audio) ->
-      savoiardi.stop_positional_audio_with_fade_out(
+      stop_positional_audio_with_fade_out_ffi(
         audio,
-        fade_duration,
+        fade_ms,
         pause_instead_of_stop,
       )
   }
@@ -572,16 +587,20 @@ fn update_sources_in_group(
 // ============================================================================
 
 /// Resume AudioContext after user interaction
-pub fn resume_audio_context(state: AudioManagerState) -> AudioManagerState {
+/// Takes the AudioListener from the renderer state to use the correct AudioContext
+pub fn resume_audio_context(
+  state: AudioManagerState,
+  audio_listener: savoiardi.AudioListener,
+) -> AudioManagerState {
   case state.context_resumed {
     True -> state
     False -> {
-      let context_state = savoiardi.get_audio_context_state()
+      let context_state = get_audio_context_state_from_listener(audio_listener)
 
       case context_state == "suspended" {
         True -> {
-          // Resume context
-          savoiardi.resume_audio_context()
+          // Resume context using the actual game's AudioListener
+          resume_audio_context_from_listener(audio_listener)
 
           // Mark as resumed
           let state = AudioManagerState(..state, context_resumed: True)
@@ -762,3 +781,49 @@ fn set_source_buffer(source: Source, buffer: audio.Buffer) -> Nil {
       savoiardi.set_positional_audio_buffer(audio, buffer)
   }
 }
+
+// ============================================================================
+// FFI - Audio fade functions (tiramisu-specific, not pure Three.js bindings)
+// ============================================================================
+
+@external(javascript, "../../tiramisu.ffi.mjs", "playAudioWithFadeIn")
+fn play_audio_with_fade_in_ffi(
+  audio: savoiardi.Audio,
+  fade_duration_ms: Int,
+  target_volume: Float,
+) -> Nil
+
+@external(javascript, "../../tiramisu.ffi.mjs", "playAudioWithFadeIn")
+fn play_positional_audio_with_fade_in_ffi(
+  audio: savoiardi.PositionalAudio,
+  fade_duration_ms: Int,
+  target_volume: Float,
+) -> Nil
+
+@external(javascript, "../../tiramisu.ffi.mjs", "stopAudioWithFadeOut")
+fn stop_audio_with_fade_out_ffi(
+  audio: savoiardi.Audio,
+  fade_duration_ms: Int,
+  pause_instead_of_stop: Bool,
+) -> Nil
+
+@external(javascript, "../../tiramisu.ffi.mjs", "stopAudioWithFadeOut")
+fn stop_positional_audio_with_fade_out_ffi(
+  audio: savoiardi.PositionalAudio,
+  fade_duration_ms: Int,
+  pause_instead_of_stop: Bool,
+) -> Nil
+
+// ============================================================================
+// FFI - Audio context management (uses actual game's AudioListener)
+// ============================================================================
+
+@external(javascript, "../../tiramisu.ffi.mjs", "getAudioContextStateFromListener")
+fn get_audio_context_state_from_listener(
+  audio_listener: savoiardi.AudioListener,
+) -> String
+
+@external(javascript, "../../tiramisu.ffi.mjs", "resumeAudioContextFromListener")
+fn resume_audio_context_from_listener(
+  audio_listener: savoiardi.AudioListener,
+) -> Nil

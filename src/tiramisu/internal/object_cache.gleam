@@ -28,6 +28,12 @@ pub type AnimationActions {
   BlendedActions(from: AnimationAction, to: AnimationAction)
 }
 
+/// Stored animation state for diffing (clip names to detect changes)
+pub type AnimationState {
+  SingleState(clip_name: String)
+  BlendedState(from_clip_name: String, to_clip_name: String)
+}
+
 /// Complete cache state
 pub type CacheState {
   CacheState(
@@ -37,6 +43,8 @@ pub type CacheState {
     mixers: Dict(String, AnimationMixer),
     /// Current animation actions by node ID
     actions: Dict(String, AnimationActions),
+    /// Current animation state by node ID (for diffing clip names)
+    animation_states: Dict(String, AnimationState),
     /// Camera viewport configurations by camera ID
     viewports: Dict(String, camera.ViewPort),
     /// Particle systems by node ID
@@ -59,6 +67,7 @@ pub fn init() -> CacheState {
     objects: dict.new(),
     mixers: dict.new(),
     actions: dict.new(),
+    animation_states: dict.new(),
     viewports: dict.new(),
     camera_postprocessing: dict.new(),
     cameras: set.new(),
@@ -147,6 +156,35 @@ pub fn get_actions(cache: CacheState, id) -> Option(AnimationActions) {
 pub fn remove_actions(cache: CacheState, id) -> CacheState {
   // id is already a string
   CacheState(..cache, actions: dict.delete(cache.actions, id))
+}
+
+// ============================================================================
+// ANIMATION STATE OPERATIONS
+// ============================================================================
+
+/// Set the animation state for a node (for diffing clip names)
+pub fn set_animation_state(
+  cache: CacheState,
+  id: String,
+  state: AnimationState,
+) -> CacheState {
+  CacheState(
+    ..cache,
+    animation_states: dict.insert(cache.animation_states, id, state),
+  )
+}
+
+/// Get the animation state for a node
+pub fn get_animation_state(cache: CacheState, id: String) -> Option(AnimationState) {
+  dict.get(cache.animation_states, id) |> option.from_result
+}
+
+/// Remove animation state for a node
+pub fn remove_animation_state(cache: CacheState, id: String) -> CacheState {
+  CacheState(
+    ..cache,
+    animation_states: dict.delete(cache.animation_states, id),
+  )
 }
 
 // ============================================================================
@@ -289,13 +327,14 @@ pub fn get_all_cameras_with_info(
 // CLEANUP OPERATIONS
 // ============================================================================
 
-/// Remove all cached data for a given ID (object, mixer, actions, viewport, particles, camera, postprocessing)
+/// Remove all cached data for a given ID (object, mixer, actions, animation_state, viewport, particles, camera, postprocessing)
 /// This is used when a node is removed from the scene
 pub fn remove_all(cache: CacheState, id: String) -> CacheState {
   cache
   |> remove_object(id)
   |> remove_mixer(id)
   |> remove_actions(id)
+  |> remove_animation_state(id)
   |> remove_viewport(id)
   |> remove_camera(id)
   |> remove_camera_postprocessing(id)

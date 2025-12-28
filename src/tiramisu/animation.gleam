@@ -1,5 +1,8 @@
 import savoiardi
 
+pub type Clip =
+  savoiardi.AnimationClip
+
 /// Controls how an animation loops.
 pub type LoopMode {
   /// Play the animation once and stop at the end
@@ -41,10 +44,10 @@ pub type AnimationPlayback {
 ///
 /// ```gleam
 /// import tiramisu/animation
-/// import tiramisu/asset
+/// import tiramisu/model
 ///
-/// let model = asset.get_model(assets, "character")
-/// let clips = asset.model_animations(model)
+/// // After loading a GLTF model
+/// let clips = model.get_animations(gltf_data)
 /// let walk_clip = list.find(clips, fn(clip) { animation.clip_name(clip) == "Walk" })
 ///
 /// let walk_animation = animation.new_animation(walk_clip)
@@ -112,10 +115,10 @@ pub fn set_weight(anim: Animation, weight: Float) -> Animation {
 ///
 /// ```gleam
 /// import gleam/list
-/// import tiramisu/asset
+/// import tiramisu/model
 ///
-/// let model = asset.get_model(assets, "character")
-/// let clips = asset.model_animations(model)
+/// // After loading a GLTF model
+/// let clips = model.get_animations(gltf_data)
 ///
 /// let walk_clip = list.find(clips, fn(clip) {
 ///   animation.clip_name(clip) == "Walk"

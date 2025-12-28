@@ -2,6 +2,7 @@ import gleam/bool
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
+import vec/vec2.{type Vec2}
 
 /// Camera configuration (perspective or orthographic projection).
 ///
@@ -115,7 +116,7 @@ pub fn orthographic(
 /// ## Example
 ///
 /// ```gleam
-/// let cam = camera.camera_2d(width: 800, height: 600)
+/// let cam = camera.camera_2d(size: vec2.Vec2(800, 600))
 /// scene.Camera(
 ///   id: "main_camera",
 ///   camera: cam,
@@ -126,9 +127,9 @@ pub fn orthographic(
 /// )
 /// // (0, 0) is screen center, positive Y is up
 /// ```
-pub fn camera_2d(width width: Int, height height: Int) -> Camera {
-  let w = int.to_float(width)
-  let h = int.to_float(height)
+pub fn camera_2d(size size: Vec2(Int)) -> Camera {
+  let w = int.to_float(size.x)
+  let h = int.to_float(size.y)
   let half_w = w /. 2.0
   let half_h = h /. 2.0
 
@@ -149,7 +150,7 @@ pub fn camera_2d(width width: Int, height height: Int) -> Camera {
 /// ## Example
 ///
 /// ```gleam
-/// let cam = camera.camera_2d_screen_space(width: 800, height: 600)
+/// let cam = camera.camera_2d_screen_space(size: vec2.Vec2(800, 600))
 /// scene.Camera(
 ///   id: "ui_camera",
 ///   camera: cam,
@@ -160,9 +161,9 @@ pub fn camera_2d(width width: Int, height height: Int) -> Camera {
 /// )
 /// // (0, 0) is top-left, positive Y is down (like CSS)
 /// ```
-pub fn camera_2d_screen_space(width: Int, height: Int) -> Camera {
-  let w = int.to_float(width)
-  let h = int.to_float(height)
+pub fn camera_2d_screen_space(size size: Vec2(Int)) -> Camera {
+  let w = int.to_float(size.x)
+  let h = int.to_float(size.y)
 
   orthographic(
     left: 0.0,
@@ -217,13 +218,12 @@ pub fn camera_2d_with_bounds(
 /// ```gleam
 /// import tiramisu/camera
 /// import tiramisu/scene
+/// import vec/vec2
 ///
 /// // Create a viewport in the top-right corner
 /// let minimap_viewport = camera.ViewPort(
-///   x: 650,
-///   y: 10,
-///   width: 150,
-///   height: 100,
+///   position: vec2.Vec2(650, 10),
+///   size: vec2.Vec2(150, 100),
 /// )
 ///
 /// scene.camera(
@@ -238,14 +238,10 @@ pub fn camera_2d_with_bounds(
 /// ```
 pub type ViewPort {
   ViewPort(
-    /// X position from left edge in pixels
-    x: Int,
-    /// Y position from top edge in pixels
-    y: Int,
-    /// Width in pixels
-    width: Int,
-    /// Height in pixels
-    height: Int,
+    /// Position from top-left corner in pixels (x, y)
+    position: Vec2(Int),
+    /// Size in pixels (width, height)
+    size: Vec2(Int),
   )
 }
 

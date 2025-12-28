@@ -1,13 +1,13 @@
 import gleam/float
 import gleam/int
 import gleam/option.{None}
+import gleam/time/duration
 import lustre/attribute
 import lustre/element.{type Element}
 import lustre/element/html
 import paint as p
 import paint/canvas
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -15,19 +15,9 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
-
-pub type Id {
-  MainCamera
-  Scene
-  Sun
-  Cube
-  CubeGroup
-  CubeLabel
-  Cube2
-  CubeGroup2
-  CubeLabel2
-}
+import vec/vec3f
 
 pub type Model {
   Model(rotation: Float, frame: Int)
@@ -43,7 +33,8 @@ pub fn main() {
 
   tiramisu.run(
     dimensions: option.None,
-    background: background.Color(0x87ceeb),
+    bridge: option.None,
+    selector: "body",
     init: init,
     update: update,
     view: view,
@@ -54,7 +45,7 @@ fn css2d_label_element() -> Element(Msg) {
   html.div(
     [
       attribute.class(
-        "bg-black/80 text-cyan-400 px-3 py-2 rounded font-sans text-sm font-medium shadow-lg",
+        "bg-white/80 text-black-400 px-3 py-2 rounded font-sans text-sm font-medium shadow-lg",
       ),
     ],
     [element.text("CSS2D - Always On Top")],
@@ -80,14 +71,14 @@ fn sprite_label_picture(rotation: Float, frame: Int) -> p.Picture {
   ])
 }
 
-fn init(_ctx: tiramisu.Context(Id)) {
+fn init(_ctx: tiramisu.Context) {
   #(Model(rotation: 0.0, frame: 0), effect.tick(Tick), option.None)
 }
 
-fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Id)) {
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time /. 1000.0
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
       let new_frame = model.frame + 1
       #(
         Model(rotation: new_rotation, frame: new_frame),
@@ -98,11 +89,11 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Id)) {
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
-  scene.empty(id: Scene, transform: transform.identity, children: [
+fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
+  scene.empty(id: "scene", transform: transform.identity, children: [
     // Camera
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: {
         let assert Ok(cam) =
           camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
@@ -116,7 +107,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
     ),
     // Light
     scene.light(
-      id: Sun,
+      id: "sun",
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 1.0)
@@ -126,7 +117,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
     ),
     // Left Cube with CSS2D label (always on top)
     scene.empty(
-      id: CubeGroup,
+      id: "cube-group",
       transform: transform.identity
         |> transform.with_position(vec3.Vec3(-2.0, 0.0, 0.0))
         |> transform.with_euler_rotation(vec3.Vec3(
@@ -136,9 +127,9 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
         )),
       children: [
         scene.mesh(
-          id: Cube,
+          id: "cube",
           geometry: {
-            let assert Ok(g) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+            let assert Ok(g) = geometry.box(vec3f.one)
             g
           },
           material: {
@@ -153,7 +144,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
         ),
         // CSS2D Label - always visible on top
         scene.css2d_label(
-          id: CubeLabel,
+          id: "cube-label",
           html: element.to_string(css2d_label_element()),
           transform: transform.at(position: vec3.Vec3(0.0, 1.0, 0.0)),
         ),
@@ -161,7 +152,7 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
     ),
     // Right Cube with Sprite label (depth-aware with occlusion)
     scene.empty(
-      id: CubeGroup2,
+      id: "cube-group-2",
       transform: transform.identity
         |> transform.with_position(vec3.Vec3(2.0, 0.0, 0.0))
         |> transform.with_euler_rotation(vec3.Vec3(
@@ -171,29 +162,27 @@ fn view(model: Model, _ctx: tiramisu.Context(Id)) -> scene.Node(Id) {
         )),
       children: [
         scene.mesh(
-          id: Cube2,
+          id: "cube-2",
           geometry: {
-            let assert Ok(g) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-            g
+            let assert Ok(geometry) = geometry.box(vec3f.one)
+            geometry
           },
           material: {
-            let assert Ok(m) =
+            let assert Ok(material) =
               material.new()
               |> material.with_color(0xff6b6b)
               |> material.build()
-            m
+            material
           },
           transform: transform.identity,
           physics: None,
         ),
         // Sprite Label - hides behind objects with depth occlusion
         scene.canvas(
-          id: CubeLabel2,
+          id: "cube-label-2",
           picture: sprite_label_picture(model.rotation, model.frame),
-          texture_width: 256,
-          texture_height: 64,
-          width: 2.0,
-          height: 0.5,
+          texture_size: vec2.Vec2(256, 64),
+          size: vec2.Vec2(2.0, 0.5),
           transform: transform.at(position: vec3.Vec3(0.0, 1.5, 0.0)),
         ),
       ],

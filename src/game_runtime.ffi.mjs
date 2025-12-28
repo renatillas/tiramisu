@@ -9,14 +9,18 @@ import { toList } from '../gleam_stdlib/gleam.mjs';
 import * as SCENE from './tiramisu/scene.mjs';
 import { FrameData$FrameData } from './tiramisu.mjs'
 import { createEffectComposer } from './postprocessing.ffi.mjs';
-import { Some } from '../gleam_stdlib/gleam/option.mjs';
+import { Some, None, Option$isSome, Option$Some$0 } from '../gleam_stdlib/gleam/option.mjs';
+import { Vec2$Vec2 } from '../vec/vec/vec2.mjs';
 
 /**
  * GameRuntime - Encapsulates all game loop state
  * Similar to Lustre's Runtime class
  */
 export class GameRuntime {
-  constructor(state, prevNode, context, rendererState, _, inputManager) {
+  constructor(bridge, state, prevNode, context, rendererState, inputManager) {
+    // UI Bridge for Lustre integration (may be null)
+    this.bridge = bridge;
+
     this.state = state;
     this.prevNode = prevNode;
     this.context = context;
@@ -27,18 +31,17 @@ export class GameRuntime {
     this.lastTime = performance.now();
 
     // Message queue as JavaScript array (not Gleam list!)
-    this.shouldQueue = false;
-    this.queue = [];  // Always start with empty JS array
+    this.queue = [];
 
     // Dispatch function bound to this instance
     this.dispatch = (msg) => {
-      if (this.shouldQueue) {
-        this.queue.push(msg);
-      } else {
-        // When not in a processing cycle, just queue for next frame
-        this.queue.push(msg);
-      }
+      this.queue.push(msg);
     };
+
+    // Register Tiramisu's dispatch with the bridge (if bridge exists)
+    if (this.bridge) {
+      this.bridge.setTiramisuDispatch(this.dispatch);
+    }
   }
 
   /**
@@ -105,10 +108,13 @@ export class GameRuntime {
 }
 
 /**
- * Create a new game runtime instance
+ * Create a new game runtime instance with optional UI bridge
+ * @param {Option<Bridge>} bridgeOption - Gleam Option type containing the bridge
  */
-export function createRuntime(state, prevNode, context, rendererState, messageQueue, inputManager) {
-  return new GameRuntime(state, prevNode, context, rendererState, messageQueue, inputManager);
+export function createRuntime(bridgeOption, state, prevNode, context, rendererState, inputManager) {
+  // Extract bridge from Gleam Option type
+  const bridge = Option$isSome(bridgeOption) ? Option$Some$0(bridgeOption) : null;
+  return new GameRuntime(bridge, state, prevNode, context, rendererState, inputManager);
 }
 
 /**
@@ -132,8 +138,7 @@ export function processFrame(runtime, _, __, timestamp, captureInputState, ___) 
   // Get canvas dimensions
   const renderer = SCENE.get_renderer(runtime.getRendererState());
   const canvas = renderer.domElement;
-  const canvasWidth = canvas.clientWidth;
-  const canvasHeight = canvas.clientHeight;
+  const canvasSize = Vec2$Vec2(canvas.clientWidth, canvas.clientHeight);
 
   // Return a FrameData record matching the Gleam type
   return FrameData$FrameData(
@@ -144,8 +149,7 @@ export function processFrame(runtime, _, __, timestamp, captureInputState, ___) 
     runtime.getRendererState(),
     deltaTimeMs,
     inputState,
-    canvasWidth,
-    canvasHeight,
+    canvasSize,
   );
 }
 
@@ -192,6 +196,7 @@ const composerCache = new Map();
 export function renderCameras(rendererState, mainCameras, viewportCameras) {
   const renderer = SCENE.get_renderer(rendererState);
   const scene = SCENE.get_scene(rendererState);
+  const css2dRenderer = getCSS2DRenderer(rendererState);
 
   // Clear the entire canvas first
   renderer.setScissorTest(false);
@@ -201,6 +206,11 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
   for (const cameraData of mainCameras) {
     const [id, threeCamera, _viewport, postprocessing] = cameraData;
     renderCameraWithPostprocessing(renderer, scene, threeCamera, postprocessing, id, null);
+
+    // Render CSS2D labels for this camera
+    if (css2dRenderer) {
+      css2dRenderer.render(scene, threeCamera);
+    }
   }
 
   // Render viewport cameras
@@ -209,8 +219,24 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
     if (viewport instanceof Some) {
       const vp = viewport[0];
       renderCameraWithPostprocessing(renderer, scene, threeCamera, postprocessing, id, vp);
+
+      // Render CSS2D labels for viewport camera
+      if (css2dRenderer) {
+        css2dRenderer.render(scene, threeCamera);
+      }
     }
   }
+}
+
+/**
+ * Get CSS2D renderer from renderer state (handles Gleam Option type)
+ */
+function getCSS2DRenderer(rendererState) {
+  const css2dOpt = rendererState.css2d_renderer;
+  if (css2dOpt instanceof Some) {
+    return css2dOpt[0];
+  }
+  return null;
 }
 
 /**
@@ -221,11 +247,11 @@ function renderCameraWithPostprocessing(renderer, scene, camera, postprocessing,
   const size = renderer.getSize(new THREE.Vector2());
 
   if (viewport) {
-    // Set viewport for this camera
-    const x = viewport.x;
-    const y = size.y - viewport.y - viewport.height; // Flip Y for WebGL
-    renderer.setViewport(x, y, viewport.width, viewport.height);
-    renderer.setScissor(x, y, viewport.width, viewport.height);
+    // Set viewport for this camera - viewport uses position: Vec2, size: Vec2
+    const x = viewport.position.x;
+    const y = size.y - viewport.position.y - viewport.size.y; // Flip Y for WebGL
+    renderer.setViewport(x, y, viewport.size.x, viewport.size.y);
+    renderer.setScissor(x, y, viewport.size.x, viewport.size.y);
     renderer.setScissorTest(true);
   } else {
     // Fullscreen - reset to full renderer size
@@ -251,7 +277,7 @@ function renderCameraWithPostprocessing(renderer, scene, camera, postprocessing,
 
     // Update composer size
     if (viewport) {
-      composer.setSize(viewport.width, viewport.height);
+      composer.setSize(viewport.size.x, viewport.size.y);
     } else {
       composer.setSize(size.x, size.y);
     }

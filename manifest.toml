@@ -19,8 +19,8 @@ packages = [
   { name = "paint", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_community_colour", "gleam_json", "gleam_stdlib"], otp_app = "paint", source = "hex", outer_checksum = "D28F61C2965949A4845FE2F3F8CE4601FF8F51856A36B8239736CA05277D6A6A" },
   { name = "plinth", version = "0.8.1", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_json", "gleam_stdlib"], otp_app = "plinth", source = "hex", outer_checksum = "012E65087018F9C7B48513EB47D0F452D6E57AF257555B46BB82BC0B58D9C482" },
   { name = "quaterni", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib", "vec"], otp_app = "quaterni", source = "hex", outer_checksum = "89F3467A29F85B12A433A18219594A1036C55C49F59573DD64810DC1BBA200DE" },
-  { name = "savoiardi", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], source = "local", path = "../savoiardi" },
-  { name = "structures", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "structures", source = "hex", outer_checksum = "25002A9EBBB373C4AA4333F4CDC3745F2CCE227E79730AAAB36064F6A351C967" },
+  { name = "savoiardi", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], source = "local", path = "../savoiardi" },
+  { name = "statemachine", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_time"], otp_app = "statemachine", source = "hex", outer_checksum = "432B4732269CE93B71713AA734A939A487B4DD0EC2083019EF06E08E538DC312" },
   { name = "vec", version = "3.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "7658595B4792E29B150FF8854D15DEAC6D3F4EAFB31EEECE473845794ABA7198" },
 ]
 
@@ -37,5 +37,5 @@ paint = { version = ">= 1.0.0 and < 2.0.0" }
 plinth = { version = ">= 0.7.2 and < 1.0.0" }
 quaterni = { version = ">= 1.0.0 and < 2.0.0" }
 savoiardi = { path = "../savoiardi" }
-structures = { version = ">= 1.0.0 and < 2.0.0" }
+statemachine = { version = ">= 1.0.0 and < 2.0.0" }
 vec = { version = ">= 3.0.1 and < 4.0.0" }

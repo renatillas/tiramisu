@@ -1,6 +1,9 @@
 import gleam/bool
 import gleam/javascript/promise
 import savoiardi
+import tiramisu/effect
+import vec/vec2.{type Vec2}
+import vec/vec3.{type Vec3}
 
 pub type CustomGeometry =
   savoiardi.Geometry
@@ -76,19 +79,15 @@ pub type GeometryError {
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(cube) = scene.box(width: 1.0, height: 1.0, depth: 1.0)
-/// let assert Ok(wall) = scene.box(width: 10.0, height: 3.0, depth: 0.1)
+/// let assert Ok(cube) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+/// let assert Ok(wall) = geometry.box(size: vec3.Vec3(10.0, 3.0, 0.1))
 /// ```
-pub fn box(
-  width width: Float,
-  height height: Float,
-  depth depth: Float,
-) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(width <=. 0.0, Error(NonPositiveWidth(width)))
-  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
-  use <- bool.guard(depth <=. 0.0, Error(NonPositiveDepth(depth)))
+pub fn box(size size: Vec3(Float)) -> Result(Geometry, GeometryError) {
+  use <- bool.guard(size.x <=. 0.0, Error(NonPositiveWidth(size.x)))
+  use <- bool.guard(size.y <=. 0.0, Error(NonPositiveHeight(size.y)))
+  use <- bool.guard(size.z <=. 0.0, Error(NonPositiveDepth(size.z)))
 
-  Ok(BoxGeometry(width, height, depth))
+  Ok(BoxGeometry(size.x, size.y, size.z))
 }
 
 /// Create a validated sphere geometry.
@@ -99,25 +98,24 @@ pub fn box(
 /// ## Example
 ///
 /// ```gleam
-/// let assert Ok(ball) = scene.sphere(radius: 1.0, width_segments: 32, height_segments: 16)
-/// let assert Ok(low_poly) = scene.sphere(radius: 1.0, width_segments: 8, height_segments: 6)
+/// let assert Ok(ball) = geometry.sphere(radius: 1.0, segments: vec2.Vec2(32, 16))
+/// let assert Ok(low_poly) = geometry.sphere(radius: 1.0, segments: vec2.Vec2(8, 6))
 /// ```
 pub fn sphere(
   radius radius: Float,
-  width_segments width_segments: Int,
-  height_segments height_segments: Int,
+  segments segments: Vec2(Int),
 ) -> Result(Geometry, GeometryError) {
   use <- bool.guard(radius <=. 0.0, Error(NonPositiveRadius(radius)))
   use <- bool.guard(
-    width_segments < 3,
-    Error(LessThanThreeSegmentCountWidth(width_segments)),
+    segments.x < 3,
+    Error(LessThanThreeSegmentCountWidth(segments.x)),
   )
   use <- bool.guard(
-    height_segments < 2,
-    Error(LessThanTwoSegmentCountHeight(height_segments)),
+    segments.y < 2,
+    Error(LessThanTwoSegmentCountHeight(segments.y)),
   )
 
-  Ok(SphereGeometry(radius, width_segments, height_segments))
+  Ok(SphereGeometry(radius, segments.x, segments.y))
 }
 
 pub fn cone(
@@ -132,31 +130,25 @@ pub fn cone(
   Ok(ConeGeometry(radius, height, segments))
 }
 
-pub fn plane(
-  width width: Float,
-  height height: Float,
-) -> Result(Geometry, GeometryError) {
-  sheet(width:, height:, width_segments: 1, height_segments: 1)
+pub fn plane(size size: Vec2(Float)) -> Result(Geometry, GeometryError) {
+  sheet(size:, segments: vec2.Vec2(1, 1))
 }
 
 pub fn sheet(
-  width width: Float,
-  height height: Float,
-  width_segments width_segments: Int,
-  height_segments height_segments: Int,
+  size size: Vec2(Float),
+  segments segments: Vec2(Int),
 ) -> Result(Geometry, GeometryError) {
-  use <- bool.guard(width <=. 0.0, Error(NonPositiveWidth(width)))
-  use <- bool.guard(height <=. 0.0, Error(NonPositiveHeight(height)))
-  use <- bool.guard(
-    width_segments < 1,
-    Error(NegativeSegmentCount(width_segments)),
-  )
-  use <- bool.guard(
-    height_segments < 1,
-    Error(NegativeSegmentCount(height_segments)),
-  )
+  use <- bool.guard(size.x <=. 0.0, Error(NonPositiveWidth(size.x)))
+  use <- bool.guard(size.y <=. 0.0, Error(NonPositiveHeight(size.y)))
+  use <- bool.guard(segments.x < 1, Error(NegativeSegmentCount(segments.x)))
+  use <- bool.guard(segments.y < 1, Error(NegativeSegmentCount(segments.y)))
 
-  Ok(PlaneGeometry(width:, height:, width_segments:, height_segments:))
+  Ok(PlaneGeometry(
+    width: size.x,
+    height: size.y,
+    width_segments: segments.x,
+    height_segments: segments.y,
+  ))
 }
 
 pub fn circle(
@@ -272,15 +264,14 @@ pub fn icosahedron(
 /// Create validated 3D text geometry from a loaded font.
 ///
 /// Renders text as 3D geometry with optional beveling (rounded edges).
-/// Requires a font loaded via `asset.load_font()`.
+/// Requires a font loaded via `geometry.load_font()`.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// import tiramisu/geometry
-/// import tiramisu/asset
 ///
-/// // After loading font...
+/// // After loading font with geometry.load_font()...
 /// let assert Ok(text) = geometry.text(
 ///   text: "Hello!",
 ///   font: my_font,
@@ -298,7 +289,7 @@ pub fn icosahedron(
 /// ## Parameters
 ///
 /// - `text`: String to render (must not be empty)
-/// - `font`: Loaded font from `asset.load_font()`
+/// - `font`: Loaded font from `geometry.load_font()`
 /// - `size`: Text size (must be positive)
 /// - `depth`: Extrusion depth for 3D effect (0 for flat, >0 for 3D)
 /// - `curve_segments`: Quality of curves (more = smoother but more triangles)
@@ -414,10 +405,62 @@ pub fn create_geometry(geometry: Geometry) -> savoiardi.Geometry {
   }
 }
 
-pub fn load_font(url url: String) -> promise.Promise(Result(Font, Nil)) {
-  savoiardi.load_font(url)
+pub fn load_font(
+  from url: String,
+  on_success on_success: fn(Font) -> msg,
+  on_error on_error: msg,
+) -> effect.Effect(msg) {
+  let promise =
+    savoiardi.load_font(url)
+    |> promise.map(fn(result) {
+      case result {
+        Ok(data) -> on_success(data)
+        Error(Nil) -> on_error
+      }
+    })
+
+  effect.from_promise(promise)
 }
 
-pub fn load_stl(url url: String) -> promise.Promise(Result(CustomGeometry, Nil)) {
-  savoiardi.load_stl(url)
+pub fn load_stl(
+  from url: String,
+  on_success on_success: fn(CustomGeometry) -> msg,
+  on_error on_error: msg,
+) -> effect.Effect(msg) {
+  let promise =
+    savoiardi.load_stl(url)
+    |> promise.map(fn(result) {
+      case result {
+        Ok(data) -> on_success(data)
+        Error(Nil) -> on_error
+      }
+    })
+
+  effect.from_promise(promise)
+}
+
+/// Centers a geometry around its bounding box center.
+///
+/// This is useful for STL or OBJ models that need to rotate around their
+/// geometric center rather than their original origin point.
+///
+/// Many CAD-exported models have their origin at an arbitrary location.
+/// Call this function after loading to ensure the model rotates around
+/// its visual center.
+///
+/// ## Example
+///
+/// ```gleam
+/// use result <- promise.await(geometry.load_stl("/models/part.stl"))
+/// case result {
+///   Ok(geom) -> {
+///     // Center the geometry so it rotates around its middle
+///     let centered = geometry.center(geom)
+///     // Use centered geometry in your mesh...
+///   }
+///   Error(Nil) -> // handle error
+/// }
+/// ```
+pub fn center(geometry geometry: CustomGeometry) -> CustomGeometry {
+  savoiardi.center_geometry(geometry)
 }

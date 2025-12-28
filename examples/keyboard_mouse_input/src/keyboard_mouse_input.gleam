@@ -17,7 +17,9 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
+import vec/vec3f
 
 pub type Model {
   Model(
@@ -35,6 +37,7 @@ pub type Msg {
 pub fn main() -> Nil {
   let assert Ok(_) =
     tiramisu.run(
+      bridge: option.None,
       selector: "body",
       dimensions: option.None,
       init: init,
@@ -92,7 +95,7 @@ fn update(
         )
 
       // Mouse position affects rotation
-      let #(mouse_x, mouse_y) = input.mouse_position(ctx.input)
+      let vec2.Vec2(mouse_x, mouse_y) = input.mouse_position(ctx.input)
       let rotation_y = { mouse_x -. 400.0 } /. 100.0
       let rotation_x = { mouse_y -. 300.0 } /. 100.0
 
@@ -160,7 +163,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "cube",
       geometry: {
-        let assert Ok(box) = geometry.box(width: 2.0, height: 2.0, depth: 2.0)
+        let assert Ok(box) = geometry.box(vec3f.one)
         box
       },
       material: {

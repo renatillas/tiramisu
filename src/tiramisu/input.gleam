@@ -1,6 +1,7 @@
 import gleam/list
 import gleam/result
 import gleam/set
+import vec/vec2.{type Vec2}
 
 /// Input state for all input devices (automatically updated each frame).
 ///
@@ -57,7 +58,7 @@ pub type TouchState {
 }
 
 pub type Touch {
-  Touch(id: Int, x: Float, y: Float)
+  Touch(id: Int, position: Vec2(Float))
 }
 
 pub fn new() -> InputState {
@@ -121,13 +122,13 @@ pub fn is_key_just_released(input: InputState, key: Key) -> Bool {
 // --- Mouse Helpers ---
 
 /// Get mouse position
-pub fn mouse_position(input: InputState) -> #(Float, Float) {
-  #(input.mouse.x, input.mouse.y)
+pub fn mouse_position(input: InputState) -> vec2.Vec2(Float) {
+  vec2.Vec2(input.mouse.x, input.mouse.y)
 }
 
 /// Get mouse delta
-pub fn mouse_delta(input: InputState) -> #(Float, Float) {
-  #(input.mouse.delta_x, input.mouse.delta_y)
+pub fn mouse_delta(input: InputState) -> vec2.Vec2(Float) {
+  vec2.Vec2(input.mouse.delta_x, input.mouse.delta_y)
 }
 
 /// Check if left mouse button is pressed
@@ -224,6 +225,24 @@ pub fn touches_just_ended(input: InputState) -> List(Touch) {
 /// Get touch count
 pub fn touch_count(input: InputState) -> Int {
   list.length(input.touch.touches)
+}
+
+/// Check if there was any user interaction this frame (for audio context resume)
+/// Returns True if any key was just pressed, mouse button clicked, or touch started
+pub fn has_user_interaction(input: InputState) -> Bool {
+  // Check for any key just pressed
+  let has_key_press = !set.is_empty(input.keyboard.just_pressed_keys)
+
+  // Check for mouse button just pressed
+  let has_mouse_click =
+    input.mouse.left_button.just_pressed
+    || input.mouse.middle_button.just_pressed
+    || input.mouse.right_button.just_pressed
+
+  // Check for touch just started
+  let has_touch_start = !list.is_empty(input.touch.touches_just_started)
+
+  has_key_press || has_mouse_click || has_touch_start
 }
 
 fn list_get(list: List(a), index: Int) -> Result(a, Nil) {
@@ -1123,8 +1142,8 @@ pub fn build_mouse_state(
 
 /// Build a Touch (internal use only)
 @internal
-pub fn build_touch(id id: Int, x x: Float, y y: Float) -> Touch {
-  Touch(id: id, x: x, y: y)
+pub fn build_touch(id id: Int, position position: Vec2(Float)) -> Touch {
+  Touch(id: id, position: position)
 }
 
 /// Build a TouchState (internal use only)

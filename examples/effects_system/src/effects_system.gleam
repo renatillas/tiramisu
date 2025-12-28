@@ -12,6 +12,7 @@ import tiramisu/material
 import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
+import vec/vec3f
 
 pub type Model {
   Model(cubes: List(Cube), next_id: Int)
@@ -34,6 +35,7 @@ pub type Msg {
 pub fn main() {
   let assert Ok(_) =
     tiramisu.run(
+      bridge: option.None,
       selector: "body",
       dimensions: option.None,
       init: init,
@@ -47,7 +49,10 @@ fn init(
 ) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   #(
     Model(cubes: [], next_id: 0),
-    effect.batch([effect.tick(Tick), effect.delay(500, AddCube)]),
+    effect.batch([
+      effect.tick(Tick),
+      effect.delay(duration.milliseconds(500), AddCube),
+    ]),
     option.None,
   )
 }
@@ -98,7 +103,7 @@ fn update(
 
       #(
         Model(cubes: [new_cube, ..model.cubes], next_id: model.next_id + 1),
-        effect.delay(500, AddCube),
+        effect.delay(duration.milliseconds(500), AddCube),
         option.None,
       )
     }
@@ -129,8 +134,7 @@ fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let assert Ok(box_geometry) =
-    geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geometry) = geometry.box(vec3f.one)
 
   let camera_node =
     scene.camera(

@@ -2,14 +2,14 @@ import gleam/bool
 import gleam/int
 import gleam/javascript/promise
 import gleam/list
-import gleam/option.{None}
+import gleam/option.{None, Some}
+import gleam/time/duration
 import lustre
 import lustre/attribute.{class}
 import lustre/effect as lustre_effect
 import lustre/element.{type Element}
 import lustre/element/html
 import tiramisu
-import tiramisu/asset
 import tiramisu/audio.{Playing}
 import tiramisu/background
 import tiramisu/camera
@@ -18,10 +18,10 @@ import tiramisu/geometry
 import tiramisu/input
 import tiramisu/light
 import tiramisu/material
-import tiramisu/physics
 import tiramisu/scene
 import tiramisu/transform
 import tiramisu/ui
+import vec/vec2
 import vec/vec3
 
 const grid_size = 20
@@ -43,22 +43,9 @@ pub type Position {
   Position(x: Int, y: Int)
 }
 
-pub type Id {
-  EatingSound
-  GameOverSound
-  Ground
-  Snake(segment_id: Int)
-  RightEye
-  LeftEye
-  Food
-  MainCamera
-  AmbientLight
-  DirectionalLight
-  Scene
-}
-
 pub type Model {
   Model(
+    bridge: ui.Bridge(UIMsg, Msg),
     input_bindings: input.InputBindings(Direction),
     snake: List(#(Int, Position)),
     direction: Direction,
@@ -67,7 +54,8 @@ pub type Model {
     game_over: Bool,
     move_timer: Float,
     move_interval: Float,
-    asset_cache: asset.AssetCache,
+    fruit_sound: option.Option(audio.Buffer),
+    game_over_sound: option.Option(audio.Buffer),
     ate_food: Bool,
     next_segment_id: Int,
   )
@@ -76,7 +64,11 @@ pub type Model {
 pub type Msg {
   Tick
   RestartGame
-  AudioAssetsLoaded(asset.BatchLoadResult)
+  FruitSoundLoaded(audio.Buffer)
+  GameOverSoundLoaded(audio.Buffer)
+  AudioLoadFailed
+  BackgroundSet
+  BackgroundFailed
 }
 
 // UI Messages
@@ -87,28 +79,37 @@ pub type UIMsg {
 }
 
 pub type UIModel {
-  UIModel(score: Int, game_over: Bool)
+  UIModel(bridge: ui.Bridge(UIMsg, Msg), score: Int, game_over: Bool)
 }
 
 pub fn main() -> Nil {
+  // Create a bridge for communication
+  let bridge = ui.new_bridge()
+
   // Start Lustre UI overlay
   let assert Ok(_) =
     lustre.application(ui_init, ui_update, ui_view)
-    |> lustre.start("#app", Nil)
+    |> lustre.start("#app", bridge)
 
   // Start Tiramisu game in fullscreen mode
-  tiramisu.run(
-    dimensions: None,
-    background: background.Color(0x1a1a2e),
-    init:,
-    update:,
-    view:,
-  )
+  let assert Ok(_) =
+    tiramisu.run(
+      selector: "#game",
+      dimensions: None,
+      bridge: Some(bridge),
+      init: init(bridge, _),
+      update:,
+      view:,
+    )
+  Nil
 }
 
 // UI Init/Update/View
-fn ui_init(_flags) {
-  #(UIModel(score: 0, game_over: False), ui.register_lustre())
+fn ui_init(bridge) {
+  #(
+    UIModel(bridge: bridge, score: 0, game_over: False),
+    ui.register_lustre(bridge),
+  )
 }
 
 fn ui_update(model: UIModel, msg: UIMsg) {
@@ -118,7 +119,10 @@ fn ui_update(model: UIModel, msg: UIMsg) {
       lustre_effect.none(),
     )
     GameOver -> #(UIModel(..model, game_over: True), lustre_effect.none())
-    Restart -> #(UIModel(score: 0, game_over: False), lustre_effect.none())
+    Restart -> #(
+      UIModel(..model, score: 0, game_over: False),
+      ui.to_tiramisu(model.bridge, RestartGame),
+    )
   }
 }
 
@@ -173,23 +177,40 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
 }
 
 fn init(
-  _ctx: tiramisu.Context(Id),
-) -> #(Model, Effect(Msg), option.Option(physics.PhysicsWorld(Id))) {
+  bridge: ui.Bridge(UIMsg, Msg),
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg), option.Option(a)) {
   let input_bindings =
     input.new_bindings()
     |> input.bind_key(input.KeyW, Up)
     |> input.bind_key(input.KeyD, Right)
     |> input.bind_key(input.KeyS, Down)
     |> input.bind_key(input.KeyA, Left)
-  let sound_assets = [
-    asset.AudioAsset("game-over.wav"),
-    asset.AudioAsset("fruit-collect.wav"),
-  ]
-  let fruit_eat_sound =
-    effect.from_promise(promise.map(
-      asset.load_batch_simple(sound_assets),
-      AudioAssetsLoaded,
-    ))
+
+  // Load audio files
+  let load_fruit_sound =
+    audio.load_audio(
+      url: "fruit-collect.wav",
+      on_success: FruitSoundLoaded,
+      on_error: AudioLoadFailed,
+    )
+
+  let load_game_over_sound =
+    audio.load_audio(
+      url: "game-over.wav",
+      on_success: GameOverSoundLoaded,
+      on_error: AudioLoadFailed,
+    )
+
+  // Set background color
+  let set_background =
+    background.set(
+      ctx.scene,
+      background.Color(0x1a1a2e),
+      BackgroundSet,
+      BackgroundFailed,
+    )
+
   let initial_snake = [
     #(0, Position(10, 10)),
     #(1, Position(10, 11)),
@@ -197,6 +218,7 @@ fn init(
   ]
   let model =
     Model(
+      bridge:,
       input_bindings:,
       snake: initial_snake,
       direction: Up,
@@ -205,32 +227,58 @@ fn init(
       game_over: False,
       move_timer: 0.0,
       move_interval: initial_speed,
-      asset_cache: asset.new_cache(),
+      fruit_sound: option.None,
+      game_over_sound: option.None,
       ate_food: False,
       next_segment_id: 3,
     )
-  #(model, effect.batch([effect.tick(Tick), fruit_eat_sound]), option.None)
+  #(
+    model,
+    effect.batch([
+      effect.tick(Tick),
+      load_fruit_sound,
+      load_game_over_sound,
+      set_background,
+    ]),
+    option.None,
+  )
 }
 
 fn update(
   model: Model,
   msg: Msg,
-  ctx: tiramisu.Context(Id),
-) -> #(Model, Effect(Msg), option.Option(_)) {
+  ctx: tiramisu.Context,
+) -> #(Model, Effect(Msg), option.Option(a)) {
   case msg {
-    AudioAssetsLoaded(audio_buffer) -> {
-      let asset.BatchLoadResult(asset_cache, _) = audio_buffer
-      #(Model(..model, asset_cache:), effect.none(), option.None)
+    FruitSoundLoaded(buffer) -> {
+      #(Model(..model, fruit_sound: Some(buffer)), effect.none(), option.None)
+    }
+    GameOverSoundLoaded(buffer) -> {
+      #(
+        Model(..model, game_over_sound: Some(buffer)),
+        effect.none(),
+        option.None,
+      )
+    }
+    AudioLoadFailed | BackgroundSet | BackgroundFailed -> {
+      #(model, effect.none(), option.None)
     }
     RestartGame -> {
       // Reset UI and restart game
-      let #(new_model, game_effect, _) = init(ctx)
+      let #(new_model, game_effect, _) = init(model.bridge, ctx)
+      // Preserve loaded audio
+      let new_model =
+        Model(
+          ..new_model,
+          fruit_sound: model.fruit_sound,
+          game_over_sound: model.game_over_sound,
+        )
       #(
         new_model,
         effect.batch([
           game_effect,
-          ui.dispatch_to_lustre(RestartGame),
-          ui.dispatch_to_lustre(UpdateScore(0)),
+          ui.to_lustre(model.bridge, Restart),
+          ui.to_lustre(model.bridge, UpdateScore(0)),
         ]),
         option.None,
       )
@@ -254,7 +302,7 @@ fn update(
         get_new_direction(ctx.input, model.input_bindings, model.direction)
 
       // Update move timer
-      let new_timer = model.move_timer +. ctx.delta_time /. 1000.0
+      let new_timer = model.move_timer +. duration.to_seconds(ctx.delta_time)
 
       // Validate direction change before moving
       let assert [#(_, head_pos), ..tail] = model.snake
@@ -288,7 +336,7 @@ fn update(
               Model(..model, game_over: True),
               effect.batch([
                 effect.tick(Tick),
-                ui.dispatch_to_lustre(GameOver),
+                ui.to_lustre(model.bridge, GameOver),
               ]),
               option.None,
             )
@@ -336,7 +384,7 @@ fn update(
                 ),
                 effect.batch([
                   effect.tick(Tick),
-                  ui.dispatch_to_lustre(UpdateScore(new_score)),
+                  ui.to_lustre(model.bridge, UpdateScore(new_score)),
                 ]),
                 option.None,
               )
@@ -477,56 +525,32 @@ fn get_eye_positions(
   }
 }
 
-fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
-  let fruit_audio = case
-    asset.get_audio(model.asset_cache, "fruit-collect.wav"),
-    model.ate_food
-  {
-    Ok(audio_buffer), True ->
+fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
+  let fruit_audio = case model.fruit_sound, model.ate_food {
+    Some(buffer), True -> [
       scene.audio(
-        id: EatingSound,
+        id: "eating-sound",
         audio: audio.GlobalAudio(
-          buffer: audio_buffer,
-          config: audio.AudioConfig(
-            state: case model.ate_food {
-              True -> Playing
-              False -> audio.Stopped
-            },
-            fade: audio.NoFade,
-            group: option.Some(audio.SFX),
-            on_end: option.None,
-            volume: 1.0,
-            loop: False,
-            playback_rate: 1.0,
-          ),
+          buffer:,
+          config: audio.config()
+            |> audio.with_state(Playing)
+            |> audio.with_group(audio.SFX),
         ),
-      )
-      |> list.wrap
-
+      ),
+    ]
     _, _ -> []
   }
 
-  let game_over_audio = case
-    asset.get_audio(model.asset_cache, "game-over.wav"),
-    model.game_over
-  {
-    Ok(audio_buffer), True -> [
+  let game_over_audio = case model.game_over_sound, model.game_over {
+    Some(buffer), True -> [
       scene.audio(
-        id: GameOverSound,
+        id: "game-over-sound",
         audio: audio.GlobalAudio(
-          buffer: audio_buffer,
-          config: audio.AudioConfig(
-            volume: 0.3,
-            loop: False,
-            playback_rate: 1.0,
-            state: case model.game_over {
-              True -> audio.Playing
-              False -> audio.Stopped
-            },
-            fade: audio.NoFade,
-            group: option.Some(audio.SFX),
-            on_end: option.None,
-          ),
+          buffer:,
+          config: audio.config()
+            |> audio.with_state(Playing)
+            |> audio.with_volume(0.3)
+            |> audio.with_group(audio.SFX),
         ),
       ),
     ]
@@ -538,7 +562,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   let camera_node =
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 15.0, 15.0)),
       viewport: option.None,
@@ -550,7 +574,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   let lights = [
     scene.light(
-      id: AmbientLight,
+      id: "ambient-light",
       light: {
         let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
         light
@@ -558,7 +582,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
       transform: transform.identity,
     ),
     scene.light(
-      id: DirectionalLight,
+      id: "directional-light",
       light: {
         let assert Ok(light) =
           light.directional(color: 0xffffff, intensity: 0.8)
@@ -579,14 +603,10 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
         _ -> #(0x3aafa9, vec3.Vec3(0.0, 0.0, 0.0))
       }
       scene.mesh(
-        id: Snake(segment_id),
+        id: "snake-" <> int.to_string(segment_id),
         geometry: {
-          let assert Ok(box) =
-            geometry.box(
-              width: cell_size *. 0.9,
-              height: cell_size *. 0.9,
-              depth: cell_size *. 0.9,
-            )
+          let size = cell_size *. 0.9
+          let assert Ok(box) = geometry.box(size: vec3.Vec3(size, size, size))
           box
         },
         material: {
@@ -609,14 +629,10 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
       [
         scene.mesh(
-          id: LeftEye,
+          id: "left-eye",
           geometry: {
             let assert Ok(sphere) =
-              geometry.sphere(
-                radius: 0.12,
-                width_segments: 16,
-                height_segments: 12,
-              )
+              geometry.sphere(radius: 0.12, segments: vec2.Vec2(16, 12))
             sphere
           },
           material: {
@@ -630,14 +646,10 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
           physics: option.None,
         ),
         scene.mesh(
-          id: RightEye,
+          id: "right-eye",
           geometry: {
             let assert Ok(sphere) =
-              geometry.sphere(
-                radius: 0.12,
-                width_segments: 16,
-                height_segments: 12,
-              )
+              geometry.sphere(radius: 0.12, segments: vec2.Vec2(16, 12))
             sphere
           },
           material: {
@@ -659,14 +671,10 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
   let food_world = position_to_world(model.food)
   let food_node =
     scene.mesh(
-      id: Food,
+      id: "food",
       geometry: {
-        let assert Ok(box) =
-          geometry.box(
-            width: cell_size *. 0.8,
-            height: cell_size *. 0.8,
-            depth: cell_size *. 0.8,
-          )
+        let size = cell_size *. 0.8
+        let assert Ok(box) = geometry.box(size: vec3.Vec3(size, size, size))
         box
       },
       material: {
@@ -689,13 +697,10 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
 
   let ground_updated =
     scene.mesh(
-      id: Ground,
+      id: "ground",
       geometry: {
-        let assert Ok(plane) =
-          geometry.plane(
-            width: int.to_float(grid_size) *. cell_size,
-            height: int.to_float(grid_size) *. cell_size,
-          )
+        let size = int.to_float(grid_size) *. cell_size
+        let assert Ok(plane) = geometry.plane(size: vec2.Vec2(size, size))
         plane
       },
       material: {
@@ -712,7 +717,7 @@ fn view(model: Model, _context: tiramisu.Context(Id)) -> scene.Node(Id) {
     |> list.wrap
 
   scene.empty(
-    id: Scene,
+    id: "scene",
     transform: transform.identity,
     children: list.flatten([
       fruit_audio,
