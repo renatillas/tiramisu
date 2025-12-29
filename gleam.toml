@@ -24,7 +24,7 @@ paint = ">= 1.0.0 and < 2.0.0"
 iv = ">= 1.3.3 and < 2.0.0"
 quaterni = ">= 1.0.0 and < 2.0.0"
 gleam_time = ">= 1.6.0 and < 2.0.0"
-savoiardi = { path = "../savoiardi" }
+savoiardi = ">= 1.0.0 and < 2.0.0"
 statemachine = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]
