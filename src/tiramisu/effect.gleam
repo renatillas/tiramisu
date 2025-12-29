@@ -1,3 +1,50 @@
+//// Side effects for game updates and browser interactions.
+////
+//// Effects represent actions that happen outside of pure state updates. They are returned
+//// from your `init` and `update` functions alongside state changes, and the runtime
+//// executes them after your function returns.
+////
+//// ## Common Effects
+////
+//// ```gleam
+//// // Run every frame (game loop)
+//// effect.tick(NextFrame)
+////
+//// // Delay a message
+//// effect.delay(duration.seconds(1), DelayedMessage)
+////
+//// // Combine multiple effects
+//// effect.batch([effect.tick(Tick), audio_effect, ui_effect])
+////
+//// // No effect needed
+//// effect.none()
+//// ```
+////
+//// ## Browser APIs
+////
+//// ```gleam
+//// // Fullscreen
+//// effect.request_fullscreen(on_success: Entered, on_error: Failed)
+////
+//// // Pointer lock (FPS games)
+//// effect.request_pointer_lock(on_success: Locked, on_error: Failed)
+////
+//// // Haptics
+//// effect.vibrate([100, 50, 100])
+//// effect.gamepad_vibrate(gamepad: 0, intensity: 0.5, duration: duration.milliseconds(200))
+//// ```
+////
+//// ## Intervals
+////
+//// ```gleam
+//// // Create interval
+//// effect.interval(ms: 2000, msg: SpawnEnemy, on_created: IntervalCreated)
+////
+//// // Cancel interval
+//// effect.cancel_interval(interval_id)
+//// ```
+////
+
 import gleam/float
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}

@@ -1,3 +1,69 @@
+//// Time-based value interpolation (tweening) for smooth animations.
+////
+//// Tweens smoothly interpolate between two values over time, with configurable
+//// easing functions. Use them for movement, fading, color changes, and any
+//// time-based animation.
+////
+//// ## Creating Tweens
+////
+//// ```gleam
+//// import gleam/time/duration
+////
+//// // Float tween (opacity, score counter, etc.)
+//// let fade = tween.tween_float(
+////   start: 0.0,
+////   end: 1.0,
+////   duration: duration.seconds(2),
+////   easing: fn(t) { t },  // Linear
+//// )
+////
+//// // Vec3 tween (position, scale, etc.)
+//// let move = tween.tween_vec3(
+////   start: vec3.Vec3(0.0, 0.0, 0.0),
+////   end: vec3.Vec3(10.0, 5.0, 0.0),
+////   duration: duration.seconds(1),
+////   easing: fn(t) { t *. t },  // Ease-in quadratic
+//// )
+////
+//// // Transform tween (full movement + rotation + scale)
+//// let transform_tween = tween.tween_transform(start, end, duration, easing)
+//// ```
+////
+//// ## Updating Tweens
+////
+//// Call `update` each frame with `ctx.delta_time` to advance the tween:
+////
+//// ```gleam
+//// fn update(model: Model, msg: Msg, ctx: Context) {
+////   let updated_tween = tween.update(model.tween, ctx.delta_time)
+////   let current_value = tween.get_value(updated_tween)
+////
+////   case tween.is_complete(updated_tween) {
+////     True -> // Animation finished
+////     False -> // Still animating
+////   }
+//// }
+//// ```
+////
+//// ## Easing Functions
+////
+//// Easing functions transform linear time (0→1) into curved progress:
+////
+//// ```gleam
+//// // Linear (constant speed)
+//// fn(t) { t }
+////
+//// // Ease-in quadratic (slow start)
+//// fn(t) { t *. t }
+////
+//// // Ease-out quadratic (slow end)
+//// fn(t) { 1.0 -. { 1.0 -. t } *. { 1.0 -. t } }
+////
+//// // Smooth step (slow start and end)
+//// fn(t) { t *. t *. { 3.0 -. 2.0 *. t } }
+//// ```
+////
+
 import gleam/order
 import gleam/time/duration.{type Duration}
 import quaternion

@@ -1,10 +1,44 @@
-// Browser API effects - System-level browser interactions
-//
-// This module provides access to browser APIs like fullscreen, pointer lock,
-// haptic feedback, and clipboard operations.
-//
-// Most functionality uses Plinth's browser bindings. Some features (pointer lock,
-// vibration) require minimal FFI as they're not yet in Plinth.
+//// Low-level browser API bindings.
+////
+//// This module provides direct access to browser APIs like fullscreen, pointer lock,
+//// haptic feedback, and clipboard operations. Most games will use the higher-level
+//// `effect` module instead, which wraps these in the game's effect system.
+////
+//// ## Fullscreen
+////
+//// ```gleam
+//// import tiramisu/browser
+//// import plinth/browser/document
+////
+//// let assert Ok(canvas) = document.query_selector("canvas")
+//// browser.request_fullscreen(canvas)
+//// ```
+////
+//// ## Pointer Lock (FPS Games)
+////
+//// ```gleam
+//// browser.request_pointer_lock(canvas)  // Hide cursor, unlimited mouse movement
+//// browser.exit_pointer_lock()
+//// browser.is_pointer_locked()
+//// ```
+////
+//// ## Haptic Feedback
+////
+//// ```gleam
+//// // Mobile vibration pattern: vibrate 200ms, pause 100ms, vibrate 200ms
+//// browser.vibrate(array.from_list([200, 100, 200]))
+////
+//// // Gamepad vibration
+//// browser.gamepad_vibrate(gamepad: 0, intensity: 0.7, duration_ms: 500)
+//// ```
+////
+//// ## Clipboard
+////
+//// ```gleam
+//// browser.clipboard_write("High Score: 1000")
+//// browser.clipboard_read()
+//// ```
+////
 
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}

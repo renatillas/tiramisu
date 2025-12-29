@@ -1,3 +1,59 @@
+//// 3D model animation playback and blending.
+////
+//// This module handles animation clips loaded from 3D models (GLTF, FBX).
+//// Use it to configure and play skeletal animations with configurable
+//// loop modes, speed, and blending.
+////
+//// ## Loading Animations
+////
+//// Animations are loaded as part of 3D models. Extract clips using the
+//// `model` module:
+////
+//// ```gleam
+//// import tiramisu/model
+//// import tiramisu/animation
+////
+//// // After loading a GLTF model
+//// let clips = model.get_animations(gltf_data)
+////
+//// // Find a specific animation by name
+//// let walk_clip = list.find(clips, fn(clip) {
+////   animation.clip_name(clip) == "Walk"
+//// })
+////
+//// // Create animation configuration
+//// let walk_animation = animation.new_animation(walk_clip)
+////   |> animation.set_loop(animation.LoopRepeat)
+////   |> animation.set_speed(1.0)
+//// ```
+////
+//// ## Animation Playback
+////
+//// Use `AnimationPlayback` with `scene.model()` to play animations:
+////
+//// ```gleam
+//// scene.model(
+////   id: "character",
+////   object: my_model,
+////   transform: transform.identity,
+////   animation: option.Some(animation.SingleAnimation(walk_animation)),
+////   physics: option.None,
+//// )
+//// ```
+////
+//// ## Blending Animations
+////
+//// Smoothly transition between animations:
+////
+//// ```gleam
+//// animation.BlendedAnimations(
+////   from: walk_animation,
+////   to: run_animation,
+////   blend_factor: 0.5,  // Halfway between walk and run
+//// )
+//// ```
+////
+
 import savoiardi
 
 pub type Clip =

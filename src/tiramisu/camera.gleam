@@ -1,3 +1,69 @@
+//// Camera configuration and post-processing effects.
+////
+//// Cameras define how your 3D scene is projected onto the 2D screen. This module provides
+//// both perspective (3D) and orthographic (2D) camera types, plus a full post-processing
+//// pipeline for visual effects.
+////
+//// ## Camera Types
+////
+//// ```gleam
+//// // Perspective camera for 3D games
+//// let assert Ok(cam) = camera.perspective(
+////   field_of_view: 75.0,
+////   near: 0.1,
+////   far: 1000.0,
+//// )
+////
+//// // Orthographic camera for 2D games
+//// let cam = camera.camera_2d(size: vec2.Vec2(800, 600))
+//// ```
+////
+//// ## Adding to Scene
+////
+//// ```gleam
+//// scene.camera(
+////   id: "main-camera",
+////   camera: cam,
+////   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
+////   look_at: Some(vec3.Vec3(0.0, 0.0, 0.0)),
+////   active: True,
+////   viewport: None,
+////   postprocessing: None,
+//// )
+//// ```
+////
+//// ## Post-Processing
+////
+//// Add visual effects like bloom, vignette, and film grain:
+////
+//// ```gleam
+//// let pp = camera.new_postprocessing()
+////   |> camera.add_pass(camera.clear_pass(None))
+////   |> camera.add_pass(camera.render_pass())
+////   |> camera.add_pass(camera.bloom(strength: 1.0, threshold: 0.8, radius: 0.4))
+////   |> camera.add_pass(camera.fxaa())
+////   |> camera.add_pass(camera.output_pass())
+////
+//// scene.camera(
+////   id: "main-camera",
+////   camera: cam,
+////   // ...
+////   postprocessing: Some(pp),
+//// )
+//// ```
+////
+//// ## Viewports
+////
+//// Create split-screen or picture-in-picture views:
+////
+//// ```gleam
+//// let minimap = camera.ViewPort(
+////   position: vec2.Vec2(650, 10),
+////   size: vec2.Vec2(150, 100),
+//// )
+//// ```
+////
+
 import gleam/bool
 import gleam/int
 import gleam/list

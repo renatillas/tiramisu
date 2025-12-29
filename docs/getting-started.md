@@ -2,7 +2,7 @@
 
 Tiramisu is a type-safe 3D game engine for Gleam, built on Three.js. It follows the **Model-View-Update (MVU)** architecture, making game state management predictable and testable.
 
-## Quick Start with Mascarpone 🧀
+## Quick Start with Mascarpone
 
 **The easiest way to start** is using [Mascarpone](https://hexdocs.pm/mascarpone/), an interactive CLI tool that scaffolds complete Tiramisu projects.
 
@@ -16,7 +16,7 @@ cd my_game
 ### Run Mascarpone
 
 ```bash
-gleam add --dev mascarpone 
+gleam add --dev mascarpone
 gleam run -m mascarpone
 ```
 
@@ -29,11 +29,11 @@ The interactive TUI will guide you through:
    - **Physics Demo** - Physics-enabled objects
 
 Mascarpone automatically:
-- ✅ Configures `gleam.toml` with all dependencies
-- ✅ Sets up Three.js and Rapier3D CDN imports
-- ✅ Creates a working game example
-- ✅ Adds necessary stylesheets for fullscreen games
-- ✅ Generates `.gitignore` for Gleam projects
+- Configures `gleam.toml` with all dependencies
+- Sets up Three.js and Rapier3D CDN imports
+- Creates a working game example
+- Adds necessary stylesheets for fullscreen games
+- Generates `.gitignore` for Gleam projects
 
 ### Run Your Game
 
@@ -78,8 +78,7 @@ If you used Mascarpone, you already have a working game! This section shows how 
 Replace the contents of `src/my_game.gleam` with:
 
 ```gleam
-import tiramisu/physics
-import gleam/option
+import gleam/option.{None, Some}
 import gleam/time/duration
 import tiramisu
 import tiramisu/background
@@ -100,21 +99,33 @@ pub type Model {
 // Msg: Events that can happen
 pub type Msg {
   Tick
+  BackgroundSet
+  BackgroundFailed
 }
 
 pub fn main() {
-  tiramisu.run(
-    dimensions: option.Some(tiramisu.Dimensions(width: 800.0, height: 600.0)),
-    background: background.Color(0x1a1a2e),  // Dark blue background
-    init: init,
-    update: update,
-    view: view,
-  )
+  let assert Ok(_) =
+    tiramisu.run(
+      selector: "#app",
+      dimensions: None,
+      bridge: None,
+      init: init,
+      update: update,
+      view: view,
+    )
+  Nil
 }
 
 // Initialize the game state
-fn init(_ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld)) {
-  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
+fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(a)) {
+  // Set the background color via effect
+  let set_bg = background.set(
+    ctx.scene,
+    background.Color(0x1a1a2e),
+    BackgroundSet,
+    BackgroundFailed,
+  )
+  #(Model(rotation: 0.0), effect.batch([effect.tick(Tick), set_bg]), None)
 }
 
 // Update game state based on events
@@ -122,13 +133,14 @@ fn update(
   model: Model,
   msg: Msg,
   ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(physics.PhysicsWorld)) {
+) -> #(Model, effect.Effect(Msg), option.Option(a)) {
   case msg {
+    BackgroundSet | BackgroundFailed -> #(model, effect.none(), None)
     Tick -> {
       // ctx.delta_time is a Duration type - convert to seconds for rotation
       let delta_seconds = duration.to_seconds(ctx.delta_time)
       let new_rotation = model.rotation +. delta_seconds
-      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(rotation: new_rotation), effect.tick(Tick), None)
     }
   }
 }
@@ -143,21 +155,18 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
   )
 
   let camera_node = scene.camera(
-    id: "main",
+    id: "main-camera",
     camera: cam,
     transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-    look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+    look_at: Some(vec3.Vec3(0.0, 0.0, 0.0)),
     active: True,
-    viewport: option.None,
-    children: [],
-    postprocessing: option.None,
+    viewport: None,
+    postprocessing: None,
   )
 
   // Create rotating cube
   let assert Ok(cube_geometry) = geometry.box(
-    width: 1.0,
-    height: 1.0,
-    depth: 1.0,
+    size: vec3.Vec3(1.0, 1.0, 1.0),
   )
 
   let assert Ok(cube_material) =
@@ -174,7 +183,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
     transform: transform.identity
       |> transform.with_position(vec3.Vec3(0.0, 0.0, 0.0))
       |> transform.with_euler_rotation(vec3.Vec3(model.rotation, model.rotation, 0.0)),
-    physics: option.None,
+    physics: None,
   )
 
   // Add lights
@@ -237,16 +246,17 @@ The `Context` type provides timing, input, and canvas dimension information:
 ```gleam
 pub type Context {
   Context(
-    delta_time: Float,      // Time since last frame in milliseconds (e.g., 16.0 for 60 FPS)
-    input: InputState,      // Keyboard, mouse, touch state
-    canvas_width: Float,    // Current canvas width in pixels
-    canvas_height: Float,   // Current canvas height in pixels
-    ...
+    delta_time: Duration,       // Time since last frame (use duration.to_seconds())
+    input: InputState,          // Keyboard, mouse, touch state
+    canvas_size: Vec2(Float),   // Current canvas dimensions in pixels
+    physics_world: Option(...), // Physics world if enabled
+    scene: Scene,               // Three.js scene (for background, etc.)
+    renderer: Renderer,         // WebGL renderer
   )
 }
 ```
 
-**Delta Time**: Always use `delta_time` for movement and animations to ensure frame-rate independence. `delta_time` is in **milliseconds**, so convert to seconds by multiplying by `0.001`. For example, if you want an object to move at 5 units per second: `5.0 *. ctx.delta_time *. 0.001` each frame.
+**Delta Time**: Always use `delta_time` for movement and animations to ensure frame-rate independence. It's a `Duration` type, so use `duration.to_seconds(ctx.delta_time)` to convert. For example, to move at 5 units per second: `5.0 *. duration.to_seconds(ctx.delta_time)`.
 
 #### 2. Effects
 
@@ -256,7 +266,7 @@ Effects are side effects that may return messages:
 effect.tick(Tick)                    // Run on every frame
 effect.from(fn(dispatch) { ... })    // Custom effect
 effect.batch([effect1, effect2])     // Run multiple effects
-effect.none()                         // No effects
+effect.none()                        // No effects
 ```
 
 #### 3. Scene Nodes
@@ -273,8 +283,19 @@ fn view(model: Model, _ctx: Context) -> scene.Node {
 }
 ```
 
+#### 4. String IDs
 
-#### 4. Transforms
+All scene nodes use plain `String` IDs to identify them:
+
+```gleam
+scene.mesh(id: "player", ...)
+scene.mesh(id: "enemy-1", ...)
+scene.camera(id: "main-camera", ...)
+```
+
+Use descriptive, unique IDs. For dynamic objects, append an index: `"enemy-" <> int.to_string(idx)`.
+
+#### 5. Transforms
 
 Every scene node has a transform (position, rotation, scale). The Transform type is opaque, so you use builder functions:
 
@@ -288,9 +309,112 @@ transform.at(position: vec3.Vec3(5.0, 0.0, -3.0))
 // Build with multiple properties
 transform.identity
   |> transform.with_position(vec3.Vec3(5.0, 2.0, -3.0))
-  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90° on Y)
+  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90 deg on Y)
   |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))  // 2x larger
 ```
 
-**Rotation:** Uses Euler angles in radians (π radians = 180°, π/2 = 90°)
+**Rotation:** Uses Euler angles in radians (pi radians = 180 deg, pi/2 = 90 deg)
 
+#### 6. Background
+
+Set the background color or skybox using the `background` effect:
+
+```gleam
+// In init or update:
+let set_bg = background.set(
+  ctx.scene,
+  background.Color(0x1a1a2e),
+  BackgroundSetMsg,
+  BackgroundFailedMsg,
+)
+```
+
+## Lustre Integration
+
+For bidirectional communication between Tiramisu and Lustre UI:
+
+```gleam
+import tiramisu
+import tiramisu/ui
+
+pub fn main() {
+  // Create a bridge for communication
+  let bridge = ui.new_bridge()
+
+  // Start Lustre with the bridge
+  let assert Ok(_) =
+    lustre.application(ui_init, ui_update, ui_view)
+    |> lustre.start("#app", bridge)
+
+  // Start Tiramisu with the same bridge
+  let assert Ok(_) =
+    tiramisu.run(
+      selector: "#game",
+      dimensions: None,
+      bridge: Some(bridge),
+      init: init(bridge, _),
+      update: update,
+      view: view,
+    )
+  Nil
+}
+
+// In Lustre init:
+fn ui_init(bridge) {
+  #(UIModel(bridge: bridge, ...), ui.register_lustre(bridge))
+}
+
+// Send message from Lustre to Tiramisu:
+ui.to_tiramisu(bridge, GameMessage)
+
+// Send message from Tiramisu to Lustre:
+ui.to_lustre(bridge, UIMessage)
+```
+
+## Audio
+
+Load and play audio files:
+
+```gleam
+// In your Msg type:
+pub type Msg {
+  SoundLoaded(audio.Buffer)
+  SoundFailed
+  // ...
+}
+
+// In init, load audio:
+let load_sound = audio.load_audio(
+  url: "sounds/jump.wav",
+  on_success: SoundLoaded,
+  on_error: SoundFailed,
+)
+
+// Store the buffer in your model when loaded:
+case msg {
+  SoundLoaded(buffer) -> #(Model(..model, jump_sound: Some(buffer)), ...)
+  // ...
+}
+
+// Play audio in view:
+case model.jump_sound, model.should_play_jump {
+  Some(buffer), True -> [
+    scene.audio(
+      id: "jump-sound",
+      audio: audio.GlobalAudio(
+        buffer: buffer,
+        config: audio.config()
+          |> audio.with_state(audio.Playing)
+          |> audio.with_volume(0.8),
+      ),
+    ),
+  ]
+  _, _ -> []
+}
+```
+
+## Next Steps
+
+- **Scene Graph Guide**: Learn about meshes, lights, cameras, and hierarchy
+- **Physics Guide**: Add physics simulation with Rapier
+- **Examples**: Explore the `examples/` folder for complete demos

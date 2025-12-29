@@ -1,3 +1,71 @@
+//// Spritesheet animation with state machine transitions.
+////
+//// This module provides a complete animation system for 2D sprites with:
+//// - Multiple named animations (idle, walk, jump, etc.)
+//// - Automatic frame advancement with configurable timing
+//// - Loop modes (once, repeat, ping-pong)
+//// - State machine transitions with conditions
+//// - Smooth blending between animations
+////
+//// ## Creating an Animation Machine
+////
+//// ```gleam
+//// import tiramisu/spritesheet
+//// import gleam/time/duration
+////
+//// let assert Ok(machine) =
+////   spritesheet.new(texture: player_tex, columns: 8, rows: 4)
+////   |> result.map(spritesheet.with_animation(
+////     _,
+////     name: "idle",
+////     frames: [0, 1, 2, 3],
+////     frame_duration: duration.milliseconds(100),
+////     loop: spritesheet.Repeat,
+////   ))
+////   |> result.map(spritesheet.with_animation(
+////     _,
+////     name: "walk",
+////     frames: [8, 9, 10, 11, 12, 13],
+////     frame_duration: duration.milliseconds(80),
+////     loop: spritesheet.Repeat,
+////   ))
+////   |> result.map(spritesheet.with_transition(
+////     _,
+////     from: "idle",
+////     to: "walk",
+////     condition: spritesheet.custom(fn(ctx) { ctx.is_moving }),
+////     blend_duration: duration.milliseconds(200),
+////   ))
+////   |> result.map(spritesheet.build)
+//// ```
+////
+//// ## Updating and Rendering
+////
+//// ```gleam
+//// fn update(model: Model, msg: Msg, ctx: Context) {
+////   let #(new_machine, _transitioned) =
+////     spritesheet.update(model.machine, model.game_state, ctx.delta_time)
+////   Model(..model, machine: new_machine)
+//// }
+////
+//// fn view(model: Model, _ctx: Context) -> scene.Node {
+////   scene.animated_sprite(
+////     id: "player",
+////     sprite: spritesheet.to_sprite(model.machine),
+////     size: vec2.Vec2(64.0, 64.0),
+////     transform: transform.identity,
+////     physics: option.None,
+////   )
+//// }
+//// ```
+////
+//// ## Transition Conditions
+////
+//// - `always()`: Immediate transition
+//// - `after_duration(duration)`: After time in current state
+//// - `custom(fn(ctx) -> Bool)`: Based on game context
+////
+
 import gleam/bool
 import gleam/dict
 import gleam/int

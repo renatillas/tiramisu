@@ -1,3 +1,41 @@
+//// Light sources for illuminating 3D scenes.
+////
+//// Different light types provide different visual effects and have different performance costs.
+//// Most scenes use a combination of ambient light for base illumination plus one or more
+//// directional/point/spot lights for dynamic lighting.
+////
+//// ## Light Types
+////
+//// - **Ambient**: Global illumination, affects all objects equally
+//// - **Directional**: Parallel rays like sunlight, can cast shadows
+//// - **Point**: Radiates in all directions like a light bulb
+//// - **Spot**: Cone-shaped like a flashlight
+//// - **Hemisphere**: Outdoor ambient with sky/ground colors
+////
+//// ## Basic Usage
+////
+//// ```gleam
+//// let assert Ok(ambient) = light.ambient(intensity: 0.3, color: 0xffffff)
+//// let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
+////   |> light.with_shadows(True)
+////
+//// scene.light(
+////   id: "sun",
+////   light: sun,
+////   transform: transform.at(position: vec3.Vec3(10.0, 20.0, 10.0)),
+//// )
+//// ```
+////
+//// ## Shadow Configuration
+////
+//// ```gleam
+//// let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
+////   |> light.with_shadows(True)
+////   |> light.with_shadow_resolution(2048)
+////   |> light.with_shadow_bias(0.0005)
+//// ```
+////
+
 import gleam/bool
 import savoiardi
 

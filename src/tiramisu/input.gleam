@@ -1,3 +1,73 @@
+//// Input handling for keyboard, mouse, touch, and gamepad.
+////
+//// Access input state via `ctx.input` in your `update` function. The engine automatically
+//// tracks pressed/released states and provides both current-frame and persistent state.
+////
+//// ## Keyboard
+////
+//// ```gleam
+//// // Check if key is held down
+//// input.is_key_pressed(ctx.input, input.KeyW)
+////
+//// // Check if key was pressed this frame (for one-shot actions)
+//// input.is_key_just_pressed(ctx.input, input.Space)
+////
+//// // Check if key was released this frame
+//// input.is_key_just_released(ctx.input, input.Escape)
+//// ```
+////
+//// ## Mouse
+////
+//// ```gleam
+//// // Position and movement
+//// let pos = input.mouse_position(ctx.input)  // Vec2(x, y)
+//// let delta = input.mouse_delta(ctx.input)   // Movement since last frame
+////
+//// // Buttons
+//// input.is_left_button_pressed(ctx.input)
+//// input.is_left_button_just_pressed(ctx.input)
+//// input.mouse_wheel_delta(ctx.input)
+//// ```
+////
+//// ## Gamepad
+////
+//// ```gleam
+//// // Check connection
+//// input.is_gamepad_connected(ctx.input, 0)
+////
+//// // Buttons (A, B, X, Y, bumpers, triggers, etc.)
+//// input.is_gamepad_button_pressed(ctx.input, 0, input.ButtonA)
+//// input.gamepad_button(ctx.input, 0, input.RightTrigger)  // Analog 0.0-1.0
+////
+//// // Analog sticks
+//// input.gamepad_axis(ctx.input, 0, input.LeftStickX)
+//// input.get_axis_with_deadzone(ctx.input, 0, input.LeftStickY, 0.15)
+//// ```
+////
+//// ## Action Bindings
+////
+//// Map multiple inputs to game actions:
+////
+//// ```gleam
+//// let bindings = input.new_bindings()
+////   |> input.bind_key(input.Space, Jump)
+////   |> input.bind_gamepad_button(input.ButtonA, Jump)
+////
+//// // Check action regardless of input device
+//// input.is_action_pressed(ctx.input, bindings, Jump)
+//// ```
+////
+//// ## Input Buffering
+////
+//// Buffer inputs for forgiving timing (e.g., press jump before landing):
+////
+//// ```gleam
+//// let buffered = input.with_buffer(buffer_frames: 5)
+//// let buffered = input.update_buffer(buffered, ctx.input, bindings)
+//// input.was_action_pressed_buffered(buffered, Jump)
+//// ```
+////
+
 import gleam/list
 import gleam/result
 import gleam/set

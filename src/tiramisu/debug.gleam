@@ -1,3 +1,34 @@
+//// Debug utilities for performance monitoring.
+////
+//// This module provides tools for profiling and optimizing your game.
+//// Track draw calls, triangle counts, and other render statistics.
+////
+//// ## Render Statistics
+////
+//// ```gleam
+//// import tiramisu/debug
+////
+//// fn update(model: Model, msg: Msg, ctx: Context) {
+////   let stats = debug.get_render_stats(ctx.renderer)
+////
+////   // Log if draw calls are too high
+////   case stats.draw_calls > 100 {
+////     True -> io.println("Warning: " <> int.to_string(stats.draw_calls) <> " draw calls")
+////     False -> Nil
+////   }
+////
+////   // ...
+//// }
+//// ```
+////
+//// ## Performance Tips
+////
+//// - **Draw calls**: Each unique material/mesh combination is a draw call.
+////   Use instancing or merge similar meshes to reduce draw calls.
+//// - **Triangles**: High triangle counts impact GPU performance. Use LOD
+////   (Level of Detail) for distant objects.
+////
+
 import savoiardi
 
 /// Render statistics from the WebGL renderer.

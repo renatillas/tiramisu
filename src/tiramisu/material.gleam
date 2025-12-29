@@ -1,3 +1,61 @@
+//// Materials define how surfaces are rendered and interact with light.
+////
+//// Materials control the visual appearance of 3D objects - their color, shininess, texture,
+//// and how they respond to lighting. Different material types offer different trade-offs
+//// between visual quality and performance.
+////
+//// ## Material Types
+////
+//// - **Basic**: Unlit, fastest, no lighting calculations
+//// - **Lambert**: Matte surfaces (cloth, wood), diffuse-only
+//// - **Phong**: Shiny surfaces (plastic, ceramic), has specular highlights
+//// - **Standard**: Physically-based (PBR), most realistic
+//// - **Toon**: Cel-shaded cartoon style
+////
+//// ## Builder Pattern (Recommended)
+////
+//// ```gleam
+//// let assert Ok(metal) = material.new()
+////   |> material.with_color(0xcccccc)
+////   |> material.with_metalness(1.0)
+////   |> material.with_roughness(0.3)
+////   |> material.build()
+//// ```
+////
+//// ## Textures
+////
+//// Load and apply textures for detailed surfaces:
+////
+//// ```gleam
+//// let assert Ok(tex) = texture.load(...)
+////
+//// material.new()
+////   |> material.with_color(0xffffff)
+////   |> material.with_color_map(tex)
+////   |> material.with_normal_map(normal_tex)
+////   |> material.build()
+//// ```
+////
+//// ## Transparency
+////
+//// ```gleam
+//// material.new()
+////   |> material.with_color(0x88ccff)
+////   |> material.with_transparent(True)
+////   |> material.with_opacity(0.5)
+////   |> material.build()
+//// ```
+////
+//// ## Emissive (Glow)
+////
+//// ```gleam
+//// material.new()
+////   |> material.with_emissive(0xff0000)
+////   |> material.with_emissive_intensity(1.0)
+////   |> material.build()
+//// ```
+////
+
 import gleam/bool
 import gleam/option.{type Option}
 import savoiardi

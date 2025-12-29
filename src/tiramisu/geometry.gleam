@@ -1,3 +1,56 @@
+//// 3D geometry primitives and custom geometry loading.
+////
+//// This module provides validated constructors for common 3D shapes used in game development.
+//// All constructors return `Result` types to ensure valid geometry parameters at compile time.
+////
+//// ## Primitive Shapes
+////
+//// ```gleam
+//// // Box with Vec3 size (width, height, depth)
+//// let assert Ok(cube) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+////
+//// // Sphere with radius and segment counts
+//// let assert Ok(ball) = geometry.sphere(radius: 1.0, segments: vec2.Vec2(32, 16))
+////
+//// // Plane with Vec2 size (width, height)
+//// let assert Ok(floor) = geometry.plane(size: vec2.Vec2(10.0, 10.0))
+//// ```
+////
+//// ## Loading External Geometry
+////
+//// Load STL files for custom 3D models:
+////
+//// ```gleam
+//// let load_model = geometry.load_stl(
+////   from: "models/part.stl",
+////   on_success: ModelLoaded,
+////   on_error: ModelFailed,
+//// )
+//// ```
+////
+//// ## 3D Text
+////
+//// Create extruded 3D text with loaded fonts:
+////
+//// ```gleam
+//// // First load a font
+//// let load_font = geometry.load_font(
+////   from: "fonts/helvetica.json",
+////   on_success: FontLoaded,
+////   on_error: FontFailed,
+//// )
+////
+//// // Then create text geometry
+//// let assert Ok(text) = geometry.text(
+////   text: "Hello!",
+////   font: my_font,
+////   size: 1.0,
+////   depth: 0.2,
+////   // ...
+//// )
+//// ```
+////
+
 import gleam/bool
 import gleam/javascript/promise
 import savoiardi

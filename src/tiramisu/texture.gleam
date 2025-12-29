@@ -1,3 +1,45 @@
+//// Texture loading and manipulation.
+////
+//// Textures are images applied to materials or used as sprites. This module
+//// provides loading, cloning, and UV manipulation for texture coordinates.
+////
+//// ## Loading Textures
+////
+//// ```gleam
+//// fn init(ctx: Context) {
+////   #(
+////     Model(texture: option.None),
+////     texture.load(
+////       from_url: "/textures/player.png",
+////       on_success: TextureLoaded,
+////       on_error: TextureFailed,
+////     ),
+////     None,
+////   )
+//// }
+//// ```
+////
+//// ## Spritesheet UV Manipulation
+////
+//// For animated sprites, use offset and repeat to show specific frames:
+////
+//// ```gleam
+//// // 4x4 spritesheet: show frame at row 1, column 2
+//// texture.set_repeat(tex, vec2.Vec2(0.25, 0.25))  // Each frame is 1/4 of texture
+//// texture.set_offset(tex, vec2.Vec2(0.5, 0.25))   // Column 2, row 1
+//// ```
+////
+//// ## Texture Filtering
+////
+//// ```gleam
+//// // Pixel art: use nearest neighbor for crisp pixels
+//// texture.set_filter_mode(tex, texture.NearestFilter, texture.NearestFilter)
+////
+//// // Smooth textures: use linear (default)
+//// texture.set_filter_mode(tex, texture.LinearFilter, texture.LinearFilter)
+//// ```
+////
+
 import gleam/javascript/promise
 import savoiardi
 import tiramisu/effect

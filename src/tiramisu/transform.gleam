@@ -1,3 +1,52 @@
+//// 3D transform utilities for position, rotation, and scale.
+////
+//// Transforms define the spatial properties of scene objects: where they are,
+//// how they're rotated, and their size. All scene nodes use transforms to
+//// position themselves in world space.
+////
+//// ## Creating Transforms
+////
+//// ```gleam
+//// // Identity transform (origin, no rotation, unit scale)
+//// transform.identity
+////
+//// // At a specific position
+//// transform.at(position: vec3.Vec3(5.0, 0.0, -3.0))
+////
+//// // Builder pattern
+//// transform.identity
+////   |> transform.with_position(vec3.Vec3(1.0, 2.0, 3.0))
+////   |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90° Y
+////   |> transform.with_scale(vec3.Vec3(2.0, 1.0, 2.0))
+//// ```
+////
+//// ## Rotation
+////
+//// Rotations are stored internally as quaternions but can be set using Euler angles
+//// (in radians). Quaternions avoid gimbal lock and interpolate smoothly.
+////
+//// ```gleam
+//// // Using Euler angles (radians)
+//// transform.with_euler_rotation(t, vec3.Vec3(0.0, 3.14, 0.0))
+////
+//// // Using quaternion directly
+//// transform.with_quaternion_rotation(t, my_quaternion)
+////
+//// // Convenience rotations
+//// transform.rotate_y(t, 1.57)  // Turn 90° right
+//// transform.rotate_x(t, 0.5)   // Look up
+//// ```
+////
+//// ## Interpolation
+////
+//// Use `lerp` for smooth transitions between transforms. Great for animations
+//// and camera movement:
+////
+//// ```gleam
+//// let halfway = transform.lerp(start, to: end, with: 0.5)
+//// ```
+////
+
 import gleam/option
 import quaternion
 import vec/vec3

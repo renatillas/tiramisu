@@ -12,7 +12,7 @@ Every object in your game is a `scene.Node`. Nodes can be:
 - **InstancedMesh** - Many identical objects (efficient!)
 - **Light** - Light source (ambient, directional, point, spot)
 - **Camera** - Viewpoint for rendering
-- **Group** - Container for child nodes
+- **Empty** - Container for child nodes (groups, pivot points)
 - **LOD** - Level-of-detail system
 - **Model3D** - Loaded 3D model with animations
 - **Audio** - 2D or 3D audio source
@@ -23,7 +23,7 @@ Every object in your game is a `scene.Node`. Nodes can be:
 Your `view()` function returns a single root `scene.Node` every frame. If you have multiple top-level nodes, wrap them in `scene.empty()`:
 
 ```gleam
-fn view(model: Model) -> scene.Node {
+fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
   scene.empty(
     id: "root",
     transform: transform.identity,
@@ -39,6 +39,24 @@ fn view(model: Model) -> scene.Node {
 
 Tiramisu automatically **diffs** the scene tree against the previous frame and applies only the changes.
 
+### String IDs
+
+All scene nodes use plain `String` IDs:
+
+```gleam
+scene.mesh(id: "player", ...)
+scene.mesh(id: "enemy-1", ...)
+scene.camera(id: "main-camera", ...)
+```
+
+Use descriptive, unique IDs. For dynamic objects, append an index:
+
+```gleam
+list.index_map(enemies, fn(enemy, idx) {
+  scene.mesh(id: "enemy-" <> int.to_string(idx), ...)
+})
+```
+
 ## Creating Scene Nodes
 
 ### Meshes
@@ -46,7 +64,7 @@ Tiramisu automatically **diffs** the scene tree against the previous frame and a
 Basic 3D objects with geometry and material:
 
 ```gleam
-import gleam/option
+import gleam/option.{None}
 import tiramisu/geometry
 import tiramisu/material
 import tiramisu/scene
@@ -54,9 +72,7 @@ import tiramisu/transform
 import vec/vec3
 
 let assert Ok(cube_geometry) = geometry.box(
-  width: 1.0,
-  height: 1.0,
-  depth: 1.0,
+  size: vec3.Vec3(1.0, 1.0, 1.0),
 )
 
 let assert Ok(cube_material) =
@@ -67,11 +83,11 @@ let assert Ok(cube_material) =
   |> material.build()
 
 scene.mesh(
-  id: "cube",  // Unique identifier
+  id: "cube",
   geometry: cube_geometry,
   material: cube_material,
-  transform: transform.identity,  // Position (0,0,0), no rotation, scale (1,1,1)
-  physics: option.None,
+  transform: transform.identity,
+  physics: None,
 )
 ```
 
@@ -81,15 +97,16 @@ Built-in geometries (all return `Result(Geometry, GeometryError)`):
 
 ```gleam
 import tiramisu/geometry
+import vec/vec2
+import vec/vec3
 
-// Box
-let assert Ok(box_geo) = geometry.box(width: 2.0, height: 1.0, depth: 1.0)
+// Box - size as Vec3(width, height, depth)
+let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(2.0, 1.0, 1.0))
 
-// Sphere
+// Sphere - radius and segments as Vec2(width_segments, height_segments)
 let assert Ok(sphere_geo) = geometry.sphere(
   radius: 1.0,
-  width_segments: 32,
-  height_segments: 16,
+  segments: vec2.Vec2(32, 16),
 )
 
 // Cylinder
@@ -100,8 +117,8 @@ let assert Ok(cylinder_geo) = geometry.cylinder(
   radial_segments: 32,
 )
 
-// Plane
-let assert Ok(plane_geo) = geometry.plane(width: 10.0, height: 10.0)
+// Plane - size as Vec2(width, height)
+let assert Ok(plane_geo) = geometry.plane(size: vec2.Vec2(10.0, 10.0))
 
 // Circle
 let assert Ok(circle_geo) = geometry.circle(radius: 1.0, segments: 32)
@@ -122,7 +139,7 @@ let assert Ok(tetra_geo) = geometry.tetrahedron(radius: 1.0, detail: 0)
 let assert Ok(icosa_geo) = geometry.icosahedron(radius: 1.0, detail: 0)
 
 // Custom (loaded from file)
-geometry.custom(buffer_geometry)
+geometry.custom_geometry(buffer_geometry)
 ```
 
 ### Material Types
@@ -291,6 +308,7 @@ scene.light(
 **Perspective Camera** (3D games):
 ```gleam
 import tiramisu/camera
+import gleam/option.{Some, None}
 
 // Aspect ratio is calculated automatically from viewport/window dimensions
 let assert Ok(cam) = camera.perspective(
@@ -300,14 +318,13 @@ let assert Ok(cam) = camera.perspective(
 )
 
 scene.camera(
-  id: "main",
+  id: "main-camera",
   camera: cam,
   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
-  look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Point camera at origin
+  look_at: Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Point camera at origin
   active: True,  // This camera is used for rendering
-  viewport: option.None,
-  children: [],
-  postprocessing: option.None,
+  viewport: None,
+  postprocessing: None,
 )
 ```
 
@@ -323,13 +340,13 @@ let assert Ok(cam) = camera.orthographic(
 )
 
 scene.camera(
-  id: "2d_cam",
+  id: "2d-camera",
   camera: cam,
   transform: transform.identity,
+  look_at: None,
   active: True,
-  viewport: option.None,
-  children: [],
-  postprocessing: option.None,
+  viewport: None,
+  postprocessing: None,
 )
 ```
 
@@ -341,11 +358,11 @@ let cam = camera.camera_2d(width: 800, height: 600)
 scene.camera(
   id: "2d",
   camera: cam,
-  transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),  // Distance from scene
+  transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
+  look_at: None,
   active: True,
-  viewport: option.None,
-  children: [],
-  postprocessing: option.None,
+  viewport: None,
+  postprocessing: None,
 )
 ```
 
@@ -372,22 +389,20 @@ scene.empty(
       id: "main",
       camera: main_cam,
       transform: transform.identity,
-      look_at: option.None,
+      look_at: None,
       active: True,
-      viewport: option.None,
-      children: [],
-      postprocessing: option.None,
+      viewport: None,
+      postprocessing: None,
     ),
     // Mini-map camera (top-right corner)
     scene.camera(
       id: "minimap",
       camera: minimap_cam,
       transform: transform.at(position: vec3.Vec3(0.0, 100.0, 0.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
+      look_at: Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: False,
-      viewport: option.Some(scene.Viewport(x: 800, y: 450, width: 200, height: 150)),
-      children: [],
-      postprocessing: option.None,
+      viewport: Some(camera.viewport(x: 800, y: 450, width: 200, height: 150)),
+      postprocessing: None,
     ),
   ],
 )
@@ -398,19 +413,19 @@ scene.empty(
 Empty nodes act as containers for children, creating parent-child relationships:
 
 ```gleam
-let assert Ok(body_geo) = geometry.box(width: 1.0, height: 2.0, depth: 1.0)
+let assert Ok(body_geo) = geometry.box(size: vec3.Vec3(1.0, 2.0, 1.0))
 let assert Ok(body_mat) =
   material.new()
   |> material.with_color(0x4ecdc4)
   |> material.build()
 
-let assert Ok(weapon_geo) = geometry.box(width: 0.2, height: 0.2, depth: 1.5)
+let assert Ok(weapon_geo) = geometry.box(size: vec3.Vec3(0.2, 0.2, 1.5))
 let assert Ok(weapon_mat) =
   material.new()
   |> material.with_color(0x888888)
   |> material.build()
 
-let assert Ok(healthbar_geo) = geometry.plane(width: 1.0, height: 0.1)
+let assert Ok(healthbar_geo) = geometry.plane(size: vec2.Vec2(1.0, 0.1))
 let assert Ok(healthbar_mat) = material.basic(
   color: 0x00ff00,
   transparent: False,
@@ -425,7 +440,7 @@ scene.empty(
   children: [
     // Body mesh
     scene.mesh(
-      id: "player_body",
+      id: "player-body",
       geometry: body_geo,
       material: body_mat,
       transform: transform.identity,  // Relative to parent
@@ -436,15 +451,15 @@ scene.empty(
       id: "weapon",
       geometry: weapon_geo,
       material: weapon_mat,
-      transform: transform.at(position: vec3.Vec3(0.5, 0.5, 0.0)),  // Offset from player center
+      transform: transform.at(position: vec3.Vec3(0.5, 0.5, 0.0)),
       physics: option.None,
     ),
     // Health bar (UI element)
     scene.mesh(
-      id: "health_bar",
+      id: "health-bar",
       geometry: healthbar_geo,
       material: healthbar_mat,
-      transform: transform.at(position: vec3.Vec3(0.0, 1.5, 0.0))  // Above player
+      transform: transform.at(position: vec3.Vec3(0.0, 1.5, 0.0))
         |> transform.with_scale(vec3.Vec3(model.player_health /. 100.0, 1.0, 1.0)),
       physics: option.None,
     ),
@@ -474,7 +489,7 @@ transform.at(position: vec3.Vec3(10.0, 0.0, 5.0))
 // Build with multiple properties
 transform.identity
   |> transform.with_position(vec3.Vec3(5.0, 2.0, -3.0))
-  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90° on Y axis)
+  |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // Radians (90 deg on Y axis)
   |> transform.with_scale(vec3.Vec3(2.0, 2.0, 2.0))  // 2x larger
 
 // Or start from a position and build on it
@@ -485,15 +500,15 @@ transform.at(position: vec3.Vec3(5.0, 2.0, -3.0))
 
 **Rotation:**
 - Uses Euler angles in radians
-- Order: X → Y → Z
-- π radians = 180°, π/2 = 90°
+- Order: X -> Y -> Z
+- pi radians = 180 deg, pi/2 = 90 deg
 
 **Common rotations:**
 ```gleam
-// Quarter turn clockwise (90°)
+// Quarter turn clockwise (90 deg)
 vec3.Vec3(0.0, 1.5708, 0.0)
 
-// Half turn (180°)
+// Half turn (180 deg)
 vec3.Vec3(0.0, 3.1416, 0.0)
 
 // Face down
@@ -544,30 +559,6 @@ scene.instanced_mesh(
 Automatically switch detail based on distance:
 
 ```gleam
-// Assume these are loaded or created elsewhere
-let complex_geometry = // 10,000 triangles
-let medium_geometry = // 2,000 triangles
-let low_geometry =  // 500 triangles
-
-let assert Ok(detailed_material) =
-  material.new()
-  |> material.with_color(0x808080)
-  |> material.build()
-
-let assert Ok(simple_material) =
-  material.new()
-  |> material.with_color(0x808080)
-  |> material.build()
-
-let assert Ok(billboard_geo) = geometry.plane(width: 10.0, height: 15.0)
-let assert Ok(billboard_mat) = material.basic(
-  color: 0x808080,
-  transparent: True,
-  opacity: 0.8,
-  alpha_test: 0.0,
-  map: option.Some(building_texture),
-)
-
 scene.lod(
   id: "building",
   transform: transform.at(position: vec3.Vec3(100.0, 0.0, 50.0)),
@@ -576,7 +567,7 @@ scene.lod(
     scene.lod_level(
       distance: 0.0,
       node: scene.mesh(
-        id: "building_high",
+        id: "building-high",
         geometry: complex_geometry,
         material: detailed_material,
         transform: transform.identity,
@@ -587,31 +578,20 @@ scene.lod(
     scene.lod_level(
       distance: 50.0,
       node: scene.mesh(
-        id: "building_medium",
+        id: "building-medium",
         geometry: medium_geometry,
         material: simple_material,
         transform: transform.identity,
         physics: option.None,
       ),
     ),
-    // Low detail (150-500 units)
+    // Low detail (150+ units)
     scene.lod_level(
       distance: 150.0,
       node: scene.mesh(
-        id: "building_low",
+        id: "building-low",
         geometry: low_geometry,
         material: simple_material,
-        transform: transform.identity,
-        physics: option.None,
-      ),
-    ),
-    // Billboard (500+ units)
-    scene.lod_level(
-      distance: 500.0,
-      node: scene.mesh(
-        id: "building_billboard",
-        geometry: billboard_geo,
-        material: billboard_mat,
         transform: transform.identity,
         physics: option.None,
       ),
@@ -667,23 +647,13 @@ scene.mesh(
 // Patch: UpdateTransform("player", new_transform)
 ```
 
-**Material changed:**
-```gleam
-// Patch: UpdateMaterial("cube", new_material)
-```
-
-**Geometry changed:**
-```gleam
-// Patch: UpdateGeometry("shape", new_geometry)
-```
-
 ### Optimization: Unchanged Nodes
 
 If a node is **identical** between frames, no patch is generated:
 
 ```gleam
-// Both frames have identical mesh
-let assert Ok(wall_geo) = geometry.box(width: 10.0, height: 5.0, depth: 1.0)
+// Both frames have identical mesh - no patch generated
+let assert Ok(wall_geo) = geometry.box(size: vec3.Vec3(10.0, 5.0, 1.0))
 let assert Ok(wall_mat) = material.new()
   |> material.with_color(0x808080)
   |> material.build()
@@ -710,24 +680,19 @@ let static_mesh = scene.mesh(
 ### 1. Use Meaningful IDs
 
 ```gleam
-// ❌ Bad: String ids with ambiguous ids
+// Bad: Ambiguous
 id: "mesh1"
 
-// ✅ Good: Typed Ids with descriptive names
-pub type Id {
-  PlayerBody
-  EnemyGoblin(goblin_index: Int)
-  Ground
-}
-id: PlayerBody
-id: EnemyGoblin(10)
-id: Ground
+// Good: Descriptive
+id: "player-body"
+id: "enemy-goblin-5"
+id: "ground"
 ```
 
 ### 2. Keep Hierarchies Shallow
 
 ```gleam
-// ❌ Bad: Deep nesting (slow)
+// Bad: Deep nesting (slow)
 scene.empty(
   id: "root",
   transform: transform.identity,
@@ -739,44 +704,42 @@ scene.empty(
         scene.empty(
           id: "level2",
           transform: transform.identity,
-          children: [
-            scene.empty(id: "level3", transform: transform.identity, children: [mesh])
-          ]
+          children: [mesh]
         )
       ]
     )
   ]
 )
 
-// ✅ Good: Flat or 2-3 levels max
+// Good: Flat or 2-3 levels max
 scene.empty(id: "player", transform: transform.identity, children: [body, weapon, ui])
 ```
 
 ### 3. Use instanced_mesh() for Repeated Objects
 
 ```gleam
-// ❌ Bad: 100 separate meshes
+// Bad: 100 separate meshes
 list.range(0, 99)
   |> list.map(fn(i) {
-    scene.mesh(id: "coin_" <> int.to_string(i), ...)
+    scene.mesh(id: "coin-" <> int.to_string(i), ...)
   })
 
-// ✅ Good: 1 instanced mesh
-scene.instanced_mesh(id: "coins", instances: coin_transforms)
+// Good: 1 instanced mesh
+scene.instanced_mesh(id: "coins", instances: coin_transforms, ...)
 ```
 
 ### 4. Minimize Material/Geometry Variety
 
 ```gleam
-// ❌ Bad: Different material for each enemy
+// Bad: Different material for each enemy
 list.map(enemies, fn(e) {
   let assert Ok(mat) = material.new()
     |> material.with_color(e.color)
     |> material.build()
-  scene.Mesh(id: e.id, geometry: enemy_geo, material: mat, ...)
+  scene.mesh(id: e.id, geometry: enemy_geo, material: mat, ...)
 })
 
-// ✅ Good: Same material, use instanced mesh
+// Good: Same material, use instanced mesh
 let assert Ok(enemy_mat) = material.new()
   |> material.with_color(0xff0000)
   |> material.build()
@@ -798,7 +761,7 @@ import tiramisu/debug
 
 // Box (AABB)
 debug.bounding_box(
-  id: "collision_box",
+  id: "collision-box",
   min: vec3.Vec3(-1.0, 0.0, -1.0),
   max: vec3.Vec3(1.0, 2.0, 1.0),
   color: debug.color_green,
@@ -806,7 +769,7 @@ debug.bounding_box(
 
 // Sphere
 debug.sphere(
-  id: "trigger_zone",
+  id: "trigger-zone",
   center: vec3.Vec3(0.0, 0.0, 0.0),
   radius: 5.0,
   color: debug.color_red,
@@ -822,14 +785,14 @@ debug.line(
 
 // Axes (X=red, Y=green, Z=blue)
 debug.axes(
-  id: "world_origin",
+  id: "world-origin",
   origin: vec3.Vec3(0.0, 0.0, 0.0),
   size: 5.0,
 )
 
 // Grid
 debug.grid(
-  id: "ground_grid",
+  id: "ground-grid",
   size: 100.0,
   divisions: 10,
   color: debug.color_white,
@@ -837,7 +800,7 @@ debug.grid(
 
 // Point
 debug.point(
-  id: "spawn_point",
+  id: "spawn-point",
   position: vec3.Vec3(10.0, 0.0, 5.0),
   size: 0.5,
   color: debug.color_yellow,

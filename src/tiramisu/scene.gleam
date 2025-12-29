@@ -1,3 +1,68 @@
+//// Declarative scene graph for building 3D scenes.
+////
+//// This module provides the scene node types returned by your `view` function. The engine
+//// automatically diffs and patches the Three.js scene to match your declarative description,
+//// similar to how virtual DOM works in web frameworks.
+////
+//// ## Scene Structure
+////
+//// Your `view` function returns a single root `Node`. Use `scene.empty` to group multiple
+//// nodes together:
+////
+//// ```gleam
+//// fn view(model: Model, ctx: Context) -> scene.Node {
+////   scene.empty(
+////     id: "root",
+////     transform: transform.identity,
+////     children: [
+////       camera_node,
+////       player_mesh,
+////       enemy_mesh,
+////       light_node,
+////     ],
+////   )
+//// }
+//// ```
+////
+//// ## Node Types
+////
+//// - **`empty`**: Invisible grouping node for organization
+//// - **`mesh`**: 3D object with geometry and material
+//// - **`sprite`**: 2D billboard that always faces camera
+//// - **`camera`**: Viewpoint with projection settings
+//// - **`light`**: Ambient, directional, point, or spot light
+//// - **`audio`**: Global or positional audio source
+//// - **`model`**: Loaded GLTF/GLB 3D model with animations
+//// - **`LOD`**: Level-of-detail with automatic switching
+////
+//// ## String IDs
+////
+//// All nodes require a unique string ID for efficient diffing:
+////
+//// ```gleam
+//// scene.mesh(id: "player", ...)
+//// scene.mesh(id: "enemy-" <> int.to_string(idx), ...)
+//// ```
+////
+//// ## Physics
+////
+//// Attach physics bodies to meshes for simulation:
+////
+//// ```gleam
+//// scene.mesh(
+////   id: "ball",
+////   geometry: sphere_geo,
+////   material: ball_mat,
+////   transform: transform.identity,
+////   physics: Some(
+////     physics.new_rigid_body(physics.Dynamic)
+////     |> physics.with_collider(physics.Sphere(transform.identity, 1.0))
+////     |> physics.build()
+////   ),
+//// )
+//// ```
+////
+
 import gleam/dict
 import gleam/float
 import gleam/int

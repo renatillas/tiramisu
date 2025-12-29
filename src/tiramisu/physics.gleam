@@ -1,3 +1,109 @@
+//// 3D physics simulation using the Rapier physics engine.
+////
+//// Tiramisu uses Rapier for realistic physics with rigid bodies, colliders,
+//// forces, raycasting, and collision detection. Physics is opt-in per scene node.
+////
+//// ## Setting Up Physics
+////
+//// ```gleam
+//// import tiramisu/physics
+//// import vec/vec3
+//// import gleam/option
+////
+//// fn init(ctx: Context) {
+////   let world = physics.new_world(physics.WorldConfig(
+////     gravity: vec3.Vec3(0.0, -9.81, 0.0),
+////   ))
+////
+////   #(Model(physics_world: world), effect.tick(Tick), option.Some(world))
+//// }
+////
+//// fn update(model: Model, msg: Msg, ctx: Context) {
+////   case msg {
+////     Tick -> {
+////       let world = physics.step(model.physics_world, ctx.delta_time)
+////       #(Model(..model, physics_world: world), effect.tick(Tick), option.None)
+////     }
+////   }
+//// }
+//// ```
+////
+//// ## Creating Rigid Bodies
+////
+//// ```gleam
+//// // Dynamic ball that responds to physics
+//// let ball = physics.new_rigid_body(physics.Dynamic)
+////   |> physics.with_collider(physics.Sphere(
+////     offset: transform.identity,
+////     radius: 1.0,
+////   ))
+////   |> physics.with_mass(5.0)
+////   |> physics.with_restitution(0.8)  // Bouncy
+////   |> physics.build()
+////
+//// // Static ground
+//// let ground = physics.new_rigid_body(physics.Fixed)
+////   |> physics.with_collider(physics.Box(
+////     offset: transform.identity,
+////     size: vec3.Vec3(50.0, 1.0, 50.0),
+////   ))
+////   |> physics.build()
+//// ```
+////
+//// ## Attaching Physics to Scene Nodes
+////
+//// ```gleam
+//// scene.mesh(
+////   id: "ball",
+////   geometry: geometry.sphere(radius: 1.0, segments: vec2.Vec2(32.0, 32.0)),
+////   material: material.standard() |> material.with_color(0xFF0000),
+////   transform: transform.at(position: vec3.Vec3(0.0, 10.0, 0.0)),
+////   physics: option.Some(ball),  // Physics attached here
+//// )
+//// ```
+////
+//// ## Applying Forces and Impulses
+////
+//// ```gleam
+//// // Apply force (continuous, like wind)
+//// let world = physics.apply_force(world, "player", vec3.Vec3(100.0, 0.0, 0.0))
+////
+//// // Apply impulse (instant, like a jump)
+//// let world = physics.apply_impulse(world, "player", vec3.Vec3(0.0, 10.0, 0.0))
+////
+//// // Set velocity directly
+//// let world = physics.set_velocity(world, "player", vec3.Vec3(5.0, 0.0, 0.0))
+//// ```
+////
+//// ## Raycasting
+////
+//// ```gleam
+//// case physics.raycast(world, origin, direction, max_distance: 100.0) {
+////   Ok(hit) -> {
+////     io.println("Hit " <> hit.id <> " at distance " <> float.to_string(hit.distance))
+////   }
+////   Error(Nil) -> // No hit
+//// }
+//// ```
+////
+//// ## Collision Events
+////
+//// Enable collision tracking and query events each frame:
+////
+//// ```gleam
+//// // Enable on body
+//// physics.with_collision_events()
+////
+//// // Query in update
+//// list.each(physics.get_collision_events(world), fn(event) {
+////   case event {
+////     physics.CollisionStarted(a, b) -> // Bodies started touching
+////     physics.CollisionEnded(a, b) -> // Bodies stopped touching
+////   }
+//// })
+//// ```
+////
+
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
