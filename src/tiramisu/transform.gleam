@@ -47,7 +47,9 @@
 //// ```
 ////
 
+import gleam/float
 import gleam/option
+import gleam_community/maths
 import quaternion
 import vec/vec3
 import vec/vec3f
@@ -293,9 +295,14 @@ pub fn look_at(
   to to: Transform,
   up up: option.Option(vec3.Vec3(Float)),
 ) -> Transform {
-  // Convert Euler angles to quaternion
   let up = option.unwrap(up, vec3.Vec3(0.0, 1.0, 0.0))
-  let quat = quaternion.look_at(from.position, to.position, up)
+
+  // Calculate direction from 'from' to 'to' (quaternion.look_at expects a direction, not a position)
+  let direction = vec3f.subtract(to.position, from.position)
+
+  // quaternion.look_at takes (forward, target_direction, up)
+  // forward is unused in the implementation, target_direction should be the look direction
+  let quat = quaternion.look_at(vec3.Vec3(0.0, 0.0, -1.0), direction, up)
 
   // Preserve position and scale from the 'from' transform
   Transform(position: from.position, rotation: quat, scale: from.scale)
@@ -408,4 +415,85 @@ pub fn rotate_x(transform: Transform, angle: Float) -> Transform {
 /// ```
 pub fn rotate_z(transform: Transform, angle: Float) -> Transform {
   rotate_by(transform, vec3.Vec3(0.0, 0.0, angle))
+}
+
+/// Create a billboard transform that faces a target position.
+///
+/// Billboards are 2D sprites that always face a target (usually the camera).
+/// This rotates the plane's default +Z normal to face the target.
+///
+/// ## Example
+///
+/// ```gleam
+/// let sprite_pos = vec3.Vec3(5.0, 0.0, 0.0)
+/// let camera_pos = vec3.Vec3(0.0, 5.0, 10.0)
+/// let t = transform.billboard(at: sprite_pos, facing: camera_pos)
+/// // Sprite now faces the camera
+/// ```
+/// Billboard mode controls which axes the sprite rotates on to face the target.
+pub type BillboardMode {
+  /// Full 3D billboard - rotates on all axes to always face the target.
+  /// The sprite will tilt and roll to perfectly face the camera.
+  Spherical
+  /// Cylindrical billboard - only rotates around Y axis.
+  /// The sprite stays upright and only turns left/right.
+  Cylindrical
+  /// Spherical billboard without roll - rotates on X and Y but not Z.
+  /// The sprite tilts up/down and turns left/right, but doesn't roll.
+  SphericalNoRoll
+}
+
+/// Create a billboard transform that makes a sprite face a target.
+///
+/// The `mode` parameter controls how the billboard rotates:
+/// - `Spherical`: Full 3D rotation to always face the target
+/// - `Cylindrical`: Only Y-axis rotation (stays upright)
+/// - `SphericalNoRoll`: X and Y rotation but no Z roll
+///
+/// ## Example
+///
+/// ```gleam
+/// let sprite_pos = vec3.Vec3(5.0, 0.0, 0.0)
+/// let camera_pos = vec3.Vec3(0.0, 5.0, 10.0)
+/// let t = transform.billboard(sprite_pos, camera_pos, Cylindrical)
+/// // Sprite faces camera horizontally but stays upright
+/// ```
+pub fn billboard(
+  at position: vec3.Vec3(Float),
+  facing target: vec3.Vec3(Float),
+  mode mode: BillboardMode,
+) -> Transform {
+  let dx = target.x -. position.x
+  let dy = target.y -. position.y
+  let dz = target.z -. position.z
+
+  let quat = case mode {
+    Spherical -> {
+      let direction = vec3f.subtract(target, position)
+      quaternion.from_to_rotation(vec3.Vec3(0.0, 0.0, 1.0), direction)
+    }
+    Cylindrical -> {
+      // Only rotate around Y axis
+      let angle_y = maths.atan2(dx, dz) +. maths.pi()
+      quaternion.from_axis_angle(vec3.Vec3(0.0, 1.0, 0.0), angle_y)
+    }
+    SphericalNoRoll -> {
+      // Calculate Y rotation (horizontal facing)
+      let angle_y = maths.atan2(dx, dz) +. maths.pi()
+
+      // Calculate X rotation (vertical tilt)
+      let horizontal_dist = case float.square_root(dx *. dx +. dz *. dz) {
+        Ok(d) -> d
+        Error(_) -> 0.0
+      }
+      let angle_x = maths.atan2(dy, horizontal_dist)
+
+      // Combine Y then X rotations (Y first, then tilt)
+      let quat_y = quaternion.from_axis_angle(vec3.Vec3(0.0, 1.0, 0.0), angle_y)
+      let quat_x = quaternion.from_axis_angle(vec3.Vec3(1.0, 0.0, 0.0), angle_x)
+      quaternion.multiply(quat_y, quat_x)
+    }
+  }
+
+  Transform(position:, rotation: quat, scale: vec3f.one)
 }

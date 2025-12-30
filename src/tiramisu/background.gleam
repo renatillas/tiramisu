@@ -43,8 +43,8 @@ pub type Background {
 pub fn set(
   game_scene: savoiardi.Scene,
   background: Background,
-  on_success: msg,
-  on_error: msg,
+  on_success on_success: msg,
+  on_error on_error: msg,
 ) -> effect.Effect(msg) {
   effect.from(fn(dispatch) {
     case background {

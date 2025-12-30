@@ -1970,6 +1970,7 @@ fn compare_mesh_fields(
 ) -> List(Patch) {
   let patches = []
 
+  // Only emit UpdateTransform if transform changed
   let patches = case prev_trans != curr_trans {
     True -> [UpdateTransform(id, curr_trans), ..patches]
     False -> patches
@@ -3130,8 +3131,12 @@ fn handle_add_camera(
   // Store lookAt target if provided (will apply after adding to scene)
   case look_at {
     option.Some(target) -> {
-      savoiardi.set_camera_user_data(camera, "lookAtTarget", target)
-      savoiardi.set_camera_user_data(camera, "needsLookAtUpdate", True)
+      savoiardi.set_object_user_data(camera |> coerce, "lookAtTarget", target)
+      savoiardi.set_object_user_data(
+        camera |> coerce,
+        "needsLookAtUpdate",
+        True,
+      )
     }
     option.None -> Nil
   }
@@ -3154,7 +3159,7 @@ fn handle_add_camera(
   case look_at {
     option.Some(target) -> {
       savoiardi.set_camera_look_at(camera: camera, target: target)
-      savoiardi.delete_camera_user_data(camera, "needsLookAtUpdate")
+      savoiardi.delete_object_user_data(camera |> coerce, "needsLookAtUpdate")
     }
     option.None -> Nil
   }
@@ -3347,12 +3352,10 @@ fn handle_update_transform(
 
       case is_camera {
         True -> {
-          case
-            savoiardi.has_camera_user_data(object |> coerce, "lookAtTarget")
-          {
+          case savoiardi.has_object_user_data(object, "lookAtTarget") {
             True -> {
               let target =
-                savoiardi.get_camera_user_data(object |> coerce, "lookAtTarget")
+                savoiardi.get_object_user_data(object, "lookAtTarget")
               savoiardi.set_camera_look_at(
                 camera: object |> coerce,
                 target: target,
@@ -3361,7 +3364,9 @@ fn handle_update_transform(
             False -> Nil
           }
         }
-        False -> Nil
+        False -> {
+          Nil
+        }
       }
 
       // If this object has a physics body, update the physics body's transform too
@@ -3707,18 +3712,11 @@ fn handle_update_camera(
                 target: target,
               )
               // Update the stored lookAtTarget so it's used in future transform updates
-              savoiardi.set_camera_user_data(
-                object |> coerce,
-                "lookAtTarget",
-                target,
-              )
+              savoiardi.set_object_user_data(object, "lookAtTarget", target)
             }
             option.None -> {
               // If None, remove the stored lookAtTarget so the camera can rotate freely
-              savoiardi.delete_camera_user_data(
-                object |> coerce,
-                "lookAtTarget",
-              )
+              savoiardi.delete_object_user_data(object, "lookAtTarget")
             }
           }
 
@@ -4153,10 +4151,10 @@ fn create_animation_action(
 
   // Configure action
   let loop_mode = case animation.loop {
-    animation.LoopRepeat -> loop_repeat()
-    animation.LoopOnce -> loop_once()
+    animation.LoopRepeat -> savoiardi.LoopRepeat
+    animation.LoopOnce -> savoiardi.LoopOnce
   }
-  set_animation_loop_ffi(three_animation_action, loop_mode)
+  savoiardi.set_action_loop(three_animation_action, loop_mode)
   set_animation_time_scale_ffi(three_animation_action, animation.speed)
   set_animation_weight_ffi(three_animation_action, animation.weight)
   play_animation_action_ffi(three_animation_action)
@@ -4184,13 +4182,6 @@ fn create_animation_action_ffi(
   savoiardi.clip_action(mixer, clip)
 }
 
-fn set_animation_loop_ffi(
-  action: object_cache.AnimationAction,
-  loop_mode: Int,
-) -> Nil {
-  savoiardi.set_action_loop(action, loop_mode)
-}
-
 fn set_animation_time_scale_ffi(
   action: object_cache.AnimationAction,
   time_scale: Float,
@@ -4211,14 +4202,6 @@ fn play_animation_action_ffi(action: object_cache.AnimationAction) -> Nil {
 
 fn stop_animation_action_ffi(action: object_cache.AnimationAction) -> Nil {
   savoiardi.stop_action(action)
-}
-
-fn loop_repeat() -> Int {
-  savoiardi.get_loop_repeat()
-}
-
-fn loop_once() -> Int {
-  savoiardi.get_loop_once()
 }
 
 @internal

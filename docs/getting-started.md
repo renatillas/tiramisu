@@ -117,13 +117,13 @@ pub fn main() {
 }
 
 // Initialize the game state
-fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(a)) {
+fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   // Set the background color via effect
   let set_bg = background.set(
     ctx.scene,
     background.Color(0x1a1a2e),
-    BackgroundSet,
-    BackgroundFailed,
+    on_success: BackgroundSet,
+    on_error: BackgroundFailed,
   )
   #(Model(rotation: 0.0), effect.batch([effect.tick(Tick), set_bg]), None)
 }
@@ -133,7 +133,7 @@ fn update(
   model: Model,
   msg: Msg,
   ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(a)) {
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
   case msg {
     BackgroundSet | BackgroundFailed -> #(model, effect.none(), None)
     Tick -> {

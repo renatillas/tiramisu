@@ -35,6 +35,7 @@ import gleam/javascript/promise
 import savoiardi
 import tiramisu/effect
 import tiramisu/scene
+import tiramisu/texture
 
 // ============================================================================
 // TYPES
@@ -171,3 +172,64 @@ pub fn get_fbx_scene(fbx: FBXData) -> savoiardi.Object3D
 /// ```
 @external(javascript, "../model.ffi.mjs", "getFBXAnimations")
 pub fn get_fbx_animations(fbx: FBXData) -> List(savoiardi.AnimationClip)
+
+// ============================================================================
+// OBJECT3D MANIPULATION
+// ============================================================================
+
+/// Re-export Object3D type from savoiardi for convenience.
+pub type Object3D =
+  savoiardi.Object3D
+
+/// Center an Object3D so its geometric center is at the origin.
+///
+/// Computes the bounding box of the entire object hierarchy and adjusts
+/// all children's positions so the center of the bounding box is at (0, 0, 0).
+///
+/// This is useful for loaded models (FBX, GLTF, OBJ) where the origin may not
+/// be at the geometric center of the mesh.
+///
+/// ## Example
+///
+/// ```gleam
+/// let fbx_data = model.get_fbx_scene(loaded_fbx)
+/// let centered = model.center_object(fbx_data)
+/// // Now the model's center is at (0, 0, 0)
+/// ```
+///
+/// ## Notes
+///
+/// - This mutates the object in place and returns it for convenience
+/// - The children's positions are adjusted, not the root object's position
+pub fn center_object(object: Object3D) -> Object3D {
+  savoiardi.center_object_3d(object)
+}
+
+/// Apply a texture to all meshes in an Object3D hierarchy.
+///
+/// This is useful for loaded models that reference external textures,
+/// or when you want to override the model's textures.
+///
+/// ## Parameters
+///
+/// - `object` - The object hierarchy to apply the texture to
+/// - `tex` - The texture to apply
+/// - `filter_mode` - Texture filtering mode for pixel art or smooth textures
+///
+/// ## Example
+///
+/// ```gleam
+/// let floor = model.get_fbx_scene(loaded_fbx)
+/// model.apply_texture(floor, dungeon_texture, texture.NearestFilter)
+/// ```
+pub fn apply_texture(
+  object: Object3D,
+  tex: texture.Texture,
+  filter_mode: texture.FilterMode,
+) -> Nil {
+  let savoiardi_filter = case filter_mode {
+    texture.NearestFilter -> savoiardi.NearestFilter
+    texture.LinearFilter -> savoiardi.LinearFilter
+  }
+  savoiardi.apply_texture_to_object(object, tex, savoiardi_filter)
+}

@@ -188,12 +188,6 @@ fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(a))
 }
 ```
 
-**Common gravity values:**
-- Earth: `vec3.Vec3(0.0, -9.81, 0.0)`
-- Moon: `vec3.Vec3(0.0, -1.62, 0.0)`
-- Zero gravity: `vec3.Vec3(0.0, 0.0, 0.0)`
-- Custom (platformer): `vec3.Vec3(0.0, -20.0, 0.0)` (faster falling)
-
 ### Stepping the Simulation
 
 Call `physics.step()` every frame in your `update()` function. **Important**: `physics.step()` requires the `delta_time` parameter (as a `Duration` type) to implement frame-rate independent physics.

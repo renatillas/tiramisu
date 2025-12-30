@@ -78,6 +78,9 @@ pub opaque type Material {
     map: Option(savoiardi.Texture),
     transparent: Bool,
     opacity: Float,
+    side: MaterialSide,
+    alpha_test: Float,
+    depth_write: Bool,
   )
   /// Physically-based material with metalness/roughness workflow. Most realistic.
   StandardMaterial(
@@ -146,6 +149,15 @@ pub type MaterialSide {
   DoubleSide
 }
 
+/// Convert tiramisu MaterialSide to Three.js side constant via savoiardi
+fn material_side_to_int(side: MaterialSide) -> Int {
+  case side {
+    FrontSide -> savoiardi.material_side_to_int(savoiardi.FrontSide)
+    BackSide -> savoiardi.material_side_to_int(savoiardi.BackSide)
+    DoubleSide -> savoiardi.material_side_to_int(savoiardi.DoubleSide)
+  }
+}
+
 pub type MaterialError {
   OutOfBoundsColor(Int)
   OutOfBoundsOpacity(Float)
@@ -173,6 +185,9 @@ pub fn basic(
   transparent transparent: Bool,
   opacity opacity: Float,
   map map: option.Option(savoiardi.Texture),
+  side side: MaterialSide,
+  alpha_test alpha_test: Float,
+  depth_write depth_write: Bool,
 ) -> Result(Material, MaterialError) {
   use <- bool.guard(
     color < 0x000000 || color > 0xffffff,
@@ -183,7 +198,7 @@ pub fn basic(
     Error(OutOfBoundsOpacity(opacity)),
   )
 
-  Ok(BasicMaterial(color:, transparent:, opacity:, map:))
+  Ok(BasicMaterial(color:, transparent:, opacity:, map:, side:, alpha_test:, depth_write:))
 }
 
 /// Create a validated physically-based (PBR) standard material.
@@ -934,8 +949,16 @@ pub fn build(
 @internal
 pub fn create_material(material: Material) -> savoiardi.Material {
   case material {
-    BasicMaterial(color:, map:, transparent:, opacity:) ->
-      savoiardi.create_basic_material(color, transparent, opacity, map)
+    BasicMaterial(color:, map:, transparent:, opacity:, side:, alpha_test:, depth_write:) ->
+      savoiardi.create_basic_material(
+        color,
+        transparent,
+        opacity,
+        map,
+        material_side_to_int(side),
+        alpha_test,
+        depth_write,
+      )
     StandardMaterial(
       color:,
       map:,

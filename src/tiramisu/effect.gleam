@@ -46,7 +46,6 @@
 ////
 
 import gleam/float
-import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/time/duration
@@ -99,7 +98,6 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
   Effect(perform: effect)
 }
 
-// TODO: Document
 pub fn dispatch(msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     dispatch(msg)
@@ -221,11 +219,11 @@ pub fn tick(msg: msg) -> Effect(msg) {
 /// ```
 pub fn delay(duration duration: duration.Duration, msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    timer.delay(
-      duration |> duration.to_seconds |> float.multiply(1000.0) |> float.round,
-      fn() { dispatch(msg) },
-    )
-    Nil
+    duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+    |> timer.delay(fn() { dispatch(msg) })
   })
 }
 
@@ -278,14 +276,18 @@ pub fn delay(duration duration: duration.Duration, msg msg: msg) -> Effect(msg) 
 /// }
 /// ```
 pub fn interval(
-  ms milliseconds: Int,
+  duration duration: duration.Duration,
   msg msg: msg,
   on_created on_created: fn(TimerId) -> msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    let id = timer.interval(milliseconds, fn() { dispatch(msg) })
-    dispatch(on_created(id))
-    Nil
+    duration
+    |> duration.to_seconds()
+    |> float.multiply(1000.0)
+    |> float.round()
+    |> timer.interval(fn() { dispatch(msg) })
+    |> on_created
+    |> dispatch
   })
 }
 
@@ -302,10 +304,7 @@ pub fn interval(
 /// }
 /// ```
 pub fn cancel_interval(id: TimerId) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    timer.cancel_interval(id)
-    Nil
-  })
+  Effect(perform: fn(_dispatch) { timer.cancel_interval(id) })
 }
 
 // ============================================================================
@@ -443,10 +442,7 @@ pub fn request_pointer_lock(
 /// effect.exit_pointer_lock()
 /// ```
 pub fn exit_pointer_lock() -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    browser.exit_pointer_lock()
-    Nil
-  })
+  Effect(perform: fn(_dispatch) { browser.exit_pointer_lock() })
 }
 
 /// Trigger haptic feedback on mobile devices.
@@ -471,8 +467,8 @@ pub fn exit_pointer_lock() -> Effect(msg) {
 ///   }
 /// }
 /// ```
-pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) { browser.vibrate(array.from_list(pattern)) })
+pub fn mobile_vibrate(pattern: List(duration.Duration)) -> Effect(msg) {
+  Effect(perform: fn(_dispatch) { browser.mobile_vibrate(pattern) })
 }
 
 /// Trigger haptic feedback on a gamepad.
@@ -506,13 +502,8 @@ pub fn gamepad_vibrate(
   intensity intensity: Float,
   duration duration: duration.Duration,
 ) -> Effect(msg) {
-  let #(duration_seconds, duration_nanoseconds) =
-    duration.to_seconds_and_nanoseconds(duration)
-  let duration_milliseconds =
-    duration_seconds * 1000 + duration_nanoseconds / 1_000_000
   Effect(perform: fn(_dispatch) {
-    browser.gamepad_vibrate(gamepad, intensity, duration_milliseconds)
-    Nil
+    browser.gamepad_vibrate(gamepad, intensity, duration)
   })
 }
 

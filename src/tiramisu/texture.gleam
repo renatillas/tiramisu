@@ -48,22 +48,49 @@ import vec/vec2.{type Vec2}
 pub type Texture =
   savoiardi.Texture
 
-/// Texture wrapping mode
+/// Texture wrapping mode.
+///
+/// Controls how textures behave when UV coordinates exceed the 0-1 range.
+///
+/// ## Variants
+///
+/// - `RepeatWrapping` - Texture repeats infinitely (requires power-of-two dimensions)
+/// - `ClampToEdgeWrapping` - Edge pixels stretch infinitely (works with any dimensions)
+/// - `MirroredRepeatWrapping` - Texture repeats with alternating mirrored copies
 pub type WrapMode {
-  /// Repeat the texture (requires power-of-two dimensions)
   RepeatWrapping
-  /// Clamp to edge (default, works with any dimensions)
   ClampToEdgeWrapping
-  /// Mirror the texture when repeating
   MirroredRepeatWrapping
 }
 
-/// Texture filtering mode
+/// Texture filtering mode.
+///
+/// Controls how textures are sampled when scaled.
+///
+/// ## Variants
+///
+/// - `NearestFilter` - No interpolation, uses nearest pixel (best for pixel art)
+/// - `LinearFilter` - Bilinear interpolation for smooth texture sampling (default)
 pub type FilterMode {
-  /// Nearest neighbor filtering (best for pixel art)
   NearestFilter
-  /// Linear interpolation filtering (smooth, default)
   LinearFilter
+}
+
+// Convert tiramisu WrapMode to savoiardi WrapMode
+fn to_savoiardi_wrap_mode(mode: WrapMode) -> savoiardi.WrapMode {
+  case mode {
+    RepeatWrapping -> savoiardi.RepeatWrapping
+    ClampToEdgeWrapping -> savoiardi.ClampToEdgeWrapping
+    MirroredRepeatWrapping -> savoiardi.MirroredRepeatWrapping
+  }
+}
+
+// Convert tiramisu FilterMode to savoiardi FilterMode
+fn to_savoiardi_filter_mode(mode: FilterMode) -> savoiardi.FilterMode {
+  case mode {
+    NearestFilter -> savoiardi.NearestFilter
+    LinearFilter -> savoiardi.LinearFilter
+  }
 }
 
 /// Clone a texture for independent manipulation.
@@ -163,9 +190,11 @@ pub fn set_wrap_mode(
   wrap_s wrap_s: WrapMode,
   wrap_t wrap_t: WrapMode,
 ) -> savoiardi.Texture {
-  let s = wrap_mode_to_constant(wrap_s)
-  let t = wrap_mode_to_constant(wrap_t)
-  savoiardi.set_texture_wrap_mode(texture, s, t)
+  savoiardi.set_texture_wrap_mode(
+    texture,
+    to_savoiardi_wrap_mode(wrap_s),
+    to_savoiardi_wrap_mode(wrap_t),
+  )
   texture
 }
 
@@ -193,29 +222,12 @@ pub fn set_filter_mode(
   min_filter min_filter: FilterMode,
   mag_filter mag_filter: FilterMode,
 ) -> savoiardi.Texture {
-  let min = filter_mode_to_constant(min_filter)
-  let mag = filter_mode_to_constant(mag_filter)
-  savoiardi.set_texture_filter_mode(texture, min, mag)
+  savoiardi.set_texture_filter_mode(
+    texture,
+    to_savoiardi_filter_mode(min_filter),
+    to_savoiardi_filter_mode(mag_filter),
+  )
   texture
-}
-
-// ============================================================================
-// Internal Helpers
-// ============================================================================
-
-fn wrap_mode_to_constant(mode: WrapMode) -> Int {
-  case mode {
-    RepeatWrapping -> savoiardi.get_repeat_wrapping()
-    ClampToEdgeWrapping -> savoiardi.get_clamp_to_edge_wrapping()
-    MirroredRepeatWrapping -> savoiardi.get_mirrored_repeat_wrapping()
-  }
-}
-
-fn filter_mode_to_constant(mode: FilterMode) -> Int {
-  case mode {
-    NearestFilter -> savoiardi.get_nearest_filter()
-    LinearFilter -> savoiardi.get_linear_filter()
-  }
 }
 
 /// Load a texture from URL

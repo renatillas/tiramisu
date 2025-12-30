@@ -20,6 +20,7 @@ pub fn diff_empty_to_single_node_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -39,6 +40,7 @@ pub fn diff_single_node_to_empty_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
   let next = option.None
 
@@ -58,6 +60,7 @@ pub fn diff_transform_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -66,6 +69,7 @@ pub fn diff_transform_change_test() {
       material: mat,
       transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
       physics: option.None,
+      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -88,6 +92,7 @@ pub fn diff_material_change_test() {
       material: mat1,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -96,6 +101,7 @@ pub fn diff_material_change_test() {
       material: mat2,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -117,6 +123,7 @@ pub fn diff_geometry_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -125,6 +132,7 @@ pub fn diff_geometry_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -148,6 +156,7 @@ pub fn diff_multiple_changes_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
+          look_at: option.None,
         ),
       ]),
     )
@@ -160,6 +169,7 @@ pub fn diff_multiple_changes_test() {
           material: mat,
           transform: transform.at(vec3.Vec3(10.0, 0.0, 0.0)),
           physics: option.None,
+          look_at: option.None,
         ),
         scene.light(
           id: "light1",
@@ -186,6 +196,7 @@ pub fn diff_no_changes_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -194,6 +205,7 @@ pub fn diff_no_changes_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
+      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -217,6 +229,7 @@ pub fn diff_hierarchy_ordering_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
+          look_at: option.None,
         ),
         scene.mesh(
           id: "child2",
@@ -224,6 +237,7 @@ pub fn diff_hierarchy_ordering_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
+          look_at: option.None,
         ),
       ]),
     )
@@ -275,6 +289,7 @@ pub fn diff_deep_hierarchy_ordering_test() {
             material: mat,
             transform: transform.identity,
             physics: option.None,
+            look_at: option.None,
           ),
         ]),
       ]),

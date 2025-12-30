@@ -40,8 +40,11 @@
 //// ```
 ////
 
+import gleam/float
 import gleam/javascript/array
 import gleam/javascript/promise.{type Promise}
+import gleam/list
+import gleam/time/duration
 import plinth/browser/clipboard
 import plinth/browser/document
 import plinth/browser/element
@@ -128,14 +131,26 @@ fn is_pointer_locked_ffi() -> Bool
 
 /// Stop any ongoing vibration
 pub fn cancel_vibrate() -> Nil {
-  vibrate(array.from_list([]))
+  do_vibrate(array.from_list([]))
 }
 
 /// Trigger haptic feedback on mobile devices
 /// Pattern is a list of vibration durations in milliseconds
-/// Example: [200, 100, 200] vibrates 200ms, pauses 100ms, vibrates 200ms
+/// Example: [duration.milliseconds(200), duration.milliseconds(100), duration.milliseconds(200)] vibrates 200ms, pauses 100ms, vibrates 200ms
+pub fn mobile_vibrate(pattern: List(duration.Duration)) -> Nil {
+  pattern
+  |> list.map(fn(duration) {
+    duration
+    |> duration.to_seconds()
+    |> float.multiply(1000.0)
+    |> float.round()
+  })
+  |> array.from_list()
+  |> do_vibrate
+}
+
 @external(javascript, "../browser.ffi.mjs", "vibrate")
-pub fn vibrate(pattern: array.Array(Int)) -> Nil
+fn do_vibrate(pattern: array.Array(Int)) -> Nil
 
 // ============================================================================
 // GAMEPAD HAPTICS - Minimal FFI (not in Plinth yet)
@@ -144,6 +159,17 @@ pub fn vibrate(pattern: array.Array(Int)) -> Nil
 /// Trigger haptic feedback on a gamepad
 /// - gamepad: Gamepad index (0-3)
 /// - intensity: Vibration intensity (0.0 to 1.0)
-/// - duration_ms: Duration in milliseconds
+/// - duration: Duration of the vibration
+pub fn gamepad_vibrate(
+  gamepad: Int,
+  intensity: Float,
+  duration: duration.Duration,
+) -> Nil {
+  duration
+  |> duration.to_seconds()
+  |> float.multiply(1000.0)
+  |> do_gamepad_vibrate(gamepad, intensity, _)
+}
+
 @external(javascript, "../browser.ffi.mjs", "gamepadVibrate")
-pub fn gamepad_vibrate(gamepad: Int, intensity: Float, duration_ms: Int) -> Nil
+fn do_gamepad_vibrate(gamepad: Int, intensity: Float, duration_ms: Float) -> Nil
