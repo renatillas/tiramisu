@@ -179,6 +179,7 @@ pub opaque type Node {
     animation: option.Option(animation.AnimationPlayback),
     physics: option.Option(physics.RigidBody),
     material: option.Option(material.Material),
+    transparent: Bool,
   )
   InstancedModel(
     id: String,
@@ -187,6 +188,7 @@ pub opaque type Node {
     instances: List(transform.Transform),
     physics: option.Option(physics.RigidBody),
     material: option.Option(material.Material),
+    transparent: Bool,
   )
   Audio(id: String, children: List(Node), audio: audio.Audio)
   // UI overlay nodes
@@ -597,6 +599,7 @@ pub fn object_3d(
   animation animation: option.Option(animation.AnimationPlayback),
   physics physics: option.Option(physics.RigidBody),
   material material: option.Option(material.Material),
+  transparent transparent: Bool,
 ) -> Node {
   Model3D(
     id:,
@@ -605,6 +608,7 @@ pub fn object_3d(
     animation:,
     physics:,
     material:,
+    transparent:,
     children: [],
   )
 }
@@ -651,8 +655,17 @@ pub fn instanced_model(
   instances instances: List(transform.Transform),
   physics physics: option.Option(physics.RigidBody),
   material material: option.Option(material.Material),
+  transparent transparent: Bool,
 ) -> Node {
-  InstancedModel(id:, object:, instances:, physics:, material:, children: [])
+  InstancedModel(
+    id:,
+    object:,
+    instances:,
+    physics:,
+    material:,
+    transparent:,
+    children: [],
+  )
 }
 
 /// Create an audio scene node.
@@ -1590,6 +1603,7 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
       animation: previous_animation,
       physics: previous_physics,
       material: previous_material,
+      transparent: _,
     ),
       Model3D(
         id: _,
@@ -1599,6 +1613,7 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         animation: current_animation,
         physics: current_physics,
         material: current_material,
+        transparent: _,
       )
     ->
       compare_model3d_fields(
@@ -1620,6 +1635,7 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
       instances: previous_instances,
       physics: previous_physics,
       material: previous_material,
+      transparent: _,
     ),
       InstancedModel(
         id: _,
@@ -1628,6 +1644,7 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         instances: current_instances,
         physics: current_physics,
         material: current_material,
+        transparent: _,
       )
     ->
       compare_instanced_model_fields(
@@ -2520,6 +2537,7 @@ fn handle_add_node(
       animation: animation,
       physics: physics,
       material: material,
+      transparent: transparent,
     ) ->
       handle_add_model3d(
         state,
@@ -2529,6 +2547,7 @@ fn handle_add_node(
         animation,
         physics,
         material,
+        transparent,
         parent_id,
       )
 
@@ -2539,6 +2558,7 @@ fn handle_add_node(
       instances: instances,
       physics: physics,
       material: material,
+      transparent: transparent,
     ) ->
       handle_add_instanced_model(
         state,
@@ -2547,6 +2567,7 @@ fn handle_add_node(
         instances,
         physics,
         material,
+        transparent,
         parent_id,
       )
 
@@ -2749,6 +2770,7 @@ fn handle_add_instanced_model(
   instances: List(transform.Transform),
   physics: option.Option(physics.RigidBody),
   material: option.Option(material.Material),
+  transparent: Bool,
   parent_id: option.Option(String),
 ) -> RendererState {
   // Extract all mesh/material pairs from the loaded model
@@ -2784,6 +2806,15 @@ fn handle_add_instanced_model(
     // Add the instanced mesh to the group
     savoiardi.add_child(parent: group, child: coerce(instanced_mesh))
   })
+
+  // Enable transparency if requested
+  case transparent {
+    True -> savoiardi.enable_transparency(group)
+    False -> Nil
+  }
+
+  // Enable shadows on all meshes (cast and receive)
+  savoiardi.enable_shadows(group, True, True)
 
   // Add the group to the scene or parent
   add_to_scene_or_parent(state, group, parent_id)
@@ -2824,11 +2855,11 @@ fn generate_instance_id(base_id: String, index: Int) -> String {
 fn handle_add_light(
   state: RendererState,
   id: String,
-  light: light.Light,
+  light_config: light.Light,
   transform: transform.Transform,
   parent_id: option.Option(String),
 ) -> RendererState {
-  let light = light.create_light(light)
+  let light = light.create_light(light_config)
   savoiardi.apply_transform_with_quaternion(
     object: light |> coerce,
     position: transform.position(transform),
@@ -2933,6 +2964,7 @@ fn create_lod_level_object(node: Node) -> Object3D {
       animation: _,
       physics: _,
       material: material,
+      transparent: transparent,
     ) -> {
       let cloned = savoiardi.clone_object(object)
       savoiardi.apply_transform_with_quaternion(
@@ -2949,6 +2981,11 @@ fn create_lod_level_object(node: Node) -> Object3D {
             material.create_material(material),
           )
         option.None -> Nil
+      }
+      // Enable transparency if requested
+      case transparent {
+        True -> savoiardi.enable_transparency(cloned)
+        False -> Nil
       }
       cloned
     }
@@ -2967,6 +3004,7 @@ fn handle_add_model3d(
   animation: option.Option(animation.AnimationPlayback),
   physics: option.Option(physics.RigidBody),
   material: option.Option(material.Material),
+  transparent: Bool,
   parent_id: option.Option(String),
 ) -> RendererState {
   // For models with animations, we cannot clone because the animation clips
@@ -2993,6 +3031,15 @@ fn handle_add_model3d(
       )
     option.None -> Nil
   }
+
+  // Enable transparency if requested
+  case transparent {
+    True -> savoiardi.enable_transparency(model_object)
+    False -> Nil
+  }
+
+  // Enable shadows on all meshes (cast and receive)
+  savoiardi.enable_shadows(model_object, True, True)
 
   // Create animation mixer
   let mixer = savoiardi.create_animation_mixer(model_object)

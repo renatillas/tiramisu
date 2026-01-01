@@ -72,12 +72,9 @@ pub fn tween_float_with_easing_test() {
 
 pub fn tween_float_negative_values_test() {
   let t =
-    tween.tween_float(
-      -50.0,
-      50.0,
-      duration: duration.seconds(2),
-      easing: fn(x) { x },
-    )
+    tween.tween_float(-50.0, 50.0, duration: duration.seconds(2), easing: fn(x) {
+      x
+    })
     |> tween.update(delta: duration.seconds(1))
 
   // Midpoint should be 0
@@ -371,7 +368,13 @@ pub fn custom_tween_test() {
   }
 
   let t =
-    tween.new(0, 255, duration: duration.seconds(2), easing: fn(x) { x }, lerp_fn: lerp_int)
+    tween.new(
+      0,
+      255,
+      duration: duration.seconds(2),
+      easing: fn(x) { x },
+      lerp_fn: lerp_int,
+    )
     |> tween.update(delta: duration.seconds(1))
 
   let value = tween.get_value(t)
@@ -400,12 +403,9 @@ pub fn zero_duration_tween_test() {
 
 pub fn same_start_end_test() {
   let t =
-    tween.tween_float(
-      50.0,
-      50.0,
-      duration: duration.seconds(1),
-      easing: fn(x) { x },
-    )
+    tween.tween_float(50.0, 50.0, duration: duration.seconds(1), easing: fn(x) {
+      x
+    })
     |> tween.update(delta: duration.milliseconds(500))
 
   // When start equals end, value should always be that value

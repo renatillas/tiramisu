@@ -198,9 +198,7 @@ pub fn to_lustre(
   bridge: Bridge(lustre_msg, game_msg),
   msg: lustre_msg,
 ) -> game_effect.Effect(game_msg) {
-  game_effect.from(fn(_dispatch) {
-    dispatch_to_lustre_ffi(bridge.bridge, msg)
-  })
+  game_effect.from(fn(_dispatch) { dispatch_to_lustre_ffi(bridge.bridge, msg) })
 }
 
 // ============================================================================

@@ -281,6 +281,9 @@ fn create_scene(count: Int) -> option.Option(scene.Node) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let children =
@@ -314,6 +317,9 @@ fn create_scene_pair(count: Int, offset: Float) -> ScenePair(String) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let prev_children =
@@ -372,6 +378,9 @@ fn create_scene_with_partial_changes(
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let changed_count = { total_count * percent_changed } / 100
@@ -441,6 +450,9 @@ fn create_nested_group(depth: Int, current: Int, offset: Float) -> scene.Node {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   case current >= depth {
@@ -475,6 +487,9 @@ fn create_cached_benchmark_input(
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   // Create frame 1 (previous frame)

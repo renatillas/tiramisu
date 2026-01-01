@@ -54,6 +54,13 @@ pub opaque type Light {
     cast_shadow: Bool,
     shadow_resolution: Int,
     shadow_bias: Float,
+    shadow_normal_bias: Float,
+    shadow_camera_left: Float,
+    shadow_camera_right: Float,
+    shadow_camera_top: Float,
+    shadow_camera_bottom: Float,
+    shadow_camera_near: Float,
+    shadow_camera_far: Float,
   )
   /// Point light that radiates in all directions (like a light bulb).
   Point(
@@ -63,6 +70,7 @@ pub opaque type Light {
     cast_shadow: Bool,
     shadow_resolution: Int,
     shadow_bias: Float,
+    shadow_normal_bias: Float,
   )
   /// Cone-shaped spotlight (like a flashlight or stage light).
   Spot(
@@ -74,6 +82,7 @@ pub opaque type Light {
     cast_shadow: Bool,
     shadow_resolution: Int,
     shadow_bias: Float,
+    shadow_normal_bias: Float,
   )
   /// Hemisphere light with different colors for sky and ground (outdoor ambient).
   Hemisphere(intensity: Float, sky_color: Int, ground_color: Int)
@@ -173,6 +182,13 @@ pub fn directional(
     cast_shadow: False,
     shadow_resolution: 1024,
     shadow_bias: 0.0001,
+    shadow_normal_bias: 0.5,
+    shadow_camera_left: -200.0,
+    shadow_camera_right: 200.0,
+    shadow_camera_top: 200.0,
+    shadow_camera_bottom: -200.0,
+    shadow_camera_near: 0.5,
+    shadow_camera_far: 500.0,
   ))
 }
 
@@ -224,6 +240,7 @@ pub fn point(
     cast_shadow: False,
     shadow_resolution: 1024,
     shadow_bias: 0.0001,
+    shadow_normal_bias: 0.5,
   ))
 }
 
@@ -285,6 +302,7 @@ pub fn spot(
     cast_shadow: False,
     shadow_resolution: 1024,
     shadow_bias: 0.0001,
+    shadow_normal_bias: 0.5,
   ))
 }
 
@@ -351,15 +369,43 @@ pub fn hemisphere(
 /// ```
 pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
   case light {
-    Directional(intensity:, color:, shadow_resolution:, shadow_bias:, ..) ->
+    Directional(
+      intensity:,
+      color:,
+      shadow_resolution:,
+      shadow_bias:,
+      shadow_normal_bias:,
+      shadow_camera_left:,
+      shadow_camera_right:,
+      shadow_camera_top:,
+      shadow_camera_bottom:,
+      shadow_camera_near:,
+      shadow_camera_far:,
+      ..,
+    ) ->
       Directional(
         intensity:,
         color:,
         cast_shadow:,
         shadow_resolution:,
         shadow_bias:,
+        shadow_normal_bias:,
+        shadow_camera_left:,
+        shadow_camera_right:,
+        shadow_camera_top:,
+        shadow_camera_bottom:,
+        shadow_camera_near:,
+        shadow_camera_far:,
       )
-    Point(intensity:, color:, distance:, shadow_resolution:, shadow_bias:, ..) ->
+    Point(
+      intensity:,
+      color:,
+      distance:,
+      shadow_resolution:,
+      shadow_bias:,
+      shadow_normal_bias:,
+      ..,
+    ) ->
       Point(
         intensity:,
         color:,
@@ -367,6 +413,7 @@ pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
         cast_shadow:,
         shadow_resolution:,
         shadow_bias:,
+        shadow_normal_bias:,
       )
     Spot(
       intensity:,
@@ -376,6 +423,7 @@ pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
       penumbra:,
       shadow_resolution:,
       shadow_bias:,
+      shadow_normal_bias:,
       ..,
     ) ->
       Spot(
@@ -387,6 +435,7 @@ pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
         cast_shadow:,
         shadow_resolution:,
         shadow_bias:,
+        shadow_normal_bias:,
       )
     _ -> light
   }
@@ -402,8 +451,8 @@ pub fn with_shadows(light: Light, cast_shadow: Bool) -> Light {
 ///
 /// ```gleam
 /// let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
-///   |> light.with_shadows(True)
-///   |> light.with_shadow_resolution(2048)
+///   |> result.map(light.with_shadows(_, True))
+///   |> result.try(light.with_shadow_resolution(_, 2048))
 /// ```
 pub fn with_shadow_resolution(
   light: Light,
@@ -415,15 +464,43 @@ pub fn with_shadow_resolution(
   )
 
   case light {
-    Directional(intensity:, color:, cast_shadow:, shadow_bias:, ..) ->
+    Directional(
+      intensity:,
+      color:,
+      cast_shadow:,
+      shadow_bias:,
+      shadow_normal_bias:,
+      shadow_camera_left:,
+      shadow_camera_right:,
+      shadow_camera_top:,
+      shadow_camera_bottom:,
+      shadow_camera_near:,
+      shadow_camera_far:,
+      ..,
+    ) ->
       Ok(Directional(
         intensity:,
         color:,
         cast_shadow:,
         shadow_resolution: resolution,
         shadow_bias:,
+        shadow_normal_bias:,
+        shadow_camera_left:,
+        shadow_camera_right:,
+        shadow_camera_top:,
+        shadow_camera_bottom:,
+        shadow_camera_near:,
+        shadow_camera_far:,
       ))
-    Point(intensity:, color:, distance:, cast_shadow:, shadow_bias:, ..) ->
+    Point(
+      intensity:,
+      color:,
+      distance:,
+      cast_shadow:,
+      shadow_bias:,
+      shadow_normal_bias:,
+      ..,
+    ) ->
       Ok(Point(
         intensity:,
         color:,
@@ -431,6 +508,7 @@ pub fn with_shadow_resolution(
         cast_shadow:,
         shadow_resolution: resolution,
         shadow_bias:,
+        shadow_normal_bias:,
       ))
     Spot(
       intensity:,
@@ -440,6 +518,7 @@ pub fn with_shadow_resolution(
       penumbra:,
       cast_shadow:,
       shadow_bias:,
+      shadow_normal_bias:,
       ..,
     ) ->
       Ok(Spot(
@@ -451,6 +530,7 @@ pub fn with_shadow_resolution(
         cast_shadow:,
         shadow_resolution: resolution,
         shadow_bias:,
+        shadow_normal_bias:,
       ))
     _ -> Ok(light)
   }
@@ -473,15 +553,43 @@ pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) 
   use <- bool.guard(bias <. 0.0, Error(InvalidShadowBias(bias)))
 
   case light {
-    Directional(intensity:, color:, cast_shadow:, shadow_resolution:, ..) ->
+    Directional(
+      intensity:,
+      color:,
+      cast_shadow:,
+      shadow_resolution:,
+      shadow_normal_bias:,
+      shadow_camera_left:,
+      shadow_camera_right:,
+      shadow_camera_top:,
+      shadow_camera_bottom:,
+      shadow_camera_near:,
+      shadow_camera_far:,
+      ..,
+    ) ->
       Ok(Directional(
         intensity:,
         color:,
         cast_shadow:,
         shadow_resolution:,
         shadow_bias: bias,
+        shadow_normal_bias:,
+        shadow_camera_left:,
+        shadow_camera_right:,
+        shadow_camera_top:,
+        shadow_camera_bottom:,
+        shadow_camera_near:,
+        shadow_camera_far:,
       ))
-    Point(intensity:, color:, distance:, cast_shadow:, shadow_resolution:, ..) ->
+    Point(
+      intensity:,
+      color:,
+      distance:,
+      cast_shadow:,
+      shadow_resolution:,
+      shadow_normal_bias:,
+      ..,
+    ) ->
       Ok(Point(
         intensity:,
         color:,
@@ -489,6 +597,7 @@ pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) 
         cast_shadow:,
         shadow_resolution:,
         shadow_bias: bias,
+        shadow_normal_bias:,
       ))
     Spot(
       intensity:,
@@ -498,6 +607,7 @@ pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) 
       penumbra:,
       cast_shadow:,
       shadow_resolution:,
+      shadow_normal_bias:,
       ..,
     ) ->
       Ok(Spot(
@@ -509,6 +619,7 @@ pub fn with_shadow_bias(light: Light, bias: Float) -> Result(Light, LightError) 
         cast_shadow:,
         shadow_resolution:,
         shadow_bias: bias,
+        shadow_normal_bias:,
       ))
     _ -> Ok(light)
   }
@@ -525,13 +636,29 @@ pub fn create_light(light: Light) -> savoiardi.Light {
       cast_shadow:,
       shadow_resolution:,
       shadow_bias:,
+      shadow_normal_bias:,
+      shadow_camera_left:,
+      shadow_camera_right:,
+      shadow_camera_top:,
+      shadow_camera_bottom:,
+      shadow_camera_near:,
+      shadow_camera_far:,
     ) ->
       savoiardi.create_directional_light(
         color,
         intensity,
         cast_shadow,
-        shadow_resolution,
-        shadow_bias,
+        savoiardi.DirectionalShadowConfig(
+          resolution: shadow_resolution,
+          bias: shadow_bias,
+          normal_bias: shadow_normal_bias,
+          camera_left: shadow_camera_left,
+          camera_right: shadow_camera_right,
+          camera_top: shadow_camera_top,
+          camera_bottom: shadow_camera_bottom,
+          camera_near: shadow_camera_near,
+          camera_far: shadow_camera_far,
+        ),
       )
     Point(
       intensity:,
@@ -540,14 +667,18 @@ pub fn create_light(light: Light) -> savoiardi.Light {
       cast_shadow:,
       shadow_resolution:,
       shadow_bias:,
+      shadow_normal_bias:,
     ) ->
       savoiardi.create_point_light(
         color,
         intensity,
         distance,
         cast_shadow,
-        shadow_resolution,
-        shadow_bias,
+        savoiardi.ShadowConfig(
+          resolution: shadow_resolution,
+          bias: shadow_bias,
+          normal_bias: shadow_normal_bias,
+        ),
       )
     Spot(
       intensity:,
@@ -558,6 +689,7 @@ pub fn create_light(light: Light) -> savoiardi.Light {
       cast_shadow:,
       shadow_resolution:,
       shadow_bias:,
+      shadow_normal_bias:,
     ) ->
       savoiardi.create_spot_light(
         color,
@@ -566,8 +698,11 @@ pub fn create_light(light: Light) -> savoiardi.Light {
         angle,
         penumbra,
         cast_shadow,
-        shadow_resolution,
-        shadow_bias,
+        savoiardi.ShadowConfig(
+          resolution: shadow_resolution,
+          bias: shadow_bias,
+          normal_bias: shadow_normal_bias,
+        ),
       )
     Hemisphere(intensity:, sky_color:, ground_color:) ->
       savoiardi.create_hemisphere_light(sky_color, ground_color, intensity)

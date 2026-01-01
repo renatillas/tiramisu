@@ -10,7 +10,16 @@ import vec/vec3
 
 pub fn diff_empty_to_single_node_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev = option.None
   let next =
@@ -20,7 +29,6 @@ pub fn diff_empty_to_single_node_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -31,7 +39,16 @@ pub fn diff_empty_to_single_node_test() {
 
 pub fn diff_single_node_to_empty_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev =
     option.Some(scene.mesh(
@@ -40,7 +57,6 @@ pub fn diff_single_node_to_empty_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
   let next = option.None
 
@@ -51,7 +67,16 @@ pub fn diff_single_node_to_empty_test() {
 
 pub fn diff_transform_change_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev =
     option.Some(scene.mesh(
@@ -60,7 +85,6 @@ pub fn diff_transform_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -69,7 +93,6 @@ pub fn diff_transform_change_test() {
       material: mat,
       transform: transform.at(vec3.Vec3(5.0, 0.0, 0.0)),
       physics: option.None,
-      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -82,8 +105,26 @@ pub fn diff_transform_change_test() {
 
 pub fn diff_material_change_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat1) = material.basic(0xff0000, False, 1.0, option.None)
-  let assert Ok(mat2) = material.basic(0x00ff00, False, 1.0, option.None)
+  let assert Ok(mat1) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
+  let assert Ok(mat2) =
+    material.basic(
+      color: 0x00ff00,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev =
     option.Some(scene.mesh(
@@ -92,7 +133,6 @@ pub fn diff_material_change_test() {
       material: mat1,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -101,7 +141,6 @@ pub fn diff_material_change_test() {
       material: mat2,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -113,8 +152,18 @@ pub fn diff_material_change_test() {
 
 pub fn diff_geometry_change_test() {
   let assert Ok(geom1) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(geom2) = geometry.sphere(radius: 2.0, segments: vec2.Vec2(32, 16))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(geom2) =
+    geometry.sphere(radius: 2.0, segments: vec2.Vec2(32, 16))
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev =
     option.Some(scene.mesh(
@@ -123,7 +172,6 @@ pub fn diff_geometry_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -132,7 +180,6 @@ pub fn diff_geometry_change_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -144,7 +191,16 @@ pub fn diff_geometry_change_test() {
 
 pub fn diff_multiple_changes_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
   let assert Ok(light_obj) = light.directional(1.0, 0xffffff)
 
   let prev =
@@ -156,7 +212,6 @@ pub fn diff_multiple_changes_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
-          look_at: option.None,
         ),
       ]),
     )
@@ -169,7 +224,6 @@ pub fn diff_multiple_changes_test() {
           material: mat,
           transform: transform.at(vec3.Vec3(10.0, 0.0, 0.0)),
           physics: option.None,
-          look_at: option.None,
         ),
         scene.light(
           id: "light1",
@@ -187,7 +241,16 @@ pub fn diff_multiple_changes_test() {
 
 pub fn diff_no_changes_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev =
     option.Some(scene.mesh(
@@ -196,7 +259,6 @@ pub fn diff_no_changes_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
   let next =
     option.Some(scene.mesh(
@@ -205,7 +267,6 @@ pub fn diff_no_changes_test() {
       material: mat,
       transform: transform.identity,
       physics: option.None,
-      look_at: option.None,
     ))
 
   let #(patches, _) = scene.diff(prev, next, option.None)
@@ -217,7 +278,16 @@ pub fn diff_no_changes_test() {
 // Parents must be added before their children
 pub fn diff_hierarchy_ordering_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev = option.None
   let next =
@@ -229,7 +299,6 @@ pub fn diff_hierarchy_ordering_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
-          look_at: option.None,
         ),
         scene.mesh(
           id: "child2",
@@ -237,7 +306,6 @@ pub fn diff_hierarchy_ordering_test() {
           material: mat,
           transform: transform.identity,
           physics: option.None,
-          look_at: option.None,
         ),
       ]),
     )
@@ -276,7 +344,16 @@ pub fn diff_hierarchy_ordering_test() {
 // Test deeper hierarchy with grandchildren
 pub fn diff_deep_hierarchy_ordering_test() {
   let assert Ok(geom) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
-  let assert Ok(mat) = material.basic(0xff0000, False, 1.0, option.None)
+  let assert Ok(mat) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
 
   let prev = option.None
   let next =
@@ -289,7 +366,6 @@ pub fn diff_deep_hierarchy_ordering_test() {
             material: mat,
             transform: transform.identity,
             physics: option.None,
-            look_at: option.None,
           ),
         ]),
       ]),

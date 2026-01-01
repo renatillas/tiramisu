@@ -561,12 +561,16 @@ pub fn build(builder: Builder(HasAnimation, ctx)) -> AnimationMachine(ctx) {
 
   // Create the state machine with all animations
   let state_machine =
-    dict.fold(builder.animations, statemachine.new(initial_anim), fn(sm, _, anim) {
-      case anim.name == initial_anim.name {
-        True -> sm
-        False -> statemachine.with_state(sm, anim)
-      }
-    })
+    dict.fold(
+      builder.animations,
+      statemachine.new(initial_anim),
+      fn(sm, _, anim) {
+        case anim.name == initial_anim.name {
+          True -> sm
+          False -> statemachine.with_state(sm, anim)
+        }
+      },
+    )
 
   // Add all transitions
   let state_machine =

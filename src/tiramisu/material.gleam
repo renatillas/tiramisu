@@ -198,7 +198,15 @@ pub fn basic(
     Error(OutOfBoundsOpacity(opacity)),
   )
 
-  Ok(BasicMaterial(color:, transparent:, opacity:, map:, side:, alpha_test:, depth_write:))
+  Ok(BasicMaterial(
+    color:,
+    transparent:,
+    opacity:,
+    map:,
+    side:,
+    alpha_test:,
+    depth_write:,
+  ))
 }
 
 /// Create a validated physically-based (PBR) standard material.
@@ -949,7 +957,15 @@ pub fn build(
 @internal
 pub fn create_material(material: Material) -> savoiardi.Material {
   case material {
-    BasicMaterial(color:, map:, transparent:, opacity:, side:, alpha_test:, depth_write:) ->
+    BasicMaterial(
+      color:,
+      map:,
+      transparent:,
+      opacity:,
+      side:,
+      alpha_test:,
+      depth_write:,
+    ) ->
       savoiardi.create_basic_material(
         color,
         transparent,

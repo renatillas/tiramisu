@@ -91,6 +91,9 @@ fn create_flat_scene(count: Int) -> List(scene.Node) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   list.range(0, count - 1)
@@ -116,6 +119,9 @@ fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   list.range(0, count - 1)
@@ -145,6 +151,9 @@ fn create_nested_group(depth: Int, current: Int) -> scene.Node {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   case current >= depth {

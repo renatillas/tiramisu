@@ -175,16 +175,16 @@ pub fn set_animation_state(
 }
 
 /// Get the animation state for a node
-pub fn get_animation_state(cache: CacheState, id: String) -> Option(AnimationState) {
+pub fn get_animation_state(
+  cache: CacheState,
+  id: String,
+) -> Option(AnimationState) {
   dict.get(cache.animation_states, id) |> option.from_result
 }
 
 /// Remove animation state for a node
 pub fn remove_animation_state(cache: CacheState, id: String) -> CacheState {
-  CacheState(
-    ..cache,
-    animation_states: dict.delete(cache.animation_states, id),
-  )
+  CacheState(..cache, animation_states: dict.delete(cache.animation_states, id))
 }
 
 // ============================================================================

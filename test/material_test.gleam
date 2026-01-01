@@ -66,6 +66,9 @@ pub fn basic_test() {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 }
 
@@ -76,6 +79,9 @@ pub fn basic_invalid_opacity_high_test() {
       transparent: True,
       opacity: 1.5,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 }
 
@@ -86,6 +92,9 @@ pub fn basic_invalid_opacity_negative_test() {
       transparent: True,
       opacity: -0.1,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 }
 
