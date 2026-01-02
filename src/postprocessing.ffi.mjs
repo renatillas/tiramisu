@@ -9,7 +9,7 @@ import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
 import { GlitchPass } from 'three/addons/postprocessing/GlitchPass.js';
 import { ClearPass } from 'three/addons/postprocessing/ClearPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { Some } from '../gleam_stdlib/gleam/option.mjs';
+import { Option$isSome, Option$Some$0 } from '../gleam_stdlib/gleam/option.mjs';
 import * as CAMERA from './tiramisu/camera.mjs';
 import {
   Pass$isRenderPass,
@@ -22,7 +22,20 @@ import {
   Pass$isFXAAPass,
   Pass$isGlitchPass,
   Pass$isColorCorrectionPass,
-  Pass$isCustomShaderPass
+  Pass$isCustomShaderPass,
+  UniformValue$isFloatUniform,
+  UniformValue$FloatUniform$0,
+  UniformValue$isIntUniform,
+  UniformValue$IntUniform$0,
+  UniformValue$isVec2Uniform,
+  UniformValue$Vec2Uniform$0,
+  UniformValue$Vec2Uniform$1,
+  UniformValue$isVec3Uniform,
+  UniformValue$Vec3Uniform$0,
+  UniformValue$Vec3Uniform$1,
+  UniformValue$Vec3Uniform$2,
+  UniformValue$isColorUniform,
+  UniformValue$ColorUniform$0
 } from './tiramisu/camera.mjs';
 
 /**
@@ -68,8 +81,8 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
     const colorOption = gleamPass.color;
     let clearColor;
 
-    if (colorOption instanceof Some) {
-      clearColor = new THREE.Color(colorOption[0]);
+    if (Option$isSome(colorOption)) {
+      clearColor = new THREE.Color(Option$Some$0(colorOption));
     } else {
       // Use scene background color or fallback to black
       if (scene.background && scene.background.isColor) {
@@ -240,24 +253,16 @@ function createPassFromGleam(gleamPass, renderer, scene, camera) {
     const uniformsArray = uniforms.toArray();
 
     for (const [name, value] of uniformsArray) {
-      const uniformVariant = value[0];
-
-      switch (uniformVariant) {
-        case 'FloatUniform':
-          threeUniforms[name] = { value: value[1] };
-          break;
-        case 'IntUniform':
-          threeUniforms[name] = { value: value[1] };
-          break;
-        case 'Vec2Uniform':
-          threeUniforms[name] = { value: new THREE.Vector2(value[1], value[2]) };
-          break;
-        case 'Vec3Uniform':
-          threeUniforms[name] = { value: new THREE.Vector3(value[1], value[2], value[3]) };
-          break;
-        case 'ColorUniform':
-          threeUniforms[name] = { value: new THREE.Color(value[1]) };
-          break;
+      if (UniformValue$isFloatUniform(value)) {
+        threeUniforms[name] = { value: UniformValue$FloatUniform$0(value) };
+      } else if (UniformValue$isIntUniform(value)) {
+        threeUniforms[name] = { value: UniformValue$IntUniform$0(value) };
+      } else if (UniformValue$isVec2Uniform(value)) {
+        threeUniforms[name] = { value: new THREE.Vector2(UniformValue$Vec2Uniform$0(value), UniformValue$Vec2Uniform$1(value)) };
+      } else if (UniformValue$isVec3Uniform(value)) {
+        threeUniforms[name] = { value: new THREE.Vector3(UniformValue$Vec3Uniform$0(value), UniformValue$Vec3Uniform$1(value), UniformValue$Vec3Uniform$2(value)) };
+      } else if (UniformValue$isColorUniform(value)) {
+        threeUniforms[name] = { value: new THREE.Color(UniformValue$ColorUniform$0(value)) };
       }
     }
 

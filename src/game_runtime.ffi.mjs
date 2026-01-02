@@ -9,7 +9,7 @@ import { toList } from '../gleam_stdlib/gleam.mjs';
 import * as SCENE from './tiramisu/scene.mjs';
 import { FrameData$FrameData } from './tiramisu.mjs'
 import { createEffectComposer } from './postprocessing.ffi.mjs';
-import { Some, None, Option$isSome, Option$Some$0 } from '../gleam_stdlib/gleam/option.mjs';
+import { Option$isSome, Option$Some$0 } from '../gleam_stdlib/gleam/option.mjs';
 import { Vec2$Vec2 } from '../vec/vec/vec2.mjs';
 
 /**
@@ -216,8 +216,8 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
   // Render viewport cameras
   for (const cameraData of viewportCameras) {
     const [id, threeCamera, viewport, postprocessing] = cameraData;
-    if (viewport instanceof Some) {
-      const vp = viewport[0];
+    if (Option$isSome(viewport)) {
+      const vp = Option$Some$0(viewport);
       renderCameraWithPostprocessing(renderer, scene, threeCamera, postprocessing, id, vp);
 
       // Render CSS2D labels for viewport camera
@@ -233,8 +233,8 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
  */
 function getCSS2DRenderer(rendererState) {
   const css2dOpt = rendererState.css2d_renderer;
-  if (css2dOpt instanceof Some) {
-    return css2dOpt[0];
+  if (Option$isSome(css2dOpt)) {
+    return Option$Some$0(css2dOpt);
   }
   return null;
 }
@@ -259,8 +259,8 @@ function renderCameraWithPostprocessing(renderer, scene, camera, postprocessing,
     renderer.setScissorTest(false);
   }
 
-  if (postprocessing instanceof Some) {
-    const ppConfig = postprocessing[0];
+  if (Option$isSome(postprocessing)) {
+    const ppConfig = Option$Some$0(postprocessing);
 
     // Get or create composer for this camera
     let composer = composerCache.get(cameraId);
