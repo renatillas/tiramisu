@@ -288,6 +288,8 @@ pub opaque type RigidBody {
     character_controller: option.Option(CharacterController),
     /// Enable collision event tracking (default: False)
     track_collision_events: Bool,
+    /// Make collider a sensor (triggers events but no physical response)
+    is_sensor: Bool,
   )
 }
 
@@ -386,6 +388,7 @@ pub opaque type RigidBodyBuilder(a) {
     collision_groups: option.Option(CollisionGroups),
     character_controller: option.Option(CharacterController),
     track_collision_events: Bool,
+    is_sensor: Bool,
   )
 }
 
@@ -446,6 +449,7 @@ pub fn new_rigid_body(body_type: Body) -> RigidBodyBuilder(WithoutCollider) {
     collision_groups: option.None,
     character_controller: option.None,
     track_collision_events: False,
+    is_sensor: False,
   )
 }
 
@@ -737,6 +741,31 @@ pub fn with_collision_events(
   RigidBodyBuilder(..builder, track_collision_events: True)
 }
 
+/// Make this collider a sensor (trigger).
+///
+/// Sensors detect collisions and generate events, but don't cause physical
+/// response (no pushing, bouncing, or blocking). Perfect for:
+/// - Projectiles that should pass through targets
+/// - Trigger zones (checkpoints, damage areas)
+/// - Collectibles that don't block movement
+///
+/// **Note**: Sensor colliders still need `with_collision_events()` to receive
+/// collision events.
+///
+/// ## Example
+///
+/// ```gleam
+/// // Projectile that detects hits but passes through enemies
+/// let bullet = physics.new_rigid_body(physics.Dynamic)
+///   |> physics.with_collider(physics.Sphere(transform.identity, 0.1))
+///   |> physics.with_sensor()
+///   |> physics.with_collision_events()
+///   |> physics.build()
+/// ```
+pub fn with_sensor(builder: RigidBodyBuilder(_)) -> RigidBodyBuilder(_) {
+  RigidBodyBuilder(..builder, is_sensor: True)
+}
+
 pub type WithCollider
 
 pub type WithoutCollider
@@ -768,6 +797,7 @@ pub fn build(builder: RigidBodyBuilder(WithCollider)) -> RigidBody {
     collision_groups: builder.collision_groups,
     character_controller: builder.character_controller,
     track_collision_events: builder.track_collision_events,
+    is_sensor: builder.is_sensor,
   )
 }
 
@@ -1616,6 +1646,12 @@ pub fn create_body(
     False -> Nil
   }
 
+  // Set sensor mode if configured (triggers events but no physical response)
+  case config.is_sensor {
+    True -> set_collider_sensor_ffi(collider_desc, True)
+    False -> Nil
+  }
+
   // Create collider attached to body
   let collider = create_collider_ffi(world.world, collider_desc, rapier_body)
 
@@ -1873,6 +1909,9 @@ fn set_collider_active_events_ffi(desc: RapierColliderDesc, events: Int) -> Nil
 
 @external(javascript, "../rapier.ffi.mjs", "getActiveEvents")
 fn get_active_events_ffi() -> Int
+
+@external(javascript, "../rapier.ffi.mjs", "setColliderSensor")
+fn set_collider_sensor_ffi(desc: RapierColliderDesc, is_sensor: Bool) -> Nil
 
 @external(javascript, "../rapier.ffi.mjs", "setColliderTranslation")
 fn set_collider_translation_ffi(
