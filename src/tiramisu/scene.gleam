@@ -160,7 +160,6 @@ pub opaque type Node {
     children: List(Node),
     camera: camera.Camera,
     transform: transform.Transform,
-    look_at: option.Option(vec3.Vec3(Float)),
     active: Bool,
     viewport: option.Option(#(Int, Int, Int, Int)),
     postprocessing: option.Option(camera.PostProcessing),
@@ -450,7 +449,6 @@ pub fn light(
 ///   id: "main-camera",
 ///   camera: cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
-///   look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),  // Look at origin
 ///   active: True,
 ///   viewport: option.None,  // Fullscreen
 /// )
@@ -465,7 +463,6 @@ pub fn light(
 ///   camera: minimap_cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 50.0, 0.0))
 ///     |> transform.with_euler_rotation(vec3.Vec3(-1.57, 0.0, 0.0)),
-///   look_at: option.None,
 ///   active: True,
 ///   viewport: option.Some(camera.ViewPort(position: vec2.Vec2(10, 10), size: vec2.Vec2(200, 200))),
 /// )
@@ -474,7 +471,6 @@ pub fn camera(
   id id: String,
   camera camera: camera.Camera,
   transform transform: transform.Transform,
-  look_at look_at: option.Option(vec3.Vec3(Float)),
   active active: Bool,
   viewport viewport: option.Option(camera.ViewPort),
   postprocessing postprocessing: option.Option(camera.PostProcessing),
@@ -484,7 +480,6 @@ pub fn camera(
     children: [],
     camera:,
     transform:,
-    look_at:,
     active:,
     viewport: option.map(viewport, fn(viewport) {
       #(
@@ -1176,11 +1171,7 @@ pub type Patch {
   UpdateAudio(id: String, audio: audio.Audio)
   UpdateInstances(id: String, instances: List(transform.Transform))
   UpdateLODLevels(id: String, levels: List(LODLevel))
-  UpdateCamera(
-    id: String,
-    camera_type: camera.Camera,
-    look_at: option.Option(vec3.Vec3(Float)),
-  )
+  UpdateCamera(id: String, camera_type: camera.Camera)
   SetActiveCamera(id: String)
   UpdateCameraPostprocessing(
     id: String,
@@ -1542,7 +1533,6 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
       children: _,
       camera: previous_camera,
       transform: previous_transform,
-      look_at: previous_look_at,
       active: previous_active,
       viewport: previous_viewport,
       postprocessing: previous_postprocessing,
@@ -1552,7 +1542,6 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         children: _,
         camera: current_camera,
         transform: current_transform,
-        look_at: current_look_at,
         active: current_active,
         viewport: current_viewport,
         postprocessing: current_postprocessing,
@@ -1562,13 +1551,11 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         id,
         previous_camera:,
         previous_transform:,
-        previous_look_at:,
         previous_active:,
         previous_viewport:,
         previous_postprocessing:,
         current_camera:,
         current_transform:,
-        current_look_at:,
         current_active:,
         current_viewport:,
         current_postprocessing:,
@@ -2092,13 +2079,11 @@ fn compare_camera_fields(
   id: String,
   previous_camera prev_cam: camera.Camera,
   previous_transform prev_trans: transform.Transform,
-  previous_look_at prev_look_at: option.Option(vec3.Vec3(Float)),
   previous_active prev_active: Bool,
   previous_viewport prev_viewport: option.Option(#(Int, Int, Int, Int)),
   previous_postprocessing prev_pp: option.Option(camera.PostProcessing),
   current_camera curr_cam: camera.Camera,
   current_transform curr_trans: transform.Transform,
-  current_look_at curr_look_at: option.Option(vec3.Vec3(Float)),
   current_active curr_active: Bool,
   current_viewport curr_viewport: option.Option(#(Int, Int, Int, Int)),
   current_postprocessing curr_pp: option.Option(camera.PostProcessing),
@@ -2110,12 +2095,8 @@ fn compare_camera_fields(
     False -> patches
   }
 
-  let patches = case
-    prev_cam != curr_cam
-    || prev_look_at != curr_look_at
-    || prev_viewport != curr_viewport
-  {
-    True -> [UpdateCamera(id, curr_cam, curr_look_at), ..patches]
+  let patches = case prev_cam != curr_cam || prev_viewport != curr_viewport {
+    True -> [UpdateCamera(id, curr_cam), ..patches]
     False -> patches
   }
 
@@ -2440,8 +2421,8 @@ pub fn apply_patch(state: RendererState, patch: Patch) -> RendererState {
     UpdateLODLevels(id: id_val, levels: levels) ->
       handle_update_lod_levels(state, id_val, levels)
 
-    UpdateCamera(id: id_val, camera_type: camera_type, look_at: look_at) ->
-      handle_update_camera(state, id_val, camera_type, look_at)
+    UpdateCamera(id: id_val, camera_type: camera_type) ->
+      handle_update_camera(state, id_val, camera_type)
 
     SetActiveCamera(id: id_val) -> handle_set_active_camera(state, id_val)
 
@@ -2579,7 +2560,6 @@ fn handle_add_node(
       children: _,
       camera: camera,
       transform: transform,
-      look_at: look_at,
       active: active,
       viewport: viewport,
       postprocessing: postprocessing,
@@ -2589,7 +2569,6 @@ fn handle_add_node(
         id,
         camera,
         transform,
-        look_at,
         active,
         viewport,
         postprocessing,
@@ -3138,7 +3117,6 @@ fn handle_add_camera(
   id: String,
   camera_type: camera.Camera,
   transform: transform.Transform,
-  look_at: option.Option(vec3.Vec3(Float)),
   active: Bool,
   viewport: option.Option(#(Int, Int, Int, Int)),
   postprocessing: option.Option(camera.PostProcessing),
@@ -3175,19 +3153,6 @@ fn handle_add_camera(
     scale: transform.scale(transform),
   )
 
-  // Store lookAt target if provided (will apply after adding to scene)
-  case look_at {
-    option.Some(target) -> {
-      savoiardi.set_object_user_data(camera |> coerce, "lookAtTarget", target)
-      savoiardi.set_object_user_data(
-        camera |> coerce,
-        "needsLookAtUpdate",
-        True,
-      )
-    }
-    option.None -> Nil
-  }
-
   savoiardi.update_camera_projection_matrix(camera)
 
   case parent_id {
@@ -3200,15 +3165,6 @@ fn handle_add_camera(
         Ok(parent_obj) ->
           savoiardi.add_child(parent: parent_obj, child: camera |> coerce)
       }
-  }
-
-  // Apply lookAt after adding to scene
-  case look_at {
-    option.Some(target) -> {
-      savoiardi.set_camera_look_at(camera: camera, target: target)
-      savoiardi.delete_object_user_data(camera |> coerce, "needsLookAtUpdate")
-    }
-    option.None -> Nil
   }
 
   // Store viewport if specified
@@ -3391,30 +3347,6 @@ fn handle_update_transform(
         scale: transform.scale(transform),
       )
       savoiardi.update_matrix_world_force(object, True)
-
-      // If this is a camera with lookAt, reapply it after transform update
-      let is_camera =
-        savoiardi.is_perspective_camera(object)
-        || savoiardi.is_orthographic_camera(object)
-
-      case is_camera {
-        True -> {
-          case savoiardi.has_object_user_data(object, "lookAtTarget") {
-            True -> {
-              let target =
-                savoiardi.get_object_user_data(object, "lookAtTarget")
-              savoiardi.set_camera_look_at(
-                camera: object |> coerce,
-                target: target,
-              )
-            }
-            False -> Nil
-          }
-        }
-        False -> {
-          Nil
-        }
-      }
 
       // If this object has a physics body, update the physics body's transform too
       let new_state = case state.physics_world {
@@ -3704,73 +3636,47 @@ fn handle_update_camera(
   state: RendererState,
   id: String,
   camera_type: camera.Camera,
-  look_at: option.Option(vec3.Vec3(Float)),
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(object) -> {
-      let is_camera =
-        savoiardi.is_perspective_camera(object)
-        || savoiardi.is_orthographic_camera(object)
-
-      case is_camera {
-        True -> {
-          // Update camera projection parameters from camera_type
-          let projection = camera.get_projection(camera_type)
-          case projection {
-            camera.Perspective(fov:, aspect: _, near:, far:) -> {
-              // Calculate the correct aspect ratio instead of using placeholder
-              let viewport = object_cache.get_viewport(state.cache, id)
-              // Convert Viewport to tuple format for calculate_aspect_ratio
-              let viewport_tuple = case viewport {
-                option.Some(camera.ViewPort(position:, size:)) ->
-                  option.Some(#(position.x, position.y, size.x, size.y))
-                option.None -> option.None
-              }
-              let calculated_aspect =
-                calculate_aspect_ratio(viewport_tuple, state.renderer)
-
-              savoiardi.set_perspective_camera_params(
-                object |> coerce,
-                fov,
-                calculated_aspect,
-                near,
-                far,
-              )
-            }
-            camera.Orthographic(left:, right:, top:, bottom:, near:, far:) -> {
-              savoiardi.set_orthographic_camera_params(
-                object |> coerce,
-                left,
-                right,
-                top,
-                bottom,
-                near,
-                far,
-              )
-            }
+      // Update camera projection parameters from camera_type
+      let projection = camera.get_projection(camera_type)
+      case projection {
+        camera.Perspective(fov:, aspect: _, near:, far:) -> {
+          // Calculate the correct aspect ratio instead of using placeholder
+          let viewport = object_cache.get_viewport(state.cache, id)
+          // Convert Viewport to tuple format for calculate_aspect_ratio
+          let viewport_tuple = case viewport {
+            option.Some(camera.ViewPort(position:, size:)) ->
+              option.Some(#(position.x, position.y, size.x, size.y))
+            option.None -> option.None
           }
-          savoiardi.update_camera_projection_matrix(object |> coerce)
+          let calculated_aspect =
+            calculate_aspect_ratio(viewport_tuple, state.renderer)
 
-          // Apply lookAt if provided and update stored target
-          case look_at {
-            option.Some(target) -> {
-              savoiardi.set_camera_look_at(
-                camera: object |> coerce,
-                target: target,
-              )
-              // Update the stored lookAtTarget so it's used in future transform updates
-              savoiardi.set_object_user_data(object, "lookAtTarget", target)
-            }
-            option.None -> {
-              // If None, remove the stored lookAtTarget so the camera can rotate freely
-              savoiardi.delete_object_user_data(object, "lookAtTarget")
-            }
-          }
-
-          state
+          savoiardi.set_perspective_camera_params(
+            object |> coerce,
+            fov,
+            calculated_aspect,
+            near,
+            far,
+          )
         }
-        False -> state
+        camera.Orthographic(left:, right:, top:, bottom:, near:, far:) -> {
+          savoiardi.set_orthographic_camera_params(
+            object |> coerce,
+            left,
+            right,
+            top,
+            bottom,
+            near,
+            far,
+          )
+        }
       }
+      savoiardi.update_camera_projection_matrix(object |> coerce)
+
+      state
     }
     Error(Nil) -> state
   }
