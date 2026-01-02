@@ -28,8 +28,10 @@ import vec/vec2.{type Vec2}
 /// If not provided (None), the game will run in fullscreen mode.
 /// Vec2(x, y) where x is width and y is height.
 ///
-pub type Dimensions =
-  Vec2(Float)
+pub type Dimensions {
+  FullScreen
+  Window(dimensions: Vec2(Float))
+}
 
 /// Game context passed to init and update functions.
 ///
@@ -134,7 +136,7 @@ pub type FrameData(state, msg) {
 ///
 pub fn run(
   selector selector: String,
-  dimensions dimensions: Option(Dimensions),
+  dimensions dimensions: Dimensions,
   bridge bridge: Option(ui.Bridge(lustre_msg, msg)),
   init init: fn(Context) ->
     #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
@@ -147,11 +149,16 @@ pub fn run(
 
   // Create renderer state (audio manager is initialized internally)
   let renderer_state =
-    scene.new_render_state(savoiardi.RendererOptions(
-      antialias: True,
-      alpha: False,
-      dimensions: dimensions,
-    ))
+    scene.new_render_state(
+      savoiardi.RendererOptions(
+        antialias: True,
+        alpha: False,
+        dimensions: case dimensions {
+          FullScreen -> option.None
+          Window(dim) -> option.Some(dim)
+        },
+      ),
+    )
 
   // Get canvas and append to container (so dimensions are available)
   let renderer = scene.get_renderer(renderer_state)
