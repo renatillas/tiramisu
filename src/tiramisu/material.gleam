@@ -150,11 +150,11 @@ pub type MaterialSide {
 }
 
 /// Convert tiramisu MaterialSide to Three.js side constant via savoiardi
-fn material_side_to_int(side: MaterialSide) -> Int {
+fn material_side_to_int(side: MaterialSide) -> savoiardi.MaterialSide {
   case side {
-    FrontSide -> savoiardi.material_side_to_int(savoiardi.FrontSide)
-    BackSide -> savoiardi.material_side_to_int(savoiardi.BackSide)
-    DoubleSide -> savoiardi.material_side_to_int(savoiardi.DoubleSide)
+    FrontSide -> savoiardi.FrontSide
+    BackSide -> savoiardi.BackSide
+    DoubleSide -> savoiardi.DoubleSide
   }
 }
 

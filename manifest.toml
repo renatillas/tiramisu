@@ -19,7 +19,7 @@ packages = [
   { name = "paint", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_community_colour", "gleam_json", "gleam_stdlib"], otp_app = "paint", source = "hex", outer_checksum = "D28F61C2965949A4845FE2F3F8CE4601FF8F51856A36B8239736CA05277D6A6A" },
   { name = "plinth", version = "0.8.1", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_json", "gleam_stdlib"], otp_app = "plinth", source = "hex", outer_checksum = "012E65087018F9C7B48513EB47D0F452D6E57AF257555B46BB82BC0B58D9C482" },
   { name = "quaterni", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib", "vec"], otp_app = "quaterni", source = "hex", outer_checksum = "14351B0EBF8C01394442E63E67D1A4B94D1B93C32FE14F910C455D0DD549EA60" },
-  { name = "savoiardi", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], source = "git", repo = "https://github.com/renatillas/savoiardi.git", commit = "36df8a59d834e78bede54a2d974d488d5cd998fe" },
+  { name = "savoiardi", version = "2.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], otp_app = "savoiardi", source = "hex", outer_checksum = "047550FA216E9520C97F4DF0514BCC1CBD772BD66538941AFB29E256A79BBE58" },
   { name = "statemachine", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_time"], otp_app = "statemachine", source = "hex", outer_checksum = "432B4732269CE93B71713AA734A939A487B4DD0EC2083019EF06E08E538DC312" },
   { name = "vec", version = "3.0.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "F92F052C01FC124D4E67EF8BDA53ACAC40FFBBA1BC92FB9A7CD215CC88F5822B" },
 ]
@@ -36,6 +36,6 @@ lustre = { version = ">= 5.3.5 and < 6.0.0" }
 paint = { version = ">= 1.0.0 and < 2.0.0" }
 plinth = { version = ">= 0.7.2 and < 1.0.0" }
 quaterni = { version = ">= 1.0.0 and < 2.0.0" }
-savoiardi = { git = "https://github.com/renatillas/savoiardi.git", ref = "main" }
+savoiardi = { version = ">= 2.0.0 and < 3.0.0" }
 statemachine = { version = ">= 1.0.0 and < 2.0.0" }
 vec = { version = ">= 3.0.1 and < 4.0.0" }

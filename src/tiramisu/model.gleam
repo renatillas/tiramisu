@@ -202,7 +202,7 @@ pub type Object3D =
 /// - This mutates the object in place and returns it for convenience
 /// - The children's positions are adjusted, not the root object's position
 pub fn center_object(object: Object3D) -> Object3D {
-  savoiardi.center_object_3d(object)
+  savoiardi.center_object(object)
 }
 
 /// Apply a texture to all meshes in an Object3D hierarchy.

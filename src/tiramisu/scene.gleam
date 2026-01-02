@@ -191,13 +191,13 @@ pub opaque type Node {
   )
   Audio(id: String, children: List(Node), audio: audio.Audio)
   // UI overlay nodes
-  CSS2DLabel(
+  CSS2D(
     id: String,
     children: List(Node),
     html: String,
     transform: transform.Transform,
   )
-  CSS3DLabel(
+  CSS3D(
     id: String,
     children: List(Node),
     html: String,
@@ -716,25 +716,25 @@ pub fn audio(id id: String, audio audio: audio.Audio) -> Node {
 /// let hp_element = html.div([attribute.class("bg-red-500 text-white px-4 py-2")], [
 ///   html.text("HP: 100")
 /// ])
-/// scene.css2d_label(
+/// scene.css2d(
 ///   id: "player-hp",
 ///   html: element.to_string(hp_element),
 ///   position: vec3.Vec3(0.0, 2.0, 0.0),
 /// )
 ///
 /// // Option 2: Raw HTML string
-/// scene.css2d_label(
+/// scene.css2d(
 ///   id: "player-name",
 ///   html: "<div class='text-white font-bold'>Player</div>",
 ///   transform: vec3.Vec3(0.0, 2.5, 0.0),
 /// )
 /// ```
-pub fn css2d_label(
+pub fn css2d(
   id id: String,
   html html: String,
   transform transform: transform.Transform,
 ) -> Node {
-  CSS2DLabel(id:, html:, transform:, children: [])
+  CSS2D(id:, html:, transform:, children: [])
 }
 
 /// Create a CSS3D label that respects 3D depth and occlusion.
@@ -753,18 +753,18 @@ pub fn css2d_label(
 /// import vec/vec3
 ///
 /// // Label that hides behind objects
-/// scene.css3d_label(
+/// scene.css3d(
 ///   id: "3d-sign",
 ///   html: "<div class='text-white text-2xl'>→ Exit</div>",
 ///   transform: vec3.Vec3(0.0, 2.0, 0.0),
 /// )
 /// ```
-pub fn css3d_label(
+pub fn css3d(
   id id: String,
   html html: String,
   transform transform: transform.Transform,
 ) -> Node {
-  CSS3DLabel(id:, html:, transform:, children: [])
+  CSS3D(id:, html:, transform:, children: [])
 }
 
 /// Create a canvas node with a paint.Picture drawing rendered to a texture.
@@ -1100,8 +1100,8 @@ pub fn with_children(node: Node, children children: List(Node)) {
   case node {
     AnimatedSprite(..) -> AnimatedSprite(..node, children:)
     Audio(..) -> Audio(..node, children:)
-    CSS2DLabel(..) -> CSS2DLabel(..node, children:)
-    CSS3DLabel(..) -> CSS3DLabel(..node, children:)
+    CSS2D(..) -> CSS2D(..node, children:)
+    CSS3D(..) -> CSS3D(..node, children:)
     Camera(..) -> Camera(..node, children:)
     Canvas(..) -> Canvas(..node, children:)
     DebugAxes(..) -> DebugAxes(..node, children:)
@@ -1652,21 +1652,16 @@ fn compare_nodes_detailed(id: String, prev: Node, curr: Node) -> List(Patch) {
         False -> []
       }
 
-    CSS2DLabel(
-      id: _,
-      children: _,
-      html: previous_html,
-      transform: prev_transform,
-    ),
-      CSS2DLabel(id: _, children: _, html: curr_html, transform: curr_transform)
+    CSS2D(id: _, children: _, html: previous_html, transform: prev_transform),
+      CSS2D(id: _, children: _, html: curr_html, transform: curr_transform)
     ->
       case previous_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS2DLabel(id, curr_html, curr_transform)]
         False -> []
       }
 
-    CSS3DLabel(id: _, children: _, html: prev_html, transform: prev_transform),
-      CSS3DLabel(id: _, children: _, html: curr_html, transform: curr_transform)
+    CSS3D(id: _, children: _, html: prev_html, transform: prev_transform),
+      CSS3D(id: _, children: _, html: curr_html, transform: curr_transform)
     ->
       case prev_html != curr_html || prev_transform != curr_transform {
         True -> [UpdateCSS3DLabel(id, curr_html, curr_transform)]
@@ -2430,10 +2425,10 @@ pub fn apply_patch(state: RendererState, patch: Patch) -> RendererState {
       handle_update_camera_postprocessing(state, id_val, pp)
 
     UpdateCSS2DLabel(id: id_val, html: html, transform: trans) ->
-      handle_update_css2d_label(state, id_val, html, trans)
+      handle_update_css2d(state, id_val, html, trans)
 
     UpdateCSS3DLabel(id: id_val, html: html, transform: trans) ->
-      handle_update_css3d_label(state, id_val, html, trans)
+      handle_update_css3d(state, id_val, html, trans)
 
     UpdateCanvas(
       id: id_val,
@@ -2603,11 +2598,11 @@ fn handle_add_node(
     DebugPoint(id: _, children: _, position: position, size: size, color: color) ->
       handle_add_debug_point(state, id, position, size, color, parent_id)
 
-    CSS2DLabel(id: _, children: _, html: html, transform: trans) ->
-      handle_add_css2d_label(state, id, html, trans, parent_id)
+    CSS2D(id: _, children: _, html: html, transform: trans) ->
+      handle_add_css2d(state, id, html, trans, parent_id)
 
-    CSS3DLabel(id: _, children: _, html: html, transform: trans) ->
-      handle_add_css3d_label(state, id, html, trans, parent_id)
+    CSS3D(id: _, children: _, html: html, transform: trans) ->
+      handle_add_css3d(state, id, html, trans, parent_id)
 
     Canvas(
       id: _,
@@ -3577,25 +3572,12 @@ fn handle_update_instances(
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(object) -> {
-      case savoiardi.is_instanced_mesh(object) {
-        True -> {
-          // Single InstancedMesh node
-          savoiardi.update_instanced_mesh_transforms(
-            coerce(object),
-            transforms_to_tuples(instances),
-          )
-          state
-        }
-        False -> {
-          // Could be a Group containing InstancedMeshes (InstancedModel)
-          // This will recursively update all InstancedMesh children
-          savoiardi.update_group_instanced_meshes(
-            object,
-            transforms_to_tuples(instances),
-          )
-          state
-        }
-      }
+      // Single InstancedMesh node
+      savoiardi.update_instanced_mesh_transforms(
+        coerce(object),
+        transforms_to_tuples(instances),
+      )
+      state
     }
     Error(Nil) -> state
   }
@@ -3608,25 +3590,20 @@ fn handle_update_lod_levels(
 ) -> RendererState {
   case object_cache.get_object(state.cache, id) {
     Ok(object) -> {
-      case savoiardi.is_lod(object) {
-        True -> {
-          // Clear existing levels
-          savoiardi.clear_lod_levels(object |> coerce)
+      // Clear existing levels
+      savoiardi.clear_lod_levels(object |> coerce)
 
-          // Add new levels
-          list.each(levels, fn(level) {
-            let level_obj = create_lod_level_object(level.node)
-            savoiardi.add_lod_level(
-              lod: object |> coerce,
-              object: level_obj,
-              distance: level.distance,
-            )
-          })
+      // Add new levels
+      list.each(levels, fn(level) {
+        let level_obj = create_lod_level_object(level.node)
+        savoiardi.add_lod_level(
+          lod: object |> coerce,
+          object: level_obj,
+          distance: level.distance,
+        )
+      })
 
-          state
-        }
-        False -> state
-      }
+      state
     }
     Error(Nil) -> state
   }
@@ -3708,7 +3685,7 @@ fn handle_update_camera_postprocessing(
   RendererState(..state, cache: new_cache)
 }
 
-fn handle_add_css2d_label(
+fn handle_add_css2d(
   state: RendererState,
   id: String,
   html: String,
@@ -3729,7 +3706,7 @@ fn handle_add_css2d_label(
   RendererState(..state, cache: new_cache)
 }
 
-fn handle_update_css2d_label(
+fn handle_update_css2d(
   state: RendererState,
   id: String,
   html: String,
@@ -3751,7 +3728,7 @@ fn handle_update_css2d_label(
   }
 }
 
-fn handle_add_css3d_label(
+fn handle_add_css3d(
   state: RendererState,
   id: String,
   html: String,
@@ -3772,7 +3749,7 @@ fn handle_add_css3d_label(
   RendererState(..state, cache: new_cache)
 }
 
-fn handle_update_css3d_label(
+fn handle_update_css3d(
   state: RendererState,
   id: String,
   html: String,
