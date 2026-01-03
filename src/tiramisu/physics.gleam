@@ -15,14 +15,14 @@
 ////     gravity: vec3.Vec3(0.0, -9.81, 0.0),
 ////   ))
 ////
-////   #(Model(physics_world: world), effect.tick(Tick), option.Some(world))
+////   #(Model(physics_world: world), effect.dispatch(Tick), option.Some(world))
 //// }
 ////
 //// fn update(model: Model, msg: Msg, ctx: Context) {
 ////   case msg {
 ////     Tick -> {
 ////       let world = physics.step(model.physics_world, ctx.delta_time)
-////       #(Model(..model, physics_world: world), effect.tick(Tick), option.None)
+////       #(Model(..model, physics_world: world), effect.dispatch(Tick), option.None)
 ////     }
 ////   }
 //// }

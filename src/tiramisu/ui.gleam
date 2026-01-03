@@ -184,7 +184,7 @@ pub fn to_tiramisu(
 ///       #(
 ///         GameModel(..model, score: new_score),
 ///         game_effect.batch([
-///           game_effect.tick(Tick),
+///           game_effect.dispatch(Tick),
 ///           ui.to_lustre(model.bridge, UpdateScore(new_score)),
 ///         ]),
 ///         None,

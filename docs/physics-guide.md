@@ -78,7 +78,7 @@ fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(a))
     BackgroundFailed,
   )
 
-  #(Model, effect.batch([effect.tick(Tick), set_bg]), Some(physics_world))
+  #(Model, effect.batch([effect.dispatch(Tick), set_bg]), Some(physics_world))
 }
 
 fn update(
@@ -93,7 +93,7 @@ fn update(
     Tick -> {
       // Step the physics simulation (requires delta_time as Duration)
       let new_physics_world = physics.step(physics_world, ctx.delta_time)
-      #(model, effect.tick(Tick), Some(new_physics_world))
+      #(model, effect.dispatch(Tick), Some(new_physics_world))
     }
   }
 }
@@ -184,7 +184,7 @@ fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(a))
     )
   )
 
-  #(Model(...), effect.tick(Tick), option.Some(physics_world))
+  #(Model(...), effect.dispatch(Tick), option.Some(physics_world))
 }
 ```
 
@@ -206,7 +206,7 @@ fn update(
     Tick -> {
       // Pass delta_time (Duration type) directly
       let new_physics_world = physics.step(physics_world, ctx.delta_time)
-      #(model, effect.tick(Tick), option.Some(new_physics_world))
+      #(model, effect.dispatch(Tick), option.Some(new_physics_world))
     }
   }
 }
@@ -616,7 +616,7 @@ fn update(
         }
       })
 
-      #(model, effect.tick(Tick), option.Some(new_physics_world))
+      #(model, effect.dispatch(Tick), option.Some(new_physics_world))
     }
   }
 }

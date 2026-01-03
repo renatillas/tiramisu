@@ -7,14 +7,14 @@
 //// ## Common Effects
 ////
 //// ```gleam
-//// // Run every frame (game loop)
-//// effect.tick(NextFrame)
+//// // Dispatch a message (for tick loops, cross-module messaging, etc.)
+//// effect.dispatch(Tick)
 ////
 //// // Delay a message
 //// effect.delay(duration.seconds(1), DelayedMessage)
 ////
 //// // Combine multiple effects
-//// effect.batch([effect.tick(Tick), audio_effect, ui_effect])
+//// effect.batch([effect.dispatch(Tick), audio_effect, ui_effect])
 ////
 //// // No effect needed
 //// effect.none()
@@ -50,7 +50,6 @@ import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/time/duration
 import plinth/browser/document
-import plinth/browser/window
 import tiramisu/browser
 import tiramisu/internal/timer
 
@@ -113,7 +112,7 @@ pub fn dispatch(msg msg: msg) -> Effect(msg) {
 ///
 /// ```gleam
 /// effect.batch([
-///   effect.tick(NextFrame),
+///   effect.dispatch(NextFrame),
 ///   play_sound_effect("jump.wav"),
 ///   update_scoreboard(score),
 /// ])
@@ -161,38 +160,9 @@ pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
   effect.perform(dispatch)
 }
 
-/// Request the next animation frame and dispatch a message.
-///
-/// This is the primary way to create frame-based game loops. Call this in your
-/// `update` function to receive a message on the next frame.
-///
-/// ## Example
-///
-/// ```gleam
-/// type Msg {
-///   Tick
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     Tick -> #(
-///       Model(..model, time: model.time +. ctx.delta_time),
-///       effect.tick(Tick),  // Request next frame
-///     )
-///   }
-/// }
-/// ```
-pub fn tick(msg: msg) -> Effect(msg) {
-  Effect(perform: fn(dispatch) {
-    window.request_animation_frame(fn(_timestamp) { dispatch(msg) })
-    Nil
-  })
-}
-
 /// Delay dispatching a message by a specified duration.
 ///
-/// Unlike `tick`, which waits for the next animation frame, `delay` waits
-/// for a specific number of milliseconds using `setTimeout`.
+/// Waits for a specific number of milliseconds using `setTimeout`.
 ///
 /// ## Example
 ///

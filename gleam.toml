@@ -10,6 +10,8 @@ pages = [
     { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
     { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
     { title = "Physics guide", path = "physics.html", source = "./docs/physics-guide.md" },
+    { title = "Arquitecting a tiramisu game", path = "arquitecture.html", source = "./docs/arquitecture.md" },
+    { title = "The runtime", path = "runtime.html", source = "./docs/runtime.md" },
 ]
 
 

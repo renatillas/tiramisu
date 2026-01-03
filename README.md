@@ -66,7 +66,7 @@ pub fn main() {
 }
 
 fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
+  #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
 }
 
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
@@ -75,7 +75,7 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
       // ctx.delta_time is a Duration type for type-safe time handling
       let delta_seconds = duration.to_seconds(ctx.delta_time)
       let new_rotation = model.rotation +. delta_seconds
-      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
   }
 }

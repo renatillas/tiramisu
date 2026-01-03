@@ -125,7 +125,7 @@ fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), option.Option(_))
     on_success: BackgroundSet,
     on_error: BackgroundFailed,
   )
-  #(Model(rotation: 0.0), effect.batch([effect.tick(Tick), set_bg]), None)
+  #(Model(rotation: 0.0), effect.batch([effect.dispatch(Tick), set_bg]), None)
 }
 
 // Update game state based on events
@@ -140,7 +140,7 @@ fn update(
       // ctx.delta_time is a Duration type - convert to seconds for rotation
       let delta_seconds = duration.to_seconds(ctx.delta_time)
       let new_rotation = model.rotation +. delta_seconds
-      #(Model(rotation: new_rotation), effect.tick(Tick), None)
+      #(Model(rotation: new_rotation), effect.dispatch(Tick), None)
     }
   }
 }
@@ -263,7 +263,7 @@ pub type Context {
 Effects are side effects that may return messages:
 
 ```gleam
-effect.tick(Tick)                    // Run on every frame
+effect.dispatch(Tick)                // Dispatch message (for tick loops)
 effect.from(fn(dispatch) { ... })    // Custom effect
 effect.batch([effect1, effect2])     // Run multiple effects
 effect.none()                        // No effects
