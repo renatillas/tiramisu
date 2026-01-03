@@ -67,10 +67,10 @@ pub type Context {
 type GameRuntime
 
 @internal
-pub type FrameData(state, msg) {
+pub type FrameData(model, msg) {
   FrameData(
     messages: List(msg),
-    state: state,
+    state: model,
     prev_node: scene.Node,
     context: Context,
     renderer_state: scene.RendererState,
@@ -80,20 +80,123 @@ pub type FrameData(state, msg) {
   )
 }
 
-/// Initialize and run the game loop.
+// ============================================================================
+// APP TYPE AND CONSTRUCTORS
+// ============================================================================
+
+/// Represents a constructed Tiramisu game application that is ready to be started.
 ///
-/// This is the main entry point for your game. It sets up the renderer, initializes your game state,
-/// and starts the game loop. The loop will call your `update` and `view` functions each frame.
+/// There are two ways to create an App:
+///
+/// 1. [`element`](#element) - Renders a static scene with no state or updates
+/// 2. [`application`](#application) - Full MVU with state, effects, and physics
+///
+/// Once you have an App, use [`start`](#start) to run it.
+///
+pub opaque type App(model, msg) {
+  App(
+    init: fn(Context) ->
+      #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+    update: fn(model, msg, Context) ->
+      #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+    view: fn(model, Context) -> scene.Node,
+  )
+}
+
+/// The simplest type of Tiramisu application. Renders a static scene with no
+/// state or update logic. Useful for demos, static visualizations, or learning
+/// the basics before moving to `application`.
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/scene
+///
+/// pub fn main() {
+///   tiramisu.element(my_scene())
+///   |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
+/// }
+///
+/// fn my_scene() -> scene.Node {
+///   scene.mesh(id: "cube", geometry: cube_geo, material: mat, ...)
+/// }
+/// ```
+///
+pub fn element(view: scene.Node) -> App(Nil, msg) {
+  App(
+    init: fn(_ctx) { #(Nil, effect.none(), option.None) },
+    update: fn(_model, _msg, _ctx) { #(Nil, effect.none(), option.None) },
+    view: fn(_model, _ctx) { view },
+  )
+}
+
+/// A complete Tiramisu application with the full Model-View-Update architecture.
+/// Supports side effects (like dispatching messages) and physics.
+///
+/// Use this when you need:
+/// - A game loop via `effect.dispatch(Tick)`
+/// - Delayed messages via `effect.delay`
+/// - Physics simulation
+/// - Communication with Lustre UI via bridge
+///
+/// ## Example
+///
+/// ```gleam
+/// import tiramisu
+/// import tiramisu/effect
+/// import tiramisu/scene
+///
+/// pub fn main() {
+///   tiramisu.application(init, update, view)
+///   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
+/// }
+///
+/// fn init(ctx) {
+///   #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
+/// }
+///
+/// fn update(model, msg, ctx) {
+///   case msg {
+///     Tick -> {
+///       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
+///       #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
+///     }
+///   }
+/// }
+///
+/// fn view(model, ctx) {
+///   scene.mesh(id: "cube", transform: transform.rotate_y(model.rotation), ...)
+/// }
+/// ```
+///
+pub fn application(
+  init init: fn(Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  update update: fn(model, msg, Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view view: fn(model, Context) -> scene.Node,
+) -> App(model, msg) {
+  App(init:, update:, view:)
+}
+
+// ============================================================================
+// STARTING THE APPLICATION
+// ============================================================================
+
+/// Start a constructed game application.
+///
+/// This is the main entry point for running your game. It sets up the renderer,
+/// initializes your game state, and starts the game loop.
 ///
 /// ## Parameters
 ///
-/// - `selector`: CSS selector for the container element (e.g., "#app", ".game-container")
-/// - `dimensions`: Canvas dimensions (width and height). Use `None` for fullscreen mode.
-/// - `bridge`: Optional UI bridge for Lustre integration. Use `None` for standalone games,
-///   or `Some(bridge)` to enable bidirectional communication with Lustre.
-/// - `init`: Function to create initial game state and effect
-/// - `update`: Function to update state based on messages
-/// - `view`: Function to render your game state as scene nodes
+/// - `app`: The game application created with [`application`](#application)
+/// - `selector`: CSS selector for the container element (e.g., "#game", ".game-container")
+/// - `dimensions`: Canvas dimensions. Use `FullScreen` or `Window(Vec2(width, height))`
+/// - `bridge`: Optional UI bridge for Lustre integration as a tuple of bridge and wrapper.
+///   Use `None` for standalone games, or `Some(#(bridge, wrapper))` to enable
+///   bidirectional communication with Lustre.
 ///
 /// ## Example (standalone game)
 ///
@@ -101,14 +204,8 @@ pub type FrameData(state, msg) {
 /// import tiramisu
 ///
 /// pub fn main() {
-///   tiramisu.run(
-///     selector: "#game",
-///     dimensions: None,
-///     bridge: None,
-///     init: init,
-///     update: update,
-///     view: view,
-///   )
+///   tiramisu.application(init, update, view)
+///   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
 /// }
 /// ```
 ///
@@ -118,31 +215,28 @@ pub type FrameData(state, msg) {
 /// import tiramisu
 /// import tiramisu/ui
 ///
+/// pub type BridgeMsg { UpdateScore(Int), SelectSlot(Int) }
+/// pub type Msg { Tick, FromBridge(BridgeMsg) }
+///
 /// pub fn main() {
 ///   let bridge = ui.new_bridge()
 ///
-///   // Start Lustre first with bridge in flags...
+///   // Start Lustre with bridge in flags...
 ///
-///   tiramisu.run(
-///     selector: "#game",
-///     dimensions: None,
-///     bridge: Some(bridge),
-///     init: init,
-///     update: update,
-///     view: view,
+///   tiramisu.application(init, update, view)
+///   |> tiramisu.start(
+///     "#game",
+///     tiramisu.FullScreen,
+///     option.Some(#(bridge, FromBridge)),
 ///   )
 /// }
 /// ```
 ///
-pub fn run(
-  selector selector: String,
-  dimensions dimensions: Dimensions,
-  bridge bridge: Option(ui.Bridge(lustre_msg, msg)),
-  init init: fn(Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-  update update: fn(state, msg, Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-  view view: fn(state, Context) -> scene.Node,
+pub fn start(
+  app: App(model, msg),
+  selector: String,
+  dimensions: Dimensions,
+  bridge: Option(#(ui.Bridge(bridge_msg), fn(bridge_msg) -> msg)),
 ) -> Result(Nil, Nil) {
   // Find the container element using the selector
   use container <- result.try(document.query_selector(selector))
@@ -189,7 +283,7 @@ pub fn run(
     )
 
   // Initialize game state
-  let #(initial_state, initial_effect, physics_world) = init(initial_context)
+  let #(initial_state, initial_effect, physics_world) = app.init(initial_context)
 
   // Create context with physics_world for the game loop
   let context_with_physics =
@@ -211,7 +305,7 @@ pub fn run(
   }
 
   // Get initial scene root node
-  let initial_root = view(initial_state, context_with_physics)
+  let initial_root = app.view(initial_state, context_with_physics)
 
   // Apply initial scene using renderer.gleam
   let renderer_state_after_init =
@@ -228,9 +322,16 @@ pub fn run(
     option.None -> context_with_physics
   }
 
+  // Extract bridge and wrapper from Option tuple
+  let #(bridge_internal, bridge_wrapper) = case bridge {
+    option.Some(#(b, wrapper)) -> #(option.Some(ui.get_internal(b)), option.Some(wrapper))
+    option.None -> #(option.None, option.None)
+  }
+
   // Start game loop (now in pure Gleam!)
   game_loop(
-    bridge: bridge |> option.map(ui.get_internal),
+    bridge: bridge_internal,
+    bridge_wrapper: bridge_wrapper,
     state: initial_state,
     prev_node: initial_root,
     pending_effect: initial_effect,
@@ -238,8 +339,8 @@ pub fn run(
     renderer_state: renderer_state_after_init,
     input_manager: input_mgr,
     canvas: canvas |> coerce,
-    update: update,
-    view: view,
+    update: app.update,
+    view: app.view,
   )
 
   Ok(Nil)
@@ -252,21 +353,23 @@ pub fn run(
 /// Start the game loop
 fn game_loop(
   bridge bridge: Option(ui.BridgeInternal),
-  state state: state,
+  bridge_wrapper bridge_wrapper: Option(fn(bridge_msg) -> msg),
+  state state: model,
   prev_node prev_node: scene.Node,
   pending_effect pending_effect: effect.Effect(msg),
   context context: Context,
   renderer_state renderer_state: scene.RendererState,
   input_manager input_manager: input_manager.InputManager,
   canvas canvas: element.Element,
-  update update: fn(state, msg, Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-  view view: fn(state, Context) -> scene.Node,
+  update update: fn(model, msg, Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view view: fn(model, Context) -> scene.Node,
 ) -> Nil {
   // Create the runtime instance that holds all mutable state (no globals!)
   let runtime =
     create_runtime_ffi(
       bridge,
+      bridge_wrapper,
       state,
       prev_node,
       context,
@@ -293,9 +396,9 @@ fn game_loop(
 /// Schedule the next animation frame using the runtime
 fn schedule_frame_with_runtime(
   runtime: GameRuntime,
-  update: fn(state, msg, Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-  view: fn(state, Context) -> scene.Node,
+  update: fn(model, msg, Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view: fn(model, Context) -> scene.Node,
 ) -> Nil {
   window.request_animation_frame(fn(timestamp) {
     // Get frame data from runtime (includes delta_time, input, canvas dimensions)
@@ -400,13 +503,13 @@ fn schedule_frame_with_runtime(
 
 /// Process all queued messages through the update function
 fn process_messages(
-  state: state,
+  state: model,
   messages: List(msg),
   context: Context,
   accumulated_effect: Option(effect.Effect(msg)),
-  update: fn(state, msg, Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-) -> #(state, effect.Effect(msg), Option(physics.PhysicsWorld)) {
+  update: fn(model, msg, Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+) -> #(model, effect.Effect(msg), Option(physics.PhysicsWorld)) {
   case messages {
     [] -> {
       let final_effect = case accumulated_effect {
@@ -526,7 +629,8 @@ fn apply_initial_scene_gleam(
 @external(javascript, "./game_runtime.ffi.mjs", "createRuntime")
 fn create_runtime_ffi(
   bridge: Option(ui.BridgeInternal),
-  state: state,
+  bridge_wrapper: Option(fn(bridge_msg) -> msg),
+  state: model,
   prev_node: scene.Node,
   context: Context,
   renderer_state: scene.RendererState,
@@ -539,19 +643,19 @@ fn get_runtime_dispatch_ffi(runtime: GameRuntime) -> fn(msg) -> Nil
 @external(javascript, "./game_runtime.ffi.mjs", "processFrame")
 fn process_frame_ffi(
   runtime: GameRuntime,
-  update: fn(state, msg, Context) ->
-    #(state, effect.Effect(msg), Option(physics.PhysicsWorld)),
-  view: fn(state, Context) -> scene.Node,
+  update: fn(model, msg, Context) ->
+    #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
+  view: fn(model, Context) -> scene.Node,
   timestamp: Float,
   capture_input_state: fn(input_manager.InputManager) -> input.InputState,
   clear_input_frame_state: fn(input_manager.InputManager) ->
     input_manager.InputManager,
-) -> FrameData(state, msg)
+) -> FrameData(model, msg)
 
 @external(javascript, "./game_runtime.ffi.mjs", "updateRuntimeState")
 fn update_runtime_state_ffi(
   runtime: GameRuntime,
-  state: state,
+  state: model,
   prev_node: scene.Node,
   context: Context,
   renderer_state: scene.RendererState,

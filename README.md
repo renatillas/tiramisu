@@ -30,7 +30,6 @@ Tiramisu brings the power of functional programming and static type safety to ga
 import gleam/option
 import gleam/time/duration
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -56,13 +55,8 @@ type Ids {
 }
 
 pub fn main() {
-  tiramisu.run(
-    dimensions: option.None,  // Fullscreen
-    background: background.Color(0x1a1a2e),
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
 }
 
 fn init(_ctx: tiramisu.Context) {

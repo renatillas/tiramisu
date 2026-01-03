@@ -2,63 +2,55 @@
 //// Tiramisu-Lustre integration module.
 ////
 //// This module provides bidirectional message passing between Tiramisu (game engine)
-//// and Lustre (web UI framework) without using global state. Both systems communicate
-//// through a shared Bridge instance.
+//// and Lustre (web UI framework). Both systems communicate through a shared Bridge
+//// with a single message type.
 ////
-//// ## Overview
+//// ## Design
 ////
-//// The Bridge is an opaque type that holds dispatch functions for both systems.
-//// You create it once, include it in your Lustre flags (alongside any other data
-//// you need), and pass it to Tiramisu via `tiramisu.run_with_ui()`.
+//// The bridge has ONE message type that both sides understand. Each side provides
+//// a wrapper function to convert bridge messages into their internal message type.
+//// This is similar to frontend/backend communication over websockets.
 ////
 //// ## Example
 ////
 //// ```gleam
-//// import tiramisu
-//// import tiramisu/ui
-//// import lustre
-////
-//// // Define your Lustre flags - include bridge plus any other initial data
-//// pub type Flags {
-////   Flags(bridge: ui.Bridge(UIMsg, GameMsg), username: String, difficulty: Int)
+//// // 1. Define a shared bridge message type
+//// pub type BridgeMsg {
+////   // Game → UI
+////   UpdateScore(Int)
+////   UpdateHealth(Float)
+////   // UI → Game
+////   SelectSlot(Int)
+////   StartGame
 //// }
 ////
-//// pub type Model {
-////   Model(bridge: ui.Bridge(UIMsg, GameMsg), score: Int, health: Float)
+//// // 2. Lustre side wraps bridge messages
+//// pub type UIMsg {
+////   FromBridge(BridgeMsg)
+////   ButtonClicked
 //// }
 ////
-//// pub fn main() {
-////   // 1. Create a bridge instance
-////   let bridge = ui.new_bridge()
-////
-////   // 2. Start Lustre with bridge in your flags
-////   let assert Ok(_) =
-////     lustre.application(init, update, view)
-////     |> lustre.start("#app", Flags(bridge, "Player1", 2))
-////
-////   // 3. Start Tiramisu with the same bridge
-////   tiramisu.run_with_ui(
-////     bridge: bridge,
-////     selector: "#game",
-////     dimensions: None,
-////     init: game_init,
-////     update: game_update,
-////     view: game_view,
-////   )
+//// fn init(bridge) {
+////   #(Model(bridge: bridge), ui.register_lustre(bridge, FromBridge))
 //// }
 ////
-//// fn init(flags: Flags) {
-////   // Store bridge in model and register Lustre's dispatch
-////   #(
-////     Model(bridge: flags.bridge, score: 0, health: 100.0),
-////     ui.register_lustre(flags.bridge),
-////   )
-//// }
-////
-//// fn update(model: Model, msg: UIMsg) {
+//// fn update(model, msg) {
 ////   case msg {
-////     StartGame -> #(model, ui.to_tiramisu(model.bridge, Resume))
-////     UpdateScore(score) -> #(Model(..model, score: score), lustre_effect.none())
+////     FromBridge(UpdateScore(s)) -> #(Model(..model, score: s), effect.none())
+////     ButtonClicked -> #(model, ui.send(model.bridge, SelectSlot(0)))
+////   }
+//// }
+////
+//// // 3. Game side wraps bridge messages
+//// pub type GameMsg {
+////   FromBridge(BridgeMsg)
+////   Tick
+//// }
+////
+//// fn update(model, msg, ctx) {
+////   case msg {
+////     FromBridge(SelectSlot(i)) -> // handle slot selection
+////     Tick -> #(model, ui.send_to_ui(bridge, UpdateScore(10)), ...)
 ////   }
 //// }
 //// ```
@@ -67,16 +59,13 @@
 import lustre/effect as lustre_effect
 import tiramisu/effect as game_effect
 
-/// Opaque type representing a communication bridge between Tiramisu and Lustre.
+/// Bridge for bidirectional Tiramisu-Lustre communication.
 ///
-/// The bridge holds dispatch functions for both systems, allowing bidirectional
-/// message passing without global state.
+/// The bridge has a single type parameter: the shared message type that both
+/// sides understand. Each side provides a wrapper function to convert bridge
+/// messages into their internal message type.
 ///
-/// Type parameters:
-/// - `lustre_msg`: The message type used by your Lustre application
-/// - `game_msg`: The message type used by your Tiramisu game
-///
-pub opaque type Bridge(lustre_msg, game_msg) {
+pub opaque type Bridge(bridge_msg) {
   Bridge(bridge: BridgeInternal)
 }
 
@@ -86,119 +75,94 @@ pub type BridgeInternal
 
 /// Create a new bridge for Tiramisu-Lustre communication.
 ///
-/// The bridge is an instance (not global state) that should be:
-/// 1. Included in your Lustre flags
-/// 2. Passed to `tiramisu.run_with_ui()`
-///
 /// ## Example
 ///
 /// ```gleam
 /// let bridge = ui.new_bridge()
 /// ```
 ///
-pub fn new_bridge() -> Bridge(lustre_msg, game_msg) {
+pub fn new_bridge() -> Bridge(bridge_msg) {
   Bridge(bridge: create_bridge_ffi())
 }
 
-/// Get the internal bridge object (for use by tiramisu.run_with_ui).
+/// Get the internal bridge object (for use by tiramisu.run).
 @internal
-pub fn get_internal(bridge: Bridge(lustre_msg, game_msg)) -> BridgeInternal {
+pub fn get_internal(bridge: Bridge(bridge_msg)) -> BridgeInternal {
   bridge.bridge
 }
 
 // ============================================================================
-// LUSTRE SIDE - Effects for Lustre applications
+// LUSTRE SIDE
 // ============================================================================
 
-/// Register Lustre's dispatch function with the bridge.
+/// Register Lustre's dispatch with a wrapper function.
 ///
-/// Call this effect in your Lustre `init` function to enable bidirectional
-/// communication. This allows Tiramisu to send messages to Lustre.
+/// The wrapper converts bridge messages to Lustre's internal message type.
+/// Call this in your Lustre `init` function.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// fn init(flags: MyFlags) {
-///   #(
-///     Model(bridge: flags.bridge, ...),
-///     ui.register_lustre(flags.bridge),
-///   )
+/// pub type Msg {
+///   FromBridge(BridgeMsg)
+///   // ... other messages
+/// }
+///
+/// fn init(bridge) {
+///   #(Model(bridge: bridge), ui.register_lustre(bridge, FromBridge))
 /// }
 /// ```
 ///
 pub fn register_lustre(
-  bridge: Bridge(lustre_msg, game_msg),
+  bridge: Bridge(bridge_msg),
+  wrapper: fn(bridge_msg) -> lustre_msg,
 ) -> lustre_effect.Effect(lustre_msg) {
   lustre_effect.from(fn(dispatch) {
-    register_lustre_dispatch_ffi(bridge.bridge, dispatch)
+    // Register a composed dispatch: bridge_msg -> lustre_msg -> dispatch
+    register_lustre_ffi(bridge.bridge, fn(msg) { dispatch(wrapper(msg)) })
   })
 }
 
-/// Dispatch a message to Tiramisu from Lustre.
-///
-/// Use this effect in your Lustre `update` function to send messages to
-/// the Tiramisu game.
+/// Send a message across the bridge to the game.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// fn update(model: Model, msg: UIMsg) {
+/// fn update(model, msg) {
 ///   case msg {
-///     StartGame -> #(
-///       Model(..model, state: Playing),
-///       ui.to_tiramisu(model.bridge, Resume),
-///     )
-///     PauseGame -> #(
-///       Model(..model, state: Paused),
-///       ui.to_tiramisu(model.bridge, Pause),
-///     )
+///     ButtonClicked -> #(model, ui.send(model.bridge, SelectSlot(0)))
 ///   }
 /// }
 /// ```
 ///
-pub fn to_tiramisu(
-  bridge: Bridge(lustre_msg, game_msg),
-  msg: game_msg,
+pub fn send(
+  bridge: Bridge(bridge_msg),
+  msg: bridge_msg,
 ) -> lustre_effect.Effect(lustre_msg) {
-  lustre_effect.from(fn(_dispatch) {
-    dispatch_to_tiramisu_ffi(bridge.bridge, msg)
-  })
+  lustre_effect.from(fn(_dispatch) { send_to_game_ffi(bridge.bridge, msg) })
 }
 
 // ============================================================================
-// TIRAMISU SIDE - Effects for Tiramisu games
+// GAME SIDE
 // ============================================================================
 
-/// Dispatch a message to Lustre from Tiramisu.
-///
-/// Use this effect in your Tiramisu `update` function to send messages to
-/// the Lustre UI.
+/// Send a message across the bridge to the UI.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// fn update(model: GameModel, msg: GameMsg, ctx: Context) {
+/// fn update(model, msg, ctx) {
 ///   case msg {
-///     Tick -> {
-///       let new_score = model.score + 1
-///       #(
-///         GameModel(..model, score: new_score),
-///         game_effect.batch([
-///           game_effect.dispatch(Tick),
-///           ui.to_lustre(model.bridge, UpdateScore(new_score)),
-///         ]),
-///         None,
-///       )
-///     }
+///     Tick -> #(model, ui.send_to_ui(bridge, UpdateScore(10)), ...)
 ///   }
 /// }
 /// ```
 ///
-pub fn to_lustre(
-  bridge: Bridge(lustre_msg, game_msg),
-  msg: lustre_msg,
+pub fn send_to_ui(
+  bridge: Bridge(bridge_msg),
+  msg: bridge_msg,
 ) -> game_effect.Effect(game_msg) {
-  game_effect.from(fn(_dispatch) { dispatch_to_lustre_ffi(bridge.bridge, msg) })
+  game_effect.from(fn(_dispatch) { send_to_lustre_ffi(bridge.bridge, msg) })
 }
 
 // ============================================================================
@@ -208,14 +172,14 @@ pub fn to_lustre(
 @external(javascript, "../ui.ffi.mjs", "createBridge")
 fn create_bridge_ffi() -> BridgeInternal
 
-@external(javascript, "../ui.ffi.mjs", "registerLustreDispatch")
-fn register_lustre_dispatch_ffi(
+@external(javascript, "../ui.ffi.mjs", "registerLustre")
+fn register_lustre_ffi(
   bridge: BridgeInternal,
-  dispatch: fn(lustre_msg) -> Nil,
+  dispatch: fn(bridge_msg) -> Nil,
 ) -> Nil
 
-@external(javascript, "../ui.ffi.mjs", "dispatchToTiramisu")
-fn dispatch_to_tiramisu_ffi(bridge: BridgeInternal, msg: game_msg) -> Nil
+@external(javascript, "../ui.ffi.mjs", "sendToGame")
+fn send_to_game_ffi(bridge: BridgeInternal, msg: bridge_msg) -> Nil
 
-@external(javascript, "../ui.ffi.mjs", "dispatchToLustre")
-fn dispatch_to_lustre_ffi(bridge: BridgeInternal, msg: lustre_msg) -> Nil
+@external(javascript, "../ui.ffi.mjs", "sendToLustre")
+fn send_to_lustre_ffi(bridge: BridgeInternal, msg: bridge_msg) -> Nil

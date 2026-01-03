@@ -482,8 +482,8 @@ pub type Key {
   Custom(String)
 }
 
-/// Convert Key to JavaScript KeyboardEvent.code string
-fn key_to_code(key: Key) -> String {
+@internal
+pub fn key_to_code(key: Key) -> String {
   case key {
     // Letters
     KeyA -> "KeyA"
@@ -1249,4 +1249,100 @@ pub fn build_input_state(
   touch touch: TouchState,
 ) -> InputState {
   InputState(keyboard: keyboard, mouse: mouse, gamepad: gamepads, touch: touch)
+}
+
+/// Get keyboard state (internal use only)
+@internal
+pub fn get_keyboard_state(input: InputState) -> KeyboardState {
+  input.keyboard
+}
+
+/// Get mouse state (internal use only)
+@internal
+pub fn get_mouse_state(input: InputState) -> MouseState {
+  input.mouse
+}
+
+/// Get touch state (internal use only)
+@internal
+pub fn get_touch_state(input: InputState) -> TouchState {
+  input.touch
+}
+
+/// Get gamepad list (internal use only)
+@internal
+pub fn get_gamepad_list(input: InputState) -> List(GamepadState) {
+  input.gamepad
+}
+
+/// Get pressed keys set (internal use only)
+@internal
+pub fn get_pressed_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.pressed_keys
+}
+
+/// Get just pressed keys set (internal use only)
+@internal
+pub fn get_just_pressed_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.just_pressed_keys
+}
+
+/// Get just released keys set (internal use only)
+@internal
+pub fn get_just_released_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.just_released_keys
+}
+
+/// Get active touches list (internal use only)
+@internal
+pub fn get_active_touches(input: InputState) -> List(Touch) {
+  input.touch.touches
+}
+
+/// Get mouse x position (internal use only)
+@internal
+pub fn get_mouse_x(input: InputState) -> Float {
+  input.mouse.x
+}
+
+/// Get mouse y position (internal use only)
+@internal
+pub fn get_mouse_y(input: InputState) -> Float {
+  input.mouse.y
+}
+
+/// Get mouse delta x (internal use only)
+@internal
+pub fn get_mouse_delta_x(input: InputState) -> Float {
+  input.mouse.delta_x
+}
+
+/// Get mouse delta y (internal use only)
+@internal
+pub fn get_mouse_delta_y(input: InputState) -> Float {
+  input.mouse.delta_y
+}
+
+/// Get mouse wheel delta (internal use only)
+@internal
+pub fn get_mouse_wheel_delta(input: InputState) -> Float {
+  input.mouse.wheel_delta
+}
+
+/// Get left button state (internal use only)
+@internal
+pub fn get_left_button_state(input: InputState) -> ButtonState {
+  input.mouse.left_button
+}
+
+/// Get middle button state (internal use only)
+@internal
+pub fn get_middle_button_state(input: InputState) -> ButtonState {
+  input.mouse.middle_button
+}
+
+/// Get right button state (internal use only)
+@internal
+pub fn get_right_button_state(input: InputState) -> ButtonState {
+  input.mouse.right_button
 }

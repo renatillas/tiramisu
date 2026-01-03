@@ -7,11 +7,19 @@ repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 
 [documentation]
 pages = [
-    { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
-    { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
-    { title = "Physics guide", path = "physics.html", source = "./docs/physics-guide.md" },
-    { title = "Arquitecting a tiramisu game", path = "arquitecture.html", source = "./docs/arquitecture.md" },
-    { title = "The runtime", path = "runtime.html", source = "./docs/runtime.md" },
+    # Guide
+    { title = " ", path = "#", source = "" },
+    { title = "Guide", path = "guide/index.html", source = "./docs/guide/index.md" },
+    { title = "Quickstart", path = "guide/01-quickstart.html", source = "./docs/guide/01-quickstart.md" },
+    { title = "State Management", path = "guide/02-state-management.html", source = "./docs/guide/02-state-management.md" },
+    { title = "Side Effects", path = "guide/03-side-effects.html", source = "./docs/guide/03-side-effects.md" },
+    { title = "Scene Graph", path = "guide/04-scene-graph.html", source = "./docs/guide/04-scene-graph.md" },
+    { title = "Physics", path = "guide/05-physics.html", source = "./docs/guide/05-physics.md" },
+    { title = "UI with Lustre", path = "guide/06-lustre-integration.html", source = "./docs/guide/06-lustre-integration.md" },
+    # Advanced
+    { title = " ", path = "#", source = "" },
+    { title = "Architecture", path = "advanced/architecture.html", source = "./docs/advanced/architecture.md" },
+    { title = "Runtime", path = "advanced/runtime.html", source = "./docs/advanced/runtime.md" },
 ]
 
 

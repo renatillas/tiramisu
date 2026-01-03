@@ -6,16 +6,17 @@ This document explains how Tiramisu executes your game code - when each function
 
 Tiramisu runs a continuous game loop using the browser's `requestAnimationFrame`. Your code interacts with this loop through three functions:
 
-### Initialization 
+### Initialization
 
 ```
-  tiramisu.run() called
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("#app", dimensions, bridge) called
        ↓
   init(ctx) → #(Model, Effect, Option(PhysicsWorld))
        ↓
   view(model, ctx) → scene.Node  (initial render)
        ↓
-  Run initial effects
+  Process initial effects
        ↓
   Start game loop
 ```
@@ -35,7 +36,7 @@ Tiramisu runs a continuous game loop using the browser's `requestAnimationFrame`
        ↓
   5. Diff scene, apply patches, render to canvas
        ↓
-  6. Run ALL effects from this frame
+  6. Process ALL effects from this frame
        ↓
   7. Clear per-frame input state (just_pressed, etc.)
        ↓
@@ -57,7 +58,7 @@ fn init(ctx: tiramisu.Context) -> #(Model, effect.Effect(Msg), Option(physics.Ph
 }
 ```
 
-**When called:** Immediately when `tiramisu.run()` executes, before the game loop starts.
+**When called:** Immediately when `tiramisu.start()` executes, before the game loop starts.
 
 **Context available:** `ctx.delta_time` is zero, `ctx.input` is empty, `ctx.physics_world` is `None`.
 
@@ -122,9 +123,9 @@ Frame N                              Frame N+1
          ↓                                  ↓
   view() called                       render
          ↓                                  ↓
-  render                              run effects (Tick queued)
+  render                              process effects (Tick queued)
          ↓
-  run effects (Tick queued for next frame)
+  process effects (Tick queued for next frame)
 ```
 
 ### How messages get queued
@@ -132,24 +133,37 @@ Frame N                              Frame N+1
 **`effect.dispatch(msg)`** - Adds `msg` to the queue immediately:
 
 ```gleam
-// When this effect runs, Tick is added to the queue right away
+// When this effect is processed, Tick is added to the queue
 effect.dispatch(Tick)
 ```
 
-The message will be processed in the **next frame** (since effects run at the end of the current frame).
+The message will be processed in the **next frame** (since effects are processed at the end of the current frame).
 
-## Effect Execution
+## Effect Processing
 
-Effects are collected from all `update` calls and run **after** rendering:
+Effects are collected from all `update` calls and processed **after** rendering:
 
 ```
 Frame Timeline:
-─────────────────────────────────────────────────────────────
-  update()  update()  update()  view()  render  RUN EFFECTS
+───────────────────────────────────────────────────────────────────
+  update()  update()  update()  view()  render  PROCESS EFFECTS
      │         │         │                          │
      └─────────┴─────────┴──────────────────────────┘
-          effects batched together              all run here
+          effects batched together              processed here
 ```
+
+### What "processing" means for each effect type
+
+| Effect | What happens when processed |
+|--------|----------------------------|
+| `effect.dispatch(msg)` | Adds `msg` to the queue (processed next frame) |
+| `effect.batch([...])` | Processes each effect in order |
+| `effect.none()` | Nothing |
+| `effect.delay(duration, msg)` | Schedules a `setTimeout` to queue `msg` later |
+| `effect.from(fn)` | Executes the function (for custom side effects) |
+| Browser effects | Calls browser APIs (fullscreen, clipboard, etc.) |
+
+Most game code only uses `effect.dispatch` and `effect.batch`, which just queue messages - no actual "execution" happens beyond adding to the queue.
 
 ### Common Effects
 
@@ -166,19 +180,20 @@ effect.batch([
 // Do nothing
 effect.none()
 
-// Delay a message
+// Delay a message (schedules setTimeout)
 effect.delay(duration.seconds(1), DelayedMsg)
 
-// Custom effect
+// Custom side effect
 effect.from(fn(dispatch) {
-  // do something
-  dispatch(SomeMsg)
+  // This code runs immediately when effect is processed
+  do_something()
+  dispatch(SomeMsg)  // Queue a message
 })
 ```
 
 ## The Tick Loop Pattern
 
-Since effects run at the end of each frame, dispatching a message schedules it for the next frame. This creates a natural tick loop:
+Since effects are processed at the end of each frame, dispatching a message schedules it for the next frame. This creates a natural tick loop:
 
 ```gleam
 pub type Msg {
@@ -286,61 +301,3 @@ fn update(model, msg, ctx) {
   }
 }
 ```
-
-## Multiple Modules Pattern
-
-In larger games, each module manages its own tick loop:
-
-```gleam
-// player.gleam
-pub fn init() -> #(Model, effect.Effect(Msg)) {
-  #(Model(...), effect.dispatch(Tick))
-}
-
-pub fn update(model, msg, ctx, effect_mapper) {
-  case msg {
-    Tick -> {
-      let new_model = ...
-      #(new_model, effect.dispatch(effect_mapper(Tick)))
-    }
-  }
-}
-```
-
-```gleam
-// main.gleam
-fn init(ctx) {
-  let #(player, player_effect) = player.init()
-  let player_effect = effect.map(player_effect, PlayerMsg)
-
-  #(Model(player: player), player_effect, option.None)
-}
-
-fn update(model, msg, ctx) {
-  case msg {
-    PlayerMsg(player_msg) -> {
-      let #(new_player, player_effect) =
-        player.update(model.player, player_msg, ctx, PlayerMsg)
-      #(Model(..model, player: new_player), player_effect, ctx.physics_world)
-    }
-  }
-}
-```
-
-Each module's `Tick` runs independently every frame, creating parallel update loops.
-
-## Summary
-
-| Phase | Function | When | How Many Times |
-|-------|----------|------|----------------|
-| Startup | `init` | Once at start | 1 total |
-| Frame start | `update` | For each queued message | 0-N per frame |
-| After updates | `view` | Once per frame | 1 per frame |
-| After render | effects | Run all batched effects | - |
-
-**Key points:**
-- Effects run at the **end** of each frame
-- `effect.dispatch(msg)` queues for the **next** frame
-- Multiple messages can be processed per frame
-- `view` is called once per frame regardless of message count
-- Each module can have its own independent tick loop

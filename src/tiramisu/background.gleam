@@ -1,10 +1,6 @@
-//// Background type for scene rendering.
-////
-//// Defines what is rendered behind all scene objects. Can be either a solid color,
-//// a texture image, or a cube texture (skybox).
-
 import gleam/javascript/promise
 import savoiardi
+
 import tiramisu/effect
 
 pub type Background {

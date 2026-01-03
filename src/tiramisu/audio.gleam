@@ -1,55 +1,8 @@
-//// Audio playback for games, supporting both 2D (global) and 3D (positional) audio.
-////
-//// This module provides a declarative API for audio in Tiramisu games. Audio is managed
-//// through the scene graph - add `scene.audio()` nodes to your view function and the
-//// engine handles playback, pausing, and cleanup automatically.
-////
-//// ## Loading Audio
-////
-//// Audio files must be loaded before use. The `load_audio` effect returns a `Buffer`:
-////
-//// ```gleam
-//// // In your Msg type:
-//// pub type Msg {
-////   SoundLoaded(audio.Buffer)
-////   SoundFailed
-////   // ...
-//// }
-////
-//// // In init, load the audio file:
-//// let load_sfx = audio.load_audio(
-////   url: "sounds/jump.wav",
-////   on_success: SoundLoaded,
-////   on_error: SoundFailed,
-//// )
-//// ```
-////
-//// ## Playing Audio
-////
-//// Add audio nodes to your scene to play sounds:
-////
-//// ```gleam
-//// scene.audio(
-////   id: "jump-sound",
-////   audio: audio.GlobalAudio(
-////     buffer: buffer,
-////     config: audio.config()
-////       |> audio.with_state(audio.Playing)
-////       |> audio.with_volume(0.8),
-////   ),
-//// )
-//// ```
-////
-//// ## Global vs Positional Audio
-////
-//// - **GlobalAudio**: Same volume everywhere (music, UI sounds)
-//// - **PositionalAudio**: Volume varies with distance from camera (footsteps, explosions)
-////
-
 import gleam/javascript/promise
 import gleam/option
 import gleam/time/duration
 import savoiardi
+
 import tiramisu/effect
 
 // --- Public Types ---

@@ -1,60 +1,34 @@
 // UI Bridge - Enables bidirectional communication between Tiramisu and Lustre
 //
-// The Bridge is an instance (not global state) that holds dispatch functions
-// for both systems, allowing them to send messages to each other.
+// The Bridge holds dispatch functions for both systems, allowing them to send
+// messages to each other using a shared message type.
 
 /**
  * Bridge class - holds dispatch functions for both Tiramisu and Lustre
  */
 class Bridge {
   constructor() {
-    // Lustre's dispatch function (set via registerLustreDispatch)
+    // Lustre's dispatch function (set via registerLustre)
+    // This is already composed with the wrapper: bridge_msg -> lustre_msg -> dispatch
     this.lustreDispatch = null;
 
     // Tiramisu's dispatch function (set by the game runtime)
+    // This is already composed with the wrapper: bridge_msg -> game_msg -> dispatch
     this.tiramisuDispatch = null;
   }
 
   /**
-   * Set Lustre's dispatch function
+   * Set Lustre's dispatch function (already wrapped)
    */
   setLustreDispatch(dispatch) {
     this.lustreDispatch = dispatch;
   }
 
   /**
-   * Set Tiramisu's dispatch function
+   * Set Tiramisu's dispatch function (already wrapped)
    */
   setTiramisuDispatch(dispatch) {
     this.tiramisuDispatch = dispatch;
-  }
-
-  /**
-   * Dispatch a message to Lustre
-   */
-  dispatchToLustre(msg) {
-    if (this.lustreDispatch) {
-      this.lustreDispatch(msg);
-    } else {
-      console.warn(
-        "Bridge: Cannot dispatch to Lustre - Lustre dispatch not registered. " +
-          "Make sure to call ui.register_lustre(bridge) in your Lustre init function."
-      );
-    }
-  }
-
-  /**
-   * Dispatch a message to Tiramisu
-   */
-  dispatchToTiramisu(msg) {
-    if (this.tiramisuDispatch) {
-      this.tiramisuDispatch(msg);
-    } else {
-      console.warn(
-        "Bridge: Cannot dispatch to Tiramisu - Tiramisu dispatch not registered. " +
-          "Make sure tiramisu.run() has started with the bridge."
-      );
-    }
   }
 }
 
@@ -68,24 +42,39 @@ export function createBridge() {
 
 /**
  * Register Lustre's dispatch function with the bridge
- * Called from Gleam: ui.register_lustre(bridge) effect
+ * Called from Gleam: ui.register_lustre(bridge, wrapper) effect
+ * The dispatch function is already composed with the wrapper
  */
-export function registerLustreDispatch(bridge, dispatch) {
+export function registerLustre(bridge, dispatch) {
   bridge.setLustreDispatch(dispatch);
 }
 
 /**
- * Dispatch a message to Tiramisu from Lustre
- * Called from Gleam: ui.to_tiramisu(bridge, msg) effect
+ * Send a message to the game (Tiramisu) from Lustre
+ * Called from Gleam: ui.send(bridge, msg) effect
  */
-export function dispatchToTiramisu(bridge, msg) {
-  bridge.dispatchToTiramisu(msg);
+export function sendToGame(bridge, msg) {
+  if (bridge.tiramisuDispatch) {
+    bridge.tiramisuDispatch(msg);
+  } else {
+    console.warn(
+      "Bridge: Cannot send to game - Tiramisu dispatch not registered. " +
+        "Make sure tiramisu.run() has started with the bridge."
+    );
+  }
 }
 
 /**
- * Dispatch a message to Lustre from Tiramisu
- * Called from Gleam: ui.to_lustre(bridge, msg) effect
+ * Send a message to the UI (Lustre) from the game
+ * Called from Gleam: ui.send_to_ui(bridge, msg) effect
  */
-export function dispatchToLustre(bridge, msg) {
-  bridge.dispatchToLustre(msg);
+export function sendToLustre(bridge, msg) {
+  if (bridge.lustreDispatch) {
+    bridge.lustreDispatch(msg);
+  } else {
+    console.warn(
+      "Bridge: Cannot send to UI - Lustre dispatch not registered. " +
+        "Make sure to call ui.register_lustre(bridge, wrapper) in your Lustre init function."
+    );
+  }
 }

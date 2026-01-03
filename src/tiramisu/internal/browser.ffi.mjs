@@ -5,7 +5,7 @@
 // - Vibration API
 // - Gamepad Haptics API
 
-import { Result$Ok, Result$Error } from '../gleam_stdlib/gleam.mjs';
+import { Result$Ok, Result$Error } from '../../../gleam_stdlib/gleam.mjs';
 
 // ============================================================================
 // POINTER LOCK API

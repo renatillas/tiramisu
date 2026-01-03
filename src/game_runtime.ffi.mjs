@@ -17,9 +17,11 @@ import { Vec2$Vec2 } from '../vec/vec/vec2.mjs';
  * Similar to Lustre's Runtime class
  */
 export class GameRuntime {
-  constructor(bridge, state, prevNode, context, rendererState, inputManager) {
+  constructor(bridge, bridgeWrapper, state, prevNode, context, rendererState, inputManager) {
     // UI Bridge for Lustre integration (may be null)
     this.bridge = bridge;
+    // Wrapper function to convert bridge messages to game messages (may be null)
+    this.bridgeWrapper = bridgeWrapper;
 
     this.state = state;
     this.prevNode = prevNode;
@@ -39,8 +41,13 @@ export class GameRuntime {
     };
 
     // Register Tiramisu's dispatch with the bridge (if bridge exists)
-    if (this.bridge) {
-      this.bridge.setTiramisuDispatch(this.dispatch);
+    // The dispatch is composed with the wrapper to convert bridge_msg -> game_msg
+    if (this.bridge && this.bridgeWrapper) {
+      const wrappedDispatch = (bridgeMsg) => {
+        const gameMsg = this.bridgeWrapper(bridgeMsg);
+        this.dispatch(gameMsg);
+      };
+      this.bridge.setTiramisuDispatch(wrappedDispatch);
     }
   }
 
@@ -110,11 +117,13 @@ export class GameRuntime {
 /**
  * Create a new game runtime instance with optional UI bridge
  * @param {Option<Bridge>} bridgeOption - Gleam Option type containing the bridge
+ * @param {Option<fn(bridge_msg) -> msg>} wrapperOption - Gleam Option containing the wrapper function
  */
-export function createRuntime(bridgeOption, state, prevNode, context, rendererState, inputManager) {
-  // Extract bridge from Gleam Option type
+export function createRuntime(bridgeOption, wrapperOption, state, prevNode, context, rendererState, inputManager) {
+  // Extract bridge and wrapper from Gleam Option types
   const bridge = Option$isSome(bridgeOption) ? Option$Some$0(bridgeOption) : null;
-  return new GameRuntime(bridge, state, prevNode, context, rendererState, inputManager);
+  const bridgeWrapper = Option$isSome(wrapperOption) ? Option$Some$0(wrapperOption) : null;
+  return new GameRuntime(bridge, bridgeWrapper, state, prevNode, context, rendererState, inputManager);
 }
 
 /**

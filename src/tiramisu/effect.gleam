@@ -1,56 +1,12 @@
-//// Side effects for game updates and browser interactions.
-////
-//// Effects represent actions that happen outside of pure state updates. They are returned
-//// from your `init` and `update` functions alongside state changes, and the runtime
-//// executes them after your function returns.
-////
-//// ## Common Effects
-////
-//// ```gleam
-//// // Dispatch a message (for tick loops, cross-module messaging, etc.)
-//// effect.dispatch(Tick)
-////
-//// // Delay a message
-//// effect.delay(duration.seconds(1), DelayedMessage)
-////
-//// // Combine multiple effects
-//// effect.batch([effect.dispatch(Tick), audio_effect, ui_effect])
-////
-//// // No effect needed
-//// effect.none()
-//// ```
-////
-//// ## Browser APIs
-////
-//// ```gleam
-//// // Fullscreen
-//// effect.request_fullscreen(on_success: Entered, on_error: Failed)
-////
-//// // Pointer lock (FPS games)
-//// effect.request_pointer_lock(on_success: Locked, on_error: Failed)
-////
-//// // Haptics
-//// effect.vibrate([100, 50, 100])
-//// effect.gamepad_vibrate(gamepad: 0, intensity: 0.5, duration: duration.milliseconds(200))
-//// ```
-////
-//// ## Intervals
-////
-//// ```gleam
-//// // Create interval
-//// effect.interval(ms: 2000, msg: SpawnEnemy, on_created: IntervalCreated)
-////
-//// // Cancel interval
-//// effect.cancel_interval(interval_id)
-//// ```
-////
-
 import gleam/float
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/time/duration
 import plinth/browser/document
-import tiramisu/browser
+import plinth/browser/element
+import plinth/browser/window
+
+import tiramisu/internal/browser
 import tiramisu/internal/timer
 
 pub type TimerId =
@@ -316,7 +272,7 @@ pub fn request_fullscreen(
     case document.query_selector("canvas") {
       Error(_) -> dispatch(on_error)
       Ok(canvas) -> {
-        browser.request_fullscreen(canvas)
+        element.request_fullscreen(canvas)
         |> promise.map(fn(result) {
           case result {
             Ok(_) -> dispatch(on_success)
@@ -344,7 +300,9 @@ pub fn exit_fullscreen(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    browser.exit_fullscreen()
+    window.self()
+    |> window.document
+    |> document.exit_fullscreen
     |> promise.map(fn(result) {
       case result {
         Ok(_) -> dispatch(on_success)

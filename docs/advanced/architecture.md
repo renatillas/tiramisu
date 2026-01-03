@@ -9,9 +9,6 @@ This guide explains how to structure games using Tiramisu's Model-View-Update (M
 3. [Independent Tick Cycles](#independent-tick-cycles)
 4. [Structuring a Multi-Module Game](#structuring-a-multi-module-game)
 5. [Cross-Module Communication with Taggers](#cross-module-communication-with-taggers)
-6. [The Physics Coordination Pattern](#the-physics-coordination-pattern)
-7. [UI Integration with Lustre](#ui-integration-with-lustre)
-8. [Complete Example](#complete-example)
 
 ---
 
@@ -107,14 +104,8 @@ pub fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
 
 // 6. START THE GAME
 pub fn main() {
-  tiramisu.run(
-    selector: "#game",
-    dimensions: tiramisu.FullScreen,
-    bridge: option.None,
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
 }
 ```
 
@@ -151,7 +142,6 @@ In complex games, different systems update at different rates or independently. 
 ### Why Independent Ticks?
 
 - **Decoupling** - Systems don't depend on each other's update order
-- **Different rates** - UI can update at 60fps while AI updates at 10fps
 - **Easier debugging** - Each system's tick is isolated
 
 ### Pattern: Self-Scheduling Tick
@@ -276,9 +266,8 @@ EnemyMsg(enemy_msg) -> {
       model.enemy,
       enemy_msg,
       ctx,
-      // Taggers for cross-module dispatch
+      // Tagger for cross-module dispatch
       player_took_damage: fn(dmg) { PlayerMsg(player.TakeDamage(dmg)) },
-      spawn_altar: fn(pos) { AltarMsg(altar.SpawnAltar(pos)) },
       // effect_mapper: wraps child's own Tick message
       effect_mapper: EnemyMsg,
     )
@@ -295,7 +284,6 @@ pub fn update(
   ctx: tiramisu.Context,
   // Accept taggers as parameters
   player_took_damage player_took_damage,
-  spawn_altar spawn_altar,
   effect_mapper effect_mapper,
 ) -> #(Model, effect.Effect(game_msg)) {
   case msg {
@@ -313,12 +301,6 @@ pub fn update(
         effect.dispatch(effect_mapper(Tick)),
         damage_effect,
       ]))
-    }
-
-    EnemyDied(position) -> {
-      // Dispatch to altar module via tagger
-      let spawn_effect = effect.dispatch(spawn_altar(position))
-      #(remove_enemy(model), spawn_effect)
     }
   }
 }
@@ -353,311 +335,3 @@ let stepped_world = physics.step(set_velocities(world, velocities), dt)
 // Async: Position updates can wait
 effect.dispatch(update_enemy_positions(new_positions))
 ```
-
----
-
-## The Physics Coordination Pattern
-
-Physics requires special coordination because it needs data from multiple modules in the same frame.
-
-### Physics Module Structure
-
-```gleam
-pub type TickResult {
-  TickResult(
-    physics: Model,
-    enemy: enemy.Model,
-    stepped_world: Option(physics.PhysicsWorld),
-  )
-}
-
-pub fn update(
-  msg msg: Msg,
-  ctx ctx: tiramisu.Context,
-  player_model player_model: player.Model,
-  enemy_model enemy_model: enemy.Model,
-  // Taggers
-  enemy_took_damage enemy_took_damage,
-  remove_projectile remove_projectile,
-  effect_mapper effect_mapper,
-) -> #(TickResult, effect.Effect(game_msg)) {
-  case msg {
-    Tick -> {
-      // 1. PRE-STEP: Gather velocities from game state
-      let projectile_velocities = get_projectile_velocities(player_model)
-      let enemy_velocities = get_enemy_velocities(enemy_model)
-
-      // 2. STEP: Run physics simulation
-      let world = ctx.physics_world
-        |> set_velocities(projectile_velocities)
-        |> set_velocities(enemy_velocities)
-      let stepped_world = physics.step(world, ctx.delta_time)
-
-      // 3. POST-STEP: Process collisions, read positions
-      let collisions = physics.get_collision_events(stepped_world)
-      let collision_effects = process_collisions(collisions, enemy_took_damage, remove_projectile)
-
-      let result = TickResult(
-        physics: new_physics_model,
-        enemy: updated_enemy_model,
-        stepped_world: option.Some(stepped_world),
-      )
-
-      #(result, effect.batch([collision_effects, effect.dispatch(effect_mapper(Tick))]))
-    }
-  }
-}
-```
-
-### Main Module Handling
-
-```gleam
-PhysicsMsg(physics_msg) -> {
-  let #(result, physics_effect) =
-    game_physics.update(
-      msg: physics_msg,
-      ctx: ctx,
-      player_model: model.player,
-      enemy_model: model.enemy,
-      enemy_took_damage: fn(id, dmg) { EnemyMsg(enemy.TakeDamage(id, dmg)) },
-      remove_projectile: fn(id) { PlayerMsg(player.RemoveProjectile(id)) },
-      effect_mapper: PhysicsMsg,
-    )
-
-  #(
-    Model(
-      ..model,
-      physics: result.physics,
-      enemy: result.enemy,
-    ),
-    physics_effect,
-    result.stepped_world,
-  )
-}
-```
-
----
-
-## UI Integration with Lustre
-
-Tiramisu integrates with Lustre for HTML-based UI (menus, HUD, inventory screens).
-
-### The Bridge Pattern
-
-```gleam
-import tiramisu/ui
-
-pub fn main() {
-  // 1. Create bridge for bidirectional communication
-  let bridge = ui.new_bridge()
-
-  // 2. Start Lustre UI
-  lustre.application(ui_init, ui_update, ui_view)
-  |> lustre.start("#ui", bridge)
-
-  // 3. Start Tiramisu with the same bridge
-  tiramisu.run(
-    selector: "#game",
-    dimensions: tiramisu.FullScreen,
-    bridge: option.Some(bridge),
-    init: init(bridge, _),
-    update: update,
-    view: view,
-  )
-}
-```
-
-### Sending Messages
-
-**Tiramisu to Lustre:**
-
-```gleam
-// In game update function
-let ui_effect = ui.to_lustre(bridge, UpdateScore(new_score))
-```
-
-**Lustre to Tiramisu:**
-
-```gleam
-// In Lustre update function
-let game_effect = ui.to_tiramisu(bridge, StartGame)
-```
-
-### Message Types
-
-Define separate message types for each system:
-
-```gleam
-// Game messages
-pub type GameMsg {
-  Tick
-  PlayerMsg(player.Msg)
-  // ...
-}
-
-// UI messages
-pub type UIMsg {
-  UpdateScore(Int)
-  UpdateHealth(Float)
-  ToggleInventory
-  // ...
-}
-```
-
-The bridge connects them: `ui.Bridge(UIMsg, GameMsg)`
-
----
-
-## Complete Example
-
-Here's how all the pieces fit together:
-
-```gleam
-// main.gleam
-import gleam/option
-import tiramisu
-import tiramisu/effect
-import tiramisu/physics
-import tiramisu/ui
-import my_game/player
-import my_game/enemy
-import my_game/game_physics
-import my_game/ui as game_ui
-
-pub type Msg {
-  PlayerMsg(player.Msg)
-  EnemyMsg(enemy.Msg)
-  PhysicsMsg(game_physics.Msg)
-}
-
-pub type Model {
-  Model(
-    player: player.Model,
-    enemy: enemy.Model,
-    physics: game_physics.Model,
-    bridge: ui.Bridge(game_ui.Msg, Msg),
-  )
-}
-
-pub fn main() {
-  let bridge = ui.new_bridge()
-
-  // Start UI
-  game_ui.start(bridge)
-
-  // Start game
-  tiramisu.run(
-    selector: "#game",
-    dimensions: tiramisu.FullScreen,
-    bridge: option.Some(bridge),
-    init: init(bridge, _),
-    update: update,
-    view: view,
-  )
-}
-
-fn init(bridge, ctx) {
-  let #(player_model, player_effect) = player.init()
-  let #(enemy_model, enemy_effect) = enemy.init()
-  let #(physics_model, _) = game_physics.init()
-
-  let physics_world = physics.new_world(physics.WorldConfig(
-    gravity: vec3.Vec3(0.0, -9.8, 0.0),
-  ))
-
-  let model = Model(
-    player: player_model,
-    enemy: enemy_model,
-    physics: physics_model,
-    bridge: bridge,
-  )
-
-  #(
-    model,
-    effect.batch([
-      effect.map(player_effect, PlayerMsg),
-      effect.map(enemy_effect, EnemyMsg),
-      effect.dispatch(PhysicsMsg(game_physics.Tick)),
-    ]),
-    option.Some(physics_world),
-  )
-}
-
-fn update(model, msg, ctx) {
-  case msg {
-    PlayerMsg(player_msg) -> {
-      let #(new_player, player_effect) =
-        player.update(
-          model.player,
-          player_msg,
-          ctx,
-          bridge: model.bridge,
-          ui_msg: game_ui.PlayerStateUpdated,
-          effect_mapper: PlayerMsg,
-        )
-      #(Model(..model, player: new_player), player_effect, ctx.physics_world)
-    }
-
-    EnemyMsg(enemy_msg) -> {
-      let #(new_enemy, enemy_effect) =
-        enemy.update(
-          model.enemy,
-          enemy_msg,
-          ctx,
-          player_took_damage: fn(dmg) { PlayerMsg(player.TakeDamage(dmg)) },
-          effect_mapper: EnemyMsg,
-        )
-      #(Model(..model, enemy: new_enemy), enemy_effect, ctx.physics_world)
-    }
-
-    PhysicsMsg(physics_msg) -> {
-      let #(result, physics_effect) =
-        game_physics.update(
-          msg: physics_msg,
-          ctx: ctx,
-          player_model: model.player,
-          enemy_model: model.enemy,
-          enemy_took_damage: fn(id, dmg) { EnemyMsg(enemy.TakeDamage(id, dmg)) },
-          remove_projectile: fn(id) { PlayerMsg(player.RemoveProjectile(id)) },
-          effect_mapper: PhysicsMsg,
-        )
-      #(
-        Model(..model, physics: result.physics, enemy: result.enemy),
-        physics_effect,
-        result.stepped_world,
-      )
-    }
-  }
-}
-
-fn view(model, ctx) {
-  let player_nodes = player.view(model.player, ctx)
-  let enemy_nodes = enemy.view(model.enemy, ctx)
-
-  scene.empty(
-    id: "root",
-    transform: transform.identity,
-    children: list.flatten([player_nodes, enemy_nodes]),
-  )
-}
-```
-
----
-
-## Summary
-
-| Concept | Purpose |
-|---------|---------|
-| **MVU Pattern** | Predictable state management with pure functions |
-| **Independent Ticks** | Each module manages its own update cycle |
-| **Message Taggers** | Cross-module communication without import cycles |
-| **Physics Coordination** | Special pattern for physics that needs multi-module data |
-| **UI Bridge** | Bidirectional communication with Lustre |
-
-### Best Practices
-
-1. **Keep modules focused** - Each module owns one domain (player, enemies, physics)
-2. **Use taggers everywhere** - Avoid module imports for cross-module dispatch
-3. **Prefer async dispatch** - Sync only when same-frame data is required
-4. **Parent routes, children act** - Main module doesn't contain game logic
-5. **Test in isolation** - Pure functions make testing easy

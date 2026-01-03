@@ -75,7 +75,10 @@ import paint
 import paint/encode as paint_encode
 import plinth/browser/window
 import savoiardi
-import tiramisu/animation
+import vec/vec2
+import vec/vec3
+import vec/vec3f
+
 import tiramisu/audio
 import tiramisu/camera
 import tiramisu/geometry
@@ -83,16 +86,11 @@ import tiramisu/internal/audio_manager
 import tiramisu/internal/object_cache
 import tiramisu/light
 import tiramisu/material
+import tiramisu/model
 import tiramisu/physics
 import tiramisu/spritesheet
 import tiramisu/texture
 import tiramisu/transform
-import vec/vec2
-import vec/vec3
-import vec/vec3f
-
-pub type Object3D =
-  savoiardi.Object3D
 
 /// Level of Detail (LOD) configuration.
 ///
@@ -173,9 +171,9 @@ pub opaque type Node {
   Model3D(
     id: String,
     children: List(Node),
-    object: Object3D,
+    object: model.Object3D,
     transform: transform.Transform,
-    animation: option.Option(animation.AnimationPlayback),
+    animation: option.Option(model.AnimationPlayback),
     physics: option.Option(physics.RigidBody),
     material: option.Option(material.Material),
     transparent: Bool,
@@ -183,7 +181,7 @@ pub opaque type Node {
   InstancedModel(
     id: String,
     children: List(Node),
-    object: Object3D,
+    object: model.Object3D,
     instances: List(transform.Transform),
     physics: option.Option(physics.RigidBody),
     material: option.Option(material.Material),
@@ -589,9 +587,9 @@ pub fn lod(
 /// ```
 pub fn object_3d(
   id id: String,
-  object object: Object3D,
+  object object: model.Object3D,
   transform transform: transform.Transform,
-  animation animation: option.Option(animation.AnimationPlayback),
+  animation animation: option.Option(model.AnimationPlayback),
   physics physics: option.Option(physics.RigidBody),
   material material: option.Option(material.Material),
   transparent transparent: Bool,
@@ -646,7 +644,7 @@ pub fn object_3d(
 /// ```
 pub fn instanced_model(
   id id: String,
-  object object: Object3D,
+  object object: model.Object3D,
   instances instances: List(transform.Transform),
   physics physics: option.Option(physics.RigidBody),
   material material: option.Option(material.Material),
@@ -1163,10 +1161,7 @@ pub type Patch {
   UpdateMaterial(id: String, material: option.Option(material.Material))
   UpdateGeometry(id: String, geometry: geometry.Geometry)
   UpdateLight(id: String, light: light.Light)
-  UpdateAnimation(
-    id: String,
-    animation: option.Option(animation.AnimationPlayback),
-  )
+  UpdateAnimation(id: String, animation: option.Option(model.AnimationPlayback))
   UpdatePhysics(id: String, physics: option.Option(physics.RigidBody))
   UpdateAudio(id: String, audio: audio.Audio)
   UpdateInstances(id: String, instances: List(transform.Transform))
@@ -2114,11 +2109,11 @@ fn compare_camera_fields(
 fn compare_model3d_fields(
   id: String,
   previous_transform prev_trans: transform.Transform,
-  previous_animation prev_anim: option.Option(animation.AnimationPlayback),
+  previous_animation prev_anim: option.Option(model.AnimationPlayback),
   previous_physics prev_phys: option.Option(physics.RigidBody),
   previous_material prev_mat: option.Option(material.Material),
   current_transform curr_trans: transform.Transform,
-  current_animation curr_anim: option.Option(animation.AnimationPlayback),
+  current_animation curr_anim: option.Option(model.AnimationPlayback),
   current_physics curr_phys: option.Option(physics.RigidBody),
   current_material curr_mat: option.Option(material.Material),
 ) -> List(Patch) {
@@ -2271,6 +2266,38 @@ pub fn new_render_state(options: savoiardi.RendererOptions) -> RendererState {
     css2d_renderer: option.None,
   )
 }
+
+/// Create a headless render state for testing (no WebGL required)
+///
+/// This creates a real Three.js Scene (which works in Node.js) but uses
+/// a mock Renderer that doesn't require WebGL. Use this in tests to
+/// simulate game state without needing a browser environment.
+@internal
+pub fn new_headless_render_state(width: Float, height: Float) -> RendererState {
+  let scene = create_headless_scene_ffi()
+  let renderer = create_headless_renderer_ffi(width, height)
+  let audio_listener = create_mock_audio_listener_ffi()
+
+  RendererState(
+    renderer: renderer,
+    scene: scene,
+    cache: object_cache.init(),
+    physics_world: option.None,
+    audio_manager: audio_manager.init(),
+    audio_listener: audio_listener,
+    cached_scene_dict: option.None,
+    css2d_renderer: option.None,
+  )
+}
+
+@external(javascript, "./simulate.ffi.mjs", "createHeadlessScene")
+fn create_headless_scene_ffi() -> Scene
+
+@external(javascript, "./simulate.ffi.mjs", "createHeadlessRenderer")
+fn create_headless_renderer_ffi(width: Float, height: Float) -> Renderer
+
+@external(javascript, "./simulate.ffi.mjs", "createMockAudioListener")
+fn create_mock_audio_listener_ffi() -> savoiardi.AudioListener
 
 @internal
 pub fn get_renderer(state: RendererState) -> Renderer {
@@ -2651,7 +2678,7 @@ fn handle_add_node(
 // Helper: Add object to scene or parent
 fn add_to_scene_or_parent(
   state: RendererState,
-  object: Object3D,
+  object: model.Object3D,
   parent_id: option.Option(String),
 ) -> Nil {
   case parent_id {
@@ -2740,7 +2767,7 @@ fn handle_add_instanced_mesh(
 fn handle_add_instanced_model(
   state: RendererState,
   id: String,
-  object: Object3D,
+  object: model.Object3D,
   instances: List(transform.Transform),
   physics: option.Option(physics.RigidBody),
   material: option.Option(material.Material),
@@ -2899,7 +2926,7 @@ fn handle_add_lod(
 }
 
 // Helper: Create Three.js object for LOD level
-fn create_lod_level_object(node: Node) -> Object3D {
+fn create_lod_level_object(node: Node) -> model.Object3D {
   case node {
     Mesh(
       id: _,
@@ -2973,9 +3000,9 @@ fn create_lod_level_object(node: Node) -> Object3D {
 fn handle_add_model3d(
   state: RendererState,
   id: String,
-  object: Object3D,
+  object: model.Object3D,
   transform: transform.Transform,
-  animation: option.Option(animation.AnimationPlayback),
+  animation: option.Option(model.AnimationPlayback),
   physics: option.Option(physics.RigidBody),
   material: option.Option(material.Material),
   transparent: Bool,
@@ -3415,7 +3442,7 @@ fn handle_update_light(
 
       // Create new light
       let new_light = light.create_light(light)
-      let new_light_obj: Object3D = coerce(new_light)
+      let new_light_obj: model.Object3D = coerce(new_light)
 
       // Copy transform
       savoiardi.set_object_position(new_light_obj, position)
@@ -3438,7 +3465,7 @@ fn handle_update_light(
 fn handle_update_animation(
   state: RendererState,
   id: String,
-  animation: option.Option(animation.AnimationPlayback),
+  animation: option.Option(model.AnimationPlayback),
 ) -> RendererState {
   case object_cache.get_mixer(state.cache, id) {
     option.Some(mixer) -> {
@@ -3524,7 +3551,7 @@ fn handle_update_physics(
 }
 
 // Helper to build Transform from Three.js object's position/quaternion/scale
-fn object_to_transform(object: Object3D) -> transform.Transform {
+fn object_to_transform(object: model.Object3D) -> transform.Transform {
   let position = savoiardi.get_object_position(object)
   let quaternion = savoiardi.get_object_quaternion(object)
   let scale = savoiardi.get_object_scale(object)
@@ -3978,14 +4005,14 @@ fn setup_animation(
   cache: object_cache.CacheState,
   id: String,
   mixer: object_cache.AnimationMixer,
-  playback: animation.AnimationPlayback,
+  playback: model.AnimationPlayback,
 ) -> object_cache.CacheState {
   // Get current animation state to compare clip names
   let current_state = object_cache.get_animation_state(cache, id)
 
   case playback {
-    animation.SingleAnimation(anim) -> {
-      let new_clip_name = animation.clip_name(anim.clip)
+    model.SingleAnimation(anim) -> {
+      let new_clip_name = model.clip_name(anim.clip)
       let new_state = object_cache.SingleState(new_clip_name)
 
       // Check if we can just update existing action
@@ -4015,13 +4042,13 @@ fn setup_animation(
       }
     }
 
-    animation.BlendedAnimations(
+    model.BlendedAnimations(
       from: from_anim,
       to: to_anim,
       blend_factor: blend_factor,
     ) -> {
-      let from_clip_name = animation.clip_name(from_anim.clip)
-      let to_clip_name = animation.clip_name(to_anim.clip)
+      let from_clip_name = model.clip_name(from_anim.clip)
+      let to_clip_name = model.clip_name(to_anim.clip)
       let new_state = object_cache.BlendedState(from_clip_name, to_clip_name)
 
       // Check if we can just update weights on existing actions
@@ -4074,15 +4101,15 @@ fn setup_animation(
 
 fn create_animation_action(
   mixer: object_cache.AnimationMixer,
-  animation: animation.Animation,
+  animation: model.Animation,
 ) -> object_cache.AnimationAction {
   let three_animation_action =
     create_animation_action_ffi(mixer, animation.clip)
 
   // Configure action
   let loop_mode = case animation.loop {
-    animation.LoopRepeat -> savoiardi.LoopRepeat
-    animation.LoopOnce -> savoiardi.LoopOnce
+    model.LoopRepeat -> savoiardi.LoopRepeat
+    model.LoopOnce -> savoiardi.LoopOnce
   }
   savoiardi.set_action_loop(three_animation_action, loop_mode)
   set_animation_time_scale_ffi(three_animation_action, animation.speed)
@@ -4193,7 +4220,7 @@ pub fn clear_cache(state: RendererState) -> RendererState {
 @internal
 pub fn get_cameras_with_viewports(
   state: RendererState,
-) -> List(#(Object3D, camera.ViewPort)) {
+) -> List(#(model.Object3D, camera.ViewPort)) {
   object_cache.get_cameras_with_viewports(state.cache)
   |> list.map(fn(entry) {
     let #(camera_obj, viewport) = entry
@@ -4209,7 +4236,7 @@ pub fn get_all_cameras_with_info(
 ) -> List(
   #(
     String,
-    Object3D,
+    model.Object3D,
     option.Option(camera.ViewPort),
     option.Option(camera.PostProcessing),
     Bool,
@@ -4238,19 +4265,29 @@ fn create_canvas_plane(
   texture: texture.Texture,
   width: Float,
   height: Float,
-) -> Object3D
+) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "updateCanvasTexture")
-fn update_canvas_texture(object: Object3D, texture: texture.Texture) -> Nil
+fn update_canvas_texture(
+  object: model.Object3D,
+  texture: texture.Texture,
+) -> Nil
 
 @external(javascript, "../tiramisu.ffi.mjs", "updateCanvasSize")
-fn update_canvas_size(object: Object3D, width: Float, height: Float) -> Nil
+fn update_canvas_size(
+  object: model.Object3D,
+  width: Float,
+  height: Float,
+) -> Nil
 
 @external(javascript, "../tiramisu.ffi.mjs", "getCanvasCachedPicture")
-fn get_canvas_cached_picture(object: Object3D) -> String
+fn get_canvas_cached_picture(object: model.Object3D) -> String
 
 @external(javascript, "../tiramisu.ffi.mjs", "setCanvasCachedPicture")
-fn set_canvas_cached_picture(object: Object3D, encoded_picture: String) -> Nil
+fn set_canvas_cached_picture(
+  object: model.Object3D,
+  encoded_picture: String,
+) -> Nil
 
 // Debug visualization helpers - tiramisu-specific, not pure Three.js bindings
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugBox")
@@ -4258,34 +4295,34 @@ fn create_debug_box(
   min: vec3.Vec3(Float),
   max: vec3.Vec3(Float),
   color: Int,
-) -> Object3D
+) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugSphere")
 fn create_debug_sphere(
   center: vec3.Vec3(Float),
   radius: Float,
   color: Int,
-) -> Object3D
+) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugLine")
 fn create_debug_line(
   from: vec3.Vec3(Float),
   to: vec3.Vec3(Float),
   color: Int,
-) -> Object3D
+) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugAxes")
-fn create_debug_axes(origin: vec3.Vec3(Float), size: Float) -> Object3D
+fn create_debug_axes(origin: vec3.Vec3(Float), size: Float) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugGrid")
-fn create_debug_grid(size: Float, divisions: Int, color: Int) -> Object3D
+fn create_debug_grid(size: Float, divisions: Int, color: Int) -> model.Object3D
 
 @external(javascript, "../tiramisu.ffi.mjs", "createDebugPoint")
 fn create_debug_point(
   position: vec3.Vec3(Float),
   size: Float,
   color: Int,
-) -> Object3D
+) -> model.Object3D
 
 /// Convert a list of Transforms to the tuple format expected by savoiardi
 fn transforms_to_tuples(
