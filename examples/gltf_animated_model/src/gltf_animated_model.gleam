@@ -44,14 +44,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -66,7 +60,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
 
   let load_effect = model.load_gltf("model.glb", ModelLoaded, LoadingFailed)
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
+  #(model, effect.batch([effect.dispatch(Tick), load_effect]), option.None)
 }
 
 fn update(
@@ -79,10 +73,10 @@ fn update(
       let effects = case input.is_key_just_pressed(ctx.input, input.Space) {
         True ->
           effect.batch([
-            effect.tick(Tick),
+            effect.dispatch(Tick),
             effect.dispatch(NextAnimation),
           ])
-        False -> effect.tick(Tick)
+        False -> effect.dispatch(Tick)
       }
       let new_rotation =
         model.rotation +. 0.3 *. duration.to_seconds(ctx.delta_time)
@@ -197,7 +191,6 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
       |> scene.camera(
         id: "main-camera",
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
-        look_at: option.None,
         active: True,
         viewport: option.None,
         camera: _,
@@ -233,7 +226,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "loading-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3f.one)
+            let assert Ok(geometry) = geometry.box(size: vec3f.one)
             geometry
           },
           material: {
@@ -272,7 +265,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "error-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3f.one)
+            let assert Ok(geometry) = geometry.box(size: vec3f.one)
             geometry
           },
           material: {

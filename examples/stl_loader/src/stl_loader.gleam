@@ -43,14 +43,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -61,7 +55,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
   // Place your STL file in the Lustre asset folder
   let load_effect = geometry.load_stl("model.stl", ModelLoaded, LoadingFailed)
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
+  #(model, effect.batch([effect.dispatch(Tick), load_effect]), option.None)
 }
 
 fn update(
@@ -72,7 +66,7 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
 
     ModelLoaded(geom) -> {
@@ -100,7 +94,6 @@ fn view(model: Model, _) -> scene.Node {
       id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
-      look_at: option.None,
       active: True,
       viewport: option.None,
       postprocessing: option.None,
@@ -134,7 +127,7 @@ fn view(model: Model, _) -> scene.Node {
         scene.mesh(
           id: "loading-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3f.one)
+            let assert Ok(geometry) = geometry.box(size: vec3f.one)
             geometry
           },
           material: {
@@ -172,7 +165,7 @@ fn view(model: Model, _) -> scene.Node {
         scene.mesh(
           id: "error-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3f.one)
+            let assert Ok(geometry) = geometry.box(size: vec3f.one)
             geometry
           },
           material: {

@@ -338,19 +338,6 @@ pub fn icosahedron(
 ///   bevel_segments: 5,
 /// )
 /// ```
-///
-/// ## Parameters
-///
-/// - `text`: String to render (must not be empty)
-/// - `font`: Loaded font from `geometry.load_font()`
-/// - `size`: Text size (must be positive)
-/// - `depth`: Extrusion depth for 3D effect (0 for flat, >0 for 3D)
-/// - `curve_segments`: Quality of curves (more = smoother but more triangles)
-/// - `bevel_enabled`: Whether to add rounded edges
-/// - `bevel_thickness`: How deep bevels cut into text
-/// - `bevel_size`: How far bevels extend outward
-/// - `bevel_offset`: Starting distance of bevel from outline
-/// - `bevel_segments`: Smoothness of bevel (more = rounder)
 pub fn text(
   text text: String,
   font font: savoiardi.Font,

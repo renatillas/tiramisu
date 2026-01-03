@@ -1,3 +1,24 @@
+//// Scene background configuration.
+////
+//// Set the background of your 3D scene to a solid color, 2D texture,
+//// equirectangular panorama, or cubemap skybox.
+////
+//// ## Example
+////
+//// ```gleam
+//// // Set a solid color background
+//// background.set(ctx.scene, background.Color(0x1a1a2e), BackgroundSet, BackgroundFailed)
+////
+//// // Load a skybox
+//// background.set(
+////   ctx.scene,
+////   background.CubeTexture(["px.jpg", "nx.jpg", "py.jpg", "ny.jpg", "pz.jpg", "nz.jpg"]),
+////   SkyboxLoaded,
+////   SkyboxFailed,
+//// )
+//// ```
+////
+
 import gleam/javascript/promise
 import savoiardi
 

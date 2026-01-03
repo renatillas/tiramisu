@@ -340,12 +340,6 @@ pub type FrameData {
 /// This creates the spritesheet configuration. You must add at least one
 /// animation with `with_animation` before calling `build()`.
 ///
-/// ## Parameters
-///
-/// - `texture`: The loaded texture containing the sprite frames
-/// - `columns`: Number of frames horizontally
-/// - `rows`: Number of frames vertically
-///
 /// ## Example
 ///
 /// ```gleam
@@ -403,13 +397,6 @@ fn new_frame_state() -> FrameState {
 ///
 /// The first animation added becomes the initial/default animation.
 /// Adding an animation transitions the builder from `NoAnimation` to `HasAnimation`.
-///
-/// ## Parameters
-///
-/// - `name`: Unique identifier for this animation (e.g., "idle", "walk", "jump")
-/// - `frames`: List of frame indices from the spritesheet (0-indexed)
-/// - `frame_duration`: How long to show each frame
-/// - `loop`: How the animation should loop
 ///
 /// ## Example
 ///
@@ -471,13 +458,6 @@ pub fn with_pixel_art(
 /// Add a transition between two animations by name.
 ///
 /// This can only be called on a builder that has at least one animation.
-///
-/// ## Parameters
-///
-/// - `from`: Name of the source animation (must be registered)
-/// - `to`: Name of the target animation (must be registered)
-/// - `condition`: When to trigger (`always()`, `after_duration()`, or `custom()`)
-/// - `blend_duration`: Time to crossfade between animations
 ///
 /// ## Example
 ///

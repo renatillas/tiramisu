@@ -42,14 +42,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -62,7 +56,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
       on_success: ModelLoaded,
       on_error: LoadingFailed,
     )
-  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
+  #(model, effect.batch([effect.dispatch(Tick), load_effect]), option.None)
 }
 
 fn update(
@@ -86,7 +80,7 @@ fn update(
 
       #(
         Model(rotation: new_rotation, load_state: new_load_state),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -205,7 +199,6 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
       |> scene.camera(
         id: "main",
         camera: _,
-        look_at: option.None,
         active: True,
         transform: transform.at(position: vec3.Vec3(0.0, 1.5, 20.0)),
         viewport: option.None,
@@ -241,7 +234,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "loading-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3.Vec3(1.0, 1.0, 1.0))
+            let assert Ok(geometry) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
             geometry
           },
           material: {
@@ -280,7 +273,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "error-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3.Vec3(1.0, 1.0, 1.0))
+            let assert Ok(geometry) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
             geometry
           },
           material: {

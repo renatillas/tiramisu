@@ -1,6 +1,35 @@
+//// Tiramisu - A type-safe 3D game engine for Gleam.
 ////
-//// This module provides the core game loop following the Model-View-Update (MVU) architecture,
-//// inspired by Lustre. Your game state is immutable, and updates return new state along with effects.
+//// This is the main entry point for creating Tiramisu applications. The engine follows the
+//// Model-View-Update (MVU) architecture inspired by Elm and Lustre, where your game state
+//// is immutable and updates return new state along with effects.
+////
+//// ## Quick Start
+////
+//// ```gleam
+//// import tiramisu
+//// import tiramisu/effect
+//// import tiramisu/scene
+////
+//// pub fn main() {
+////   tiramisu.application(init, update, view)
+////   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
+//// }
+////
+//// fn init(ctx) { #(Model(0.0), effect.dispatch(Tick), option.None) }
+//// fn update(model, msg, ctx) { ... }
+//// fn view(model, ctx) -> scene.Node { ... }
+//// ```
+////
+//// ## Application Types
+////
+//// - `element` - Static scene with no state or updates
+//// - `application` - Full MVU with state, effects, and optional physics
+////
+//// ## Integration
+////
+//// Tiramisu can integrate with Lustre for HTML UI overlays through the bridge system.
+//// See `tiramisu/ui` for details.
 ////
 
 import gleam/float
@@ -22,43 +51,25 @@ import tiramisu/scene
 import tiramisu/ui
 import vec/vec2.{type Vec2}
 
-/// Canvas dimensions type alias for the game window.
+/// Canvas dimensions for the game window.
 ///
-/// Used with `tiramisu.run()` to specify the size of the game canvas.
-/// If not provided (None), the game will run in fullscreen mode.
-/// Vec2(x, y) where x is width and y is height.
-///
+/// Use `FullScreen` to fill the browser window, or `Window` with specific dimensions.
 pub type Dimensions {
   FullScreen
   Window(dimensions: Vec2(Float))
 }
 
-/// Game context passed to init and update functions.
+/// Game context provided to init, update, and view functions each frame.
 ///
-/// Contains timing information, input state, canvas dimensions, physics world, scene, and renderer for the current frame.
-///
-/// ## Fields
-///
-/// - `delta_time`: Time elapsed since the last frame as a Duration. Use this for frame-rate independent movement and animations.
-/// - `input`: Current input state (keyboard, mouse, touch, gamepad)
-/// - `canvas_size`: Current canvas size in pixels as Vec2(width, height)
-/// - `physics_world`: Optional physics world handle (if physics is enabled)
-/// - `scene`: The Three.js scene instance (for background changes, etc.)
-/// - `renderer`: The WebGL renderer (for performance stats)
-///
+/// Contains timing information, input state, canvas dimensions, physics world,
+/// and renderer references needed for game logic and rendering.
 pub type Context {
   Context(
-    /// Time elapsed since the last frame as a Duration
     delta_time: Duration,
-    /// Current input state (keyboard, mouse, touch, gamepad)
     input: input.InputState,
-    /// Current canvas size in pixels as Vec2(width, height)
     canvas_size: Vec2(Float),
-    /// Physics world handle (if physics is enabled)
     physics_world: Option(physics.PhysicsWorld),
-    /// The Three.js scene instance
     scene: scene.Scene,
-    /// The WebGL renderer (for performance stats)
     renderer: scene.Renderer,
   )
 }
@@ -84,15 +95,10 @@ pub type FrameData(model, msg) {
 // APP TYPE AND CONSTRUCTORS
 // ============================================================================
 
-/// Represents a constructed Tiramisu game application that is ready to be started.
+/// A constructed Tiramisu game application ready to be started.
 ///
-/// There are two ways to create an App:
-///
-/// 1. [`element`](#element) - Renders a static scene with no state or updates
-/// 2. [`application`](#application) - Full MVU with state, effects, and physics
-///
-/// Once you have an App, use [`start`](#start) to run it.
-///
+/// Create with `element` for static scenes or `application` for full MVU.
+/// Then call `start` to run the game.
 pub opaque type App(model, msg) {
   App(
     init: fn(Context) ->
@@ -103,26 +109,9 @@ pub opaque type App(model, msg) {
   )
 }
 
-/// The simplest type of Tiramisu application. Renders a static scene with no
-/// state or update logic. Useful for demos, static visualizations, or learning
-/// the basics before moving to `application`.
+/// Creates a static scene application with no state or update logic.
 ///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu
-/// import tiramisu/scene
-///
-/// pub fn main() {
-///   tiramisu.element(my_scene())
-///   |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
-/// }
-///
-/// fn my_scene() -> scene.Node {
-///   scene.mesh(id: "cube", geometry: cube_geo, material: mat, ...)
-/// }
-/// ```
-///
+/// Useful for demos, visualizations, or learning the basics before moving to `application`.
 pub fn element(view: scene.Node) -> App(Nil, msg) {
   App(
     init: fn(_ctx) { #(Nil, effect.none(), option.None) },
@@ -131,45 +120,11 @@ pub fn element(view: scene.Node) -> App(Nil, msg) {
   )
 }
 
-/// A complete Tiramisu application with the full Model-View-Update architecture.
-/// Supports side effects (like dispatching messages) and physics.
+/// Creates a full MVU application with state, effects, and optional physics.
 ///
-/// Use this when you need:
-/// - A game loop via `effect.dispatch(Tick)`
-/// - Delayed messages via `effect.delay`
-/// - Physics simulation
-/// - Communication with Lustre UI via bridge
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu
-/// import tiramisu/effect
-/// import tiramisu/scene
-///
-/// pub fn main() {
-///   tiramisu.application(init, update, view)
-///   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
-/// }
-///
-/// fn init(ctx) {
-///   #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     Tick -> {
-///       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-///       #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
-///     }
-///   }
-/// }
-///
-/// fn view(model, ctx) {
-///   scene.mesh(id: "cube", transform: transform.rotate_y(model.rotation), ...)
-/// }
-/// ```
-///
+/// The init function initializes state and returns an initial effect (typically `effect.dispatch(Tick)`
+/// for a game loop). The update function handles messages and returns new state with effects.
+/// The view function renders the current state as a scene graph.
 pub fn application(
   init init: fn(Context) ->
     #(model, effect.Effect(msg), Option(physics.PhysicsWorld)),
@@ -184,54 +139,10 @@ pub fn application(
 // STARTING THE APPLICATION
 // ============================================================================
 
-/// Start a constructed game application.
+/// Starts a game application, setting up the renderer and game loop.
 ///
-/// This is the main entry point for running your game. It sets up the renderer,
-/// initializes your game state, and starts the game loop.
-///
-/// ## Parameters
-///
-/// - `app`: The game application created with [`application`](#application)
-/// - `selector`: CSS selector for the container element (e.g., "#game", ".game-container")
-/// - `dimensions`: Canvas dimensions. Use `FullScreen` or `Window(Vec2(width, height))`
-/// - `bridge`: Optional UI bridge for Lustre integration as a tuple of bridge and wrapper.
-///   Use `None` for standalone games, or `Some(#(bridge, wrapper))` to enable
-///   bidirectional communication with Lustre.
-///
-/// ## Example (standalone game)
-///
-/// ```gleam
-/// import tiramisu
-///
-/// pub fn main() {
-///   tiramisu.application(init, update, view)
-///   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
-/// }
-/// ```
-///
-/// ## Example (with Lustre UI)
-///
-/// ```gleam
-/// import tiramisu
-/// import tiramisu/ui
-///
-/// pub type BridgeMsg { UpdateScore(Int), SelectSlot(Int) }
-/// pub type Msg { Tick, FromBridge(BridgeMsg) }
-///
-/// pub fn main() {
-///   let bridge = ui.new_bridge()
-///
-///   // Start Lustre with bridge in flags...
-///
-///   tiramisu.application(init, update, view)
-///   |> tiramisu.start(
-///     "#game",
-///     tiramisu.FullScreen,
-///     option.Some(#(bridge, FromBridge)),
-///   )
-/// }
-/// ```
-///
+/// The selector is a CSS selector for the container element. Use `option.None` for the
+/// bridge in standalone games, or `option.Some(#(bridge, wrapper))` for Lustre integration.
 pub fn start(
   app: App(model, msg),
   selector: String,

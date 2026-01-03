@@ -1,3 +1,33 @@
+//// Side effects for Tiramisu applications.
+////
+//// Effects are data descriptions of side effects to perform. They're returned from your
+//// `update` function and executed by the runtime after state updates. This keeps your
+//// game logic pure and testable.
+////
+//// ## Common Effects
+////
+//// - `dispatch` - Schedule a message to be processed (used for game loops)
+//// - `delay` - Dispatch a message after a delay
+//// - `interval` - Dispatch a message repeatedly at fixed intervals
+//// - `batch` - Combine multiple effects to run together
+//// - `none` - No effect (for state-only updates)
+////
+//// ## Game Loop Pattern
+////
+//// The typical game loop uses `effect.dispatch(Tick)` to request the next frame:
+////
+//// ```gleam
+//// fn update(model, msg, ctx) {
+////   case msg {
+////     Tick -> {
+////       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
+////       #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
+////     }
+////   }
+//// }
+//// ```
+////
+
 import gleam/float
 import gleam/javascript/promise.{type Promise}
 import gleam/list
@@ -53,6 +83,10 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
   Effect(perform: effect)
 }
 
+/// Dispatch a message to be processed by the update function.
+///
+/// This is the core effect for game loops. Calling `effect.dispatch(Tick)` schedules
+/// a `Tick` message to be processed, which triggers another update cycle.
 pub fn dispatch(msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     dispatch(msg)

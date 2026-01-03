@@ -30,14 +30,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -61,12 +55,12 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
 
     FontLoaded(font) -> {
       io.println("Font loaded successfully!")
-      #(Model(..model, font: option.Some(font)), effect.tick(Tick), option.None)
+      #(Model(..model, font: option.Some(font)), effect.dispatch(Tick), option.None)
     }
 
     FontLoadError -> {
@@ -86,7 +80,6 @@ fn view(model: Model, _) -> scene.Node {
       id: "main_camera",
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 15.0)),
-      look_at: option.None,
       active: True,
       viewport: option.None,
       postprocessing: option.None,

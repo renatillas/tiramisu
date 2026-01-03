@@ -25,19 +25,13 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      bridge: option.None,
-      init: init,
-      update: update,
-      view: view,
-      selector: "body",
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
-  #(Model(time: duration.milliseconds(0)), effect.tick(Tick), option.None)
+  #(Model(time: duration.milliseconds(0)), effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -48,7 +42,7 @@ fn update(
   case msg {
     Tick -> #(
       Model(time: duration.add(model.time, ctx.delta_time)),
-      effect.tick(Tick),
+      effect.dispatch(Tick),
       option.None,
     )
   }
@@ -61,7 +55,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       camera: camera.camera_2d(ctx.canvas_size |> vec2.map(float.round)),
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
-      look_at: option.None,
       viewport: option.None,
       postprocessing: option.None,
     ),
@@ -76,7 +69,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "center",
       geometry: {
-        let assert Ok(geom) = geometry.plane(vec2.Vec2(50.0, 50.0))
+        let assert Ok(geom) = geometry.plane(size: vec2.Vec2(50.0, 50.0))
         geom
       },
       material: {
@@ -86,6 +79,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         mat
       },
@@ -96,7 +92,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "top-left",
       geometry: {
-        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
+        let assert Ok(geom) = geometry.plane(size: vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -106,6 +102,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         mat
       },
@@ -120,7 +119,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "top-right",
       geometry: {
-        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
+        let assert Ok(geom) = geometry.plane(size: vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -130,6 +129,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         mat
       },
@@ -144,7 +146,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "bottom-left",
       geometry: {
-        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
+        let assert Ok(geom) = geometry.plane(size: vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -154,6 +156,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         mat
       },
@@ -168,7 +173,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "bottom-right",
       geometry: {
-        let assert Ok(geom) = geometry.plane(vec2.Vec2(30.0, 30.0))
+        let assert Ok(geom) = geometry.plane(size: vec2.Vec2(30.0, 30.0))
         geom
       },
       material: {
@@ -178,6 +183,9 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         mat
       },

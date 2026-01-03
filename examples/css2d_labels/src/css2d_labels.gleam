@@ -31,14 +31,8 @@ pub fn main() {
   // Initialize paint library
   canvas.define_web_component()
 
-  tiramisu.run(
-    dimensions: option.None,
-    bridge: option.None,
-    selector: "body",
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("body", tiramisu.FullScreen, option.None)
 }
 
 fn css2d_label_element() -> Element(Msg) {
@@ -72,7 +66,7 @@ fn sprite_label_picture(rotation: Float, frame: Int) -> p.Picture {
 }
 
 fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0, frame: 0), effect.tick(Tick), option.None)
+  #(Model(rotation: 0.0, frame: 0), effect.dispatch(Tick), option.None)
 }
 
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
@@ -82,7 +76,7 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
       let new_frame = model.frame + 1
       #(
         Model(rotation: new_rotation, frame: new_frame),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -99,9 +93,8 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
           camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
         cam
       },
-      transform: transform.at(vec3.Vec3(0.0, 2.0, 5.0)),
+      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
       active: True,
-      look_at: None,
       viewport: None,
       postprocessing: option.None,
     ),
@@ -113,7 +106,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
           light.directional(color: 0xffffff, intensity: 1.0)
         light
       },
-      transform: transform.at(vec3.Vec3(5.0, 5.0, 5.0)),
+      transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),
     // Left Cube with CSS2D label (always on top)
     scene.empty(
@@ -129,7 +122,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "cube",
           geometry: {
-            let assert Ok(g) = geometry.box(vec3f.one)
+            let assert Ok(g) = geometry.box(size: vec3f.one)
             g
           },
           material: {
@@ -164,7 +157,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "cube-2",
           geometry: {
-            let assert Ok(geometry) = geometry.box(vec3f.one)
+            let assert Ok(geometry) = geometry.box(size: vec3f.one)
             geometry
           },
           material: {

@@ -1,3 +1,55 @@
+//// Audio playback for sound effects and music.
+////
+//// Tiramisu supports both global (2D) audio that plays at constant volume, and
+//// positional (3D) audio that varies based on distance from the camera/listener.
+//// Audio is added to the scene graph as `scene.audio` nodes.
+////
+//// ## Loading Audio
+////
+//// ```gleam
+//// let load_sfx = audio.load_audio(
+////   url: "sounds/jump.wav",
+////   on_success: SoundLoaded,
+////   on_error: SoundFailed,
+//// )
+//// ```
+////
+//// ## Playing Global Audio (2D)
+////
+//// ```gleam
+//// scene.audio(
+////   id: "background-music",
+////   audio: audio.GlobalAudio(
+////     buffer: music_buffer,
+////     config: audio.config()
+////       |> audio.with_state(audio.Playing)
+////       |> audio.with_loop(True)
+////       |> audio.with_volume(0.5)
+////       |> audio.with_group(audio.Music),
+////   ),
+//// )
+//// ```
+////
+//// ## Playing Positional Audio (3D)
+////
+//// ```gleam
+//// scene.audio(
+////   id: "waterfall",
+////   audio: audio.PositionalAudio(
+////     buffer: waterfall_buffer,
+////     config: audio.playing(),
+////     ref_distance: 1.0,
+////     rolloff_factor: 1.0,
+////     max_distance: 100.0,
+////   ),
+//// )
+//// ```
+////
+//// ## Audio Groups
+////
+//// Group audio for volume control (SFX, Music, Voice, Ambient, or Custom).
+////
+
 import gleam/javascript/promise
 import gleam/option
 import gleam/time/duration

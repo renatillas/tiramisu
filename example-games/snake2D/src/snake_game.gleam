@@ -91,14 +91,8 @@ type Color {
 
 pub fn main() -> Nil {
   let assert Ok(_) =
-    tiramisu.run(
-      selector: "#app",
-      dimensions: option.None,
-      bridge: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -117,7 +111,7 @@ pub fn init(ctx: tiramisu.Context) {
   #(
     init_model(highscore, option.None, ctx),
     effect.batch([
-      effect.tick(Tick),
+      effect.dispatch(Tick),
       geometry.load_font(
         from: "fonts/helvetiker_regular.typeface.json",
         on_success: FontLoaded,
@@ -175,7 +169,7 @@ pub fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
     FontLoaded(font) -> Model(..model, maybe_font: option.Some(font))
     FontLoadFailed -> model
   }
-  #(updatet_model, effect.tick(Tick), option.None)
+  #(updatet_model, effect.dispatch(Tick), option.None)
 }
 
 fn update_running_model(model: Model, ctx: tiramisu.Context) -> Model {
@@ -439,7 +433,6 @@ pub fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
-      look_at: option.None,
       active: True,
       viewport: option.None,
       postprocessing: option.None,

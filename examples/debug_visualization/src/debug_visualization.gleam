@@ -35,14 +35,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      bridge: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -56,7 +50,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
       path_points: [],
     )
 
-  #(model, effect.tick(Tick), option.None)
+  #(model, effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -106,7 +100,7 @@ fn update(
           animated_position: new_position,
           path_points: new_path,
         ),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -145,7 +139,6 @@ fn view(model: Model, _) -> scene.Node {
       id: "main-camera",
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
       postprocessing: option.None,
@@ -176,7 +169,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "cube-1",
       geometry: {
-        let assert Ok(geometry) = geometry.box(vec3f.one |> vec3f.scale(2.0))
+        let assert Ok(geometry) = geometry.box(size: vec3f.one |> vec3f.scale(2.0))
         geometry
       },
       material: {

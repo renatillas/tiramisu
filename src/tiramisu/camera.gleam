@@ -25,7 +25,6 @@
 ////   id: "main-camera",
 ////   camera: cam,
 ////   transform: transform.at(position: vec3.Vec3(0.0, 5.0, 10.0)),
-////   look_at: Some(vec3.Vec3(0.0, 0.0, 0.0)),
 ////   active: True,
 ////   viewport: None,
 ////   postprocessing: None,
@@ -73,7 +72,6 @@ import vec/vec2.{type Vec2}
 /// Camera configuration (perspective or orthographic projection).
 ///
 /// Use with `scene.Camera` nodes to define viewpoints in your scene.
-/// Position and orientation are set via the scene.Camera node's transform and look_at fields.
 pub opaque type Camera {
   Camera(projection: CameraProjection)
 }
@@ -105,25 +103,10 @@ pub type CameraError {
   NearFarConflict(near: Float, far: Float)
 }
 
-/// Create a perspective camera (for 3D games).
+/// Creates a perspective camera for 3D games.
 ///
-/// Objects further away appear smaller, like in real life.
-/// The aspect ratio is automatically calculated from the viewport or renderer dimensions at render time.
-///
-/// ## Parameters
-/// - `field_of_view`: Vertical FOV in degrees (typically 60-90)
-/// - `near`: Near clipping plane (objects closer are not rendered)
-/// - `far`: Far clipping plane (objects further are not rendered)
-///
-/// ## Example
-///
-/// ```gleam
-/// let assert Ok(cam) = camera.perspective(
-///   field_of_view: 75.0,
-///   near: 0.1,
-///   far: 1000.0,
-/// )
-/// ```
+/// Objects further away appear smaller, like in real life. The aspect ratio is
+/// automatically calculated from the viewport dimensions at render time.
 pub fn perspective(
   field_of_view fov: Float,
   near near: Float,
@@ -187,7 +170,6 @@ pub fn orthographic(
 ///   id: "main_camera",
 ///   camera: cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-///   look_at: option.None,
 ///   active: True,
 ///   viewport: option.None,
 /// )
@@ -221,7 +203,6 @@ pub fn camera_2d(size size: Vec2(Int)) -> Camera {
 ///   id: "ui_camera",
 ///   camera: cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-///   look_at: option.None,
 ///   active: True,
 ///   viewport: option.None,
 /// )
@@ -254,7 +235,6 @@ pub fn camera_2d_screen_space(size size: Vec2(Int)) -> Camera {
 ///   id: "game_camera",
 ///   camera: cam,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 5.0)),
-///   look_at: option.None,
 ///   active: True,
 ///   viewport: option.None,
 /// )
@@ -296,7 +276,6 @@ pub fn camera_2d_with_bounds(
 ///   id: "minimap",
 ///   camera: minimap_cam,
 ///   transform: transform.identity,
-///   look_at: option.None,
 ///   active: True,
 ///   viewport: option.Some(minimap_viewport),
 ///   postprocessing: option.None,
@@ -492,16 +471,11 @@ pub fn render_pass() -> Pass {
   RenderPass
 }
 
-/// Create a clear pass.
+/// Creates a clear pass for postprocessing.
 ///
-/// Clears the render target with a color. Use this before RenderPass to make
-/// scene backgrounds work correctly with postprocessing.
-///
-/// ## Parameters
-///
-/// - `color`: Optional hex color to clear with
-///   - `None`: Uses the scene's background color
-///   - `Some(0xff0000)`: Clears with the specified color
+/// Clears the render target with a color. Use before RenderPass to make
+/// scene backgrounds work correctly with postprocessing. Pass `None` to use
+/// the scene's background color.
 ///
 /// ## Example
 ///
@@ -533,15 +507,9 @@ pub fn output_pass() -> Pass {
   OutputPass
 }
 
-/// Create a bloom effect pass.
+/// Creates a bloom effect pass.
 ///
-/// Bloom makes bright areas glow and bleed into surrounding pixels.
-///
-/// ## Parameters
-///
-/// - `strength`: How much bloom to apply (0.0 - 3.0, typically 0.5 - 2.0)
-/// - `threshold`: Brightness threshold for bloom (0.0 - 1.0, typically 0.5 - 0.9)
-/// - `radius`: How far the bloom spreads (0.0 - 1.0, typically 0.4 - 0.8)
+/// Makes bright areas glow and bleed into surrounding pixels.
 ///
 /// ## Example
 ///
@@ -560,11 +528,7 @@ pub fn bloom(
   BloomPass(strength: strength, threshold: threshold, radius: radius)
 }
 
-/// Create a simple pixelation effect without edge detection.
-///
-/// ## Parameters
-///
-/// - `pixel_size`: Size of pixels (1 - 16, where 1 is no effect)
+/// Creates a simple pixelation effect without edge detection.
 ///
 /// ## Example
 ///
@@ -583,15 +547,9 @@ pub fn pixelate(pixel_size pixel_size: Int) -> Pass {
   )
 }
 
-/// Create a pixelation effect with edge detection.
+/// Creates a pixelation effect with edge detection.
 ///
 /// Edge detection adds outlines based on surface normals and depth changes.
-///
-/// ## Parameters
-///
-/// - `pixel_size`: Size of pixels (1 - 16)
-/// - `normal_edge_strength`: Strength of normal-based edges (0.0 - 2.0)
-/// - `depth_edge_strength`: Strength of depth-based edges (0.0 - 1.0)
 ///
 /// ## Example
 ///
@@ -614,16 +572,9 @@ pub fn pixelate_with_edges(
   )
 }
 
-/// Create a film grain effect.
+/// Creates a film grain effect.
 ///
 /// Adds analog film texture with grain noise and optional scanlines.
-///
-/// ## Parameters
-///
-/// - `noise_intensity`: Amount of grain (0.0 - 1.0, typically 0.2 - 0.5)
-/// - `scanline_intensity`: Strength of scanlines (0.0 - 1.0, typically 0.0 - 0.3)
-/// - `scanline_count`: Number of scanlines (e.g., 512, 1024)
-/// - `grayscale`: Convert to black and white
 ///
 /// ## Example
 ///
@@ -658,14 +609,9 @@ pub fn film_grain(
   )
 }
 
-/// Create a vignette effect.
+/// Creates a vignette effect.
 ///
 /// Darkens the edges of the screen, focusing attention on the center.
-///
-/// ## Parameters
-///
-/// - `darkness`: How dark the edges are (0.0 - 2.0, typically 0.5 - 1.5)
-/// - `offset`: How far from center the vignette starts (0.0 - 2.0, typically 0.8 - 1.2)
 ///
 /// ## Example
 ///
@@ -696,13 +642,9 @@ pub fn fxaa() -> Pass {
   FXAAPass
 }
 
-/// Create a glitch effect pass.
+/// Creates a glitch effect pass.
 ///
 /// Creates digital corruption artifacts with RGB channel offsets.
-///
-/// ## Parameters
-///
-/// - `dt_size`: Size of distortion blocks (typically 32 - 128)
 ///
 /// ## Example
 ///
@@ -713,15 +655,9 @@ pub fn glitch(dt_size dt_size: Int) -> Pass {
   GlitchPass(dt_size: dt_size)
 }
 
-/// Create a color correction pass.
+/// Creates a color correction pass.
 ///
-/// Adjust brightness, contrast, and saturation of the final image.
-///
-/// ## Parameters
-///
-/// - `brightness`: Brightness adjustment (-1.0 to 1.0, 0.0 is no change)
-/// - `contrast`: Contrast adjustment (-1.0 to 1.0, 0.0 is no change)
-/// - `saturation`: Saturation adjustment (-1.0 to 1.0, 0.0 is no change, -1.0 is grayscale)
+/// Adjusts brightness, contrast, and saturation of the final image.
 ///
 /// ## Example
 ///
@@ -752,15 +688,9 @@ pub fn color_correction(
   )
 }
 
-/// Create a custom shader pass.
+/// Creates a custom shader pass for advanced effects.
 ///
-/// Apply custom GLSL shaders for advanced effects.
-///
-/// ## Parameters
-///
-/// - `vertex_shader`: GLSL vertex shader code
-/// - `fragment_shader`: GLSL fragment shader code
-/// - `uniforms`: List of uniform name/value pairs
+/// Apply custom GLSL vertex and fragment shaders with uniforms.
 ///
 /// ## Example
 ///

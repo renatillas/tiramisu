@@ -33,10 +33,18 @@ const grid_width = 10
 
 const grid_height = 20
 
+// Shared bridge messages (Game <-> UI)
+pub type BridgeMsg {
+  // Game -> UI
+  UpdateGameState(game.GameState)
+  // UI -> Game
+  RestartGame
+}
+
 // Model
 pub type Model {
   Model(
-    bridge: tiramisu_ui.Bridge(UiMsg, Msg),
+    bridge: tiramisu_ui.Bridge(BridgeMsg),
     player_moved: Bool,
     game_state: game.GameState,
     drop_timer: Float,
@@ -51,7 +59,7 @@ pub type Model {
 // Messages
 pub type Msg {
   Tick
-  Restart
+  FromBridge(BridgeMsg)
   MoveSoundLoaded(audio.Buffer)
   AudioLoadFailed
   BackgroundSet
@@ -60,7 +68,7 @@ pub type Msg {
 
 // Initialize
 pub fn init(
-  bridge: tiramisu_ui.Bridge(UiMsg, Msg),
+  bridge: tiramisu_ui.Bridge(BridgeMsg),
   ctx: tiramisu.Context,
 ) -> #(Model, effect.Effect(Msg), option.Option(a)) {
   // Load move sound
@@ -100,7 +108,7 @@ pub fn init(
 
   #(
     model,
-    effect.batch([effect.tick(Tick), load_move_sound, set_background]),
+    effect.batch([effect.dispatch(Tick), load_move_sound, set_background]),
     option.None,
   )
 }
@@ -118,19 +126,22 @@ pub fn update(
     AudioLoadFailed | BackgroundSet | BackgroundFailed -> {
       #(model, effect.none(), option.None)
     }
-    Restart -> {
+    FromBridge(RestartGame) -> {
       let #(new_model, _, _) = init(model.bridge, ctx)
       // Preserve loaded audio
       let new_model = Model(..new_model, move_sound: model.move_sound)
       #(
         new_model,
         effect.batch([
-          tiramisu_ui.to_lustre(model.bridge, UiUpdateGameState(
+          tiramisu_ui.send_to_ui(model.bridge, UpdateGameState(
             new_model.game_state,
           )),
         ]),
         option.None,
       )
+    }
+    FromBridge(_) -> {
+      #(model, effect.none(), option.None)
     }
     Tick -> {
       // Reset player_moved from previous frame (for audio one-shot behavior)
@@ -240,10 +251,10 @@ pub fn update(
       #(
         updated_model,
         effect.batch([
-          effect.tick(Tick),
-          tiramisu_ui.to_lustre(
+          effect.dispatch(Tick),
+          tiramisu_ui.send_to_ui(
             model.bridge,
-            UiUpdateGameState(updated_model.game_state),
+            UpdateGameState(updated_model.game_state),
           ),
         ]),
         option.None,
@@ -274,7 +285,6 @@ pub fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
       id: "main-camera",
       camera: model.camera,
       transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
-      look_at: Some(vec3.Vec3(5.0, 10.0, 0.0)),
       active: True,
       viewport: None,
       postprocessing: None,
@@ -412,11 +422,11 @@ fn create_grid_outline() -> scene.Node {
 
 // UI overlay state management
 pub type UiModel {
-  UiModel(bridge: tiramisu_ui.Bridge(UiMsg, Msg), game_state: game.GameState)
+  UiModel(bridge: tiramisu_ui.Bridge(BridgeMsg), game_state: game.GameState)
 }
 
 pub type UiMsg {
-  UiUpdateGameState(game.GameState)
+  FromBridgeUi(BridgeMsg)
   UiRestart
 }
 
@@ -432,21 +442,15 @@ pub fn main() {
 
   // Start the game
   let assert Ok(_) =
-    tiramisu.run(
-      selector: "#game",
-      dimensions: None,
-      bridge: Some(bridge),
-      init: init(bridge, _),
-      update:,
-      view:,
-    )
+    tiramisu.application(init(bridge, _), update, view)
+    |> tiramisu.start("#game", tiramisu.FullScreen, Some(#(bridge, FromBridge)))
   Nil
 }
 
 fn ui_init(bridge) {
   #(
     UiModel(bridge:, game_state: game.new()),
-    tiramisu_ui.register_lustre(bridge),
+    tiramisu_ui.register_lustre(bridge, FromBridgeUi),
   )
 }
 
@@ -455,13 +459,14 @@ fn ui_update(
   msg: UiMsg,
 ) -> #(UiModel, lustre_effect.Effect(UiMsg)) {
   case msg {
-    UiUpdateGameState(new_state) -> #(
+    FromBridgeUi(UpdateGameState(new_state)) -> #(
       UiModel(..model, game_state: new_state),
       lustre_effect.none(),
     )
+    FromBridgeUi(_) -> #(model, lustre_effect.none())
     UiRestart -> #(
       UiModel(..model, game_state: game.new()),
-      tiramisu_ui.to_tiramisu(model.bridge, Restart),
+      tiramisu_ui.send(model.bridge, RestartGame),
     )
   }
 }

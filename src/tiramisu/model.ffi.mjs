@@ -1,5 +1,5 @@
 // Model FFI - GLTF and FBX data extraction functions
-import { toList } from '../gleam_stdlib/gleam.mjs';
+import { toList } from '../../gleam_stdlib/gleam.mjs';
 
 // ============================================================================
 // GLTF DATA EXTRACTION

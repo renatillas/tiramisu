@@ -169,17 +169,17 @@ pub fn send_to_ui(
 // FFI Declarations
 // ============================================================================
 
-@external(javascript, "../ui.ffi.mjs", "createBridge")
+@external(javascript, "./ui.ffi.mjs", "createBridge")
 fn create_bridge_ffi() -> BridgeInternal
 
-@external(javascript, "../ui.ffi.mjs", "registerLustre")
+@external(javascript, "./ui.ffi.mjs", "registerLustre")
 fn register_lustre_ffi(
   bridge: BridgeInternal,
   dispatch: fn(bridge_msg) -> Nil,
 ) -> Nil
 
-@external(javascript, "../ui.ffi.mjs", "sendToGame")
+@external(javascript, "./ui.ffi.mjs", "sendToGame")
 fn send_to_game_ffi(bridge: BridgeInternal, msg: bridge_msg) -> Nil
 
-@external(javascript, "../ui.ffi.mjs", "sendToLustre")
+@external(javascript, "./ui.ffi.mjs", "sendToLustre")
 fn send_to_lustre_ffi(bridge: BridgeInternal, msg: bridge_msg) -> Nil

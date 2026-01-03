@@ -43,9 +43,18 @@ pub type Position {
   Position(x: Int, y: Int)
 }
 
+// Shared bridge messages (Game <-> UI)
+pub type BridgeMsg {
+  // Game -> UI
+  UpdateScore(Int)
+  NotifyGameOver
+  // UI -> Game
+  RequestRestart
+}
+
 pub type Model {
   Model(
-    bridge: ui.Bridge(UIMsg, Msg),
+    bridge: ui.Bridge(BridgeMsg),
     input_bindings: input.InputBindings(Direction),
     snake: List(#(Int, Position)),
     direction: Direction,
@@ -63,7 +72,7 @@ pub type Model {
 
 pub type Msg {
   Tick
-  RestartGame
+  FromBridge(BridgeMsg)
   FruitSoundLoaded(audio.Buffer)
   GameOverSoundLoaded(audio.Buffer)
   AudioLoadFailed
@@ -73,13 +82,12 @@ pub type Msg {
 
 // UI Messages
 pub type UIMsg {
-  UpdateScore(Int)
-  GameOver
-  Restart
+  FromBridgeUi(BridgeMsg)
+  UiRestart
 }
 
 pub type UIModel {
-  UIModel(bridge: ui.Bridge(UIMsg, Msg), score: Int, game_over: Bool)
+  UIModel(bridge: ui.Bridge(BridgeMsg), score: Int, game_over: Bool)
 }
 
 pub fn main() -> Nil {
@@ -93,14 +101,8 @@ pub fn main() -> Nil {
 
   // Start Tiramisu game in fullscreen mode
   let assert Ok(_) =
-    tiramisu.run(
-      selector: "#game",
-      dimensions: None,
-      bridge: Some(bridge),
-      init: init(bridge, _),
-      update:,
-      view:,
-    )
+    tiramisu.application(init(bridge, _), update, view)
+    |> tiramisu.start("#game", tiramisu.FullScreen, Some(#(bridge, FromBridge)))
   Nil
 }
 
@@ -108,20 +110,24 @@ pub fn main() -> Nil {
 fn ui_init(bridge) {
   #(
     UIModel(bridge: bridge, score: 0, game_over: False),
-    ui.register_lustre(bridge),
+    ui.register_lustre(bridge, FromBridgeUi),
   )
 }
 
 fn ui_update(model: UIModel, msg: UIMsg) {
   case msg {
-    UpdateScore(score) -> #(
+    FromBridgeUi(UpdateScore(score)) -> #(
       UIModel(..model, score: score),
       lustre_effect.none(),
     )
-    GameOver -> #(UIModel(..model, game_over: True), lustre_effect.none())
-    Restart -> #(
+    FromBridgeUi(NotifyGameOver) -> #(
+      UIModel(..model, game_over: True),
+      lustre_effect.none(),
+    )
+    FromBridgeUi(_) -> #(model, lustre_effect.none())
+    UiRestart -> #(
       UIModel(..model, score: 0, game_over: False),
-      ui.to_tiramisu(model.bridge, RestartGame),
+      ui.send(model.bridge, RequestRestart),
     )
   }
 }
@@ -177,7 +183,7 @@ fn game_over_overlay(model: UIModel) -> Element(UIMsg) {
 }
 
 fn init(
-  bridge: ui.Bridge(UIMsg, Msg),
+  bridge: ui.Bridge(BridgeMsg),
   ctx: tiramisu.Context,
 ) -> #(Model, Effect(Msg), option.Option(a)) {
   let input_bindings =
@@ -235,7 +241,7 @@ fn init(
   #(
     model,
     effect.batch([
-      effect.tick(Tick),
+      effect.dispatch(Tick),
       load_fruit_sound,
       load_game_over_sound,
       set_background,
@@ -263,7 +269,7 @@ fn update(
     AudioLoadFailed | BackgroundSet | BackgroundFailed -> {
       #(model, effect.none(), option.None)
     }
-    RestartGame -> {
+    FromBridge(RequestRestart) -> {
       // Reset UI and restart game
       let #(new_model, game_effect, _) = init(model.bridge, ctx)
       // Preserve loaded audio
@@ -277,12 +283,12 @@ fn update(
         new_model,
         effect.batch([
           game_effect,
-          ui.to_lustre(model.bridge, Restart),
-          ui.to_lustre(model.bridge, UpdateScore(0)),
+          ui.send_to_ui(model.bridge, UpdateScore(0)),
         ]),
         option.None,
       )
     }
+    FromBridge(_) -> #(model, effect.none(), option.None)
     Tick -> {
       use <- bool.guard(
         model.game_over,
@@ -290,11 +296,11 @@ fn update(
           True -> {
             #(
               model,
-              effect.from(fn(dispatch) { dispatch(RestartGame) }),
+              effect.from(fn(dispatch) { dispatch(FromBridge(RequestRestart)) }),
               option.None,
             )
           }
-          False -> #(model, effect.tick(Tick), option.None)
+          False -> #(model, effect.dispatch(Tick), option.None)
         },
       )
       // Handle direction input
@@ -335,8 +341,8 @@ fn update(
             True -> #(
               Model(..model, game_over: True),
               effect.batch([
-                effect.tick(Tick),
-                ui.to_lustre(model.bridge, GameOver),
+                effect.dispatch(Tick),
+                ui.send_to_ui(model.bridge, NotifyGameOver),
               ]),
               option.None,
             )
@@ -383,8 +389,8 @@ fn update(
                   next_segment_id: next_id,
                 ),
                 effect.batch([
-                  effect.tick(Tick),
-                  ui.to_lustre(model.bridge, UpdateScore(new_score)),
+                  effect.dispatch(Tick),
+                  ui.send_to_ui(model.bridge, UpdateScore(new_score)),
                 ]),
                 option.None,
               )
@@ -393,7 +399,7 @@ fn update(
         }
         False -> #(
           Model(..model, direction: safe_direction, move_timer: new_timer),
-          effect.tick(Tick),
+          effect.dispatch(Tick),
           option.None,
         )
       }
@@ -566,7 +572,6 @@ fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 15.0, 15.0)),
       viewport: option.None,
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       postprocessing: option.None,
     )

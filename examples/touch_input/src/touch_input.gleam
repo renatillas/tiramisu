@@ -65,14 +65,8 @@ fn screen_to_world(
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      init: init,
-      update: update,
-      view: view,
-      selector: "body",
-      bridge: option.None,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -85,7 +79,7 @@ fn init(ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
       canvas_width: ctx.canvas_size.x,
       canvas_height: ctx.canvas_size.y,
     )
-  #(model, effect.tick(Tick), option.None)
+  #(model, effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -108,7 +102,7 @@ fn update(
           canvas_height: ctx.canvas_size.y,
         )
 
-      #(new_model, effect.tick(Tick), option.None)
+      #(new_model, effect.dispatch(Tick), option.None)
     }
   }
 }
@@ -187,7 +181,6 @@ fn create_camera() -> scene.Node {
     camera: cam,
     transform: transform.identity,
     active: True,
-    look_at: option.None,
     viewport: option.None,
     postprocessing: option.None,
   )
@@ -211,7 +204,7 @@ fn create_lights() -> List(scene.Node) {
 
 /// Create the main controllable cube
 fn create_main_cube(model: Model) -> List(scene.Node) {
-  let assert Ok(box) = geometry.box(vec3.Vec3(2.0, 2.0, 2.0))
+  let assert Ok(box) = geometry.box(size: vec3.Vec3(2.0, 2.0, 2.0))
   let assert Ok(cube_material) =
     material.new()
     |> material.with_color(0x4ecdc4)
@@ -253,6 +246,9 @@ fn create_touch_indicator(
       transparent: True,
       opacity: 0.7,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let #(x, y) =

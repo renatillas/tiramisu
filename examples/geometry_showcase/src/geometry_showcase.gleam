@@ -29,19 +29,13 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      init: init,
-      update: update,
-      view: view,
-      selector: "body",
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
-  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
+  #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -52,7 +46,7 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
   }
 }
@@ -67,7 +61,6 @@ fn view(model: Model, _) -> scene.Node {
       id: "main_camera",
       camera: _,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
-      look_at: option.None,
       active: True,
       viewport: option.None,
       postprocessing: option.None,
@@ -94,12 +87,12 @@ fn view(model: Model, _) -> scene.Node {
     ])
 
   // Grid layout: 3 rows x 3 columns
-  let assert Ok(box_geom) = geometry.box(vec3f.one |> vec3f.scale(2.0))
+  let assert Ok(box_geom) = geometry.box(size: vec3f.one |> vec3f.scale(2.0))
   let assert Ok(sphere_geom) =
     geometry.sphere(radius: 1.2, segments: vec2.Vec2(32, 32))
   let assert Ok(cone_geom) =
     geometry.cone(radius: 1.0, height: 2.0, segments: 32)
-  let assert Ok(plane_geom) = geometry.plane(vec2.Vec2(2.5, 2.5))
+  let assert Ok(plane_geom) = geometry.plane(size: vec2.Vec2(2.5, 2.5))
   let assert Ok(circle_geom) = geometry.circle(radius: 1.3, segments: 32)
   let assert Ok(cylinder_geom) =
     geometry.cylinder(

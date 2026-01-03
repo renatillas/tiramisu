@@ -160,7 +160,7 @@ pub fn load_fbx(
 /// let scene = model.get_scene(gltf_data)
 /// // Use with scene.model() node
 /// ```
-@external(javascript, "../model.ffi.mjs", "getGLTFScene")
+@external(javascript, "./model.ffi.mjs", "getGLTFScene")
 pub fn get_scene(gltf: GLTFData) -> savoiardi.Object3D
 
 /// Get all animation clips from loaded GLTF data.
@@ -173,14 +173,14 @@ pub fn get_scene(gltf: GLTFData) -> savoiardi.Object3D
 /// let clips = model.get_animations(gltf_data)
 /// // Use clips with animation.create_mixer() and animation.play()
 /// ```
-@external(javascript, "../model.ffi.mjs", "getGLTFAnimations")
+@external(javascript, "./model.ffi.mjs", "getGLTFAnimations")
 pub fn get_animations(gltf: GLTFData) -> List(savoiardi.AnimationClip)
 
 /// Get all cameras from loaded GLTF data.
 ///
 /// GLTF files can include camera definitions. Returns an empty list
 /// if the model has no cameras.
-@external(javascript, "../model.ffi.mjs", "getGLTFCameras")
+@external(javascript, "./model.ffi.mjs", "getGLTFCameras")
 pub fn get_cameras(gltf: GLTFData) -> List(savoiardi.Object3D)
 
 // ============================================================================
@@ -197,7 +197,7 @@ pub fn get_cameras(gltf: GLTFData) -> List(savoiardi.Object3D)
 /// let scene = model.get_fbx_scene(fbx_data)
 /// // Use with scene.model() node
 /// ```
-@external(javascript, "../model.ffi.mjs", "getFBXScene")
+@external(javascript, "./model.ffi.mjs", "getFBXScene")
 pub fn get_fbx_scene(fbx: FBXData) -> savoiardi.Object3D
 
 /// Get all animation clips from loaded FBX data.
@@ -210,7 +210,7 @@ pub fn get_fbx_scene(fbx: FBXData) -> savoiardi.Object3D
 /// let clips = model.get_fbx_animations(fbx_data)
 /// // Use clips with animation.create_mixer() and animation.play()
 /// ```
-@external(javascript, "../model.ffi.mjs", "getFBXAnimations")
+@external(javascript, "./model.ffi.mjs", "getFBXAnimations")
 pub fn get_fbx_animations(fbx: FBXData) -> List(savoiardi.AnimationClip)
 
 // ============================================================================
@@ -245,12 +245,6 @@ pub fn center_object(object: Object3D) -> Object3D {
 ///
 /// This is useful for loaded models that reference external textures,
 /// or when you want to override the model's textures.
-///
-/// ## Parameters
-///
-/// - `object` - The object hierarchy to apply the texture to
-/// - `tex` - The texture to apply
-/// - `filter_mode` - Texture filtering mode for pixel art or smooth textures
 ///
 /// ## Example
 ///

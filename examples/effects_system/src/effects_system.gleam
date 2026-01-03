@@ -34,14 +34,8 @@ pub type Msg {
 
 pub fn main() {
   let assert Ok(_) =
-    tiramisu.run(
-      bridge: option.None,
-      selector: "body",
-      dimensions: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
 }
 
 fn init(
@@ -50,7 +44,7 @@ fn init(
   #(
     Model(cubes: [], next_id: 0),
     effect.batch([
-      effect.tick(Tick),
+      effect.dispatch(Tick),
       effect.delay(duration.milliseconds(500), AddCube),
     ]),
     option.None,
@@ -85,7 +79,7 @@ fn update(
       let filtered_cubes =
         list.filter(updated_cubes, fn(cube) { cube.position.y >. -10.0 })
 
-      #(Model(..model, cubes: filtered_cubes), effect.tick(Tick), option.None)
+      #(Model(..model, cubes: filtered_cubes), effect.dispatch(Tick), option.None)
     }
 
     AddCube -> {
@@ -134,14 +128,13 @@ fn view(model: Model, _) -> scene.Node {
   let assert Ok(cam) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  let assert Ok(box_geometry) = geometry.box(vec3f.one)
+  let assert Ok(box_geometry) = geometry.box(size: vec3f.one)
 
   let camera_node =
     scene.camera(
       id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 20.0)),
-      look_at: option.None,
       active: True,
       viewport: option.None,
       postprocessing: option.None,

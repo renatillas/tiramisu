@@ -113,16 +113,10 @@ pub fn clone(texture: savoiardi.Texture) -> savoiardi.Texture {
   savoiardi.clone_texture(texture)
 }
 
-/// Set the texture UV offset.
+/// Sets the texture UV offset.
 ///
 /// Controls which portion of the texture starts being displayed.
 /// Values range from 0.0 to 1.0.
-///
-/// ## Parameters
-///
-/// - `offset`: Offset as Vec2 (x = horizontal, y = vertical)
-///   - x: 0.0 = left edge, 1.0 = right edge
-///   - y: 0.0 = bottom edge, 1.0 = top edge
 ///
 /// ## Example
 ///
@@ -138,16 +132,10 @@ pub fn set_offset(
   texture
 }
 
-/// Set the texture UV repeat (scaling).
+/// Sets the texture UV repeat (scaling).
 ///
 /// Controls how much of the texture is displayed.
 /// Values range from 0.0 to 1.0 (or higher for tiling).
-///
-/// ## Parameters
-///
-/// - `repeat`: Repeat as Vec2 (x = horizontal, y = vertical)
-///   - x: 0.5 = show half width, 2.0 = tile twice
-///   - y: 0.5 = show half height, 2.0 = tile twice
 ///
 /// ## Example
 ///
@@ -163,17 +151,11 @@ pub fn set_repeat(
   texture
 }
 
-/// Set the texture wrapping mode.
+/// Sets the texture wrapping mode.
 ///
 /// Controls how the texture behaves at edges when UV coordinates exceed 0-1 range.
 ///
-/// **Important**: RepeatWrapping only works with power-of-two texture dimensions
-/// (2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, etc.)
-///
-/// ## Parameters
-///
-/// - `wrap_s`: Horizontal wrapping mode
-/// - `wrap_t`: Vertical wrapping mode
+/// **Important**: RepeatWrapping only works with power-of-two texture dimensions.
 ///
 /// ## Example
 ///
@@ -198,14 +180,10 @@ pub fn set_wrap_mode(
   texture
 }
 
-/// Set the texture filtering mode.
+/// Sets the texture filtering mode.
 ///
 /// Controls how the texture is sampled when scaled.
-///
-/// ## Parameters
-///
-/// - `min_filter`: Minification filter (when texture appears smaller)
-/// - `mag_filter`: Magnification filter (when texture appears larger)
+/// Use NearestFilter for crisp pixel art, LinearFilter for smooth textures.
 ///
 /// ## Example
 ///

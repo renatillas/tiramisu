@@ -29,14 +29,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      selector: "body",
-      bridge: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -46,7 +40,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), Option(_)) {
   let load_effect =
     texture.load("star-struck.png", TextureLoaded, TextureLoadError)
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
+  #(model, effect.batch([effect.dispatch(Tick), load_effect]), option.None)
 }
 
 fn update(
@@ -57,7 +51,7 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.tick(Tick), option.None)
+      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
 
     TextureLoaded(texture) -> {
@@ -81,7 +75,6 @@ fn view(model: Model, _) -> scene.Node {
         id: "main-camera",
         transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
         active: True,
-        look_at: option.None,
         viewport: option.None,
         camera: _,
         postprocessing: option.None,
@@ -110,7 +103,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-1",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -120,6 +113,9 @@ fn view(model: Model, _) -> scene.Node {
                   transparent: True,
                   opacity: 1.0,
                   map: option.Some(tex),
+                  side: material.DoubleSide,
+                  alpha_test: 0.1,
+                  depth_write: False,
                 )
               material
             },
@@ -135,7 +131,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-2",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -145,6 +141,9 @@ fn view(model: Model, _) -> scene.Node {
                   transparent: True,
                   opacity: 1.0,
                   map: option.Some(tex),
+                  side: material.DoubleSide,
+                  alpha_test: 0.1,
+                  depth_write: False,
                 )
               material
             },
@@ -158,7 +157,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-3",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(vec2.Vec2(1.5, 1.5))
+              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(1.5, 1.5))
               geometry
             },
             material: {
@@ -168,6 +167,9 @@ fn view(model: Model, _) -> scene.Node {
                   transparent: True,
                   opacity: 1.0,
                   map: option.Some(tex),
+                  side: material.DoubleSide,
+                  alpha_test: 0.1,
+                  depth_write: False,
                 )
               material
             },
@@ -187,7 +189,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-4",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -197,6 +199,9 @@ fn view(model: Model, _) -> scene.Node {
                   transparent: True,
                   opacity: 1.0,
                   map: option.Some(tex),
+                  side: material.DoubleSide,
+                  alpha_test: 0.1,
+                  depth_write: False,
                 )
               material
             },

@@ -41,14 +41,8 @@ pub type Id {
 
 pub fn main() {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      selector: "body",
-      dimensions: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -104,7 +98,7 @@ fn init(
       sfx_volume: 1.0,
     ),
     effect.batch([
-      effect.tick(Tick),
+      effect.dispatch(Tick),
       // Load audio assets
       effect.from_promise(
         audio.load_audio("music.ogg")
@@ -256,7 +250,7 @@ fn update(
           music_volume: music_volume,
           sfx_volume: sfx_volume,
         ),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -369,7 +363,6 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
       id: "main",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: True,
       viewport: option.None,
       postprocessing: option.None,

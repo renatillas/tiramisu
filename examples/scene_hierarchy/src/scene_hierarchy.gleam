@@ -22,19 +22,13 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      bridge: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
-  #(Model(rotation: 0.0, show_planets: True), effect.tick(Tick), option.None)
+  #(Model(rotation: 0.0, show_planets: True), effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -47,7 +41,7 @@ fn update(
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
       #(
         Model(rotation: new_rotation, show_planets: True),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -62,7 +56,6 @@ fn view(model: Model, _) -> scene.Node {
       camera: _,
       active: True,
       transform: transform.at(position: vec3.Vec3(0.0, 5.0, 15.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       viewport: option.None,
       postprocessing: option.None,
     ))
@@ -83,7 +76,7 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "sun",
       geometry: {
-        let assert Ok(geometry) = geometry.box(vec3.Vec3(2.0, 2.0, 2.0))
+        let assert Ok(geometry) = geometry.box(size: vec3.Vec3(2.0, 2.0, 2.0))
         geometry
       },
       material: {
@@ -93,6 +86,9 @@ fn view(model: Model, _) -> scene.Node {
             transparent: False,
             opacity: 1.0,
             map: option.None,
+            side: material.FrontSide,
+            alpha_test: 0.0,
+            depth_write: True,
           )
         material
       },
@@ -105,7 +101,7 @@ fn view(model: Model, _) -> scene.Node {
       scene.mesh(
         id: "planet-1",
         geometry: {
-          let assert Ok(geometry) = geometry.box(vec3f.one)
+          let assert Ok(geometry) = geometry.box(size: vec3f.one)
           geometry
         },
         material: {
@@ -127,7 +123,7 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "planet-1-moon",
             geometry: {
-              let assert Ok(geometry) = geometry.box(vec3.Vec3(0.5, 0.5, 0.5))
+              let assert Ok(geometry) = geometry.box(size: vec3.Vec3(0.5, 0.5, 0.5))
               geometry
             },
             material: {
@@ -149,7 +145,7 @@ fn view(model: Model, _) -> scene.Node {
       scene.mesh(
         id: "planet-2",
         geometry: {
-          let assert Ok(geometry) = geometry.box(vec3f.one)
+          let assert Ok(geometry) = geometry.box(size: vec3f.one)
           geometry
         },
         material: {

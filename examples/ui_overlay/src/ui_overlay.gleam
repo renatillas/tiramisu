@@ -86,14 +86,8 @@ pub fn main() {
 
   // 3. Start Tiramisu game with the same bridge
   let assert Ok(_) =
-    tiramisu.run(
-      selector: "#game",
-      dimensions: None,
-      bridge: Some(bridge),
-      init: game_init(bridge, _),
-      update: game_update,
-      view: game_view,
-    )
+    tiramisu.application(game_init(bridge, _), game_update, game_view)
+    |> tiramisu.start("#game", tiramisu.FullScreen, Some(bridge))
 }
 
 // =============================================================================
@@ -270,7 +264,7 @@ fn game_init(bridge: ui.Bridge(UIMsg, GameMsg), _ctx: tiramisu.Context) {
       health: 100.0,
       paused: True,
     ),
-    game_effect.tick(Tick),
+    game_effect.dispatch(Tick),
     None,
   )
 }
@@ -283,7 +277,7 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
 
     Tick -> {
       case model.paused {
-        True -> #(model, game_effect.tick(Tick), None)
+        True -> #(model, game_effect.dispatch(Tick), None)
         False -> {
           let delta_seconds = duration.to_seconds(ctx.delta_time)
 
@@ -337,13 +331,13 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
           // Build effects - always tick, always update UI, optionally pause
           let effects = case should_pause {
             True -> [
-              game_effect.tick(Tick),
+              game_effect.dispatch(Tick),
               ui.to_lustre(model.bridge, UpdateScore(new_score)),
               ui.to_lustre(model.bridge, UpdateHealth(model.health)),
               ui.to_lustre(model.bridge, PauseGame),
             ]
             False -> [
-              game_effect.tick(Tick),
+              game_effect.dispatch(Tick),
               ui.to_lustre(model.bridge, UpdateScore(new_score)),
               ui.to_lustre(model.bridge, UpdateHealth(model.health)),
             ]
@@ -368,7 +362,6 @@ fn game_view(model: GameModel, _ctx: tiramisu.Context) -> scene.Node {
       },
       transform: transform.at(vec3.Vec3(0.0, 0.0, 20.0)),
       active: True,
-      look_at: None,
       viewport: None,
       postprocessing: None,
     ),

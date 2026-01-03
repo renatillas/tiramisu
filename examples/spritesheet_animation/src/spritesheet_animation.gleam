@@ -30,14 +30,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      selector: "body",
-      bridge: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -51,7 +45,7 @@ fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
 
   let load_effect = texture.load("MonedaD.png", TextureLoaded, TextureLoadError)
 
-  #(model, effect.batch([effect.tick(Tick), load_effect]), option.None)
+  #(model, effect.batch([effect.dispatch(Tick), load_effect]), option.None)
 }
 
 fn update(
@@ -94,7 +88,7 @@ fn update(
           coin2_machine: new_coin2,
           coin3_machine: new_coin3,
         ),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -137,7 +131,6 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 3.0, 10.0)),
       active: True,
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       viewport: option.None,
       postprocessing: option.None,
     )
@@ -158,7 +151,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "ground",
       geometry: {
-        let assert Ok(geo) = geometry.plane(vec2.Vec2(20.0, 20.0))
+        let assert Ok(geo) = geometry.plane(size: vec2.Vec2(20.0, 20.0))
         geo
       },
       material: {

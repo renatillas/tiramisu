@@ -35,14 +35,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      bridge: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -68,7 +62,7 @@ fn init(
 
   #(
     Model(current_view: TopDown, rotation: 0.0, show_performance: False),
-    effect.tick(Tick),
+    effect.dispatch(Tick),
     option.None,
   )
 }
@@ -153,7 +147,7 @@ fn update(
           rotation: new_rotation,
           show_performance: show_performance,
         ),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -174,7 +168,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "CameraTopdown",
       camera: cam_topdown,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: model.current_view == TopDown,
       viewport: option.None,
       postprocessing: option.Some(
@@ -198,7 +191,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "CameraSide",
       camera: cam_side,
       transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 20.0, 0.0)),
       active: model.current_view == Side,
       viewport: option.None,
       postprocessing: option.Some(
@@ -223,7 +215,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "CameraFirstperson",
       camera: cam_firstperson,
       transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 6.0, 0.0)),
       active: model.current_view == FirstPerson,
       viewport: option.None,
       postprocessing: option.Some(
@@ -269,7 +260,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "CameraOrbiting",
       camera: cam_orbiting,
       transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: model.current_view == Orbiting,
       viewport: option.None,
       postprocessing: option.Some(
@@ -305,7 +295,6 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
       id: "CameraOverlay",
       camera: cam_overlay,
       transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
       active: False,
       viewport: option.Some(camera.ViewPort(
         position: vec2.Vec2(overlay_x, overlay_y),
@@ -348,7 +337,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "RotatingCube",
       geometry: {
-        let assert Ok(geometry) = geometry.box(vec3.Vec3(6.0, 6.0, 6.0))
+        let assert Ok(geometry) = geometry.box(size: vec3.Vec3(6.0, 6.0, 6.0))
         geometry
       },
       material: {
@@ -374,7 +363,7 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.mesh(
       id: "Ground",
       geometry: {
-        let assert Ok(geometry) = geometry.plane(vec2.Vec2(100.0, 100.0))
+        let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(100.0, 100.0))
         geometry
       },
       material: {

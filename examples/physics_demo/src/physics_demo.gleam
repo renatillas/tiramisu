@@ -32,14 +32,8 @@ import vec/vec3f
 
 pub fn main() {
   let assert Ok(Nil) =
-    tiramisu.run(
-      dimensions: option.None,
-      selector: "body",
-      bridge: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -84,7 +78,7 @@ fn init(
       cubes: 0,
       frame_count: 0,
     ),
-    effect.tick(Tick),
+    effect.dispatch(Tick),
     option.Some(physics_world),
   )
 }
@@ -276,7 +270,7 @@ fn update(
           cubes: new_cubes,
           frame_count: new_frame_count,
         ),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.Some(physics_world),
       )
     }
@@ -555,7 +549,6 @@ fn view(model: Model, context: tiramisu.Context) -> scene.Node {
       id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 8.0, 15.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 2.0, 0.0)),
       active: True,
       viewport: option.None,
       postprocessing: option.None,

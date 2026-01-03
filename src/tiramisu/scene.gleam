@@ -837,14 +837,6 @@ pub fn canvas(
 /// from a spritesheet. The animation is managed by an AnimationMachine
 /// which handles frame advancement and animation state transitions.
 ///
-/// ## Parameters
-///
-/// - `id`: Unique identifier for this sprite
-/// - `sprite`: The current sprite state from your animation machine
-/// - `size`: World space size of the sprite plane as Vec2(width, height)
-/// - `transform`: Position, rotation, and scale
-/// - `physics`: Optional physics body configuration
-///
 /// ## Example
 ///
 /// ```gleam

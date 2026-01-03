@@ -56,14 +56,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-      dimensions: option.None,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -153,7 +147,7 @@ fn init(
       camera_rotation: vec3.Vec3(0.0, 0.0, 0.0),
       pointer_locked: False,
     ),
-    effect.batch([effect.tick(Tick), ..texture_loader_effects]),
+    effect.batch([effect.dispatch(Tick), ..texture_loader_effects]),
     option.None,
   )
 }
@@ -293,7 +287,7 @@ fn update(
           camera_rotation: vec3.Vec3(cam_pitch, cam_yaw, cam_roll),
           pointer_locked: pointer_locked,
         ),
-        effect.batch([effect.tick(Tick), pointer_lock_effect, exit_lock_effect]),
+        effect.batch([effect.dispatch(Tick), pointer_lock_effect, exit_lock_effect]),
         option.None,
       )
     }
@@ -349,7 +343,6 @@ fn view(model: Model, _) -> scene.Node {
       camera:,
       transform: transform.at(position: model.camera_position),
       active: True,
-      look_at: option.Some(look_at_target),
       viewport: option.None,
       postprocessing: option.None,
     )
@@ -410,6 +403,9 @@ fn view(model: Model, _) -> scene.Node {
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   use <- bool.guard(
@@ -537,7 +533,7 @@ fn view(model: Model, _) -> scene.Node {
       ),
     ])
 
-  let assert Ok(plane_geom) = geometry.plane(vec2.Vec2(20.0, 20.0))
+  let assert Ok(plane_geom) = geometry.plane(size: vec2.Vec2(20.0, 20.0))
   let assert Ok(ground_material) =
     material.new()
     |> material.with_color(0xffffff)

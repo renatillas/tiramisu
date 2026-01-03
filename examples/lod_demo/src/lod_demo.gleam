@@ -24,14 +24,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(Nil) =
-    tiramisu.run(
-      bridge: option.None,
-      dimensions: option.None,
-      selector: "body",
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -52,7 +46,7 @@ fn init(
 
   #(
     Model(camera_position: vec3.Vec3(0.0, 20.0, 30.0)),
-    effect.tick(Tick),
+    effect.dispatch(Tick),
     option.None,
   )
 }
@@ -85,7 +79,7 @@ fn update(
 
       #(
         Model(camera_position: new_camera_position),
-        effect.tick(Tick),
+        effect.dispatch(Tick),
         option.None,
       )
     }
@@ -101,8 +95,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "main-camera",
       camera:,
-      transform: transform.at(model.camera_position),
-      look_at: option.None,
+      transform: transform.at(position: model.camera_position),
       active: True,
       viewport: option.None,
       postprocessing: option.None,
@@ -214,6 +207,9 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
                 transparent: False,
                 opacity: 1.0,
                 map: option.None,
+                side: material.FrontSide,
+                alpha_test: 0.0,
+                depth_write: True,
               )
             material
           },

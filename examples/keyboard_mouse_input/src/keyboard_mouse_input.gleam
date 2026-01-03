@@ -36,14 +36,8 @@ pub type Msg {
 
 pub fn main() -> Nil {
   let assert Ok(_) =
-    tiramisu.run(
-      bridge: option.None,
-      selector: "body",
-      dimensions: option.None,
-      init: init,
-      update: update,
-      view: view,
-    )
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
   Nil
 }
 
@@ -57,7 +51,7 @@ fn init(
       scale: 1.0,
       color: 0x4ecdc4,
     )
-  #(model, effect.tick(Tick), option.None)
+  #(model, effect.dispatch(Tick), option.None)
 }
 
 fn update(
@@ -125,7 +119,7 @@ fn update(
           color: color,
         )
 
-      #(new_model, effect.tick(Tick), option.None)
+      #(new_model, effect.dispatch(Tick), option.None)
     }
   }
 }
@@ -139,7 +133,6 @@ fn view(model: Model, _) -> scene.Node {
       camera: cam,
       transform: transform.identity,
       viewport: option.None,
-      look_at: option.None,
       active: True,
       postprocessing: option.None,
     ),
