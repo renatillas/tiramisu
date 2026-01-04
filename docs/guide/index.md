@@ -16,15 +16,15 @@ If you're new to Tiramisu, start here:
 
 These guides explain the fundamental patterns:
 
-2. **[State Management](02-state-management.md)** - The Model-View-Update pattern. How to structure your game state, name your messages, and write update functions that scale.
+2. **[State Management](02-state-management.html)** - The Model-View-Update pattern. How to structure your game state, name your messages, and write update functions that scale.
 
-3. **[Side Effects](03-side-effects.md)** - How Tiramisu handles the messy parts: timers, audio loading, browser APIs. Keep your logic pure while still doing useful things.
+3. **[Side Effects](03-side-effects.html)** - How Tiramisu handles the messy parts: timers, audio loading, browser APIs. Keep your logic pure while still doing useful things.
 
-4. **[The Scene Graph](04-scene-graph.md)** - Declarative 3D rendering. Build scenes from meshes, lights, and cameras. Understand how Tiramisu diffs and patches efficiently.
+4. **[The Scene Graph](04-scene-graph.html)** - Declarative 3D rendering. Build scenes from meshes, lights, and cameras. Understand how Tiramisu diffs and patches efficiently.
 
-5. **[Physics](05-physics.md)** - Add realistic simulation with Rapier. Rigid bodies, collision detection, forces, and raycasting.
+5. **[Physics](05-physics.html)** - Add realistic simulation with Rapier. Rigid bodies, collision detection, forces, and raycasting.
 
-6. **[Lustre Integration](06-lustre-integration.md)** - Connect Tiramisu with Lustre for HTML/CSS UI overlays. Build health bars, menus, inventories, and HUDs.
+6. **[Lustre Integration](06-lustre-integration.html)** - Connect Tiramisu with Lustre for HTML/CSS UI overlays. Build health bars, menus, inventories, and HUDs.
 
 ## Learning approach
 

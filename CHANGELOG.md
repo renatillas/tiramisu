@@ -1,5 +1,278 @@
 # Changelog
 
+## v7.0.0-rc1 - 2026-01-04
+
+### Major Breaking Changes
+
+This release is a major rewrite focusing on simplification, better type safety, and extraction of reusable components into separate packages.
+
+#### Entry Point API Redesign
+
+The game initialization API has been completely redesigned for better composability:
+
+```gleam
+// Before (v6.x)
+tiramisu.run(
+  dimensions: option.None,
+  background: background.Color(0x000000),
+  init: init,
+  update: update,
+  view: view,
+)
+
+// After (v7.x)
+tiramisu.application(init, update, view)
+|> tiramisu.start("#game", tiramisu.FullScreen, option.None)
+```
+
+- **BREAKING**: `tiramisu.run()` replaced with `tiramisu.application()` + `tiramisu.start()`
+- **BREAKING**: `Dimensions` type changed from `Dimensions(width, height)` to `FullScreen | Window(Vec2(Float))`
+- **BREAKING**: Background is now set via `background.set()` effect instead of at initialization
+- **BREAKING**: Selector parameter is now required (e.g., `"#game"`)
+
+#### Generic ID System Removed
+
+All generic ID type parameters have been removed. IDs are now plain `String` everywhere:
+
+```gleam
+// Before (v6.x)
+type Model(id) { ... }
+fn view(model: Model(id), ctx: Context(id)) -> scene.Node(id)
+
+// After (v7.x)
+type Model { ... }
+fn view(model: Model, ctx: Context) -> scene.Node
+```
+
+- **BREAKING**: `Context(id)` → `Context`
+- **BREAKING**: `scene.Node(id)` → `scene.Node`
+- **BREAKING**: `physics.PhysicsWorld(id)` → `physics.PhysicsWorld`
+- **BREAKING**: `physics.RigidBody(id)` → `physics.RigidBody`
+- **BREAKING**: `CollisionEvent(id)` → `CollisionEvent`
+- **BREAKING**: All scene node functions no longer have generic ID parameters
+
+#### Effect System Changes
+
+```gleam
+// Before (v6.x)
+effect.tick(Tick)  // Request next frame
+
+// After (v7.x)
+effect.dispatch(Tick)  // Dispatch any message
+```
+
+- **BREAKING**: `effect.tick()` renamed to `effect.dispatch()`
+- **BREAKING**: `effect.delay()` now takes `duration.Duration` instead of `Int` milliseconds
+- **BREAKING**: `effect.interval()` now takes `duration.Duration` instead of `Int` milliseconds
+- **BREAKING**: `effect.vibrate()` renamed to `effect.mobile_vibrate()` and takes `List(Duration)`
+- **BREAKING**: `effect.cancel_interval()` now takes `TimerId` instead of `Int`
+- **BREAKING**: `effect.set_background()` removed - use `background.set()` instead
+- **BREAKING**: `effect.tween()` removed - use new `tween` module instead
+- **BREAKING**: `effect.exit_fullscreen()` now requires success/error callbacks
+
+#### Context Type Changes
+
+```gleam
+// Before (v6.x)
+Context(
+  delta_time: Float,           // Milliseconds
+  input: input.InputState,
+  canvas_width: Float,
+  canvas_height: Float,
+  physics_world: Option(physics.PhysicsWorld(id)),
+)
+
+// After (v7.x)
+Context(
+  delta_time: Duration,        // Use duration.to_seconds()
+  input: input.InputState,
+  canvas_size: Vec2(Float),    // Combined width/height
+  physics_world: Option(physics.PhysicsWorld),
+  scene: Scene,                // Three.js scene reference
+  renderer: Renderer,          // WebGL renderer reference
+)
+```
+
+- **BREAKING**: `delta_time` is now `Duration` type - use `duration.to_seconds(ctx.delta_time)` for calculations
+- **BREAKING**: `canvas_width`/`canvas_height` combined into `canvas_size: Vec2(Float)`
+- Added `scene` and `renderer` fields for advanced use cases
+
+#### Camera API Changes
+
+- **BREAKING**: `look_at` parameter removed from `scene.camera()`
+- **BREAKING**: `ViewPort` type moved into `camera` module as `camera.ViewPort`
+- **BREAKING**: Postprocessing is now configured via `camera.PostProcessing` type with builder pattern
+
+#### Scene Node Changes
+
+- **BREAKING**: `scene.model_3d()` renamed to `scene.object_3d()`
+- **BREAKING**: `scene.css2d_label()` renamed to `scene.css2d()`
+- **BREAKING**: `scene.css3d_label()` renamed to `scene.css3d()`
+- **BREAKING**: `scene.particles()` removed (particle system removed)
+- **BREAKING**: `scene.object_3d()` now requires `transparent` parameter
+
+#### UI Bridge API Redesign
+
+The Lustre integration has been completely redesigned to use a single shared message type:
+
+```gleam
+// Before (v6.x)
+ui.register_lustre()
+ui.dispatch_to_lustre(msg)
+ui.dispatch_to_tiramisu(msg)
+
+// After (v7.x)
+pub type BridgeMsg { UpdateScore(Int), SelectSlot(Int) }  // Shared type
+
+// In Lustre:
+ui.register_lustre(bridge, FromBridge)  // With wrapper function
+ui.send(bridge, SelectSlot(0))          // Send to game
+
+// In Tiramisu:
+tiramisu.start(..., option.Some(#(bridge, FromBridge)))  // With wrapper
+ui.send_to_ui(bridge, UpdateScore(100))                  // Send to UI
+```
+
+- **BREAKING**: `Bridge(ui_msg, game_msg)` → `Bridge(bridge_msg)` (single type parameter)
+- **BREAKING**: `ui.register_lustre()` now requires bridge and wrapper function
+- **BREAKING**: `ui.dispatch_to_lustre()` → `ui.send_to_ui()`
+- **BREAKING**: `ui.dispatch_to_tiramisu()` → `ui.send()`
+
+### New Modules
+
+#### `tiramisu/model`
+
+New module for 3D model loading and skeletal animation:
+
+- `model.load_gltf()` - Load GLTF/GLB models
+- `model.load_fbx()` - Load FBX models
+- `model.load_obj()` - Load OBJ models
+- `model.load_stl()` - Load STL models
+- `model.get_scene()` / `model.get_fbx_scene()` - Get Object3D from loaded data
+- `model.get_animations()` / `model.get_fbx_animations()` - Get animation clips
+- `model.new_animation()` - Create animation from clip
+- `model.set_loop()` / `model.set_speed()` / `model.set_weight()` - Animation configuration
+- `model.clip_name()` / `model.clip_duration()` - Animation clip info
+- `model.center_object()` - Center Object3D at origin
+- `model.apply_texture()` - Apply texture to all meshes
+
+#### `tiramisu/tween`
+
+New module for value interpolation:
+
+- `tween.new()` - Create a tween with from/to values and duration
+- `tween.with_easing()` - Set easing function
+- `tween.tick()` - Advance tween by delta time
+- `tween.value()` - Get current interpolated value
+- `tween.is_complete()` - Check if tween finished
+- Built-in easings: Linear, EaseIn, EaseOut, EaseInOut, EaseInQuad, EaseOutQuad, etc.
+
+#### `tiramisu/simulate`
+
+New module for physics simulation helpers:
+
+- `simulate.step()` - Step physics world with fixed timestep
+- `simulate.raycast()` - Cast ray into physics world
+- `simulate.raycast_all()` - Get all ray intersections
+- `simulate.get_body_position()` / `simulate.get_body_rotation()` - Query body state
+- `simulate.apply_force()` / `simulate.apply_impulse()` - Apply forces
+- `simulate.set_linear_velocity()` / `simulate.set_angular_velocity()` - Set velocities
+
+### Removed Modules
+
+- **`tiramisu/postprocessing`** - Moved into `tiramisu/camera` module
+- **`tiramisu/particle_emitter`** - Particle system removed (use external solutions)
+- **`tiramisu/spatial`** - Extracted to standalone `spatial` package
+- **`tiramisu/state_machine`** - Extracted to standalone `statemachine` package
+- **`tiramisu/animation`** - Split between `model` (skeletal) and `tween` (interpolation)
+
+### New Dependencies
+
+- **`savoiardi` (v2.0.0)** - Three.js bindings extracted to separate package
+- **`statemachine` (v1.0.0)** - State machine extracted to separate package
+- **`gleam_time` (v1.6.0)** - For `Duration` type
+- **`quaterni` (v1.0.0)** - For quaternion types
+
+### Removed Dependencies
+
+- **`structures`** - No longer needed
+
+### Other Changes
+
+#### Physics
+
+- `physics.step()` signature unchanged but implementation improved
+- Collision events work the same but without generic ID parameter
+- Character controller API unchanged
+- Sensor support added via `physics.with_sensor()`
+
+#### Documentation
+
+- Complete documentation overhaul with new guide structure:
+  - Quickstart guide
+  - State management guide
+  - Side effects guide
+  - Scene graph guide
+  - Physics guide
+  - Lustre integration guide
+- All public modules now have comprehensive module-level documentation
+- Removed parameter documentation from functions (self-explanatory)
+- Updated CLAUDE.md with current API patterns
+
+#### Examples
+
+- Examples renumbered and reorganized
+- Many redundant examples removed (~24k lines removed)
+- All examples updated to v7 API
+- Example games (tetris, snake, snake2D) updated to v7 API
+
+### Migration Guide
+
+1. **Update entry point:**
+   ```gleam
+   // Change tiramisu.run(...) to:
+   tiramisu.application(init, update, view)
+   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
+   ```
+
+2. **Remove generic ID parameters:**
+   ```gleam
+   // Remove (id) from all types
+   fn view(model: Model, ctx: Context) -> scene.Node { ... }
+   ```
+
+3. **Update effect.tick to effect.dispatch:**
+   ```gleam
+   effect.dispatch(Tick)  // Instead of effect.tick(Tick)
+   ```
+
+4. **Update delta_time usage:**
+   ```gleam
+   let dt = duration.to_seconds(ctx.delta_time)  // Convert Duration to Float
+   ```
+
+5. **Update canvas dimensions:**
+   ```gleam
+   let width = ctx.canvas_size.x
+   let height = ctx.canvas_size.y
+   ```
+
+6. **Remove look_at from cameras** - Use transform-based positioning
+
+7. **Update bridge usage:**
+   ```gleam
+   // Define shared BridgeMsg type
+   // Use ui.send() and ui.send_to_ui() instead of dispatch_to_*
+   // Pass #(bridge, wrapper) to tiramisu.start()
+   ```
+
+8. **Update animation references:**
+   ```gleam
+   // animation.* functions are now in model.*
+   model.new_animation(clip)
+   model.set_loop(anim, model.LoopRepeat)
+   ```
+
 ## v6.1.0 - 2025-11-26
 
 ### Fixed
