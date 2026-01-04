@@ -557,7 +557,6 @@ pub fn lod(
 /// ```gleam
 /// import tiramisu/scene
 /// import tiramisu/model
-/// import tiramisu/animation
 /// import tiramisu/transform
 /// import vec/vec3
 /// import gleam/option
@@ -569,18 +568,18 @@ pub fn lod(
 ///
 /// // Find walk animation
 /// let walk_clip = list.find(clips, fn(clip) {
-///   animation.clip_name(clip) == "Walk"
+///   model.clip_name(clip) == "Walk"
 /// })
 ///
-/// let walk_anim = animation.new_animation(walk_clip)
-///   |> animation.set_speed(1.2)
-///   |> animation.set_loop(animation.LoopRepeat)
+/// let walk_anim = model.new_animation(walk_clip)
+///   |> model.set_speed(1.2)
+///   |> model.set_loop(model.LoopRepeat)
 ///
 /// scene.object_3d(
 ///   id: "player",
 ///   object: scene_object,
 ///   transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
-///   animation: option.Some(animation.SingleAnimation(walk_anim)),
+///   animation: option.Some(model.SingleAnimation(walk_anim)),
 ///   physics: option.None,
 ///   material: option.None,
 /// )

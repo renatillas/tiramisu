@@ -85,7 +85,7 @@ pub fn new_bridge() -> Bridge(bridge_msg) {
   Bridge(bridge: create_bridge_ffi())
 }
 
-/// Get the internal bridge object (for use by tiramisu.run).
+/// Get the internal bridge object (for use by tiramisu.start).
 @internal
 pub fn get_internal(bridge: Bridge(bridge_msg)) -> BridgeInternal {
   bridge.bridge

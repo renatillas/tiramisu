@@ -171,7 +171,7 @@ pub fn get_scene(gltf: GLTFData) -> savoiardi.Object3D
 ///
 /// ```gleam
 /// let clips = model.get_animations(gltf_data)
-/// // Use clips with animation.create_mixer() and animation.play()
+/// // Use clips with model.new_animation() and scene.object_3d()
 /// ```
 @external(javascript, "./model.ffi.mjs", "getGLTFAnimations")
 pub fn get_animations(gltf: GLTFData) -> List(savoiardi.AnimationClip)
@@ -208,7 +208,7 @@ pub fn get_fbx_scene(fbx: FBXData) -> savoiardi.Object3D
 ///
 /// ```gleam
 /// let clips = model.get_fbx_animations(fbx_data)
-/// // Use clips with animation.create_mixer() and animation.play()
+/// // Use clips with model.new_animation() and scene.object_3d()
 /// ```
 @external(javascript, "./model.ffi.mjs", "getFBXAnimations")
 pub fn get_fbx_animations(fbx: FBXData) -> List(savoiardi.AnimationClip)
@@ -271,14 +271,13 @@ pub fn apply_texture(
 /// ## Example
 ///
 /// ```gleam
-/// import tiramisu/animation
 /// import tiramisu/model
 ///
 /// // After loading a GLTF model
 /// let clips = model.get_animations(gltf_data)
-/// let walk_clip = list.find(clips, fn(clip) { animation.clip_name(clip) == "Walk" })
+/// let walk_clip = list.find(clips, fn(clip) { model.clip_name(clip) == "Walk" })
 ///
-/// let walk_animation = animation.new_animation(walk_clip)
+/// let walk_animation = model.new_animation(walk_clip)
 /// ```
 pub fn new_animation(clip: Clip) -> Animation {
   Animation(clip: clip, loop: LoopRepeat, speed: 1.0, weight: 1.0)
@@ -289,8 +288,8 @@ pub fn new_animation(clip: Clip) -> Animation {
 /// ## Example
 ///
 /// ```gleam
-/// let jump_animation = animation.new_animation(jump_clip)
-///   |> animation.set_loop(animation.LoopOnce)  // Play once, don't loop
+/// let jump_animation = model.new_animation(jump_clip)
+///   |> model.set_loop(model.LoopOnce)  // Play once, don't loop
 /// ```
 pub fn set_loop(anim: Animation, mode: LoopMode) -> Animation {
   Animation(..anim, loop: mode)
@@ -307,8 +306,8 @@ pub fn set_loop(anim: Animation, mode: LoopMode) -> Animation {
 /// ## Example
 ///
 /// ```gleam
-/// let run_animation = animation.new_animation(run_clip)
-///   |> animation.set_speed(1.5)  // 50% faster running
+/// let run_animation = model.new_animation(run_clip)
+///   |> model.set_speed(1.5)  // 50% faster running
 /// ```
 pub fn set_speed(anim: Animation, speed: Float) -> Animation {
   Animation(..anim, speed: speed)
@@ -325,11 +324,11 @@ pub fn set_speed(anim: Animation, speed: Float) -> Animation {
 ///
 /// ```gleam
 /// // Blend two animations manually
-/// let walk = animation.new_animation(walk_clip) |> animation.set_weight(0.7)
-/// let idle = animation.new_animation(idle_clip) |> animation.set_weight(0.3)
+/// let walk = model.new_animation(walk_clip) |> model.set_weight(0.7)
+/// let idle = model.new_animation(idle_clip) |> model.set_weight(0.3)
 ///
 /// // Or use BlendedAnimations with a blend factor
-/// animation.BlendedAnimations(from: walk, to: idle, blend_factor: 0.5)
+/// model.BlendedAnimations(from: walk, to: idle, blend_factor: 0.5)
 /// ```
 pub fn set_weight(anim: Animation, weight: Float) -> Animation {
   Animation(..anim, weight: weight)
@@ -349,7 +348,7 @@ pub fn set_weight(anim: Animation, weight: Float) -> Animation {
 /// let clips = model.get_animations(gltf_data)
 ///
 /// let walk_clip = list.find(clips, fn(clip) {
-///   animation.clip_name(clip) == "Walk"
+///   model.clip_name(clip) == "Walk"
 /// })
 /// ```
 pub fn clip_name(clip: savoiardi.AnimationClip) -> String {
@@ -363,8 +362,8 @@ pub fn clip_name(clip: savoiardi.AnimationClip) -> String {
 /// ## Example
 ///
 /// ```gleam
-/// let clip = animation.new_animation(walk_clip)
-/// let duration_seconds = animation.clip_duration(walk_clip)
+/// let anim = model.new_animation(walk_clip)
+/// let duration = model.clip_duration(walk_clip)
 /// // Use this to sync game events with animation timing
 /// ```
 pub fn clip_duration(clip: savoiardi.AnimationClip) -> duration.Duration {

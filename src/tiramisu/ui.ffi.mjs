@@ -59,7 +59,7 @@ export function sendToGame(bridge, msg) {
   } else {
     console.warn(
       "Bridge: Cannot send to game - Tiramisu dispatch not registered. " +
-        "Make sure tiramisu.run() has started with the bridge."
+        "Make sure tiramisu.start() has been called with the bridge."
     );
   }
 }

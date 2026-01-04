@@ -30,27 +30,24 @@ stylesheets = [
 ## Basic Game Structure
 
 ```gleam
+import gleam/option
 import tiramisu
 import tiramisu/effect
 import tiramisu/scene
 
 pub fn main() {
-  tiramisu.run(
-    selector: "#game",
-    dimensions: None,        // Fullscreen
-    bridge: None,            // No Lustre integration
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
 }
 
 fn init(ctx: tiramisu.Context) {
-  #(Model(...), effect.none(), None)  // state, effect, physics_world
+  #(Model(...), effect.dispatch(Tick), option.None)  // state, effect, physics_world
 }
 
 fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
-  #(new_model, effect.none(), None)
+  case msg {
+    Tick -> #(new_model, effect.dispatch(Tick), option.None)
+  }
 }
 
 fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
@@ -60,24 +57,33 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
 
 ## Lustre Integration
 
-For bidirectional UI communication:
+For bidirectional UI communication using a shared bridge message type:
 
 ```gleam
+import gleam/option
+import tiramisu
 import tiramisu/ui
+
+// Shared bridge message type
+pub type BridgeMsg {
+  UpdateScore(Int)   // Game → UI
+  SelectSlot(Int)    // UI → Game
+}
 
 pub fn main() {
   let bridge = ui.new_bridge()
 
-  // Lustre receives bridge in flags, calls ui.register_lustre(bridge) in init
+  // Lustre receives bridge in flags, calls ui.register_lustre(bridge, FromBridge) in init
   let assert Ok(_) = lustre.application(init, update, view)
     |> lustre.start("#app", Flags(bridge:))
 
-  // Tiramisu uses same bridge
-  tiramisu.run(bridge: Some(bridge), ...)
+  // Tiramisu uses same bridge with wrapper function
+  tiramisu.application(game_init, game_update, game_view)
+  |> tiramisu.start("#game", tiramisu.FullScreen, option.Some(#(bridge, FromBridge)))
 }
 
-// Lustre -> Tiramisu: ui.to_tiramisu(bridge, GameMsg)
-// Tiramisu -> Lustre: ui.to_lustre(bridge, UIMsg)
+// Lustre → Game: ui.send(bridge, SelectSlot(0))
+// Game → Lustre: ui.send_to_ui(bridge, UpdateScore(100))
 ```
 
 ## FFI Architecture
@@ -98,14 +104,14 @@ Three.js / Rapier3D
 
 ## Key Modules
 
-- `tiramisu`: Main entry point, `run()` function
+- `tiramisu`: Main entry point, `application()` + `start()` functions
 - `tiramisu/scene`: Scene nodes (mesh, camera, light, empty, sprite, model)
 - `tiramisu/geometry`: Box, sphere, plane, cylinder, etc.
 - `tiramisu/material`: Standard material with builder pattern
 - `tiramisu/camera`: Perspective and orthographic cameras
 - `tiramisu/light`: Ambient, directional, point, spot lights
 - `tiramisu/transform`: Position, rotation, scale
-- `tiramisu/effect`: Side effects (tick, delay, interval, browser APIs)
+- `tiramisu/effect`: Side effects (dispatch, delay, interval, browser APIs)
 - `tiramisu/input`: Keyboard, mouse, touch, gamepad state
 - `tiramisu/physics`: Rapier integration (rigid bodies, colliders)
 - `tiramisu/audio`: Positional audio, audio groups
