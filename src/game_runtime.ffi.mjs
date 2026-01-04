@@ -206,6 +206,7 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
   const renderer = SCENE.get_renderer(rendererState);
   const scene = SCENE.get_scene(rendererState);
   const css2dRenderer = getCSS2DRenderer(rendererState);
+  const css3dRenderer = getCSS3DRenderer(rendererState);
 
   // Clear the entire canvas first
   renderer.setScissorTest(false);
@@ -220,6 +221,11 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
     if (css2dRenderer) {
       css2dRenderer.render(scene, threeCamera);
     }
+
+    // Render CSS3D elements for this camera
+    if (css3dRenderer) {
+      css3dRenderer.render(scene, threeCamera);
+    }
   }
 
   // Render viewport cameras
@@ -233,6 +239,11 @@ export function renderCameras(rendererState, mainCameras, viewportCameras) {
       if (css2dRenderer) {
         css2dRenderer.render(scene, threeCamera);
       }
+
+      // Render CSS3D elements for viewport camera
+      if (css3dRenderer) {
+        css3dRenderer.render(scene, threeCamera);
+      }
     }
   }
 }
@@ -244,6 +255,17 @@ function getCSS2DRenderer(rendererState) {
   const css2dOpt = rendererState.css2d_renderer;
   if (Option$isSome(css2dOpt)) {
     return Option$Some$0(css2dOpt);
+  }
+  return null;
+}
+
+/**
+ * Get CSS3D renderer from renderer state (handles Gleam Option type)
+ */
+function getCSS3DRenderer(rendererState) {
+  const css3dOpt = rendererState.css3d_renderer;
+  if (Option$isSome(css3dOpt)) {
+    return Option$Some$0(css3dOpt);
   }
   return null;
 }

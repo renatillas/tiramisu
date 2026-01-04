@@ -173,6 +173,9 @@ pub fn start(
   // Initialize CSS2D renderer for HTML overlay labels
   let renderer_state = scene.init_css2d_renderer(renderer_state, container)
 
+  // Initialize CSS3D renderer for 3D HTML elements
+  let renderer_state = scene.init_css3d_renderer(renderer_state, container)
+
   // Create input manager (will be initialized with listeners in game_loop)
   let input_mgr = input_manager.new()
 

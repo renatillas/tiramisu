@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+- **Fixed**: CSS3D elements not rendering ([#28](https://github.com/renatillas/tiramisu/issues/28))
+  - Added CSS3DRenderer initialization and rendering
+  - CSS3DObject elements are now properly displayed in the DOM
+  - Added `CSS3DRenderer` type and FFI bindings to savoiardi
+  - Added `init_css3d_renderer`, `render_css3d`, and `update_css3d_renderer_size` functions
+
 ## v7.0.0-rc1 - 2026-01-04
 
 ### Major Breaking Changes

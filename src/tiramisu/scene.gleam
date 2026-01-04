@@ -2235,6 +2235,8 @@ pub type RendererState {
     cached_scene_dict: option.Option(dict.Dict(String, NodeWithParent)),
     /// CSS2D renderer for HTML overlay labels
     css2d_renderer: option.Option(savoiardi.CSS2DRenderer),
+    /// CSS3D renderer for 3D HTML elements
+    css3d_renderer: option.Option(savoiardi.CSS3DRenderer),
   )
 }
 
@@ -2255,6 +2257,7 @@ pub fn new_render_state(options: savoiardi.RendererOptions) -> RendererState {
     audio_listener: audio_listener,
     cached_scene_dict: option.None,
     css2d_renderer: option.None,
+    css3d_renderer: option.None,
   )
 }
 
@@ -2278,6 +2281,7 @@ pub fn new_headless_render_state(width: Float, height: Float) -> RendererState {
     audio_listener: audio_listener,
     cached_scene_dict: option.None,
     css2d_renderer: option.None,
+    css3d_renderer: option.None,
   )
 }
 
@@ -2383,6 +2387,54 @@ pub fn update_css2d_renderer_size(state: RendererState) -> Nil {
         savoiardi.get_canvas_dimensions(state.renderer)
       savoiardi.set_css2d_renderer_size(
         css2d_renderer,
+        float.round(width),
+        float.round(height),
+      )
+    }
+    option.None -> Nil
+  }
+}
+
+/// Initialize CSS3D renderer and append to container
+/// Must be called after the main canvas is appended to the container
+@internal
+pub fn init_css3d_renderer(state: RendererState, container: a) -> RendererState {
+  let css3d_renderer = savoiardi.create_css3d_renderer()
+
+  // Get initial size from the WebGL renderer
+  let vec2.Vec2(width, height) = savoiardi.get_canvas_dimensions(state.renderer)
+  savoiardi.set_css3d_renderer_size(
+    css3d_renderer,
+    float.round(width),
+    float.round(height),
+  )
+
+  // Append CSS3D renderer element to container
+  let css3d_element = savoiardi.get_css3d_renderer_dom_element(css3d_renderer)
+  append_element_to_container(container, css3d_element)
+
+  RendererState(..state, css3d_renderer: option.Some(css3d_renderer))
+}
+
+/// Render CSS3D labels (call after main render)
+@internal
+pub fn render_css3d(state: RendererState, camera: savoiardi.Camera) -> Nil {
+  case state.css3d_renderer {
+    option.Some(css3d_renderer) ->
+      savoiardi.render_css3d(css3d_renderer, state.scene, camera)
+    option.None -> Nil
+  }
+}
+
+/// Update CSS3D renderer size (call on window resize)
+@internal
+pub fn update_css3d_renderer_size(state: RendererState) -> Nil {
+  case state.css3d_renderer {
+    option.Some(css3d_renderer) -> {
+      let vec2.Vec2(width, height) =
+        savoiardi.get_canvas_dimensions(state.renderer)
+      savoiardi.set_css3d_renderer_size(
+        css3d_renderer,
         float.round(width),
         float.round(height),
       )
