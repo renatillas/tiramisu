@@ -1,0 +1,524 @@
+import gleam/float
+import gleam/int
+import gleam/io
+import gleam/list
+import gleam/option
+import gleam/time/duration
+import gleam_community/maths
+import tiramisu
+import tiramisu/camera
+import tiramisu/debug
+import tiramisu/effect
+import tiramisu/geometry
+import tiramisu/input
+import tiramisu/light
+import tiramisu/material
+import tiramisu/scene
+import tiramisu/transform
+import vec/vec2
+import vec/vec3
+
+pub type CameraView {
+  TopDown
+  Side
+  FirstPerson
+  Orbiting
+}
+
+pub type Model {
+  Model(current_view: CameraView, rotation: Float, show_performance: Bool)
+}
+
+pub type Msg {
+  Tick
+}
+
+pub fn main() -> Nil {
+  let assert Ok(Nil) =
+    tiramisu.application(init, update, view)
+    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
+  Nil
+}
+
+fn init(
+  _ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+  io.println("=== Multi-Camera Demo ===")
+  io.println("")
+  io.println("This demo shows multiple cameras viewing the same scene.")
+  io.println("Switch between different camera perspectives in real-time!")
+  io.println("")
+  io.println("Features:")
+  io.println("- Picture-in-picture overlay (bottom-right, always visible)")
+  io.println("- Dynamic camera switching")
+  io.println("")
+  io.println("Controls:")
+  io.println("  1 - Top-down view (bird's eye)")
+  io.println("  2 - Side view (profile)")
+  io.println("  3 - First-person view (ground level)")
+  io.println("  4 - Orbiting view (rotating around scene)")
+  io.println("  P - Toggle performance stats")
+  io.println("")
+
+  #(
+    Model(current_view: TopDown, rotation: 0.0, show_performance: False),
+    effect.dispatch(Tick),
+    option.None,
+  )
+}
+
+fn update(
+  model: Model,
+  msg: Msg,
+  ctx: tiramisu.Context,
+) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+  case msg {
+    Tick -> {
+      // Camera switching
+      let new_view = model.current_view
+
+      let new_view = case
+        input.is_key_just_pressed(ctx.input, input.Custom("Digit1"))
+      {
+        True -> {
+          TopDown
+        }
+        False -> new_view
+      }
+
+      let new_view = case
+        input.is_key_just_pressed(ctx.input, input.Custom("Digit2"))
+      {
+        True -> Side
+        False -> new_view
+      }
+
+      let new_view = case
+        input.is_key_just_pressed(ctx.input, input.Custom("Digit3"))
+      {
+        True -> {
+          io.println("Switched to: First-person camera")
+          FirstPerson
+        }
+        False -> new_view
+      }
+
+      let new_view = case
+        input.is_key_just_pressed(ctx.input, input.Custom("Digit4"))
+      {
+        True -> {
+          io.println("Switched to: Orbiting camera")
+          Orbiting
+        }
+        False -> new_view
+      }
+
+      // Toggle performance stats
+      let p_pressed = input.is_key_just_pressed(ctx.input, input.Custom("KeyP"))
+      let show_performance = case p_pressed {
+        True -> {
+          io.println(
+            "Performance stats: "
+            <> case !model.show_performance {
+              True -> "ON"
+              False -> "OFF"
+            },
+          )
+          !model.show_performance
+        }
+        False -> model.show_performance
+      }
+
+      // Show performance stats
+      case show_performance {
+        True -> {
+          echo debug.get_render_stats(ctx.renderer)
+          Nil
+        }
+        False -> Nil
+      }
+
+      // Update rotation for orbiting camera
+      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
+
+      #(
+        Model(
+          current_view: new_view,
+          rotation: new_rotation,
+          show_performance: show_performance,
+        ),
+        effect.dispatch(Tick),
+        option.None,
+      )
+    }
+  }
+}
+
+fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
+  // Create multiple cameras with different perspectives
+
+  // 1. Top-down camera (bird's eye view) - Retro pixelated effect
+  let assert Ok(cam_topdown) =
+    camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
+
+  let pixel_size = float.round(9.0 +. 7.0 *. maths.sin(model.rotation *. 2.0))
+
+  let camera_topdown =
+    scene.camera(
+      id: "CameraTopdown",
+      camera: cam_topdown,
+      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      active: model.current_view == TopDown,
+      viewport: option.None,
+      postprocessing: option.Some(
+        camera.new_postprocessing()
+        |> camera.add_pass(camera.clear_pass(option.None))
+        |> camera.add_pass(camera.render_pass())
+        |> camera.add_pass(
+          // Oscillating pixelate effect: 2-16 pixels
+          camera.pixelate(pixel_size),
+        )
+        |> camera.add_pass(camera.output_pass()),
+      ),
+    )
+
+  // 2. Side camera (profile view from the side) - Cinematic bloom
+  let assert Ok(cam_side) =
+    camera.perspective(field_of_view: 60.0, near: 0.1, far: 200.0)
+
+  let camera_side =
+    scene.camera(
+      id: "CameraSide",
+      camera: cam_side,
+      transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
+      active: model.current_view == Side,
+      viewport: option.None,
+      postprocessing: option.Some(
+        camera.new_postprocessing()
+        |> camera.add_pass(camera.clear_pass(option.None))
+        |> camera.add_pass(camera.render_pass())
+        |> camera.add_pass(camera.bloom(
+          strength: 0.8,
+          threshold: 0.3,
+          radius: 0.5,
+        ))
+        |> camera.add_pass(camera.output_pass()),
+      ),
+    )
+
+  // 3. First-person camera (ground level, looking at rotating cube) - Immersive vignette
+  let assert Ok(cam_firstperson) =
+    camera.perspective(field_of_view: 75.0, near: 0.1, far: 200.0)
+
+  let camera_firstperson =
+    scene.camera(
+      id: "CameraFirstperson",
+      camera: cam_firstperson,
+      transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
+      active: model.current_view == FirstPerson,
+      viewport: option.None,
+      postprocessing: option.Some(
+        camera.new_postprocessing()
+        |> camera.add_pass(camera.clear_pass(option.None))
+        |> camera.add_pass(camera.render_pass())
+        |> camera.add_pass(camera.vignette(darkness: 1.5, offset: 0.8))
+        |> camera.add_pass(camera.output_pass()),
+      ),
+    )
+
+  // 4. Orbiting camera (rotating around scene at 45 degree angle) - Color-shifted custom shader
+  let orbit_radius = 40.0
+  let orbit_x = maths.cos(model.rotation) *. orbit_radius
+  let orbit_z = maths.sin(model.rotation) *. orbit_radius
+
+  let assert Ok(cam_orbiting) =
+    camera.perspective(field_of_view: 65.0, near: 0.1, far: 200.0)
+
+  // Custom shader: Color shift effect
+  let color_shift_vertex =
+    "
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  "
+
+  let color_shift_fragment =
+    "
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      // Shift colors: red -> green -> blue -> red
+      gl_FragColor = vec4(color.g, color.b, color.r, color.a);
+    }
+  "
+
+  let camera_orbiting =
+    scene.camera(
+      id: "CameraOrbiting",
+      camera: cam_orbiting,
+      transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
+      active: model.current_view == Orbiting,
+      viewport: option.None,
+      postprocessing: option.Some(
+        camera.new_postprocessing()
+        |> camera.add_pass(camera.clear_pass(option.None))
+        |> camera.add_pass(camera.render_pass())
+        |> camera.add_pass(
+          camera.custom_shader(
+            vertex_shader: color_shift_vertex,
+            fragment_shader: color_shift_fragment,
+            uniforms: [],
+          ),
+        )
+        |> camera.add_pass(camera.output_pass()),
+      ),
+    )
+
+  // 5. Overlay camera (picture-in-picture) - Glitchy security cam aesthetic
+  let assert Ok(cam_overlay) =
+    camera.perspective(field_of_view: 50.0, near: 0.1, far: 200.0)
+
+  // Calculate viewport position relative to actual canvas size
+  let overlay_size = 250
+  let overlay_margin = 30
+  let overlay_x =
+    float.round(
+      ctx.canvas_size.x -. int.to_float(overlay_size + overlay_margin),
+    )
+  let overlay_y = overlay_margin
+
+  let camera_overlay =
+    scene.camera(
+      id: "CameraOverlay",
+      camera: cam_overlay,
+      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      active: False,
+      viewport: option.Some(camera.ViewPort(
+        position: vec2.Vec2(overlay_x, overlay_y),
+        size: vec2.Vec2(overlay_size, overlay_size),
+      )),
+      postprocessing: option.Some(
+        camera.new_postprocessing()
+        |> camera.add_pass(camera.render_pass())
+        |> camera.add_pass(camera.pixelate(float.round(model.rotation)))
+        |> camera.add_pass(camera.output_pass()),
+      ),
+    )
+
+  // Lights
+  let lights =
+    scene.empty(id: "Lights", transform: transform.identity, children: [
+      scene.light(
+        id: "AmbientLight",
+        light: {
+          let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.4)
+          light
+        },
+        transform: transform.identity,
+      ),
+      scene.light(
+        id: "DirectionalLight",
+        light: {
+          let assert Ok(light) =
+            light.directional(color: 0xffffff, intensity: 0.8)
+          light
+        },
+        transform: transform.at(position: vec3.Vec3(30.0, 40.0, 30.0)),
+      ),
+    ])
+
+  // Create a scene with various objects to view from different angles
+
+  // Central rotating cube - with emissive glow for bloom
+  let rotating_cube =
+    scene.mesh(
+      id: "RotatingCube",
+      geometry: {
+        let assert Ok(geometry) = geometry.box(size: vec3.Vec3(6.0, 6.0, 6.0))
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          material.new()
+          |> material.with_color(0xff6b6b)
+          |> material.with_emissive(0xff6b6b)
+          |> material.with_emissive_intensity(0.5)
+          |> material.build
+        material
+      },
+      transform: transform.at(position: vec3.Vec3(0.0, 6.0, 0.0))
+        |> transform.with_euler_rotation(vec3.Vec3(
+          model.rotation,
+          model.rotation *. 0.7,
+          0.0,
+        )),
+      physics: option.None,
+    )
+
+  // Ground plane
+  let ground =
+    scene.mesh(
+      id: "Ground",
+      geometry: {
+        let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(100.0, 100.0))
+        geometry
+      },
+      material: {
+        let assert Ok(material) =
+          material.new()
+          |> material.with_color(0x2d3561)
+          |> material.build()
+        material
+      },
+      // -90 degrees to make it horizontal
+      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
+        |> transform.with_euler_rotation(vec3.Vec3(
+          maths.pi() |> float.multiply(-0.5),
+          0.0,
+          0.0,
+        )),
+      physics: option.None,
+    )
+
+  // Ring of spheres around the center - with emissive glow
+  let spheres =
+    list.range(0, 7)
+    |> list.map(fn(i) {
+      let angle = int.to_float(i) *. 0.785398
+      // 45 degrees
+      let radius = 15.0
+      let x = maths.cos(angle) *. radius
+      let z = maths.sin(angle) *. radius
+
+      scene.mesh(
+        id: "Sphere" <> int.to_string(i),
+        geometry: {
+          let assert Ok(geometry) =
+            geometry.sphere(radius: 2.0, segments: vec2.Vec2(16, 16))
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            material.new()
+            |> material.with_color(0x4ecdc4)
+            |> material.with_emissive(0x4ecdc4)
+            |> material.with_emissive_intensity(0.3)
+            |> material.build()
+          material
+        },
+        transform: transform.at(position: vec3.Vec3(x, 3.0, z)),
+        physics: option.None,
+      )
+    })
+    |> scene.empty(
+      id: "SpheresGroup",
+      transform: transform.identity,
+      children: _,
+    )
+
+  // Tall pillars at corners
+  let pillars =
+    scene.empty(id: "PillarsGroup", transform: transform.identity, children: [
+      scene.mesh(
+        id: "Pillar-1",
+        geometry: {
+          let assert Ok(geometry) =
+            geometry.cylinder(
+              radius_top: 1.0,
+              radius_bottom: 1.0,
+              height: 12.0,
+              radial_segments: 8,
+            )
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            material.new()
+            |> material.with_color(0xf9ca24)
+            |> material.build()
+          material
+        },
+        transform: transform.at(position: vec3.Vec3(25.0, 6.0, 25.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "Pillar-2",
+        geometry: {
+          let assert Ok(geometry) =
+            geometry.cylinder(
+              radius_top: 1.0,
+              radius_bottom: 1.0,
+              height: 12.0,
+              radial_segments: 8,
+            )
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            material.new()
+            |> material.with_color(0xf9ca24)
+            |> material.build()
+          material
+        },
+        transform: transform.at(position: vec3.Vec3(-25.0, 6.0, 25.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "Pillar-3",
+        geometry: {
+          let assert Ok(geometry) =
+            geometry.cylinder(
+              radius_top: 1.0,
+              radius_bottom: 1.0,
+              height: 12.0,
+              radial_segments: 8,
+            )
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            material.new()
+            |> material.with_color(0xf9ca24)
+            |> material.build()
+          material
+        },
+        transform: transform.at(position: vec3.Vec3(25.0, 6.0, -25.0)),
+        physics: option.None,
+      ),
+      scene.mesh(
+        id: "Pillar-4",
+        geometry: {
+          let assert Ok(geometry) =
+            geometry.cylinder(
+              radius_top: 1.0,
+              radius_bottom: 1.0,
+              height: 12.0,
+              radial_segments: 8,
+            )
+          geometry
+        },
+        material: {
+          let assert Ok(material) =
+            material.new()
+            |> material.with_color(0xf9ca24)
+            |> material.build()
+          material
+        },
+        transform: transform.at(position: vec3.Vec3(-25.0, 6.0, -25.0)),
+        physics: option.None,
+      ),
+    ])
+
+  // Grid for reference
+  let grid =
+    scene.debug_grid(id: "grid", size: 100.0, divisions: 20, color: 0x444466)
+
+  // Combine all cameras and scene objects
+  scene.empty(id: "scene", transform: transform.identity, children: [
+    camera_topdown, camera_side, camera_firstperson, camera_orbiting,
+    camera_overlay, lights, rotating_cube, ground, grid, spheres, pillars,
+  ])
+}

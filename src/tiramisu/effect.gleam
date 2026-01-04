@@ -1,138 +1,46 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Creating effects",
-////     functions: [
-////       "none",
-////       "from",
-////       "from_promise",
-////       "batch"
-////     ]
-////   },
-////   {
-////     header: "Transform effects",
-////     functions: [
-////       "map"
-////     ]
-////   },
-////   {
-////     header: "Timing",
-////     functions: [
-////       "tick",
-////       "delay",
-////       "interval",
-////       "cancel_interval"
-////     ]
-////   },
-////   {
-////     header: "Scene effects",
-////     functions: [
-////       "set_background",
-////       "tween"
-////     ]
-////   },
-////   {
-////     header: "Browser APIs",
-////     functions: [
-////       "request_fullscreen",
-////       "exit_fullscreen",
-////       "request_pointer_lock",
-////       "exit_pointer_lock",
-////       "vibrate",
-////       "gamepad_vibrate",
-////       "clipboard_write",
-////       "clipboard_read"
-////     ]
-////   }
-//// ]
+//// Side effects for Tiramisu applications.
 ////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
+//// Effects are data descriptions of side effects to perform. They're returned from your
+//// `update` function and executed by the runtime after state updates. This keeps your
+//// game logic pure and testable.
 ////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
+//// ## Common Effects
 ////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
+//// - `dispatch` - Schedule a message to be processed (used for game loops)
+//// - `delay` - Dispatch a message after a delay
+//// - `interval` - Dispatch a message repeatedly at fixed intervals
+//// - `batch` - Combine multiple effects to run together
+//// - `none` - No effect (for state-only updates)
 ////
+//// ## Game Loop Pattern
 ////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Effect system for managing side effects in Tiramisu.
-////
-//// Effects represent side effects as immutable data, following The Elm Architecture.
-//// Your `update` function returns effects that the runtime executes for you.
-////
-//// ## Quick Example
+//// The typical game loop uses `effect.dispatch(Tick)` to request the next frame:
 ////
 //// ```gleam
-//// import tiramisu/effect
-////
-//// type Msg {
-////   Tick
-////   PlayerMoved(Vec3(Float))
-//// }
-////
-//// fn update(model: Model, msg: Msg, ctx: Context) {
+//// fn update(model, msg, ctx) {
 ////   case msg {
-////     Tick -> #(
-////       update_physics(model),
-////       effect.batch([
-////         effect.tick(Tick),  // Request next frame
-////         effect.from(fn(dispatch) {
-////           // Custom side effect
-////           log_position(model.player_pos)
-////           dispatch(PlayerMoved(model.player_pos))
-////         }),
-////       ]),
-////     )
-////     PlayerMoved(_) -> #(model, effect.none())
+////     Tick -> {
+////       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
+////       #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
+////     }
 ////   }
 //// }
 //// ```
+////
 
-import gleam/dynamic.{type Dynamic}
+import gleam/float
 import gleam/javascript/promise.{type Promise}
 import gleam/list
+import gleam/time/duration
+import plinth/browser/document
+import plinth/browser/element
 import plinth/browser/window
-import tiramisu/background.{type Background}
+
+import tiramisu/internal/browser
+import tiramisu/internal/timer
+
+pub type TimerId =
+  timer.TimerId
 
 /// Opaque effect type that can dispatch messages back to the application.
 ///
@@ -175,6 +83,17 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
   Effect(perform: effect)
 }
 
+/// Dispatch a message to be processed by the update function.
+///
+/// This is the core effect for game loops. Calling `effect.dispatch(Tick)` schedules
+/// a `Tick` message to be processed, which triggers another update cycle.
+pub fn dispatch(msg msg: msg) -> Effect(msg) {
+  Effect(perform: fn(dispatch) {
+    dispatch(msg)
+    Nil
+  })
+}
+
 /// Batch multiple effects to run them together.
 ///
 /// All effects execute in order during the same frame.
@@ -183,7 +102,7 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
 ///
 /// ```gleam
 /// effect.batch([
-///   effect.tick(NextFrame),
+///   effect.dispatch(NextFrame),
 ///   play_sound_effect("jump.wav"),
 ///   update_scoreboard(score),
 /// ])
@@ -191,10 +110,7 @@ pub fn from(effect: fn(fn(msg) -> Nil) -> Nil) -> Effect(msg) {
 pub fn batch(effects: List(Effect(msg))) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
     effects
-    |> list.each(fn(effect) {
-      let Effect(perform) = effect
-      perform(dispatch)
-    })
+    |> list.each(fn(effect) { effect.perform(dispatch) })
   })
 }
 
@@ -209,10 +125,7 @@ pub fn batch(effects: List(Effect(msg))) -> Effect(msg) {
 /// effect.map(player_effect, PlayerMsg)
 /// ```
 pub fn map(effect: Effect(a), f: fn(a) -> b) -> Effect(b) {
-  Effect(perform: fn(dispatch) {
-    let Effect(perform) = effect
-    perform(fn(msg) { dispatch(f(msg)) })
-  })
+  Effect(perform: fn(dispatch) { effect.perform(fn(msg) { dispatch(f(msg)) }) })
 }
 
 /// Create an effect from a JavaScript Promise.
@@ -234,147 +147,12 @@ pub fn from_promise(p: Promise(msg)) -> Effect(msg) {
 
 @internal
 pub fn run(effect: Effect(msg), dispatch: fn(msg) -> Nil) -> Nil {
-  let Effect(perform) = effect
-  perform(dispatch)
-}
-
-/// Request the next animation frame and dispatch a message.
-///
-/// This is the primary way to create frame-based game loops. Call this in your
-/// `update` function to receive a message on the next frame.
-///
-/// ## Example
-///
-/// ```gleam
-/// type Msg {
-///   Tick
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     Tick -> #(
-///       Model(..model, time: model.time +. ctx.delta_time),
-///       effect.tick(Tick),  // Request next frame
-///     )
-///   }
-/// }
-/// ```
-pub fn tick(msg: msg) -> Effect(msg) {
-  Effect(perform: fn(dispatch) {
-    window.request_animation_frame(fn(_timestamp) { dispatch(msg) })
-    Nil
-  })
-}
-
-/// Change the scene background dynamically.
-///
-/// Allows you to switch between color, texture, or cube texture backgrounds
-/// at runtime from your update function.
-///
-/// ## Example
-///
-/// ```gleam
-/// import tiramisu
-/// import tiramisu/background
-/// import tiramisu/effect
-///
-/// type Msg {
-///   Tick
-///   ChangeToNight
-///   ChangeToDawn
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     ChangeToNight -> #(
-///       model,
-///       effect.set_background(background.Color(0x0a0a1e)),
-///     )
-///     ChangeToDawn -> #(
-///       model,
-///       effect.set_background(background.Texture("assets/dawn-sky.jpg")),
-///     )
-///     Tick -> #(model, effect.tick(Tick))
-///   }
-/// }
-/// ```
-pub fn set_background(background: Background) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    let scene = get_game_scene_ffi()
-    case background {
-      background.Color(color) -> set_scene_background_color_ffi(scene, color)
-      background.Texture(url) -> {
-        // Load texture asynchronously
-        load_texture_ffi(url)
-        |> promise.tap(fn(texture) {
-          set_scene_background_texture_ffi(scene, texture)
-        })
-        Nil
-      }
-      background.EquirectangularTexture(url) -> {
-        // Load equirectangular texture asynchronously
-        load_equirectangular_texture_ffi(url)
-        |> promise.tap(fn(texture) {
-          set_scene_background_texture_ffi(scene, texture)
-        })
-        Nil
-      }
-      background.CubeTexture(urls) -> {
-        // Load cube texture asynchronously
-        load_cube_texture_ffi(urls)
-        |> promise.tap(fn(cube_texture) {
-          set_scene_background_cube_texture_ffi(scene, cube_texture)
-        })
-        Nil
-      }
-    }
-  })
-}
-
-// FFI bindings for background setting
-@external(javascript, "../threejs.ffi.mjs", "getGameScene")
-fn get_game_scene_ffi() -> Dynamic
-
-@external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundColor")
-fn set_scene_background_color_ffi(scene: Dynamic, color: Int) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundTexture")
-fn set_scene_background_texture_ffi(scene: Dynamic, texture: Dynamic) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setSceneBackgroundCubeTexture")
-fn set_scene_background_cube_texture_ffi(
-  scene: Dynamic,
-  cube_texture: Dynamic,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "loadTexture")
-fn load_texture_ffi(url: String) -> Promise(Dynamic)
-
-@external(javascript, "../threejs.ffi.mjs", "loadEquirectangularTexture")
-fn load_equirectangular_texture_ffi(url: String) -> Promise(Dynamic)
-
-@external(javascript, "../threejs.ffi.mjs", "loadCubeTexture")
-fn load_cube_texture_ffi(urls: List(String)) -> Promise(Dynamic)
-
-// ============================================================================
-// TIME & ANIMATION EFFECTS
-// ============================================================================
-
-/// Easing function types for animations and tweens.
-pub type Easing {
-  Linear
-  EaseInQuad
-  EaseOutQuad
-  EaseInOutQuad
-  EaseInCubic
-  EaseOutCubic
-  EaseInOutCubic
+  effect.perform(dispatch)
 }
 
 /// Delay dispatching a message by a specified duration.
 ///
-/// Unlike `tick`, which waits for the next animation frame, `delay` waits
-/// for a specific number of milliseconds using `setTimeout`.
+/// Waits for a specific number of milliseconds using `setTimeout`.
 ///
 /// ## Example
 ///
@@ -399,10 +177,13 @@ pub type Easing {
 ///   }
 /// }
 /// ```
-pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
+pub fn delay(duration duration: duration.Duration, msg msg: msg) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    delay_ffi(milliseconds, fn() { dispatch(msg) })
-    Nil
+    duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+    |> timer.delay(fn() { dispatch(msg) })
   })
 }
 
@@ -418,12 +199,12 @@ pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
 ///
 /// ```gleam
 /// type Model {
-///   Model(spawn_interval: option.Option(Int))
+///   Model(spawn_interval: option.Option(timer.TimerId))
 /// }
 ///
 /// type Msg {
 ///   StartSpawning
-///   IntervalCreated(Int)
+///   IntervalCreated(timer.TimerId)
 ///   SpawnEnemy
 ///   StopSpawning
 /// }
@@ -455,14 +236,18 @@ pub fn delay(ms milliseconds: Int, msg msg: msg) -> Effect(msg) {
 /// }
 /// ```
 pub fn interval(
-  ms milliseconds: Int,
+  duration duration: duration.Duration,
   msg msg: msg,
-  on_created on_created: fn(Int) -> msg,
+  on_created on_created: fn(TimerId) -> msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    let id = interval_ffi(milliseconds, fn() { dispatch(msg) })
-    dispatch(on_created(id))
-    Nil
+    duration
+    |> duration.to_seconds()
+    |> float.multiply(1000.0)
+    |> float.round()
+    |> timer.interval(fn() { dispatch(msg) })
+    |> on_created
+    |> dispatch
   })
 }
 
@@ -478,81 +263,8 @@ pub fn interval(
 ///   option.None -> effect.none()
 /// }
 /// ```
-pub fn cancel_interval(id: Int) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    cancel_interval_ffi(id)
-    Nil
-  })
-}
-
-/// Animate a value from start to end over a duration with easing.
-///
-/// Dispatches `on_update` messages with interpolated values each frame,
-/// and `on_complete` when the animation finishes.
-///
-/// ## Example
-///
-/// ```gleam
-/// type Msg {
-///   FadeIn
-///   UpdateOpacity(Float)
-///   FadeComplete
-/// }
-///
-/// fn update(model, msg, ctx) {
-///   case msg {
-///     FadeIn -> #(
-///       model,
-///       effect.tween(
-///         from: 0.0,
-///         to: 1.0,
-///         duration_ms: 1000,
-///         easing: effect.EaseInOutQuad,
-///         on_update: UpdateOpacity,
-///         on_complete: FadeComplete,
-///       ),
-///     )
-///     UpdateOpacity(opacity) -> #(
-///       Model(..model, opacity: opacity),
-///       effect.none(),
-///     )
-///     FadeComplete -> #(model, effect.none())
-///     _ -> #(model, effect.none())
-///   }
-/// }
-/// ```
-pub fn tween(
-  from start: Float,
-  to end: Float,
-  duration_ms duration_ms: Int,
-  easing easing: Easing,
-  on_update on_update: fn(Float) -> msg,
-  on_complete on_complete: msg,
-) -> Effect(msg) {
-  Effect(perform: fn(dispatch) {
-    tween_ffi(
-      start,
-      end,
-      duration_ms,
-      easing_to_string(easing),
-      fn(value) { dispatch(on_update(value)) },
-      fn() { dispatch(on_complete) },
-    )
-    Nil
-  })
-}
-
-// Helper to convert Easing to string for FFI
-fn easing_to_string(easing: Easing) -> String {
-  case easing {
-    Linear -> "linear"
-    EaseInQuad -> "easeInQuad"
-    EaseOutQuad -> "easeOutQuad"
-    EaseInOutQuad -> "easeInOutQuad"
-    EaseInCubic -> "easeInCubic"
-    EaseOutCubic -> "easeOutCubic"
-    EaseInOutCubic -> "easeInOutCubic"
-  }
+pub fn cancel_interval(id: TimerId) -> Effect(msg) {
+  Effect(perform: fn(_dispatch) { timer.cancel_interval(id) })
 }
 
 // ============================================================================
@@ -579,7 +291,7 @@ fn easing_to_string(easing: Easing) -> String {
 ///       model,
 ///       effect.request_fullscreen(
 ///         on_success: FullscreenEntered,
-///         on_error: FullscreenFailed,
+///         on_error: FullscreenEnteredFailed,
 ///       ),
 ///     )
 ///     _ -> #(model, effect.none())
@@ -591,15 +303,19 @@ pub fn request_fullscreen(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    request_fullscreen_ffi()
-    |> promise.map(fn(result) {
-      case result {
-        Ok(_) -> dispatch(on_success)
-        Error(_) -> dispatch(on_error)
+    case document.query_selector("canvas") {
+      Error(_) -> dispatch(on_error)
+      Ok(canvas) -> {
+        element.request_fullscreen(canvas)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(_) -> dispatch(on_success)
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
       }
-    })
-    |> promise.tap(fn(_) { Nil })
-    Nil
+    }
   })
 }
 
@@ -608,11 +324,25 @@ pub fn request_fullscreen(
 /// ## Example
 ///
 /// ```gleam
-/// effect.exit_fullscreen()
+/// effect.exit_fullscreen(
+///   on_success: FullScreenExited,
+///   on_error: FullScreenExitedFailed
+/// )
 /// ```
-pub fn exit_fullscreen() -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    exit_fullscreen_ffi()
+pub fn exit_fullscreen(
+  on_success on_success: msg,
+  on_error on_error: msg,
+) -> Effect(msg) {
+  Effect(perform: fn(dispatch) {
+    window.self()
+    |> window.document
+    |> document.exit_fullscreen
+    |> promise.map(fn(result) {
+      case result {
+        Ok(_) -> dispatch(on_success)
+        Error(_) -> dispatch(on_error)
+      }
+    })
     Nil
   })
 }
@@ -650,15 +380,19 @@ pub fn request_pointer_lock(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    request_pointer_lock_ffi()
-    |> promise.map(fn(result) {
-      case result {
-        Ok(_) -> dispatch(on_success)
-        Error(_) -> dispatch(on_error)
+    case document.query_selector("canvas") {
+      Error(_) -> dispatch(on_error)
+      Ok(canvas) -> {
+        browser.request_pointer_lock(canvas)
+        |> promise.map(fn(result) {
+          case result {
+            Ok(_) -> dispatch(on_success)
+            Error(_) -> dispatch(on_error)
+          }
+        })
+        Nil
       }
-    })
-    |> promise.tap(fn(_) { Nil })
-    Nil
+    }
   })
 }
 
@@ -670,10 +404,7 @@ pub fn request_pointer_lock(
 /// effect.exit_pointer_lock()
 /// ```
 pub fn exit_pointer_lock() -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    exit_pointer_lock_ffi()
-    Nil
-  })
+  Effect(perform: fn(_dispatch) { browser.exit_pointer_lock() })
 }
 
 /// Trigger haptic feedback on mobile devices.
@@ -698,11 +429,8 @@ pub fn exit_pointer_lock() -> Effect(msg) {
 ///   }
 /// }
 /// ```
-pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
-  Effect(perform: fn(_dispatch) {
-    vibrate_ffi(pattern)
-    Nil
-  })
+pub fn mobile_vibrate(pattern: List(duration.Duration)) -> Effect(msg) {
+  Effect(perform: fn(_dispatch) { browser.mobile_vibrate(pattern) })
 }
 
 /// Trigger haptic feedback on a gamepad.
@@ -724,7 +452,7 @@ pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
 ///       effect.gamepad_vibrate(
 ///         gamepad: 0,
 ///         intensity: 0.7,
-///         duration_ms: 500,
+///         duration: duration.milliseconds(500),
 ///       ),
 ///     )
 ///     _ -> #(model, effect.none())
@@ -734,11 +462,10 @@ pub fn vibrate(pattern: List(Int)) -> Effect(msg) {
 pub fn gamepad_vibrate(
   gamepad gamepad: Int,
   intensity intensity: Float,
-  duration_ms duration_ms: Int,
+  duration duration: duration.Duration,
 ) -> Effect(msg) {
   Effect(perform: fn(_dispatch) {
-    gamepad_vibrate_ffi(gamepad, intensity, duration_ms)
-    Nil
+    browser.gamepad_vibrate(gamepad, intensity, duration)
   })
 }
 
@@ -775,14 +502,13 @@ pub fn clipboard_write(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    clipboard_write_ffi(text)
+    browser.clipboard_write(text)
     |> promise.map(fn(result) {
       case result {
         Ok(_) -> dispatch(on_success)
         Error(_) -> dispatch(on_error)
       }
     })
-    |> promise.tap(fn(_) { Nil })
     Nil
   })
 }
@@ -822,63 +548,13 @@ pub fn clipboard_read(
   on_error on_error: msg,
 ) -> Effect(msg) {
   Effect(perform: fn(dispatch) {
-    clipboard_read_ffi()
+    browser.clipboard_read()
     |> promise.map(fn(result) {
       case result {
         Ok(text) -> dispatch(on_success(text))
         Error(_) -> dispatch(on_error)
       }
     })
-    |> promise.tap(fn(_) { Nil })
     Nil
   })
 }
-
-// ============================================================================
-// FFI BINDINGS
-// ============================================================================
-
-// Time & Animation FFI
-@external(javascript, "../tiramisu.ffi.mjs", "delay")
-fn delay_ffi(milliseconds: Int, callback: fn() -> Nil) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "interval")
-fn interval_ffi(milliseconds: Int, callback: fn() -> Nil) -> Int
-
-@external(javascript, "../tiramisu.ffi.mjs", "cancelInterval")
-fn cancel_interval_ffi(id: Int) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "tween")
-fn tween_ffi(
-  start: Float,
-  end: Float,
-  duration_ms: Int,
-  easing: String,
-  on_update: fn(Float) -> Nil,
-  on_complete: fn() -> Nil,
-) -> Nil
-
-// System & Browser FFI
-@external(javascript, "../tiramisu.ffi.mjs", "requestFullscreen")
-fn request_fullscreen_ffi() -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "exitFullscreen")
-fn exit_fullscreen_ffi() -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "requestPointerLock")
-fn request_pointer_lock_ffi() -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "exitPointerLock")
-fn exit_pointer_lock_ffi() -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "vibrate")
-fn vibrate_ffi(pattern: List(Int)) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "gamepadVibrate")
-fn gamepad_vibrate_ffi(gamepad: Int, intensity: Float, duration_ms: Int) -> Nil
-
-@external(javascript, "../tiramisu.ffi.mjs", "clipboardWrite")
-fn clipboard_write_ffi(text: String) -> Promise(Result(Nil, String))
-
-@external(javascript, "../tiramisu.ffi.mjs", "clipboardRead")
-fn clipboard_read_ffi() -> Promise(Result(String, String))

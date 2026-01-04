@@ -1,121 +1,96 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Texture operations",
-////     functions: [
-////       "clone",
-////       "set_offset",
-////       "set_repeat",
-////       "set_wrap_mode",
-////       "set_filter_mode"
-////     ]
-////   }
-//// ]
+//// Texture loading and manipulation.
 ////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
+//// Textures are images applied to materials or used as sprites. This module
+//// provides loading, cloning, and UV manipulation for texture coordinates.
 ////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Texture manipulation utilities for Three.js textures.
-////
-//// This module provides type-safe access to Three.js texture properties,
-//// particularly useful for spritesheet animation where you need to control
-//// UV offset and repeat to display different frames.
-////
-//// ## UV Coordinates
-////
-//// UV coordinates in Three.js range from 0.0 to 1.0:
-//// - (0, 0) is the bottom-left corner
-//// - (1, 1) is the top-right corner
-////
-//// ## Offset and Repeat
-////
-//// - **Offset**: Shifts which portion of the texture is displayed
-//// - **Repeat**: Controls how much of the texture is shown (0.5 = show half)
-////
-//// ## Example: Spritesheet Animation
+//// ## Loading Textures
 ////
 //// ```gleam
-//// // For a 4-frame horizontal spritesheet:
-//// // Frame 0: offset (0.0, 0.0), repeat (0.25, 1.0)
-//// // Frame 1: offset (0.25, 0.0), repeat (0.25, 1.0)
-//// // Frame 2: offset (0.5, 0.0), repeat (0.25, 1.0)
-//// // Frame 3: offset (0.75, 0.0), repeat (0.25, 1.0)
-////
-//// let texture = asset.get_texture(cache, "spritesheet.png")
-////
-//// // Setup for animation
-//// texture
-//// |> texture.set_repeat(0.25, 1.0)  // Show 1/4 of texture width
-//// |> texture.set_wrap_mode(texture.RepeatWrapping, texture.RepeatWrapping)
-////
-//// // Change to frame 2
-//// texture.set_offset(texture, 0.5, 0.0)
+//// fn init(ctx: Context) {
+////   #(
+////     Model(texture: option.None),
+////     texture.load(
+////       from_url: "/textures/player.png",
+////       on_success: TextureLoaded,
+////       on_error: TextureFailed,
+////     ),
+////     None,
+////   )
+//// }
 //// ```
+////
+//// ## Spritesheet UV Manipulation
+////
+//// For animated sprites, use offset and repeat to show specific frames:
+////
+//// ```gleam
+//// // 4x4 spritesheet: show frame at row 1, column 2
+//// texture.set_repeat(tex, vec2.Vec2(0.25, 0.25))  // Each frame is 1/4 of texture
+//// texture.set_offset(tex, vec2.Vec2(0.5, 0.25))   // Column 2, row 1
+//// ```
+////
+//// ## Texture Filtering
+////
+//// ```gleam
+//// // Pixel art: use nearest neighbor for crisp pixels
+//// texture.set_filter_mode(tex, texture.NearestFilter, texture.NearestFilter)
+////
+//// // Smooth textures: use linear (default)
+//// texture.set_filter_mode(tex, texture.LinearFilter, texture.LinearFilter)
+//// ```
+////
 
-import tiramisu/asset
+import gleam/javascript/promise
+import savoiardi
+import tiramisu/effect
+import vec/vec2.{type Vec2}
 
-/// Texture wrapping mode
+pub type Texture =
+  savoiardi.Texture
+
+/// Texture wrapping mode.
+///
+/// Controls how textures behave when UV coordinates exceed the 0-1 range.
+///
+/// ## Variants
+///
+/// - `RepeatWrapping` - Texture repeats infinitely (requires power-of-two dimensions)
+/// - `ClampToEdgeWrapping` - Edge pixels stretch infinitely (works with any dimensions)
+/// - `MirroredRepeatWrapping` - Texture repeats with alternating mirrored copies
 pub type WrapMode {
-  /// Repeat the texture (requires power-of-two dimensions)
   RepeatWrapping
-  /// Clamp to edge (default, works with any dimensions)
   ClampToEdgeWrapping
-  /// Mirror the texture when repeating
   MirroredRepeatWrapping
 }
 
-/// Texture filtering mode
+/// Texture filtering mode.
+///
+/// Controls how textures are sampled when scaled.
+///
+/// ## Variants
+///
+/// - `NearestFilter` - No interpolation, uses nearest pixel (best for pixel art)
+/// - `LinearFilter` - Bilinear interpolation for smooth texture sampling (default)
 pub type FilterMode {
-  /// Nearest neighbor filtering (best for pixel art)
   NearestFilter
-  /// Linear interpolation filtering (smooth, default)
   LinearFilter
+}
+
+// Convert tiramisu WrapMode to savoiardi WrapMode
+fn to_savoiardi_wrap_mode(mode: WrapMode) -> savoiardi.WrapMode {
+  case mode {
+    RepeatWrapping -> savoiardi.RepeatWrapping
+    ClampToEdgeWrapping -> savoiardi.ClampToEdgeWrapping
+    MirroredRepeatWrapping -> savoiardi.MirroredRepeatWrapping
+  }
+}
+
+// Convert tiramisu FilterMode to savoiardi FilterMode
+fn to_savoiardi_filter_mode(mode: FilterMode) -> savoiardi.FilterMode {
+  case mode {
+    NearestFilter -> savoiardi.NearestFilter
+    LinearFilter -> savoiardi.LinearFilter
+  }
 }
 
 /// Clone a texture for independent manipulation.
@@ -134,71 +109,53 @@ pub type FilterMode {
 /// texture.set_offset(player1_texture, 0.0, 0.0)  // Frame 0
 /// texture.set_offset(player2_texture, 0.25, 0.0) // Frame 1
 /// ```
-pub fn clone(texture: asset.Texture) -> asset.Texture {
-  clone_ffi(texture)
+pub fn clone(texture: savoiardi.Texture) -> savoiardi.Texture {
+  savoiardi.clone_texture(texture)
 }
 
-/// Set the texture UV offset.
+/// Sets the texture UV offset.
 ///
 /// Controls which portion of the texture starts being displayed.
 /// Values range from 0.0 to 1.0.
-///
-/// ## Parameters
-///
-/// - `x`: Horizontal offset (0.0 = left edge, 1.0 = right edge)
-/// - `y`: Vertical offset (0.0 = bottom edge, 1.0 = top edge)
 ///
 /// ## Example
 ///
 /// ```gleam
 /// // Show the right half of the texture
-/// texture.set_offset(my_texture, 0.5, 0.0)
+/// texture.set_offset(my_texture, vec2.Vec2(0.5, 0.0))
 /// ```
 pub fn set_offset(
-  texture: asset.Texture,
-  x x: Float,
-  y y: Float,
-) -> asset.Texture {
-  set_offset_ffi(texture, x, y)
+  texture: savoiardi.Texture,
+  offset offset: Vec2(Float),
+) -> savoiardi.Texture {
+  savoiardi.set_texture_offset(texture, offset.x, offset.y)
   texture
 }
 
-/// Set the texture UV repeat (scaling).
+/// Sets the texture UV repeat (scaling).
 ///
 /// Controls how much of the texture is displayed.
 /// Values range from 0.0 to 1.0 (or higher for tiling).
-///
-/// ## Parameters
-///
-/// - `x`: Horizontal repeat (0.5 = show half width, 2.0 = tile twice)
-/// - `y`: Vertical repeat (0.5 = show half height, 2.0 = tile twice)
 ///
 /// ## Example
 ///
 /// ```gleam
 /// // Show only 1/4 of texture width (for 4-frame horizontal sprite)
-/// texture.set_repeat(my_texture, 0.25, 1.0)
+/// texture.set_repeat(my_texture, vec2.Vec2(0.25, 1.0))
 /// ```
 pub fn set_repeat(
-  texture: asset.Texture,
-  x x: Float,
-  y y: Float,
-) -> asset.Texture {
-  set_repeat_ffi(texture, x, y)
+  texture: savoiardi.Texture,
+  repeat repeat: Vec2(Float),
+) -> savoiardi.Texture {
+  savoiardi.set_texture_repeat(texture, repeat.x, repeat.y)
   texture
 }
 
-/// Set the texture wrapping mode.
+/// Sets the texture wrapping mode.
 ///
 /// Controls how the texture behaves at edges when UV coordinates exceed 0-1 range.
 ///
-/// **Important**: RepeatWrapping only works with power-of-two texture dimensions
-/// (2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, etc.)
-///
-/// ## Parameters
-///
-/// - `wrap_s`: Horizontal wrapping mode
-/// - `wrap_t`: Vertical wrapping mode
+/// **Important**: RepeatWrapping only works with power-of-two texture dimensions.
 ///
 /// ## Example
 ///
@@ -211,24 +168,22 @@ pub fn set_repeat(
 /// )
 /// ```
 pub fn set_wrap_mode(
-  texture: asset.Texture,
+  texture: savoiardi.Texture,
   wrap_s wrap_s: WrapMode,
   wrap_t wrap_t: WrapMode,
-) -> asset.Texture {
-  let s = wrap_mode_to_constant(wrap_s)
-  let t = wrap_mode_to_constant(wrap_t)
-  set_wrap_mode_ffi(texture, s, t)
+) -> savoiardi.Texture {
+  savoiardi.set_texture_wrap_mode(
+    texture,
+    to_savoiardi_wrap_mode(wrap_s),
+    to_savoiardi_wrap_mode(wrap_t),
+  )
   texture
 }
 
-/// Set the texture filtering mode.
+/// Sets the texture filtering mode.
 ///
 /// Controls how the texture is sampled when scaled.
-///
-/// ## Parameters
-///
-/// - `min_filter`: Minification filter (when texture appears smaller)
-/// - `mag_filter`: Magnification filter (when texture appears larger)
+/// Use NearestFilter for crisp pixel art, LinearFilter for smooth textures.
 ///
 /// ## Example
 ///
@@ -241,69 +196,32 @@ pub fn set_wrap_mode(
 /// )
 /// ```
 pub fn set_filter_mode(
-  texture: asset.Texture,
+  texture: savoiardi.Texture,
   min_filter min_filter: FilterMode,
   mag_filter mag_filter: FilterMode,
-) -> asset.Texture {
-  let min = filter_mode_to_constant(min_filter)
-  let mag = filter_mode_to_constant(mag_filter)
-  set_filter_mode_ffi(texture, min, mag)
+) -> savoiardi.Texture {
+  savoiardi.set_texture_filter_mode(
+    texture,
+    to_savoiardi_filter_mode(min_filter),
+    to_savoiardi_filter_mode(mag_filter),
+  )
   texture
 }
 
-// ============================================================================
-// Internal Helpers
-// ============================================================================
+/// Load a texture from URL
+pub fn load(
+  from_url url: String,
+  on_success on_success: fn(Texture) -> msg,
+  on_error on_error: msg,
+) -> effect.Effect(msg) {
+  let promise =
+    savoiardi.load_texture(url)
+    |> promise.map(fn(result) {
+      case result {
+        Ok(data) -> on_success(data)
+        Error(Nil) -> on_error
+      }
+    })
 
-fn wrap_mode_to_constant(mode: WrapMode) -> Int {
-  case mode {
-    RepeatWrapping -> get_repeat_wrapping_ffi()
-    ClampToEdgeWrapping -> get_clamp_to_edge_wrapping_ffi()
-    MirroredRepeatWrapping -> get_mirrored_repeat_wrapping_ffi()
-  }
+  effect.from_promise(promise)
 }
-
-fn filter_mode_to_constant(mode: FilterMode) -> Int {
-  case mode {
-    NearestFilter -> get_nearest_filter_ffi()
-    LinearFilter -> get_linear_filter_ffi()
-  }
-}
-
-// ============================================================================
-// FFI Declarations
-// ============================================================================
-
-@external(javascript, "../threejs.ffi.mjs", "cloneTexture")
-fn clone_ffi(texture: asset.Texture) -> asset.Texture
-
-@external(javascript, "../threejs.ffi.mjs", "setTextureOffset")
-fn set_offset_ffi(texture: asset.Texture, x: Float, y: Float) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setTextureRepeat")
-fn set_repeat_ffi(texture: asset.Texture, x: Float, y: Float) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setTextureWrapMode")
-fn set_wrap_mode_ffi(texture: asset.Texture, wrap_s: Int, wrap_t: Int) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "setTextureFilterMode")
-fn set_filter_mode_ffi(
-  texture: asset.Texture,
-  min_filter: Int,
-  mag_filter: Int,
-) -> Nil
-
-@external(javascript, "../threejs.ffi.mjs", "getRepeatWrapping")
-fn get_repeat_wrapping_ffi() -> Int
-
-@external(javascript, "../threejs.ffi.mjs", "getClampToEdgeWrapping")
-fn get_clamp_to_edge_wrapping_ffi() -> Int
-
-@external(javascript, "../threejs.ffi.mjs", "getMirroredRepeatWrapping")
-fn get_mirrored_repeat_wrapping_ffi() -> Int
-
-@external(javascript, "../threejs.ffi.mjs", "getNearestFilter")
-fn get_nearest_filter_ffi() -> Int
-
-@external(javascript, "../threejs.ffi.mjs", "getLinearFilter")
-fn get_linear_filter_ffi() -> Int

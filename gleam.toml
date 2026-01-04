@@ -7,9 +7,19 @@ repository = { type = "github", user = "renatillas", repo = "tiramisu" }
 
 [documentation]
 pages = [
-    { title = "Getting started", path = "getting_started.html", source = "./docs/getting-started.md" },
-    { title = "Scene graph guide", path = "scene_graph_guide.html", source = "./docs/scene-graph-guide.md" },
-    { title = "Physics guide", path = "physics.html", source = "./docs/physics-guide.md" },
+    # Guide
+    { title = " ", path = "#", source = "" },
+    { title = "Guide", path = "guide/index.html", source = "./docs/guide/index.md" },
+    { title = "Quickstart", path = "guide/01-quickstart.html", source = "./docs/guide/01-quickstart.md" },
+    { title = "State Management", path = "guide/02-state-management.html", source = "./docs/guide/02-state-management.md" },
+    { title = "Side Effects", path = "guide/03-side-effects.html", source = "./docs/guide/03-side-effects.md" },
+    { title = "Scene Graph", path = "guide/04-scene-graph.html", source = "./docs/guide/04-scene-graph.md" },
+    { title = "Physics", path = "guide/05-physics.html", source = "./docs/guide/05-physics.md" },
+    { title = "UI with Lustre", path = "guide/06-lustre-integration.html", source = "./docs/guide/06-lustre-integration.md" },
+    # Advanced
+    { title = " ", path = "#", source = "" },
+    { title = "Architecture", path = "advanced/architecture.html", source = "./docs/advanced/architecture.md" },
+    { title = "Runtime", path = "advanced/runtime.html", source = "./docs/advanced/runtime.md" },
 ]
 
 
@@ -19,10 +29,13 @@ gleam_community_maths = ">= 2.0.0 and < 3.0.0"
 gleam_javascript = ">= 1.0.0 and < 2.0.0"
 vec = ">= 3.0.1 and < 4.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
-structures = ">= 1.0.0 and < 2.0.0"
 plinth = ">= 0.7.2 and < 1.0.0"
 paint = ">= 1.0.0 and < 2.0.0"
 iv = ">= 1.3.3 and < 2.0.0"
+quaterni = ">= 1.0.0 and < 2.0.0"
+gleam_time = ">= 1.6.0 and < 2.0.0"
+savoiardi = ">= 2.0.0 and < 3.0.0"
+statemachine = ">= 1.0.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -1,150 +1,58 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Creating transforms",
-////     functions: [
-////       "identity",
-////       "at"
-////     ]
-////   },
-////   {
-////     header: "Accessing transform properties",
-////     functions: [
-////       "position",
-////       "rotation",
-////       "rotation_quaternion",
-////       "scale"
-////     ]
-////   },
-////   {
-////     header: "Setting transform properties",
-////     functions: [
-////       "with_position",
-////       "with_euler_rotation",
-////       "with_quaternion_rotation",
-////       "with_scale"
-////     ]
-////   },
-////   {
-////     header: "Transform operations",
-////     functions: [
-////       "translate",
-////       "rotate_by",
-////       "rotate_x",
-////       "rotate_y",
-////       "rotate_z",
-////       "scale_by",
-////       "scale_uniform",
-////       "compose",
-////       "look_at"
-////     ]
-////   },
-////   {
-////     header: "Interpolation",
-////     functions: [
-////       "lerp",
-////       "slerp"
-////     ]
-////   },
-////   {
-////     header: "Quaternion utilities",
-////     functions: [
-////       "euler_to_quaternion",
-////       "quaternion_to_euler",
-////       "multiply_quaternions",
-////       "quaternion_from_basis",
-////       "identity_quaternion"
-////     ]
-////   }
-//// ]
+//// 3D transform utilities for position, rotation, and scale.
 ////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
+//// Transforms define the spatial properties of scene objects: where they are,
+//// how they're rotated, and their size. All scene nodes use transforms to
+//// position themselves in world space.
 ////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Transform module - position, rotation, and scale for 3D objects.
-////
-//// Transforms define where objects are in 3D space, how they're rotated, and their size.
-//// All transforms are immutable - functions return new transforms instead of modifying existing ones.
-////
-//// Internally, rotations are stored as quaternions for better interpolation and to avoid gimbal lock.
-//// You can create transforms with either Euler angles or quaternions.
-////
-//// ## Quick Example
+//// ## Creating Transforms
 ////
 //// ```gleam
-//// import tiramisu/transform
-//// import vec/vec3
+//// // Identity transform (origin, no rotation, unit scale)
+//// transform.identity
 ////
-//// // Create with Euler angles (most common)
-//// let player_transform = transform.identity
-////   |> transform.with_position(vec3.Vec3(0.0, 1.0, 0.0))
-////   |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90 degrees in radians
-////   |> transform.with_scale(vec3.Vec3(1.0, 2.0, 1.0))  // Tall player
+//// // At a specific position
+//// transform.at(position: vec3.Vec3(5.0, 0.0, -3.0))
 ////
-//// // Or create with quaternion rotation
-//// let quat = transform.Quaternion(0.0, 0.707, 0.0, 0.707)
-//// let rotated = transform.identity |> transform.with_quaternion_rotation(quat)
+//// // Builder pattern
+//// transform.identity
+////   |> transform.with_position(vec3.Vec3(1.0, 2.0, 3.0))
+////   |> transform.with_euler_rotation(vec3.Vec3(0.0, 1.57, 0.0))  // 90° Y
+////   |> transform.with_scale(vec3.Vec3(2.0, 1.0, 2.0))
 //// ```
+////
+//// ## Rotation
+////
+//// Rotations are stored internally as quaternions but can be set using Euler angles
+//// (in radians). Quaternions avoid gimbal lock and interpolate smoothly.
+////
+//// ```gleam
+//// // Using Euler angles (radians)
+//// transform.with_euler_rotation(t, vec3.Vec3(0.0, 3.14, 0.0))
+////
+//// // Using quaternion directly
+//// transform.with_quaternion_rotation(t, my_quaternion)
+////
+//// // Convenience rotations
+//// transform.rotate_y(t, 1.57)  // Turn 90° right
+//// transform.rotate_x(t, 0.5)   // Look up
+//// ```
+////
+//// ## Interpolation
+////
+//// Use `lerp` for smooth transitions between transforms. Great for animations
+//// and camera movement:
+////
+//// ```gleam
+//// let halfway = transform.lerp(start, to: end, with: 0.5)
+//// ```
+////
 
 import gleam/float
 import gleam/option
 import gleam_community/maths
+import quaternion
 import vec/vec3
 import vec/vec3f
-
-/// Quaternion represents a rotation in 3D space.
-///
-/// Quaternions are a mathematical representation that avoids gimbal lock
-/// and provides smooth interpolation between rotations.
-pub type Quaternion {
-  Quaternion(x: Float, y: Float, z: Float, w: Float)
-}
 
 /// Transform represents the position, rotation, and scale of an object in 3D space.
 ///
@@ -156,42 +64,10 @@ pub type Quaternion {
 pub opaque type Transform {
   Transform(
     position: vec3.Vec3(Float),
-    rotation: Quaternion,
+    rotation: quaternion.Quaternion,
     scale: vec3.Vec3(Float),
   )
 }
-
-// --- Quaternion <-> Euler Conversion Functions ---
-
-/// Convert Euler angles to a quaternion using Three.js's conversion.
-///
-/// Uses XYZ rotation order matching Three.js default.
-/// - euler.x = rotation around X axis (radians)
-/// - euler.y = rotation around Y axis (radians)
-/// - euler.z = rotation around Z axis (radians)
-@external(javascript, "../threejs.ffi.mjs", "eulerToQuaternion")
-pub fn euler_to_quaternion(euler: vec3.Vec3(Float)) -> Quaternion
-
-/// Convert a quaternion to Euler angles using Three.js's conversion.
-///
-/// Returns angles in radians using XYZ rotation order matching Three.js default.
-/// - result.x = rotation around X axis (radians)
-/// - result.y = rotation around Y axis (radians)
-/// - result.z = rotation around Z axis (radians)
-@external(javascript, "../threejs.ffi.mjs", "quaternionToEuler")
-fn quaternion_to_euler_ffi(q: Quaternion) -> vec3.Vec3(Float)
-
-/// Convert a quaternion to Euler angles.
-///
-/// Returns angles in radians using XYZ rotation order matching Three.js default.
-pub fn quaternion_to_euler(q: Quaternion) -> vec3.Vec3(Float) {
-  quaternion_to_euler_ffi(q)
-}
-
-// --- Constants ---
-
-/// Identity quaternion
-pub const identity_quaternion = Quaternion(0.0, 0.0, 0.0, 1.0)
 
 /// Create an identity transform (position at origin, no rotation, scale 1).
 ///
@@ -203,7 +79,7 @@ pub const identity_quaternion = Quaternion(0.0, 0.0, 0.0, 1.0)
 /// ```
 pub const identity = Transform(
   position: vec3.Vec3(0.0, 0.0, 0.0),
-  rotation: identity_quaternion,
+  rotation: quaternion.identity,
   scale: vec3.Vec3(1.0, 1.0, 1.0),
 )
 
@@ -216,7 +92,7 @@ pub const identity = Transform(
 /// // Object positioned at (5, 0, -3)
 /// ```
 pub fn at(position position: vec3.Vec3(Float)) -> Transform {
-  Transform(position:, rotation: identity_quaternion, scale: vec3f.one)
+  Transform(position:, rotation: quaternion.identity, scale: vec3f.one)
 }
 
 // --- Accessor Functions ---
@@ -244,7 +120,7 @@ pub fn position(transform: Transform) -> vec3.Vec3(Float) {
 /// // Returns vec3.Vec3(x_rotation, y_rotation, z_rotation)
 /// ```
 pub fn rotation(transform: Transform) -> vec3.Vec3(Float) {
-  quaternion_to_euler(transform.rotation)
+  quaternion.to_euler(transform.rotation)
 }
 
 /// Get the rotation of a transform as a quaternion.
@@ -253,9 +129,9 @@ pub fn rotation(transform: Transform) -> vec3.Vec3(Float) {
 ///
 /// ```gleam
 /// let quat = transform.rotation_quaternion(my_transform)
-/// // Returns Quaternion(x, y, z, w)
+/// // Returns quaternion.Quaternion(x, y, z, w)
 /// ```
-pub fn rotation_quaternion(transform: Transform) -> Quaternion {
+pub fn rotation_quaternion(transform: Transform) -> quaternion.Quaternion {
   transform.rotation
 }
 
@@ -300,7 +176,7 @@ pub fn with_euler_rotation(
   transform: Transform,
   euler: vec3.Vec3(Float),
 ) -> Transform {
-  let quat = euler_to_quaternion(euler)
+  let quat = quaternion.from_euler(euler)
   Transform(..transform, rotation: quat)
 }
 
@@ -317,7 +193,7 @@ pub fn with_euler_rotation(
 /// ```
 pub fn with_quaternion_rotation(
   transform: Transform,
-  quaternion: Quaternion,
+  quaternion: quaternion.Quaternion,
 ) -> Transform {
   Transform(..transform, rotation: quaternion)
 }
@@ -355,7 +231,11 @@ pub fn with_scale(transform: Transform, scale: vec3.Vec3(Float)) -> Transform {
 pub fn lerp(from: Transform, to to: Transform, with t: Float) -> Transform {
   Transform(
     position: lerp_vec(from.position, to.position, t),
-    rotation: slerp_quaternion(from.rotation, to.rotation, t),
+    rotation: quaternion.linear_interpolation(
+      from: from.rotation,
+      to: to.rotation,
+      t: t,
+    ),
     scale: lerp_vec(from.scale, to.scale, t),
   )
 }
@@ -370,73 +250,6 @@ fn lerp_vec(
     a.y +. { b.y -. a.y } *. t,
     a.z +. { b.z -. a.z } *. t,
   )
-}
-
-/// Spherical linear interpolation (slerp) between two quaternions.
-///
-/// Provides smooth rotation interpolation without gimbal lock issues.
-fn slerp_quaternion(q1: Quaternion, q2: Quaternion, t: Float) -> Quaternion {
-  // Compute dot product
-  let dot = q1.x *. q2.x +. q1.y *. q2.y +. q1.z *. q2.z +. q1.w *. q2.w
-
-  // If dot product is negative, negate q2 to take shorter path
-  let #(q2, dot) = case dot <. 0.0 {
-    True -> #(
-      Quaternion(-1.0 *. q2.x, -1.0 *. q2.y, -1.0 *. q2.z, -1.0 *. q2.w),
-      -1.0 *. dot,
-    )
-    False -> #(q2, dot)
-  }
-
-  // If quaternions are very close, use linear interpolation
-  case dot >. 0.9995 {
-    True -> {
-      Quaternion(
-        x: q1.x +. { q2.x -. q1.x } *. t,
-        y: q1.y +. { q2.y -. q1.y } *. t,
-        z: q1.z +. { q2.z -. q1.z } *. t,
-        w: q1.w +. { q2.w -. q1.w } *. t,
-      )
-      |> normalize_quaternion
-    }
-    False -> {
-      // Clamp dot to avoid numerical issues with acos
-      let dot_clamped = float.clamp(dot, -1.0, 1.0)
-
-      case maths.acos(dot_clamped) {
-        Ok(theta_0) -> {
-          let theta = theta_0 *. t
-          let sin_theta = maths.sin(theta)
-          let sin_theta_0 = maths.sin(theta_0)
-
-          let s1 = maths.cos(theta) -. dot_clamped *. sin_theta /. sin_theta_0
-          let s2 = sin_theta /. sin_theta_0
-
-          Quaternion(
-            x: q1.x *. s1 +. q2.x *. s2,
-            y: q1.y *. s1 +. q2.y *. s2,
-            z: q1.z *. s1 +. q2.z *. s2,
-            w: q1.w *. s1 +. q2.w *. s2,
-          )
-        }
-        Error(_) -> q1
-        // Fallback to first quaternion on error
-      }
-    }
-  }
-}
-
-/// Normalize a quaternion to unit length.
-fn normalize_quaternion(q: Quaternion) -> Quaternion {
-  let mag =
-    float.square_root(q.x *. q.x +. q.y *. q.y +. q.z *. q.z +. q.w *. q.w)
-
-  case mag {
-    Ok(m) if m >. 0.0001 -> {
-      Quaternion(x: q.x /. m, y: q.y /. m, z: q.z /. m, w: q.w /. m)
-    }
-    _ -> identity_quaternion
-  }
 }
 
 /// Compose two transforms (apply second transform after first).
@@ -456,7 +269,7 @@ fn normalize_quaternion(q: Quaternion) -> Quaternion {
 pub fn compose(first: Transform, second: Transform) -> Transform {
   Transform(
     position: vec3f.add(first.position, second.position),
-    rotation: multiply_quaternions(first.rotation, second.rotation),
+    rotation: quaternion.multiply(first.rotation, second.rotation),
     scale: vec3.Vec3(
       first.scale.x *. second.scale.x,
       first.scale.y *. second.scale.y,
@@ -464,66 +277,6 @@ pub fn compose(first: Transform, second: Transform) -> Transform {
     ),
   )
 }
-
-/// Multiply two quaternions (q1 * q2) using Three.js.
-///
-/// Represents the combined rotation of applying q1 then q2.
-/// This is useful for combining rotations, such as applying a billboard
-/// rotation followed by a camera roll adjustment.
-///
-/// ## Example
-///
-/// ```gleam
-/// let rotation1 = transform.euler_to_quaternion(Vec3(0.0, 1.57, 0.0))
-/// let rotation2 = transform.euler_to_quaternion(Vec3(0.5, 0.0, 0.0))
-/// let combined = transform.multiply_quaternions(rotation1, rotation2)
-/// ```
-@external(javascript, "../threejs.ffi.mjs", "multiplyQuaternions")
-pub fn multiply_quaternions(q1: Quaternion, q2: Quaternion) -> Quaternion
-
-/// Spherically interpolate between two quaternions.
-///
-/// Performs smooth interpolation between two rotations using spherical linear
-/// interpolation (slerp). This produces the smoothest possible rotation between
-/// two orientations.
-///
-/// - **from**: Starting rotation quaternion
-/// - **to**: Target rotation quaternion
-/// - **amount**: Interpolation factor (0.0 = from, 1.0 = to)
-///
-/// ## Example
-///
-/// ```gleam
-/// let start_rotation = transform.euler_to_quaternion(Vec3(0.0, 0.0, 0.0))
-/// let end_rotation = transform.euler_to_quaternion(Vec3(0.0, 1.57, 0.0))
-/// // Rotate 50% of the way
-/// let mid_rotation = transform.slerp(from: start_rotation, to: end_rotation, amount: 0.5)
-/// ```
-@external(javascript, "../threejs.ffi.mjs", "slerpQuaternions")
-pub fn slerp(
-  from from: Quaternion,
-  to to: Quaternion,
-  amount amount: Float,
-) -> Quaternion
-
-/// Compute quaternion rotation to orient from one position toward another.
-/// Uses Three.js's Matrix4.lookAt for proper orthonormal basis construction,
-/// avoiding gimbal lock issues from Euler angle composition.
-@external(javascript, "../threejs.ffi.mjs", "quaternionLookAt")
-fn quaternion_look_at(
-  from: vec3.Vec3(Float),
-  to: vec3.Vec3(Float),
-  up: vec3.Vec3(Float),
-) -> Quaternion
-
-/// Build a quaternion from three orthonormal basis vectors.
-/// Uses Three.js's Matrix4.makeBasis for proper quaternion construction.
-@external(javascript, "../threejs.ffi.mjs", "quaternionFromBasis")
-pub fn quaternion_from_basis(
-  x_axis: vec3.Vec3(Float),
-  y_axis: vec3.Vec3(Float),
-  z_axis: vec3.Vec3(Float),
-) -> Quaternion
 
 /// Create a transform that looks at a target position from a source position.
 ///
@@ -542,9 +295,14 @@ pub fn look_at(
   to to: Transform,
   up up: option.Option(vec3.Vec3(Float)),
 ) -> Transform {
-  // Convert Euler angles to quaternion
   let up = option.unwrap(up, vec3.Vec3(0.0, 1.0, 0.0))
-  let quat = quaternion_look_at(from.position, to.position, up)
+
+  // Calculate direction from 'from' to 'to' (quaternion.look_at expects a direction, not a position)
+  let direction = vec3f.subtract(to.position, from.position)
+
+  // quaternion.look_at takes (forward, target_direction, up)
+  // forward is unused in the implementation, target_direction should be the look direction
+  let quat = quaternion.look_at(vec3.Vec3(0.0, 0.0, -1.0), direction, up)
 
   // Preserve position and scale from the 'from' transform
   Transform(position: from.position, rotation: quat, scale: from.scale)
@@ -579,10 +337,10 @@ pub fn translate(transform: Transform, by offset: vec3.Vec3(Float)) -> Transform
 /// // Now facing backward
 /// ```
 pub fn rotate_by(transform: Transform, euler: vec3.Vec3(Float)) -> Transform {
-  let additional_rotation = euler_to_quaternion(euler)
+  let additional_rotation = quaternion.from_euler(euler)
   Transform(
     ..transform,
-    rotation: multiply_quaternions(transform.rotation, additional_rotation),
+    rotation: quaternion.multiply(transform.rotation, additional_rotation),
   )
 }
 
@@ -657,4 +415,85 @@ pub fn rotate_x(transform: Transform, angle: Float) -> Transform {
 /// ```
 pub fn rotate_z(transform: Transform, angle: Float) -> Transform {
   rotate_by(transform, vec3.Vec3(0.0, 0.0, angle))
+}
+
+/// Create a billboard transform that faces a target position.
+///
+/// Billboards are 2D sprites that always face a target (usually the camera).
+/// This rotates the plane's default +Z normal to face the target.
+///
+/// ## Example
+///
+/// ```gleam
+/// let sprite_pos = vec3.Vec3(5.0, 0.0, 0.0)
+/// let camera_pos = vec3.Vec3(0.0, 5.0, 10.0)
+/// let t = transform.billboard(at: sprite_pos, facing: camera_pos)
+/// // Sprite now faces the camera
+/// ```
+/// Billboard mode controls which axes the sprite rotates on to face the target.
+pub type BillboardMode {
+  /// Full 3D billboard - rotates on all axes to always face the target.
+  /// The sprite will tilt and roll to perfectly face the camera.
+  Spherical
+  /// Cylindrical billboard - only rotates around Y axis.
+  /// The sprite stays upright and only turns left/right.
+  Cylindrical
+  /// Spherical billboard without roll - rotates on X and Y but not Z.
+  /// The sprite tilts up/down and turns left/right, but doesn't roll.
+  SphericalNoRoll
+}
+
+/// Create a billboard transform that makes a sprite face a target.
+///
+/// The `mode` parameter controls how the billboard rotates:
+/// - `Spherical`: Full 3D rotation to always face the target
+/// - `Cylindrical`: Only Y-axis rotation (stays upright)
+/// - `SphericalNoRoll`: X and Y rotation but no Z roll
+///
+/// ## Example
+///
+/// ```gleam
+/// let sprite_pos = vec3.Vec3(5.0, 0.0, 0.0)
+/// let camera_pos = vec3.Vec3(0.0, 5.0, 10.0)
+/// let t = transform.billboard(sprite_pos, camera_pos, Cylindrical)
+/// // Sprite faces camera horizontally but stays upright
+/// ```
+pub fn billboard(
+  at position: vec3.Vec3(Float),
+  facing target: vec3.Vec3(Float),
+  mode mode: BillboardMode,
+) -> Transform {
+  let dx = target.x -. position.x
+  let dy = target.y -. position.y
+  let dz = target.z -. position.z
+
+  let quat = case mode {
+    Spherical -> {
+      let direction = vec3f.subtract(target, position)
+      quaternion.from_to_rotation(vec3.Vec3(0.0, 0.0, 1.0), direction)
+    }
+    Cylindrical -> {
+      // Only rotate around Y axis
+      let angle_y = maths.atan2(dx, dz) +. maths.pi()
+      quaternion.from_axis_angle(vec3.Vec3(0.0, 1.0, 0.0), angle_y)
+    }
+    SphericalNoRoll -> {
+      // Calculate Y rotation (horizontal facing)
+      let angle_y = maths.atan2(dx, dz) +. maths.pi()
+
+      // Calculate X rotation (vertical tilt)
+      let horizontal_dist = case float.square_root(dx *. dx +. dz *. dz) {
+        Ok(d) -> d
+        Error(_) -> 0.0
+      }
+      let angle_x = maths.atan2(dy, horizontal_dist)
+
+      // Combine Y then X rotations (Y first, then tilt)
+      let quat_y = quaternion.from_axis_angle(vec3.Vec3(0.0, 1.0, 0.0), angle_y)
+      let quat_x = quaternion.from_axis_angle(vec3.Vec3(1.0, 0.0, 0.0), angle_x)
+      quaternion.multiply(quat_y, quat_x)
+    }
+  }
+
+  Transform(position:, rotation: quat, scale: vec3f.one)
 }

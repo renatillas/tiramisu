@@ -3,7 +3,6 @@ import gleam/io
 import gleam/list
 import gleam/option
 import gleamy/bench
-import tiramisu/animation
 import tiramisu/geometry
 import tiramisu/material
 import tiramisu/scene
@@ -55,86 +54,28 @@ pub fn main() {
     ],
     [
       bench.Function("scene.diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current)
+        scene.diff(pair.previous, pair.current, option.None).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
   )
   |> bench.table([bench.IPS, bench.Min, bench.Mean, bench.Max, bench.P(99)])
   |> io.println
-
-  // Benchmark easing functions
-  io.println("=== Easing Functions ===")
-  bench.run(
-    [bench.Input("t=0.5", 0.5)],
-    [
-      bench.Function("Linear", fn(t) { animation.ease(animation.Linear, t) }),
-      bench.Function("EaseInQuad", fn(t) {
-        animation.ease(animation.EaseInQuad, t)
-      }),
-      bench.Function("EaseOutQuad", fn(t) {
-        animation.ease(animation.EaseOutQuad, t)
-      }),
-      bench.Function("EaseInOutQuad", fn(t) {
-        animation.ease(animation.EaseInOutQuad, t)
-      }),
-      bench.Function("EaseInCubic", fn(t) {
-        animation.ease(animation.EaseInCubic, t)
-      }),
-      bench.Function("EaseOutCubic", fn(t) {
-        animation.ease(animation.EaseOutCubic, t)
-      }),
-      bench.Function("EaseInOutCubic", fn(t) {
-        animation.ease(animation.EaseInOutCubic, t)
-      }),
-      bench.Function("EaseInSine", fn(t) {
-        animation.ease(animation.EaseInSine, t)
-      }),
-      bench.Function("EaseOutSine", fn(t) {
-        animation.ease(animation.EaseOutSine, t)
-      }),
-      bench.Function("EaseInOutSine", fn(t) {
-        animation.ease(animation.EaseInOutSine, t)
-      }),
-    ],
-    [bench.Duration(1000), bench.Warmup(100)],
-  )
-  |> bench.table([bench.IPS, bench.Min, bench.Mean])
-  |> io.println
-
-  // Benchmark float tween update operation
-  io.println("\n=== Float Tween Update ===")
-  bench.run(
-    [
-      bench.Input(
-        "Float tween",
-        animation.tween_float(0.0, 100.0, 1.0, animation.Linear),
-      ),
-    ],
-    [
-      bench.Function("update_tween", fn(tween) {
-        animation.update_tween(tween, 0.016)
-      }),
-    ],
-    [bench.Duration(100), bench.Warmup(10)],
-  )
-  |> bench.table([bench.IPS, bench.Min, bench.Mean])
-  |> io.println
 }
 
 pub type ScenePair(id) {
   ScenePair(
-    previous: option.Option(scene.Node(id)),
-    current: option.Option(scene.Node(id)),
+    previous: option.Option(scene.Node),
+    current: option.Option(scene.Node),
   )
 }
 
 // --- Helper Functions ---
 
 fn wrap_in_group(
-  id: id,
-  children: List(scene.Node(id)),
-) -> option.Option(scene.Node(id)) {
+  id: String,
+  children: List(scene.Node),
+) -> option.Option(scene.Node) {
   option.Some(scene.empty(
     id: id,
     transform: transform.identity,
@@ -142,14 +83,17 @@ fn wrap_in_group(
   ))
 }
 
-fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_flat_scene(count: Int) -> List(scene.Node) {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   list.range(0, count - 1)
@@ -167,17 +111,17 @@ fn create_flat_scene(count: Int) -> List(scene.Node(String)) {
   })
 }
 
-fn create_flat_scene_offset(
-  count: Int,
-  offset: Float,
-) -> List(scene.Node(String)) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_flat_scene_offset(count: Int, offset: Float) -> List(scene.Node) {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   list.range(0, count - 1)
@@ -195,18 +139,21 @@ fn create_flat_scene_offset(
   })
 }
 
-fn create_nested_scene(depth: Int) -> List(scene.Node(String)) {
+fn create_nested_scene(depth: Int) -> List(scene.Node) {
   [create_nested_group(depth, 0)]
 }
 
-fn create_nested_group(depth: Int, current: Int) -> scene.Node(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_nested_group(depth: Int, current: Int) -> scene.Node {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(red_material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   case current >= depth {

@@ -1,4 +1,5 @@
 import tiramisu/input
+import vec/vec2
 
 // --- Input State Creation Tests ---
 
@@ -14,16 +15,12 @@ pub fn new_input_state_test() {
 
 pub fn mouse_position_test() {
   let state = input.new()
-  let #(x, y) = input.mouse_position(state)
-  assert x == 0.0
-  assert y == 0.0
+  let assert vec2.Vec2(0.0, 0.0) = input.mouse_position(state)
 }
 
 pub fn mouse_delta_test() {
   let state = input.new()
-  let #(dx, dy) = input.mouse_delta(state)
-  assert dx == 0.0
-  assert dy == 0.0
+  let assert vec2.Vec2(0.0, 0.0) = input.mouse_delta(state)
 }
 
 pub fn mouse_wheel_delta_test() {

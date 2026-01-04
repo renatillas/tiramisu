@@ -8,6 +8,8 @@
 // - Postprocessing config comparison
 // - Debug mesh updates
 
+import gleam/dict
+import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
@@ -22,9 +24,12 @@ import vec/vec3
 pub fn main() {
   io.println("╔══════════════════════════════════════════════════════════════╗")
   io.println("║       Tiramisu v6.0.0 Performance Benchmark Suite           ║")
-  io.println("║                Phase 1 Optimizations                         ║")
   io.println("╚══════════════════════════════════════════════════════════════╝")
   io.println("")
+
+  // NEW: Benchmark with cache (Phase 1 optimization)
+  io.println("=== PHASE 1 OPTIMIZATION: Cached Previous Scene ===")
+  benchmark_with_cache()
 
   // Benchmark 1: Scene Diffing (Most Critical)
   benchmark_scene_diffing()
@@ -37,12 +42,6 @@ pub fn main() {
 
   // Benchmark 4: Deep Hierarchy
   benchmark_deep_hierarchy()
-
-  io.println("\n✅ Benchmark Complete!")
-  io.println("\nNext Steps:")
-  io.println("1. Run Phase 1 optimizations")
-  io.println("2. Re-run this benchmark")
-  io.println("3. Compare results and verify improvements")
 }
 
 // ============================================================================
@@ -50,10 +49,6 @@ pub fn main() {
 // ============================================================================
 
 pub fn benchmark_scene_diffing() {
-  io.println("\n=== 1. Scene Diffing Performance ===")
-  io.println("Measures: flatten_scene() + diff() + patch generation")
-  io.println("")
-
   bench.run(
     [
       bench.Input("10 nodes (Small)", create_scene_pair(10, 0.0)),
@@ -63,7 +58,7 @@ pub fn benchmark_scene_diffing() {
     ],
     [
       bench.Function("diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current)
+        scene.diff(pair.previous, pair.current, option.None).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
@@ -100,7 +95,7 @@ pub fn benchmark_static_scene() {
     ],
     [
       bench.Function("diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current)
+        scene.diff(pair.previous, pair.current, option.None).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
@@ -138,7 +133,7 @@ pub fn benchmark_partial_scene_changes() {
     ],
     [
       bench.Function("diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current)
+        scene.diff(pair.previous, pair.current, option.None).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
@@ -169,7 +164,7 @@ pub fn benchmark_deep_hierarchy() {
     ],
     [
       bench.Function("diff", fn(pair: ScenePair(String)) {
-        scene.diff(pair.previous, pair.current)
+        scene.diff(pair.previous, pair.current, option.None).0
       }),
     ],
     [bench.Duration(1000), bench.Warmup(100)],
@@ -185,25 +180,110 @@ pub fn benchmark_deep_hierarchy() {
 }
 
 // ============================================================================
+// NEW: Benchmark with Cache (Phase 1 Optimization)
+// ============================================================================
+
+pub fn benchmark_with_cache() {
+  io.println(
+    "Measures: Realistic consecutive frames with cached previous scene",
+  )
+  io.println("Expected: ~50% faster than without cache")
+  io.println("")
+
+  // Create scenes for comparison
+  let inputs = [
+    create_cached_benchmark_input(10, 0.1),
+    create_cached_benchmark_input(50, 0.1),
+    create_cached_benchmark_input(100, 0.1),
+    create_cached_benchmark_input(500, 0.1),
+  ]
+
+  // Benchmark WITHOUT cache (baseline)
+  io.println("▶ Without cache (baseline):")
+  bench.run(
+    inputs
+      |> list.map(fn(input) {
+        let label = case input.count {
+          10 -> "10 nodes"
+          50 -> "50 nodes"
+          100 -> "100 nodes"
+          500 -> "500 nodes"
+          _ -> "unknown"
+        }
+        bench.Input(label, input)
+      }),
+    [
+      bench.Function("diff (no cache)", fn(input: CachedBenchmarkInput) {
+        scene.diff(input.prev_scene, input.curr_scene, option.None).0
+      }),
+    ],
+    [bench.Duration(1000), bench.Warmup(100)],
+  )
+  |> bench.table([bench.IPS, bench.Min, bench.Mean, bench.Max])
+  |> io.println
+
+  // Benchmark WITH cache (optimized)
+  io.println("\n▶ With cache (Phase 1 optimization):")
+  bench.run(
+    inputs
+      |> list.map(fn(input) {
+        let label = case input.count {
+          10 -> "10 nodes"
+          50 -> "50 nodes"
+          100 -> "100 nodes"
+          500 -> "500 nodes"
+          _ -> "unknown"
+        }
+        bench.Input(label, input)
+      }),
+    [
+      bench.Function("diff (cached)", fn(input: CachedBenchmarkInput) {
+        scene.diff(input.prev_scene, input.curr_scene, option.Some(input.cache)).0
+      }),
+    ],
+    [bench.Duration(1000), bench.Warmup(100)],
+  )
+  |> bench.table([bench.IPS, bench.Min, bench.Mean, bench.Max])
+  |> io.println
+
+  io.println("\n📊 Expected: WITH CACHE should be ~50% faster!")
+  io.println(
+    "   This simulates real game frames where previous scene dict is available\n",
+  )
+}
+
+// ============================================================================
 // Helper Types & Functions
 // ============================================================================
 
+pub type CachedBenchmarkInput {
+  CachedBenchmarkInput(
+    count: Int,
+    prev_scene: option.Option(scene.Node),
+    curr_scene: option.Option(scene.Node),
+    cache: dict.Dict(String, scene.NodeWithParent),
+  )
+}
+
 pub type ScenePair(id) {
   ScenePair(
-    previous: option.Option(scene.Node(id)),
-    current: option.Option(scene.Node(id)),
+    previous: option.Option(scene.Node),
+    current: option.Option(scene.Node),
   )
 }
 
 /// Create a scene with N meshes in a flat hierarchy
-fn create_scene(count: Int) -> option.Option(scene.Node(String)) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_scene(count: Int) -> option.Option(scene.Node) {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let children =
@@ -230,13 +310,16 @@ fn create_scene(count: Int) -> option.Option(scene.Node(String)) {
 
 /// Create a pair of scenes (previous and current) with offset positions
 fn create_scene_pair(count: Int, offset: Float) -> ScenePair(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let prev_children =
@@ -288,13 +371,16 @@ fn create_scene_with_partial_changes(
   total_count: Int,
   percent_changed: Int,
 ) -> ScenePair(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   let changed_count = { total_count * percent_changed } / 100
@@ -356,18 +442,17 @@ fn create_nested_scene_pair(depth: Int) -> ScenePair(String) {
   )
 }
 
-fn create_nested_group(
-  depth: Int,
-  current: Int,
-  offset: Float,
-) -> scene.Node(String) {
-  let assert Ok(box_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
+fn create_nested_group(depth: Int, current: Int, offset: Float) -> scene.Node {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
   let assert Ok(material) =
     material.basic(
       color: 0xff0000,
       transparent: False,
       opacity: 1.0,
       map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
     )
 
   case current >= depth {
@@ -387,4 +472,87 @@ fn create_nested_group(
         children: [create_nested_group(depth, current + 1, offset)],
       )
   }
+}
+
+/// Create benchmark input with cached previous scene dictionary
+/// This simulates real game frames where the previous frame's cache exists
+fn create_cached_benchmark_input(
+  count: Int,
+  change_percent: Float,
+) -> CachedBenchmarkInput {
+  let assert Ok(box_geo) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+  let assert Ok(material) =
+    material.basic(
+      color: 0xff0000,
+      transparent: False,
+      opacity: 1.0,
+      map: option.None,
+      side: material.FrontSide,
+      alpha_test: 0.0,
+      depth_write: True,
+    )
+
+  // Create frame 1 (previous frame)
+  let prev_children =
+    list.range(0, count - 1)
+    |> list.map(fn(i) {
+      let id = "mesh_" <> int.to_string(i)
+      let x = int.to_float(i) *. 2.0
+
+      scene.mesh(
+        id: id,
+        geometry: box_geo,
+        material: material,
+        transform: transform.at(position: vec3.Vec3(x, 0.0, 0.0)),
+        physics: option.None,
+      )
+    })
+
+  let prev_scene =
+    option.Some(scene.empty(
+      id: "root",
+      transform: transform.identity,
+      children: prev_children,
+    ))
+
+  // Create frame 2 (current frame) - only change a few nodes
+  let changed_count_int =
+    int.to_float(count) *. change_percent
+    |> float.round
+  let curr_children =
+    list.range(0, count - 1)
+    |> list.map(fn(i) {
+      let id = "mesh_" <> int.to_string(i)
+      // Only change position for first N% of nodes
+      let x = case i < changed_count_int {
+        True -> int.to_float(i) *. 2.0 +. 5.0
+        False -> int.to_float(i) *. 2.0
+      }
+
+      scene.mesh(
+        id: id,
+        geometry: box_geo,
+        material: material,
+        transform: transform.at(position: vec3.Vec3(x, 0.0, 0.0)),
+        physics: option.None,
+      )
+    })
+
+  let curr_scene =
+    option.Some(scene.empty(
+      id: "root",
+      transform: transform.identity,
+      children: curr_children,
+    ))
+
+  // Generate the cache by diffing frame 1 with empty scene
+  // This simulates what would happen in real game after frame 1
+  let #(_, cache) = scene.diff(option.None, prev_scene, option.None)
+
+  CachedBenchmarkInput(
+    count: count,
+    prev_scene: prev_scene,
+    curr_scene: curr_scene,
+    cache: cache,
+  )
 }

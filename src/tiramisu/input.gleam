@@ -1,152 +1,77 @@
-//// <script>
-//// const docs = [
-////   {
-////     header: "Input state",
-////     functions: [
-////       "new"
-////     ]
-////   },
-////   {
-////     header: "Keyboard input",
-////     functions: [
-////       "is_key_pressed",
-////       "is_key_just_pressed",
-////       "is_key_just_released"
-////     ]
-////   },
-////   {
-////     header: "Mouse input",
-////     functions: [
-////       "mouse_position",
-////       "mouse_delta",
-////       "is_left_button_pressed",
-////       "is_left_button_just_pressed",
-////       "is_right_button_pressed",
-////       "is_right_button_just_pressed",
-////       "mouse_wheel_delta"
-////     ]
-////   },
-////   {
-////     header: "Gamepad input",
-////     functions: [
-////       "is_gamepad_connected",
-////       "gamepad_button",
-////       "is_gamepad_button_pressed",
-////       "gamepad_axis",
-////       "get_axis_with_deadzone",
-////       "is_left_stick_active",
-////       "is_right_stick_active",
-////       "is_primary_connected",
-////       "is_primary_gamepad_button_pressed",
-////       "get_primary_button",
-////       "get_primary_axis"
-////     ]
-////   },
-////   {
-////     header: "Input actions",
-////     functions: [
-////       "new_bindings",
-////       "bind_key",
-////       "bind_mouse_button",
-////       "bind_gamepad_button",
-////       "is_action_pressed",
-////       "is_action_just_pressed",
-////       "is_action_just_released",
-////       "get_action_value",
-////       "with_buffer",
-////       "update_buffer",
-////       "consume_buffered_action",
-////       "was_action_pressed_buffered",
-////       "clear_buffer"
-////     ]
-////   },
-////   {
-////     header: "Touch input",
-////     functions: [
-////       "touches",
-////       "touches_just_started",
-////       "touches_just_ended",
-////       "touch_count"
-////     ]
-////   }
-//// ]
+//// Input handling for keyboard, mouse, touch, and gamepad.
 ////
-//// const callback = () => {
-////   const list = document.querySelector(".sidebar > ul:last-of-type")
-////   const sortedLists = document.createDocumentFragment()
-////   const sortedMembers = document.createDocumentFragment()
+//// Access input state via `ctx.input` in your `update` function. The engine automatically
+//// tracks pressed/released states and provides both current-frame and persistent state.
 ////
-////   for (const section of docs) {
-////     sortedLists.append((() => {
-////       const node = document.createElement("h3")
-////       node.append(section.header)
-////       return node
-////     })())
-////     sortedMembers.append((() => {
-////       const node = document.createElement("h2")
-////       node.append(section.header)
-////       return node
-////     })())
-////
-////     const sortedList = document.createElement("ul")
-////     sortedLists.append(sortedList)
-////
-////
-////     for (const funcName of section.functions) {
-////       const href = `#${funcName}`
-////       const member = document.querySelector(
-////         `.member:has(h2 > a[href="${href}"])`
-////       )
-////       const sidebar = list.querySelector(`li:has(a[href="${href}"])`)
-////       sortedList.append(sidebar)
-////       sortedMembers.append(member)
-////     }
-////   }
-////
-////   document.querySelector(".sidebar").insertBefore(sortedLists, list)
-////   document
-////     .querySelector(".module-members:has(#module-values)")
-////     .insertBefore(
-////       sortedMembers,
-////       document.querySelector("#module-values").nextSibling
-////     )
-//// }
-////
-//// document.readyState !== "loading"
-////   ? callback()
-////   : document.addEventListener(
-////     "DOMContentLoaded",
-////     callback,
-////     { once: true }
-////   )
-//// </script>
-//// Input module - keyboard, mouse, gamepad, and touch input handling.
-////
-//// Input state is automatically updated each frame and passed to your `update` function
-//// via the `Context`. Query the input state to respond to player actions.
-////
-//// ## Quick Example
+//// ## Keyboard
 ////
 //// ```gleam
-//// import tiramisu/input
+//// // Check if key is held down
+//// input.is_key_pressed(ctx.input, input.KeyW)
 ////
-//// fn update(model, msg, ctx) {
-////   // Check if player is pressing W to move forward
-////   let move_forward = case input.is_key_pressed(ctx.input, input.KeyW) {
-////     True -> 1.0
-////     False -> 0.0
-////   }
+//// // Check if key was pressed this frame (for one-shot actions)
+//// input.is_key_just_pressed(ctx.input, input.Space)
 ////
-////   // Check mouse button
-////   let shooting = input.is_left_button_pressed(ctx.input)
-////
-////   // Update model based on input
-////   Model(..model, position: move_player(model.position, move_forward))
-//// }
+//// // Check if key was released this frame
+//// input.is_key_just_released(ctx.input, input.Escape)
 //// ```
+////
+//// ## Mouse
+////
+//// ```gleam
+//// // Position and movement
+//// let pos = input.mouse_position(ctx.input)  // Vec2(x, y)
+//// let delta = input.mouse_delta(ctx.input)   // Movement since last frame
+////
+//// // Buttons
+//// input.is_left_button_pressed(ctx.input)
+//// input.is_left_button_just_pressed(ctx.input)
+//// input.mouse_wheel_delta(ctx.input)
+//// ```
+////
+//// ## Gamepad
+////
+//// ```gleam
+//// // Check connection
+//// input.is_gamepad_connected(ctx.input, 0)
+////
+//// // Buttons (A, B, X, Y, bumpers, triggers, etc.)
+//// input.is_gamepad_button_pressed(ctx.input, 0, input.ButtonA)
+//// input.gamepad_button(ctx.input, 0, input.RightTrigger)  // Analog 0.0-1.0
+////
+//// // Analog sticks
+//// input.gamepad_axis(ctx.input, 0, input.LeftStickX)
+//// input.get_axis_with_deadzone(ctx.input, 0, input.LeftStickY, 0.15)
+//// ```
+////
+//// ## Action Bindings
+////
+//// Map multiple inputs to game actions:
+////
+//// ```gleam
+//// let bindings = input.new_bindings()
+////   |> input.bind_key(input.Space, Jump)
+////   |> input.bind_gamepad_button(input.ButtonA, Jump)
+////
+//// // Check action regardless of input device
+//// input.is_action_pressed(ctx.input, bindings, Jump)
+//// ```
+////
+//// ## Input Buffering
+////
+//// Buffer inputs for forgiving timing (e.g., press jump before landing):
+////
+//// ```gleam
+//// let buffered = input.with_buffer(buffer_frames: 5)
+//// let buffered = input.update_buffer(buffered, ctx.input, bindings)
+//// input.was_action_pressed_buffered(buffered, Jump)
+//// ```
+////
 
 import gleam/list
 import gleam/result
+import gleam/set
+import vec/vec2.{type Vec2}
 
 /// Input state for all input devices (automatically updated each frame).
 ///
@@ -162,9 +87,9 @@ pub opaque type InputState {
 
 pub opaque type KeyboardState {
   KeyboardState(
-    pressed_keys: List(String),
-    just_pressed_keys: List(String),
-    just_released_keys: List(String),
+    pressed_keys: set.Set(String),
+    just_pressed_keys: set.Set(String),
+    just_released_keys: set.Set(String),
   )
 }
 
@@ -203,15 +128,15 @@ pub type TouchState {
 }
 
 pub type Touch {
-  Touch(id: Int, x: Float, y: Float)
+  Touch(id: Int, position: Vec2(Float))
 }
 
 pub fn new() -> InputState {
   InputState(
     keyboard: KeyboardState(
-      pressed_keys: [],
-      just_pressed_keys: [],
-      just_released_keys: [],
+      pressed_keys: set.new(),
+      just_pressed_keys: set.new(),
+      just_released_keys: set.new(),
     ),
     mouse: MouseState(
       x: 0.0,
@@ -249,31 +174,31 @@ pub fn new() -> InputState {
 /// Check if a key is currently pressed
 pub fn is_key_pressed(input: InputState, key: Key) -> Bool {
   let key_code = key_to_code(key)
-  list.contains(input.keyboard.pressed_keys, key_code)
+  set.contains(input.keyboard.pressed_keys, key_code)
 }
 
 /// Check if a key was just pressed this frame
 pub fn is_key_just_pressed(input: InputState, key: Key) -> Bool {
   let key_code = key_to_code(key)
-  list.contains(input.keyboard.just_pressed_keys, key_code)
+  set.contains(input.keyboard.just_pressed_keys, key_code)
 }
 
 /// Check if a key was just released this frame
 pub fn is_key_just_released(input: InputState, key: Key) -> Bool {
   let key_code = key_to_code(key)
-  list.contains(input.keyboard.just_released_keys, key_code)
+  set.contains(input.keyboard.just_released_keys, key_code)
 }
 
 // --- Mouse Helpers ---
 
 /// Get mouse position
-pub fn mouse_position(input: InputState) -> #(Float, Float) {
-  #(input.mouse.x, input.mouse.y)
+pub fn mouse_position(input: InputState) -> vec2.Vec2(Float) {
+  vec2.Vec2(input.mouse.x, input.mouse.y)
 }
 
 /// Get mouse delta
-pub fn mouse_delta(input: InputState) -> #(Float, Float) {
-  #(input.mouse.delta_x, input.mouse.delta_y)
+pub fn mouse_delta(input: InputState) -> vec2.Vec2(Float) {
+  vec2.Vec2(input.mouse.delta_x, input.mouse.delta_y)
 }
 
 /// Check if left mouse button is pressed
@@ -370,6 +295,24 @@ pub fn touches_just_ended(input: InputState) -> List(Touch) {
 /// Get touch count
 pub fn touch_count(input: InputState) -> Int {
   list.length(input.touch.touches)
+}
+
+/// Check if there was any user interaction this frame (for audio context resume)
+/// Returns True if any key was just pressed, mouse button clicked, or touch started
+pub fn has_user_interaction(input: InputState) -> Bool {
+  // Check for any key just pressed
+  let has_key_press = !set.is_empty(input.keyboard.just_pressed_keys)
+
+  // Check for mouse button just pressed
+  let has_mouse_click =
+    input.mouse.left_button.just_pressed
+    || input.mouse.middle_button.just_pressed
+    || input.mouse.right_button.just_pressed
+
+  // Check for touch just started
+  let has_touch_start = !list.is_empty(input.touch.touches_just_started)
+
+  has_key_press || has_mouse_click || has_touch_start
 }
 
 fn list_get(list: List(a), index: Int) -> Result(a, Nil) {
@@ -539,8 +482,8 @@ pub type Key {
   Custom(String)
 }
 
-/// Convert Key to JavaScript KeyboardEvent.code string
-fn key_to_code(key: Key) -> String {
+@internal
+pub fn key_to_code(key: Key) -> String {
   case key {
     // Letters
     KeyA -> "KeyA"
@@ -1205,4 +1148,201 @@ pub fn consume_buffered_action(
 /// Useful when switching game states or when you want to reset the buffer.
 pub fn clear_buffer(buffered: BufferedInput(action)) -> BufferedInput(action) {
   BufferedInput(..buffered, buffer: [])
+}
+
+// ============================================================================
+// BUILDER FUNCTIONS (for internal use by input_manager)
+// ============================================================================
+
+/// Build a KeyboardState (internal use only)
+@internal
+pub fn build_keyboard_state(
+  pressed pressed: set.Set(String),
+  just_pressed just_pressed: set.Set(String),
+  just_released just_released: set.Set(String),
+) -> KeyboardState {
+  KeyboardState(
+    pressed_keys: pressed,
+    just_pressed_keys: just_pressed,
+    just_released_keys: just_released,
+  )
+}
+
+/// Build a MouseState (internal use only)
+@internal
+pub fn build_mouse_state(
+  x x: Float,
+  y y: Float,
+  delta_x delta_x: Float,
+  delta_y delta_y: Float,
+  wheel_delta wheel_delta: Float,
+  left_pressed left_pressed: Bool,
+  left_just_pressed left_just_pressed: Bool,
+  left_just_released left_just_released: Bool,
+  middle_pressed middle_pressed: Bool,
+  middle_just_pressed middle_just_pressed: Bool,
+  middle_just_released middle_just_released: Bool,
+  right_pressed right_pressed: Bool,
+  right_just_pressed right_just_pressed: Bool,
+  right_just_released right_just_released: Bool,
+) -> MouseState {
+  MouseState(
+    x: x,
+    y: y,
+    delta_x: delta_x,
+    delta_y: delta_y,
+    wheel_delta: wheel_delta,
+    left_button: ButtonState(
+      pressed: left_pressed,
+      just_pressed: left_just_pressed,
+      just_released: left_just_released,
+    ),
+    middle_button: ButtonState(
+      pressed: middle_pressed,
+      just_pressed: middle_just_pressed,
+      just_released: middle_just_released,
+    ),
+    right_button: ButtonState(
+      pressed: right_pressed,
+      just_pressed: right_just_pressed,
+      just_released: right_just_released,
+    ),
+  )
+}
+
+/// Build a Touch (internal use only)
+@internal
+pub fn build_touch(id id: Int, position position: Vec2(Float)) -> Touch {
+  Touch(id: id, position: position)
+}
+
+/// Build a TouchState (internal use only)
+@internal
+pub fn build_touch_state(
+  active active: List(Touch),
+  just_started just_started: List(Touch),
+  just_ended just_ended: List(Touch),
+) -> TouchState {
+  TouchState(
+    touches: active,
+    touches_just_started: just_started,
+    touches_just_ended: just_ended,
+  )
+}
+
+/// Build a GamepadState (internal use only)
+@internal
+pub fn build_gamepad_state(
+  connected connected: Bool,
+  buttons buttons: List(Float),
+  axes axes: List(Float),
+) -> GamepadState {
+  GamepadState(connected: connected, buttons: buttons, axes: axes)
+}
+
+/// Build an InputState (internal use only)
+@internal
+pub fn build_input_state(
+  keyboard keyboard: KeyboardState,
+  mouse mouse: MouseState,
+  gamepads gamepads: List(GamepadState),
+  touch touch: TouchState,
+) -> InputState {
+  InputState(keyboard: keyboard, mouse: mouse, gamepad: gamepads, touch: touch)
+}
+
+/// Get keyboard state (internal use only)
+@internal
+pub fn get_keyboard_state(input: InputState) -> KeyboardState {
+  input.keyboard
+}
+
+/// Get mouse state (internal use only)
+@internal
+pub fn get_mouse_state(input: InputState) -> MouseState {
+  input.mouse
+}
+
+/// Get touch state (internal use only)
+@internal
+pub fn get_touch_state(input: InputState) -> TouchState {
+  input.touch
+}
+
+/// Get gamepad list (internal use only)
+@internal
+pub fn get_gamepad_list(input: InputState) -> List(GamepadState) {
+  input.gamepad
+}
+
+/// Get pressed keys set (internal use only)
+@internal
+pub fn get_pressed_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.pressed_keys
+}
+
+/// Get just pressed keys set (internal use only)
+@internal
+pub fn get_just_pressed_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.just_pressed_keys
+}
+
+/// Get just released keys set (internal use only)
+@internal
+pub fn get_just_released_keys(input: InputState) -> set.Set(String) {
+  input.keyboard.just_released_keys
+}
+
+/// Get active touches list (internal use only)
+@internal
+pub fn get_active_touches(input: InputState) -> List(Touch) {
+  input.touch.touches
+}
+
+/// Get mouse x position (internal use only)
+@internal
+pub fn get_mouse_x(input: InputState) -> Float {
+  input.mouse.x
+}
+
+/// Get mouse y position (internal use only)
+@internal
+pub fn get_mouse_y(input: InputState) -> Float {
+  input.mouse.y
+}
+
+/// Get mouse delta x (internal use only)
+@internal
+pub fn get_mouse_delta_x(input: InputState) -> Float {
+  input.mouse.delta_x
+}
+
+/// Get mouse delta y (internal use only)
+@internal
+pub fn get_mouse_delta_y(input: InputState) -> Float {
+  input.mouse.delta_y
+}
+
+/// Get mouse wheel delta (internal use only)
+@internal
+pub fn get_mouse_wheel_delta(input: InputState) -> Float {
+  input.mouse.wheel_delta
+}
+
+/// Get left button state (internal use only)
+@internal
+pub fn get_left_button_state(input: InputState) -> ButtonState {
+  input.mouse.left_button
+}
+
+/// Get middle button state (internal use only)
+@internal
+pub fn get_middle_button_state(input: InputState) -> ButtonState {
+  input.mouse.middle_button
+}
+
+/// Get right button state (internal use only)
+@internal
+pub fn get_right_button_state(input: InputState) -> ButtonState {
+  input.mouse.right_button
 }

@@ -28,8 +28,8 @@ Tiramisu brings the power of functional programming and static type safety to ga
 
 ```gleam
 import gleam/option
+import gleam/time/duration
 import tiramisu
-import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
@@ -55,29 +55,26 @@ type Ids {
 }
 
 pub fn main() {
-  tiramisu.run(
-    dimensions: option.None,  // Fullscreen
-    background: background.Color(0x1a1a2e),
-    init: init,
-    update: update,
-    view: view,
-  )
+  tiramisu.application(init, update, view)
+  |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
 }
 
-fn init(_ctx: tiramisu.Context(Ids)) {
-  #(Model(rotation: 0.0), effect.tick(Tick), option.None)
+fn init(_ctx: tiramisu.Context) {
+  #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
 }
 
-fn update(model: Model, msg: Msg, ctx: tiramisu.Context(Ids)) {
+fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
   case msg {
     Tick -> {
-      let new_rotation = model.rotation +. ctx.delta_time
-      #(Model(rotation: new_rotation), effect.tick(Tick), option.None)
+      // ctx.delta_time is a Duration type for type-safe time handling
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let new_rotation = model.rotation +. delta_seconds
+      #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
     }
   }
 }
 
-fn view(model: Model, _ctx: tiramisu.Context(Ids)) {
+fn view(model: Model, _ctx: tiramisu.Context) {
   let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
   let assert Ok(cube_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
   let assert Ok(cube_mat) =

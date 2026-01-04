@@ -9,26 +9,26 @@
 /// - AudioContext resume handling
 ///
 /// All business logic lives in Gleam. Only pure Three.js audio API calls
-/// cross the FFI boundary.
+/// cross the FFI boundary via savoiardi.
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic}
+import gleam/float
 import gleam/list
 import gleam/option.{type Option}
-import tiramisu/audio.{
-  type Audio, type AudioBuffer, type AudioConfig, type AudioGroup,
-  type AudioState,
-}
-import tiramisu/internal/id
+import gleam/order
+import gleam/time/duration
+import savoiardi
+import tiramisu/audio.{type AudioState, type Group}
 
-/// Opaque type wrapping THREE.Audio or THREE.PositionalAudio
-pub opaque type ThreeAudioSource {
-  ThreeAudioSource(source: Dynamic)
+/// Audio source type - either global (2D) or positional (3D)
+pub type Source {
+  GlobalSource(savoiardi.Audio)
+  PositionalSource(savoiardi.PositionalAudio)
 }
 
 /// Audio source metadata stored alongside Three.js object
 pub type AudioSourceData {
   AudioSourceData(
-    three_source: ThreeAudioSource,
+    three_source: Source,
     base_volume: Float,
     group: Option(String),
     previous_state: Option(AudioState),
@@ -41,7 +41,7 @@ pub type PendingPlayback {
   PendingPlayback(
     id: String,
     source_data: AudioSourceData,
-    fade_duration_ms: Int,
+    fade_duration: duration.Duration,
   )
 }
 
@@ -87,48 +87,45 @@ pub fn init() -> AudioManagerState {
 /// Register an audio source
 pub fn register_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
   source_data: AudioSourceData,
 ) -> AudioManagerState {
-  let string_id = id.to_string(id)
+  // id is already a string
   AudioManagerState(
     ..state,
-    sources: dict.insert(state.sources, string_id, source_data),
+    sources: dict.insert(state.sources, id, source_data),
   )
 }
 
 /// Unregister an audio source
 pub fn unregister_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
 ) -> AudioManagerState {
-  let string_id = id.to_string(id)
-
   // Stop looping sounds before removing
-  case dict.get(state.sources, string_id) {
+  case dict.get(state.sources, id) {
     Ok(source_data) -> {
-      let three_source = unwrap_audio_source(source_data.three_source)
-      let is_playing = is_audio_playing_ffi(three_source)
-      let is_looping = get_audio_loop_ffi(three_source)
+      let is_playing = is_source_playing(source_data.three_source)
+      let is_looping = get_source_loop(source_data.three_source)
 
       case is_playing && is_looping {
-        True -> stop_audio_ffi(three_source)
+        True -> stop_source(source_data.three_source)
         False -> Nil
       }
     }
     Error(_) -> Nil
   }
 
-  AudioManagerState(..state, sources: dict.delete(state.sources, string_id))
+  AudioManagerState(..state, sources: dict.delete(state.sources, id))
 }
 
 /// Get audio source data by ID
 pub fn get_audio_source(
   state: AudioManagerState,
-  id: id,
+  id: String,
 ) -> Option(AudioSourceData) {
-  let string_id = id.to_string(id)
-  dict.get(state.sources, string_id) |> option.from_result
+  // id is already a string
+  dict.get(state.sources, id) |> option.from_result
 }
 
 // ============================================================================
@@ -138,21 +135,18 @@ pub fn get_audio_source(
 /// Create and configure an audio source
 pub fn create_audio_source(
   state: AudioManagerState,
-  id: id,
-  buffer: AudioBuffer,
-  config: AudioConfig,
-  audio_type: Audio,
-  audio_listener: Dynamic,
+  id: String,
+  buffer: audio.Buffer,
+  config: audio.Config,
+  audio_type: audio.Audio,
+  audio_listener: savoiardi.AudioListener,
 ) -> #(AudioManagerState, AudioSourceData) {
-  let string_id = id.to_string(id)
-
   // Remove existing source if it exists
-  let state = case dict.get(state.sources, string_id) {
+  let state = case dict.get(state.sources, id) {
     Ok(existing) -> {
-      let three_source = unwrap_audio_source(existing.three_source)
-      let is_playing = is_audio_playing_ffi(three_source)
+      let is_playing = is_source_playing(existing.three_source)
       case is_playing {
-        True -> stop_audio_ffi(three_source)
+        True -> stop_source(existing.three_source)
         False -> Nil
       }
       unregister_audio_source(state, id)
@@ -160,22 +154,19 @@ pub fn create_audio_source(
     Error(_) -> state
   }
 
-  // Use provided audio listener
-  let listener = audio_listener
-
   // Create appropriate audio source based on type
   let three_source = case audio_type {
     audio.GlobalAudio(_, _) -> {
       // Create global 2D audio
-      create_audio_ffi(listener)
+      GlobalSource(savoiardi.create_audio(audio_listener))
     }
     audio.PositionalAudio(_, _, ref_distance, rolloff_factor, max_distance) -> {
       // Create positional 3D audio
-      let pos_audio = create_positional_audio_ffi(listener)
-      set_ref_distance_ffi(pos_audio, ref_distance)
-      set_max_distance_ffi(pos_audio, max_distance)
-      set_rolloff_factor_ffi(pos_audio, rolloff_factor)
-      pos_audio
+      let pos_audio = savoiardi.create_positional_audio(audio_listener)
+      savoiardi.set_ref_distance(pos_audio, ref_distance)
+      savoiardi.set_max_distance(pos_audio, max_distance)
+      savoiardi.set_rolloff_factor(pos_audio, rolloff_factor)
+      PositionalSource(pos_audio)
     }
   }
 
@@ -192,14 +183,14 @@ pub fn create_audio_source(
   let effective_volume =
     calculate_effective_volume(state, config.volume, group_name)
 
-  set_audio_volume_ffi(three_source, effective_volume)
-  set_audio_loop_ffi(three_source, config.loop)
-  set_audio_playback_rate_ffi(three_source, config.playback_rate)
+  set_source_volume(three_source, effective_volume)
+  set_source_loop(three_source, config.loop)
+  set_source_playback_rate(three_source, config.playback_rate)
 
   // Create source data
   let source_data =
     AudioSourceData(
-      three_source: wrap_audio_source(three_source),
+      three_source: three_source,
       base_volume: config.volume,
       group: group_name,
       previous_state: option.None,
@@ -219,7 +210,7 @@ pub fn create_audio_source(
     }
     audio.Playing -> {
       // Apply playing state
-      apply_audio_state(state, id, source_data, buffer, config)
+      apply_audio_state(state, id, source_data, buffer, config, audio_listener)
     }
   }
 
@@ -236,13 +227,13 @@ pub fn create_audio_source(
 /// Apply audio state (Playing, Paused, Stopped)
 pub fn apply_audio_state(
   state: AudioManagerState,
-  id: id,
+  id: String,
   source_data: AudioSourceData,
-  buffer: AudioBuffer,
-  config: AudioConfig,
+  buffer: audio.Buffer,
+  config: audio.Config,
+  audio_listener: savoiardi.AudioListener,
 ) -> #(AudioManagerState, AudioSourceData) {
-  let string_id = id.to_string(id)
-  let three_source = unwrap_audio_source(source_data.three_source)
+  let three_source = source_data.three_source
 
   let previous_state = case source_data.previous_state {
     option.Some(s) -> s
@@ -252,9 +243,9 @@ pub fn apply_audio_state(
   let current_state = config.state
 
   // Extract fade duration
-  let fade_duration_ms = case config.fade {
+  let fade_duration = case config.fade {
     audio.Fade(duration) -> duration
-    audio.NoFade -> 0
+    audio.NoFade -> duration.milliseconds(0)
   }
 
   // State transition logic
@@ -265,25 +256,20 @@ pub fn apply_audio_state(
         _ -> {
           // Transition to Playing
           // Set buffer right before playing
-          let has_buffer = has_audio_buffer_ffi(three_source)
+          let has_buffer = has_source_buffer(three_source)
           case has_buffer {
-            False ->
-              set_audio_buffer_ffi(three_source, unwrap_audio_buffer(buffer))
+            False -> set_source_buffer(three_source, buffer)
             True -> Nil
           }
 
-          // Check AudioContext state
-          let context_state = get_audio_context_state_ffi()
+          // Check AudioContext state using the game's actual AudioListener
+          let context_state =
+            get_audio_context_state_from_listener(audio_listener)
 
           case context_state == "suspended" {
             True -> {
               // Add to pending playbacks
-              let pending =
-                PendingPlayback(
-                  id: string_id,
-                  source_data: source_data,
-                  fade_duration_ms: fade_duration_ms,
-                )
+              let pending = PendingPlayback(id:, source_data:, fade_duration:)
               let state =
                 AudioManagerState(..state, pending_playbacks: [
                   pending,
@@ -293,7 +279,7 @@ pub fn apply_audio_state(
             }
             False -> {
               // Play immediately
-              let is_playing = is_audio_playing_ffi(three_source)
+              let is_playing = is_source_playing(three_source)
 
               case is_playing {
                 True -> #(state, source_data)
@@ -304,18 +290,22 @@ pub fn apply_audio_state(
                     _ -> False
                   }
 
-                  case fade_duration_ms > 0 && !is_resuming_from_pause {
+                  case
+                    duration.compare(fade_duration, duration.milliseconds(0))
+                    == order.Gt
+                    && !is_resuming_from_pause
+                  {
                     True -> {
                       // Play with fade in
-                      play_audio_with_fade(
+                      play_source_with_fade(
                         three_source,
-                        fade_duration_ms,
+                        fade_duration,
                         source_data.base_volume,
                       )
                     }
                     False -> {
                       // Play without fade
-                      play_audio_ffi(three_source)
+                      play_source(three_source)
 
                       // Restore volume when resuming from pause
                       case is_resuming_from_pause {
@@ -326,7 +316,7 @@ pub fn apply_audio_state(
                               source_data.base_volume,
                               source_data.group,
                             )
-                          set_audio_volume_ffi(three_source, effective_volume)
+                          set_source_volume(three_source, effective_volume)
                         }
                         False -> Nil
                       }
@@ -352,14 +342,17 @@ pub fn apply_audio_state(
         audio.Stopped -> #(state, source_data)
         _ -> {
           // Transition to Stopped
-          let is_playing = is_audio_playing_ffi(three_source)
+          let is_playing = is_source_playing(three_source)
 
           case is_playing {
             True -> {
-              case fade_duration_ms > 0 {
+              case
+                duration.compare(fade_duration, duration.milliseconds(0))
+                == order.Gt
+              {
                 True ->
-                  stop_audio_with_fade(three_source, fade_duration_ms, False)
-                False -> stop_audio_ffi(three_source)
+                  stop_source_with_fade(three_source, fade_duration, False)
+                False -> stop_source(three_source)
               }
             }
             False -> Nil
@@ -380,10 +373,10 @@ pub fn apply_audio_state(
         audio.Paused -> #(state, source_data)
         _ -> {
           // Transition to Paused
-          let is_playing = is_audio_playing_ffi(three_source)
+          let is_playing = is_source_playing(three_source)
 
           case is_playing {
-            True -> pause_audio_ffi(three_source)
+            True -> pause_source(three_source)
             False -> Nil
           }
 
@@ -404,14 +397,15 @@ pub fn apply_audio_state(
 /// Update audio configuration for existing source
 pub fn update_audio_config(
   state: AudioManagerState,
-  id: id,
-  buffer: AudioBuffer,
-  config: AudioConfig,
+  id: String,
+  buffer: audio.Buffer,
+  config: audio.Config,
+  audio_listener: savoiardi.AudioListener,
 ) -> AudioManagerState {
   case get_audio_source(state, id) {
     option.None -> state
     option.Some(source_data) -> {
-      let three_source = unwrap_audio_source(source_data.three_source)
+      let three_source = source_data.three_source
 
       // Update base volume
       let updated_source_data =
@@ -425,19 +419,25 @@ pub fn update_audio_config(
       let effective_volume =
         calculate_effective_volume(state, config.volume, source_data.group)
 
-      set_audio_volume_ffi(three_source, effective_volume)
-      set_audio_loop_ffi(three_source, config.loop)
-      set_audio_playback_rate_ffi(three_source, config.playback_rate)
+      set_source_volume(three_source, effective_volume)
+      set_source_loop(three_source, config.loop)
+      set_source_playback_rate(three_source, config.playback_rate)
 
       // Apply state transitions
       let #(state, updated_source_data) =
-        apply_audio_state(state, id, updated_source_data, buffer, config)
+        apply_audio_state(
+          state,
+          id,
+          updated_source_data,
+          buffer,
+          config,
+          audio_listener,
+        )
 
       // Update registry
-      let string_id = id.to_string(id)
       AudioManagerState(
         ..state,
-        sources: dict.insert(state.sources, string_id, updated_source_data),
+        sources: dict.insert(state.sources, id, updated_source_data),
       )
     }
   }
@@ -447,26 +447,48 @@ pub fn update_audio_config(
 // FADE EFFECTS
 // ============================================================================
 
-/// Play audio with fade in (calls FFI to set up interval)
-fn play_audio_with_fade(
-  three_source: Dynamic,
-  fade_duration_ms: Int,
+/// Play audio with fade in
+fn play_source_with_fade(
+  source: Source,
+  fade_duration: duration.Duration,
   target_volume: Float,
 ) -> Nil {
-  play_with_fade_internal_ffi(three_source, fade_duration_ms, target_volume)
+  let fade_ms =
+    fade_duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+
+  case source {
+    GlobalSource(audio) ->
+      play_audio_with_fade_in_ffi(audio, fade_ms, target_volume)
+    PositionalSource(audio) ->
+      play_positional_audio_with_fade_in_ffi(audio, fade_ms, target_volume)
+  }
 }
 
-/// Stop audio with fade out (calls FFI to set up interval)
-fn stop_audio_with_fade(
-  three_source: Dynamic,
-  fade_duration_ms: Int,
+/// Stop audio with fade out
+fn stop_source_with_fade(
+  source: Source,
+  fade_duration: duration.Duration,
   pause_instead_of_stop: Bool,
 ) -> Nil {
-  stop_with_fade_internal_ffi(
-    three_source,
-    fade_duration_ms,
-    pause_instead_of_stop,
-  )
+  let fade_ms =
+    fade_duration
+    |> duration.to_seconds
+    |> float.multiply(1000.0)
+    |> float.round
+
+  case source {
+    GlobalSource(audio) ->
+      stop_audio_with_fade_out_ffi(audio, fade_ms, pause_instead_of_stop)
+    PositionalSource(audio) ->
+      stop_positional_audio_with_fade_out_ffi(
+        audio,
+        fade_ms,
+        pause_instead_of_stop,
+      )
+  }
 }
 
 // ============================================================================
@@ -546,12 +568,11 @@ fn update_sources_in_group(
     dict.map_values(state.sources, fn(_id, source_data) {
       case source_data.group {
         option.Some(g) if g == group_name -> {
-          let three_source = unwrap_audio_source(source_data.three_source)
           let effective_volume = case is_muted {
             True -> 0.0
             False -> source_data.base_volume *. group_volume
           }
-          set_audio_volume_ffi(three_source, effective_volume)
+          set_source_volume(source_data.three_source, effective_volume)
           source_data
         }
         _ -> source_data
@@ -566,16 +587,20 @@ fn update_sources_in_group(
 // ============================================================================
 
 /// Resume AudioContext after user interaction
-pub fn resume_audio_context(state: AudioManagerState) -> AudioManagerState {
+/// Takes the AudioListener from the renderer state to use the correct AudioContext
+pub fn resume_audio_context(
+  state: AudioManagerState,
+  audio_listener: savoiardi.AudioListener,
+) -> AudioManagerState {
   case state.context_resumed {
     True -> state
     False -> {
-      let context_state = get_audio_context_state_ffi()
+      let context_state = get_audio_context_state_from_listener(audio_listener)
 
       case context_state == "suspended" {
         True -> {
-          // Resume context
-          resume_audio_context_ffi()
+          // Resume context using the actual game's AudioListener
+          resume_audio_context_from_listener(audio_listener)
 
           // Mark as resumed
           let state = AudioManagerState(..state, context_resumed: True)
@@ -596,20 +621,23 @@ pub fn resume_audio_context(state: AudioManagerState) -> AudioManagerState {
 fn play_pending_audio(state: AudioManagerState) -> AudioManagerState {
   // Play each pending source
   list.each(state.pending_playbacks, fn(pending) {
-    let three_source = unwrap_audio_source(pending.source_data.three_source)
-    let is_playing = is_audio_playing_ffi(three_source)
-    let has_buffer = has_audio_buffer_ffi(three_source)
+    let three_source = pending.source_data.three_source
+    let is_playing = is_source_playing(three_source)
+    let has_buffer = has_source_buffer(three_source)
 
     case !is_playing && has_buffer {
       True -> {
-        case pending.fade_duration_ms > 0 {
+        case
+          duration.compare(pending.fade_duration, duration.milliseconds(0))
+          == order.Gt
+        {
           True ->
-            play_audio_with_fade(
+            play_source_with_fade(
               three_source,
-              pending.fade_duration_ms,
+              pending.fade_duration,
               pending.source_data.base_volume,
             )
-          False -> play_audio_ffi(three_source)
+          False -> play_source(three_source)
         }
       }
       False -> Nil
@@ -657,7 +685,7 @@ fn clamp_volume(volume: Float) -> Float {
 }
 
 /// Convert AudioGroup to string
-fn audio_group_to_string(group: AudioGroup) -> String {
+fn audio_group_to_string(group: Group) -> String {
   case group {
     audio.SFX -> "sfx"
     audio.Music -> "music"
@@ -668,96 +696,134 @@ fn audio_group_to_string(group: AudioGroup) -> String {
 }
 
 // ============================================================================
-// WRAPPING/UNWRAPPING
+// AUDIO SOURCE HELPER FUNCTIONS
 // ============================================================================
 
-fn wrap_audio_source(source: Dynamic) -> ThreeAudioSource {
-  ThreeAudioSource(source: source)
+/// Check if source is playing
+fn is_source_playing(source: Source) -> Bool {
+  case source {
+    GlobalSource(audio) -> savoiardi.is_audio_playing(audio)
+    PositionalSource(audio) -> savoiardi.is_positional_audio_playing(audio)
+  }
 }
 
-fn unwrap_audio_source(source: ThreeAudioSource) -> Dynamic {
-  source.source
+/// Get loop state of source
+fn get_source_loop(source: Source) -> Bool {
+  case source {
+    GlobalSource(audio) -> savoiardi.get_audio_loop(audio)
+    PositionalSource(audio) -> savoiardi.get_positional_audio_loop(audio)
+  }
 }
 
-fn unwrap_audio_buffer(buffer: AudioBuffer) -> Dynamic {
-  do_unwrap_audio_buffer(buffer)
+/// Stop audio source
+fn stop_source(source: Source) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.stop_audio(audio)
+    PositionalSource(audio) -> savoiardi.stop_positional_audio(audio)
+  }
 }
 
-@external(javascript, "../../threejs.ffi.mjs", "identity")
-fn do_unwrap_audio_buffer(buffer: AudioBuffer) -> Dynamic
+/// Play audio source
+fn play_source(source: Source) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.play_audio(audio)
+    PositionalSource(audio) -> savoiardi.play_positional_audio(audio)
+  }
+}
+
+/// Pause audio source
+fn pause_source(source: Source) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.pause_audio(audio)
+    PositionalSource(audio) -> savoiardi.pause_positional_audio(audio)
+  }
+}
+
+/// Set source volume
+fn set_source_volume(source: Source, volume: Float) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.set_audio_volume(audio, volume)
+    PositionalSource(audio) ->
+      savoiardi.set_positional_audio_volume(audio, volume)
+  }
+}
+
+/// Set source loop
+fn set_source_loop(source: Source, loop: Bool) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.set_audio_loop(audio, loop)
+    PositionalSource(audio) -> savoiardi.set_positional_audio_loop(audio, loop)
+  }
+}
+
+/// Set source playback rate
+fn set_source_playback_rate(source: Source, rate: Float) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.set_audio_playback_rate(audio, rate)
+    PositionalSource(audio) ->
+      savoiardi.set_positional_audio_playback_rate(audio, rate)
+  }
+}
+
+/// Check if source has buffer
+fn has_source_buffer(source: Source) -> Bool {
+  case source {
+    GlobalSource(audio) -> savoiardi.has_audio_buffer(audio)
+    PositionalSource(audio) -> savoiardi.has_positional_audio_buffer(audio)
+  }
+}
+
+/// Set source buffer
+fn set_source_buffer(source: Source, buffer: audio.Buffer) -> Nil {
+  case source {
+    GlobalSource(audio) -> savoiardi.set_audio_buffer(audio, buffer)
+    PositionalSource(audio) ->
+      savoiardi.set_positional_audio_buffer(audio, buffer)
+  }
+}
 
 // ============================================================================
-// FFI FUNCTIONS
+// FFI - Audio fade functions (tiramisu-specific, not pure Three.js bindings)
 // ============================================================================
 
-// Audio creation
-@external(javascript, "../../threejs.ffi.mjs", "createAudio")
-fn create_audio_ffi(listener: Dynamic) -> Dynamic
-
-@external(javascript, "../../threejs.ffi.mjs", "createPositionalAudio")
-fn create_positional_audio_ffi(listener: Dynamic) -> Dynamic
-
-// Audio configuration
-@external(javascript, "../../threejs.ffi.mjs", "setAudioBuffer")
-fn set_audio_buffer_ffi(audio: Dynamic, buffer: Dynamic) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "setAudioVolume")
-fn set_audio_volume_ffi(audio: Dynamic, volume: Float) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "setAudioLoop")
-fn set_audio_loop_ffi(audio: Dynamic, loop: Bool) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "setAudioPlaybackRate")
-fn set_audio_playback_rate_ffi(audio: Dynamic, rate: Float) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "setRefDistance")
-fn set_ref_distance_ffi(audio: Dynamic, distance: Float) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "setRolloffFactor")
-fn set_rolloff_factor_ffi(audio: Dynamic, factor: Float) -> Nil
-
-// Audio playback
-@external(javascript, "../../threejs.ffi.mjs", "playAudio")
-fn play_audio_ffi(audio: Dynamic) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "pauseAudio")
-fn pause_audio_ffi(audio: Dynamic) -> Nil
-
-@external(javascript, "../../threejs.ffi.mjs", "stopAudio")
-fn stop_audio_ffi(audio: Dynamic) -> Nil
-
-// Audio state queries
-@external(javascript, "../../threejs.ffi.mjs", "isAudioPlaying")
-fn is_audio_playing_ffi(audio: Dynamic) -> Bool
-
-// AudioContext
-@external(javascript, "../../threejs.ffi.mjs", "getAudioContextState")
-fn get_audio_context_state_ffi() -> String
-
-@external(javascript, "../../threejs.ffi.mjs", "resumeAudioContext")
-fn resume_audio_context_ffi() -> Nil
-
-// Fade effects (implemented in FFI with setInterval)
-@external(javascript, "../../threejs.ffi.mjs", "playAudioWithFadeIn")
-fn play_with_fade_internal_ffi(
-  audio: Dynamic,
+@external(javascript, "../../tiramisu.ffi.mjs", "playAudioWithFadeIn")
+fn play_audio_with_fade_in_ffi(
+  audio: savoiardi.Audio,
   fade_duration_ms: Int,
   target_volume: Float,
 ) -> Nil
 
-@external(javascript, "../../threejs.ffi.mjs", "stopAudioWithFadeOut")
-fn stop_with_fade_internal_ffi(
-  audio: Dynamic,
+@external(javascript, "../../tiramisu.ffi.mjs", "playAudioWithFadeIn")
+fn play_positional_audio_with_fade_in_ffi(
+  audio: savoiardi.PositionalAudio,
+  fade_duration_ms: Int,
+  target_volume: Float,
+) -> Nil
+
+@external(javascript, "../../tiramisu.ffi.mjs", "stopAudioWithFadeOut")
+fn stop_audio_with_fade_out_ffi(
+  audio: savoiardi.Audio,
   fade_duration_ms: Int,
   pause_instead_of_stop: Bool,
 ) -> Nil
 
-// Additional helpers
-@external(javascript, "../../threejs.ffi.mjs", "hasAudioBuffer")
-fn has_audio_buffer_ffi(audio: Dynamic) -> Bool
+@external(javascript, "../../tiramisu.ffi.mjs", "stopAudioWithFadeOut")
+fn stop_positional_audio_with_fade_out_ffi(
+  audio: savoiardi.PositionalAudio,
+  fade_duration_ms: Int,
+  pause_instead_of_stop: Bool,
+) -> Nil
 
-@external(javascript, "../../threejs.ffi.mjs", "getAudioLoop")
-fn get_audio_loop_ffi(audio: Dynamic) -> Bool
+// ============================================================================
+// FFI - Audio context management (uses actual game's AudioListener)
+// ============================================================================
 
-@external(javascript, "../../threejs.ffi.mjs", "setMaxDistance")
-fn set_max_distance_ffi(audio: Dynamic, distance: Float) -> Nil
+@external(javascript, "../../tiramisu.ffi.mjs", "getAudioContextStateFromListener")
+fn get_audio_context_state_from_listener(
+  audio_listener: savoiardi.AudioListener,
+) -> String
+
+@external(javascript, "../../tiramisu.ffi.mjs", "resumeAudioContextFromListener")
+fn resume_audio_context_from_listener(
+  audio_listener: savoiardi.AudioListener,
+) -> Nil
