@@ -92,7 +92,7 @@ pub type RecordedEffect(msg) {
 /// ## Example
 ///
 /// ```gleam
-/// let sim = simulate.start_with_size(
+/// let sim = simulate.start(
 ///   init: game.init,
 ///   update: game.update,
 ///   view: game.view,
