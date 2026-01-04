@@ -430,8 +430,7 @@ pub fn has_effect_predicate_test() {
     |> simulate.with_key_just_pressed(input.Space)
     |> simulate.dispatch_now(Tick)
 
-  assert
-    simulate.has_effect(simulation, fn(e) {
+  assert simulate.has_effect(simulation, fn(e) {
       case e {
         simulate.RecordedDispatch(StartJump) -> True
         _ -> False
@@ -439,8 +438,7 @@ pub fn has_effect_predicate_test() {
     })
     == True
 
-  assert
-    simulate.has_effect(simulation, fn(e) {
+  assert simulate.has_effect(simulation, fn(e) {
       case e {
         simulate.RecordedDispatch(GameOver) -> True
         _ -> False

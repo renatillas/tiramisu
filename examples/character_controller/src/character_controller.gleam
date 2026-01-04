@@ -234,7 +234,8 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "loading-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+            let assert Ok(geometry) =
+              geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
             geometry
           },
           material: {
@@ -273,7 +274,8 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
         scene.mesh(
           id: "error-cube",
           geometry: {
-            let assert Ok(geometry) = geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
+            let assert Ok(geometry) =
+              geometry.box(size: vec3.Vec3(1.0, 1.0, 1.0))
             geometry
           },
           material: {

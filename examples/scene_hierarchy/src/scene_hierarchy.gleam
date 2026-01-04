@@ -28,7 +28,11 @@ pub fn main() -> Nil {
 }
 
 fn init(_ctx: tiramisu.Context) -> #(Model, Effect(Msg), option.Option(_)) {
-  #(Model(rotation: 0.0, show_planets: True), effect.dispatch(Tick), option.None)
+  #(
+    Model(rotation: 0.0, show_planets: True),
+    effect.dispatch(Tick),
+    option.None,
+  )
 }
 
 fn update(
@@ -123,7 +127,8 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "planet-1-moon",
             geometry: {
-              let assert Ok(geometry) = geometry.box(size: vec3.Vec3(0.5, 0.5, 0.5))
+              let assert Ok(geometry) =
+                geometry.box(size: vec3.Vec3(0.5, 0.5, 0.5))
               geometry
             },
             material: {

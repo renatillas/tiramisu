@@ -66,7 +66,11 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
+      #(
+        Model(..model, rotation: new_rotation),
+        effect.dispatch(Tick),
+        option.None,
+      )
     }
 
     ModelLoaded(geom) -> {

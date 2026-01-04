@@ -287,7 +287,11 @@ fn update(
           camera_rotation: vec3.Vec3(cam_pitch, cam_yaw, cam_roll),
           pointer_locked: pointer_locked,
         ),
-        effect.batch([effect.dispatch(Tick), pointer_lock_effect, exit_lock_effect]),
+        effect.batch([
+          effect.dispatch(Tick),
+          pointer_lock_effect,
+          exit_lock_effect,
+        ]),
         option.None,
       )
     }

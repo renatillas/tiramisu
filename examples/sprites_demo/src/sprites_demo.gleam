@@ -51,7 +51,11 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
+      #(
+        Model(..model, rotation: new_rotation),
+        effect.dispatch(Tick),
+        option.None,
+      )
     }
 
     TextureLoaded(texture) -> {
@@ -103,7 +107,8 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-1",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) =
+                geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -131,7 +136,8 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-2",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) =
+                geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {
@@ -157,7 +163,8 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-3",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(1.5, 1.5))
+              let assert Ok(geometry) =
+                geometry.plane(size: vec2.Vec2(1.5, 1.5))
               geometry
             },
             material: {
@@ -189,7 +196,8 @@ fn view(model: Model, _) -> scene.Node {
           scene.mesh(
             id: "sprite-4",
             geometry: {
-              let assert Ok(geometry) = geometry.plane(size: vec2.Vec2(2.0, 2.0))
+              let assert Ok(geometry) =
+                geometry.plane(size: vec2.Vec2(2.0, 2.0))
               geometry
             },
             material: {

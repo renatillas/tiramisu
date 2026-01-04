@@ -194,7 +194,8 @@ pub fn start(
     )
 
   // Initialize game state
-  let #(initial_state, initial_effect, physics_world) = app.init(initial_context)
+  let #(initial_state, initial_effect, physics_world) =
+    app.init(initial_context)
 
   // Create context with physics_world for the game loop
   let context_with_physics =
@@ -235,7 +236,10 @@ pub fn start(
 
   // Extract bridge and wrapper from Option tuple
   let #(bridge_internal, bridge_wrapper) = case bridge {
-    option.Some(#(b, wrapper)) -> #(option.Some(ui.get_internal(b)), option.Some(wrapper))
+    option.Some(#(b, wrapper)) -> #(
+      option.Some(ui.get_internal(b)),
+      option.Some(wrapper),
+    )
     option.None -> #(option.None, option.None)
   }
 

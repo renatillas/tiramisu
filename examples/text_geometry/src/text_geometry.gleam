@@ -55,12 +55,20 @@ fn update(
   case msg {
     Tick -> {
       let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
-      #(Model(..model, rotation: new_rotation), effect.dispatch(Tick), option.None)
+      #(
+        Model(..model, rotation: new_rotation),
+        effect.dispatch(Tick),
+        option.None,
+      )
     }
 
     FontLoaded(font) -> {
       io.println("Font loaded successfully!")
-      #(Model(..model, font: option.Some(font)), effect.dispatch(Tick), option.None)
+      #(
+        Model(..model, font: option.Some(font)),
+        effect.dispatch(Tick),
+        option.None,
+      )
     }
 
     FontLoadError -> {

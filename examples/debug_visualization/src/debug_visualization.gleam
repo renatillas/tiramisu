@@ -169,7 +169,8 @@ fn view(model: Model, _) -> scene.Node {
     scene.mesh(
       id: "cube-1",
       geometry: {
-        let assert Ok(geometry) = geometry.box(size: vec3f.one |> vec3f.scale(2.0))
+        let assert Ok(geometry) =
+          geometry.box(size: vec3f.one |> vec3f.scale(2.0))
         geometry
       },
       material: {

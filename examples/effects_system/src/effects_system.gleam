@@ -79,7 +79,11 @@ fn update(
       let filtered_cubes =
         list.filter(updated_cubes, fn(cube) { cube.position.y >. -10.0 })
 
-      #(Model(..model, cubes: filtered_cubes), effect.dispatch(Tick), option.None)
+      #(
+        Model(..model, cubes: filtered_cubes),
+        effect.dispatch(Tick),
+        option.None,
+      )
     }
 
     AddCube -> {
