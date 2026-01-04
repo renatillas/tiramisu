@@ -11,13 +11,17 @@ Tiramisu runs a continuous game loop using the browser's `requestAnimationFrame`
 ```
   tiramisu.application(init, update, view)
   |> tiramisu.start("#app", dimensions, bridge) called
-       ↓
-  init(ctx) → #(Model, Effect, Option(PhysicsWorld))
-       ↓
-  view(model, ctx) → scene.Node  (initial render)
-       ↓
+       |
+       v
+  init(ctx) -> #(Model, Effect, Option(PhysicsWorld))
+       |
+       v
+  view(model, ctx) -> scene.Node  (initial render)
+       |
+       v
   Process initial effects
-       ↓
+       |
+       v
   Start game loop
 ```
 
@@ -25,21 +29,28 @@ Tiramisu runs a continuous game loop using the browser's `requestAnimationFrame`
 
 ```
   1. Browser calls requestAnimationFrame callback
-       ↓
+       |
+       v
   2. Calculate delta_time, capture input, get canvas size
-       ↓
+       |
+       v
   3. Process ALL queued messages
      for each msg in queue
-       update(model, msg, ctx) → #(Model, Effect, Physics)
-       ↓
-  4. view(model, ctx) → scene.Node
-       ↓
+       update(model, msg, ctx) -> #(Model, Effect, Physics)
+       |
+       v
+  4. view(model, ctx) -> scene.Node
+       |
+       v
   5. Diff scene, apply patches, render to canvas
-       ↓
+       |
+       v
   6. Process ALL effects from this frame
-       ↓
+       |
+       v
   7. Clear per-frame input state (just_pressed, etc.)
-       ↓
+       |
+       v
   8. Schedule next frame (goto step 1)
 ```
 
@@ -113,18 +124,22 @@ Messages are stored in a queue and processed at the start of each frame.
 
 ```
 Frame N                              Frame N+1
-────────────────────────────────────────────────────────────────
+----------------------------------------------------------------
 
   Queue: [Tick, Jump, Tick]          Queue: [Tick]
-         ↓                                  ↓
-  update(Tick)  → dispatches Tick    update(Tick) → dispatches Tick
-  update(Jump)  → dispatches nothing         ↓
-  update(Tick)  → dispatches nothing  view() called
-         ↓                                  ↓
-  view() called                       render
-         ↓                                  ↓
-  render                              process effects (Tick queued)
-         ↓
+         |                                  |
+         v                                  v
+  update(Tick)  -> dispatches Tick   update(Tick) -> dispatches Tick
+  update(Jump)  -> dispatches nothing        |
+  update(Tick)  -> dispatches nothing        v
+         |                            view() called
+         v                                  |
+  view() called                             v
+         |                            render
+         v                                  |
+  render                                    v
+         |                            process effects (Tick queued)
+         v
   process effects (Tick queued for next frame)
 ```
 
@@ -145,10 +160,10 @@ Effects are collected from all `update` calls and processed **after** rendering:
 
 ```
 Frame Timeline:
-───────────────────────────────────────────────────────────────────
+-------------------------------------------------------------------
   update()  update()  update()  view()  render  PROCESS EFFECTS
-     │         │         │                          │
-     └─────────┴─────────┴──────────────────────────┘
+     |         |         |                          |
+     +---------+---------+--------------------------+
           effects batched together              processed here
 ```
 
@@ -219,9 +234,9 @@ fn update(model, msg, ctx) {
 ```
 
 **Flow:**
-1. `init` dispatches `Tick` → queued
-2. Frame 1: `update(Tick)` runs, dispatches `Tick` → queued for next frame
-3. Frame 2: `update(Tick)` runs, dispatches `Tick` → queued for next frame
+1. `init` dispatches `Tick` -> queued
+2. Frame 1: `update(Tick)` runs, dispatches `Tick` -> queued for next frame
+3. Frame 2: `update(Tick)` runs, dispatches `Tick` -> queued for next frame
 4. ...continues forever
 
 ## Context Details
@@ -270,16 +285,18 @@ input.is_key_just_released(ctx.input, input.KeySpace)
 The physics world flows through the system:
 
 ```
-init() → Option(PhysicsWorld) ──┐
-                                ↓
+init() -> Option(PhysicsWorld) --+
+                                 |
+                                 v
                          stored in Context
-                                ↓
+                                 |
+                                 v
 update() receives ctx.physics_world
-         │
-         ↓
+         |
+         v
 update() returns Option(PhysicsWorld)
-         │
-         ↓
+         |
+         v
    if Some(world): replaces ctx.physics_world for next update/view
    if None: keeps existing physics_world
 ```

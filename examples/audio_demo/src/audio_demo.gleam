@@ -13,7 +13,6 @@ import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
 import gleam/io
-import gleam/javascript/promise
 import gleam/list
 import gleam/option
 import gleam/time/duration
@@ -99,24 +98,16 @@ fn init(
     ),
     effect.batch([
       effect.dispatch(Tick),
-      // Load audio assets
-      effect.from_promise(
-        audio.load_audio("music.ogg")
-        |> promise.map(fn(result) {
-          case result {
-            Ok(buffer) -> MusicLoaded(buffer)
-            Error(Nil) -> LoadError
-          }
-        }),
+      // Load audio assets using callback-based API
+      audio.load_audio(
+        url: "music.ogg",
+        on_success: MusicLoaded,
+        on_error: LoadError,
       ),
-      effect.from_promise(
-        audio.load_audio("sfx.wav")
-        |> promise.map(fn(result) {
-          case result {
-            Ok(buffer) -> SfxLoaded(buffer)
-            Error(Nil) -> LoadError
-          }
-        }),
+      audio.load_audio(
+        url: "sfx.wav",
+        on_success: SfxLoaded,
+        on_error: LoadError,
       ),
     ]),
     option.None,

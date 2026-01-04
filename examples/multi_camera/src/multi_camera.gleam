@@ -167,7 +167,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "CameraTopdown",
       camera: cam_topdown,
-      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(0.0, 80.0, 0.1)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: model.current_view == TopDown,
       viewport: option.None,
       postprocessing: option.Some(
@@ -190,7 +194,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "CameraSide",
       camera: cam_side,
-      transform: transform.at(position: vec3.Vec3(60.0, 10.0, 0.0)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(60.0, 10.0, 0.0)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: model.current_view == Side,
       viewport: option.None,
       postprocessing: option.Some(
@@ -214,7 +222,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "CameraFirstperson",
       camera: cam_firstperson,
-      transform: transform.at(position: vec3.Vec3(-18.0, 3.0, 18.0)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(-18.0, 3.0, 18.0)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: model.current_view == FirstPerson,
       viewport: option.None,
       postprocessing: option.Some(
@@ -259,7 +271,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "CameraOrbiting",
       camera: cam_orbiting,
-      transform: transform.at(position: vec3.Vec3(orbit_x, 25.0, orbit_z)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(orbit_x, 25.0, orbit_z)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: model.current_view == Orbiting,
       viewport: option.None,
       postprocessing: option.Some(
@@ -294,7 +310,11 @@ fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "CameraOverlay",
       camera: cam_overlay,
-      transform: transform.at(position: vec3.Vec3(0.0, 80.0, 0.1)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(0.0, 80.0, 0.1)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: False,
       viewport: option.Some(camera.ViewPort(
         position: vec2.Vec2(overlay_x, overlay_y),

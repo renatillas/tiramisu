@@ -297,14 +297,9 @@ pub fn look_at(
 ) -> Transform {
   let up = option.unwrap(up, vec3.Vec3(0.0, 1.0, 0.0))
 
-  // Calculate direction from 'from' to 'to' (quaternion.look_at expects a direction, not a position)
+  // Calculate direction from 'from' to 'to'
   let direction = vec3f.subtract(to.position, from.position)
-
-  // quaternion.look_at takes (forward, target_direction, up)
-  // forward is unused in the implementation, target_direction should be the look direction
   let quat = quaternion.look_at(vec3.Vec3(0.0, 0.0, -1.0), direction, up)
-
-  // Preserve position and scale from the 'from' transform
   Transform(position: from.position, rotation: quat, scale: from.scale)
 }
 

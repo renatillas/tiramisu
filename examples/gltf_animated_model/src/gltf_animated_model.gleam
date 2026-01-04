@@ -6,7 +6,6 @@ import gleam/option
 import gleam/result
 import gleam/time/duration
 import tiramisu
-import tiramisu/animation
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -29,7 +28,7 @@ pub type Model {
   Model(
     rotation: Float,
     load_state: LoadState,
-    current_animation: option.Option(animation.Animation),
+    current_animation: option.Option(model.Animation),
     animation_speed: Float,
   )
 }
@@ -99,7 +98,7 @@ fn update(
           io.println("Available animations:")
           list.index_map(clips, fn(clip, idx) {
             io.println(
-              "  [" <> int.to_string(idx) <> "] " <> animation.clip_name(clip),
+              "  [" <> int.to_string(idx) <> "] " <> model.clip_name(clip),
             )
           })
           Nil
@@ -110,9 +109,9 @@ fn update(
       let initial_animation =
         list.first(clips)
         |> result.map(fn(clip) {
-          animation.new_animation(clip)
-          |> animation.set_loop(animation.LoopRepeat)
-          |> animation.set_speed(model.animation_speed)
+          model.new_animation(clip)
+          |> model.set_loop(model.LoopRepeat)
+          |> model.set_speed(model.animation_speed)
         })
         |> option.from_result()
 
@@ -143,9 +142,9 @@ fn update(
             list.sample(model.get_animations(data), 1)
             |> list.first
             |> result.map(fn(clip) {
-              animation.new_animation(clip)
-              |> animation.set_loop(animation.LoopRepeat)
-              |> animation.set_speed(model.animation_speed)
+              model.new_animation(clip)
+              |> model.set_loop(model.LoopRepeat)
+              |> model.set_speed(model.animation_speed)
             })
             |> option.from_result()
           #(
@@ -168,7 +167,7 @@ fn update(
       // Update the stored animation's speed
       let updated_animation =
         option.map(model.current_animation, fn(anim) {
-          animation.set_speed(anim, new_speed)
+          model.set_speed(anim, new_speed)
         })
       #(
         Model(
@@ -292,7 +291,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
     Loaded(gltf_model) -> {
       // Use the stored animation directly (same object reference each frame)
       let anim_playback =
-        option.map(model.current_animation, animation.SingleAnimation)
+        option.map(model.current_animation, model.SingleAnimation)
 
       // Show the loaded GLTF model with animation
       let model_node =
@@ -304,6 +303,7 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
           animation: anim_playback,
           physics: option.None,
           material: option.None,
+          transparent: False,
         )
 
       scene.empty(id: "scene", transform: transform.identity, children: [

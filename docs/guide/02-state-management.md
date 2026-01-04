@@ -41,19 +41,19 @@ The Elm Architecture solves these problems by making data flow explicit and unid
 Here's how Tiramisu manages state:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│    ┌─────────┐         ┌─────────────┐         ┌─────────┐     │
-│    │  Model  │ ──────► │    view     │ ──────► │  Scene  │     │
-│    └─────────┘         └─────────────┘         └─────────┘     │
-│         ▲                                           │           │
-│         │                                           │           │
-│         │                                           ▼           │
-│    ┌─────────┐         ┌─────────────┐         ┌─────────┐     │
-│    │ update  │ ◄────── │   Message   │ ◄────── │  Input  │     │
-│    └─────────┘         └─────────────┘         └─────────┘     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------+
+|                                                                  |
+|    +---------+         +-------------+         +---------+       |
+|    |  Model  | ------> |    view     | ------> |  Scene  |       |
+|    +---------+         +-------------+         +---------+       |
+|         ^                                           |            |
+|         |                                           |            |
+|         |                                           v            |
+|    +---------+         +-------------+         +---------+       |
+|    | update  | <------ |   Message   | <------ |  Input  |       |
+|    +---------+         +-------------+         +---------+       |
+|                                                                  |
++------------------------------------------------------------------+
 ```
 
 Data flows in one direction:
@@ -292,38 +292,6 @@ Notice how we:
 3. Create a new Model with the updated player
 4. Dispatch a follow-up message if needed
 
-### Updating nested state
-
-Gleam's spread syntax makes nested updates readable:
-
-```gleam
-// Update a nested field
-let new_model = Model(
-  ..model,
-  player: Player(
-    ..model.player,
-    position: new_position,
-  ),
-)
-```
-
-For deeper nesting, extract helper functions:
-
-```gleam
-fn update_player_position(model: Model, new_pos: Vec3(Float)) -> Model {
-  Model(
-    ..model,
-    player: Player(..model.player, position: new_pos),
-  )
-}
-
-fn update_player_health(model: Model, new_health: Float) -> Model {
-  Model(
-    ..model,
-    player: Player(..model.player, health: new_health),
-  )
-}
-```
 
 ## The tick pattern
 
@@ -380,12 +348,12 @@ As your game grows, you'll want to split state management across modules. The pa
 
 ```
 src/
-├── my_game.gleam           # Main module, combines everything
-├── my_game/
-│   ├── player.gleam        # Player state and logic
-│   ├── enemies.gleam       # Enemy state and logic
-│   ├── physics.gleam       # Physics integration
-│   └── ui.gleam            # UI state (if using Lustre)
++-- my_game.gleam           # Main module, combines everything
++-- my_game/
+    +-- player.gleam        # Player state and logic
+    +-- enemy.gleam       # Enemy state and logic
+    +-- physics.gleam       # Physics integration
+    +-- ui.gleam            # UI state (if using Lustre)
 ```
 
 Each module exports its types and update function:

@@ -20,15 +20,15 @@ Tiramisu wraps Rapier in a declarative API that fits the MVU architecture. You d
 Physics in Tiramisu follows a specific pattern:
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│   init() ───► Create physics world ───► Return Some(world)      │
-│                                                                  │
-│   update(Tick) ───► Step simulation ───► Return Some(new_world) │
-│                                                                  │
-│   view() ───► Query transforms from world ───► Render scene     │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+|                                                                   |
+|   init() ---> Create physics world ---> Return Some(world)        |
+|                                                                   |
+|   update(Tick) ---> Step simulation ---> Return Some(new_world)   |
+|                                                                   |
+|   view() ---> Query transforms from world ---> Render scene       |
+|                                                                   |
++-------------------------------------------------------------------+
 ```
 
 The physics world flows through your functions:
@@ -663,8 +663,7 @@ fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
           physics.CollisionStarted(a, b) -> {
             case a == "player" && string.starts_with(b, "enemy-"),
                  b == "player" && string.starts_with(a, "enemy-") {
-              True, _ -> hp -. 10.0
-              _, True -> hp -. 10.0
+              True, _ | _, True -> hp -. 10.0
               _, _ -> hp
             }
           }
@@ -719,15 +718,6 @@ scene.mesh(
 
 ## Performance tips
 
-### Use simple shapes
-
-Complex collision shapes are expensive. Prefer:
-
-1. Boxes and spheres (fastest)
-2. Capsules and cylinders
-3. Convex hulls (slower)
-4. Triangle meshes (slowest, use only for static geometry)
-
 ### Use Fixed bodies for static geometry
 
 Fixed bodies are highly optimized. Use them for anything that doesn't move.
@@ -740,36 +730,12 @@ Only enable `with_collision_events()` on bodies that need it. Every collision ev
 
 Reducing the number of potential collisions is faster than resolving them. If enemies don't need to collide with each other, put them in the same layer and exclude self-collision.
 
-## Debugging physics
-
-Visualize physics shapes with debug nodes:
-
-```gleam
-// Add alongside your mesh
-debug.bounding_box(
-  id: "player-debug",
-  min: vec3.Vec3(-0.5, 0.0, -0.5),
-  max: vec3.Vec3(0.5, 2.0, 0.5),
-  color: debug.color_green,
-)
-```
-
-Or cast rays and visualize them:
-
-```gleam
-debug.line(
-  id: "ground-ray",
-  from: player_position,
-  to: vec3.add(player_position, vec3.Vec3(0.0, -2.0, 0.0)),
-  color: case is_grounded { True -> debug.color_green False -> debug.color_red },
-)
-```
 
 ## Next steps
 
 You now understand how to add physics to your Tiramisu games. The key insights:
 
-1. Physics world flows through init → update → view
+1. Physics world flows through init -> update -> view
 2. Three body types: Dynamic, Fixed, Kinematic
 3. Collider shapes approximate your geometry
 4. Forces are continuous, impulses are instant

@@ -264,7 +264,7 @@ transform.identity
 
 ### Rotation
 
-Rotations use Euler angles in radians. The order is X → Y → Z:
+Rotations use Euler angles in radians. The order is X -> Y -> Z:
 
 ```gleam
 // Common rotations (in radians)

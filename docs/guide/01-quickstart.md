@@ -199,7 +199,7 @@ Let's trace what happens each frame:
 5. Effects may dispatch new messages, which queue for the next frame
 6. Repeat from step 2
 
-This is a **closed loop**. Data flows in one direction: Model → view → render → messages → update → Model. There's no way for state to change except through update, which makes reasoning about your game much simpler.
+This is a **closed loop**. Data flows in one direction: Model -> view -> render -> messages -> update -> Model. There's no way for state to change except through update, which makes reasoning about your game much simpler.
 
 ## Making changes
 

@@ -11,12 +11,12 @@ The `Bridge` creates a communication channel between Tiramisu and Lustre. Think 
 The key insight: **one shared message type** flows in both directions. Each side provides a wrapper function to convert bridge messages into their internal type.
 
 ```
-┌──────────────┐              ┌──────────────┐
-│   TIRAMISU   │              │    LUSTRE    │
-│              │              │              │
-│ FromBridge ◄─┼── BridgeMsg ─┼─► FromBridge │
-│              │              │              │
-└──────────────┘              └──────────────┘
++--------------+              +--------------+
+|   TIRAMISU   |              |    LUSTRE    |
+|              |              |              |
+| FromBridge <-+-- BridgeMsg -+-> FromBridge |
+|              |              |              |
++--------------+              +--------------+
 ```
 
 ## Project setup
@@ -55,11 +55,11 @@ Create a module that both sides import. This is the "protocol" they speak:
 // src/my_game/bridge_msg.gleam
 
 pub type BridgeMsg {
-  // Game → UI
+  // Game -> UI
   HealthUpdated(current: Float, max: Float)
   ScoreUpdated(Int)
 
-  // UI → Game
+  // UI -> Game
   PauseClicked
   RestartClicked
 }
@@ -150,23 +150,6 @@ To send a message to the UI:
 ```gleam
 ui.send_to_ui(model.bridge, bridge_msg.HealthUpdated(new_health, max_health))
 ```
-
-## The pattern summarized
-
-| Direction | Lustre calls | Tiramisu calls |
-|-----------|--------------|----------------|
-| Register | `ui.register_lustre(bridge, FromBridge)` | Pass `#(bridge, FromBridge)` to start |
-| Send → Game | `ui.send(bridge, msg)` | — |
-| Send → UI | — | `ui.send_to_ui(bridge, msg)` |
-| Receive | `FromBridge(msg)` in update | `FromBridge(msg)` in update |
-
-## Best practices
-
-**Send state, not deltas.** When syncing, send the full current value. `HealthUpdated(75.0, 100.0)` is safer than `HealthChanged(-25.0)` which could get out of sync.
-
-**Ignore irrelevant messages.** Each side receives ALL bridge messages, including ones it sent. Pattern match and return unchanged model for messages meant for the other side.
-
-**Keep the bridge message type flat.** Avoid nesting complex types. If you need to send rich data, consider sending IDs and looking up the data locally.
 
 ## Next steps
 

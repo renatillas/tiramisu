@@ -9,7 +9,6 @@ import gleam/result
 import gleam/time/duration
 import statemachine
 import tiramisu
-import tiramisu/animation
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
@@ -25,7 +24,7 @@ pub type LoadState {
   Loading
   Loaded(
     model.GLTFData,
-    statemachine.StateMachine(animation.Animation, tiramisu.Context),
+    statemachine.StateMachine(model.Animation, tiramisu.Context),
   )
   Failed(String)
 }
@@ -93,7 +92,7 @@ fn update(
           io.println("Available animations:")
           list.index_map(clips, fn(clip, idx) {
             io.println(
-              "  [" <> int.to_string(idx) <> "] " <> animation.clip_name(clip),
+              "  [" <> int.to_string(idx) <> "] " <> model.clip_name(clip),
             )
           })
           Nil
@@ -101,7 +100,7 @@ fn update(
       }
 
       // Create state machine with animations
-      let machine = echo create_state_machine(data)
+      let machine = create_state_machine(data)
 
       #(
         Model(..model, load_state: Loaded(data, machine)),
@@ -124,22 +123,22 @@ fn update(
 /// Create an animation state machine for the character
 fn create_state_machine(
   data: model.GLTFData,
-) -> statemachine.StateMachine(animation.Animation, tiramisu.Context) {
+) -> statemachine.StateMachine(model.Animation, tiramisu.Context) {
   // Get animation clips (assume model has at least 2 animations)
   case model.get_animations(data) {
     [idle_clip, walk_clip, crouching_clip, ..] -> {
       // Create state machine
       let idle =
-        animation.new_animation(idle_clip)
-        |> animation.set_loop(animation.LoopRepeat)
+        model.new_animation(idle_clip)
+        |> model.set_loop(model.LoopRepeat)
 
       let walking =
-        animation.new_animation(walk_clip)
-        |> animation.set_loop(animation.LoopRepeat)
+        model.new_animation(walk_clip)
+        |> model.set_loop(model.LoopRepeat)
 
       let crouching =
-        animation.new_animation(crouching_clip)
-        |> animation.set_loop(animation.LoopRepeat)
+        model.new_animation(crouching_clip)
+        |> model.set_loop(model.LoopRepeat)
 
       statemachine.new(idle)
       |> statemachine.with_state(walking)
@@ -301,11 +300,10 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
 
     Loaded(data, machine) -> {
       // Get animation from state machine
-      let animation = case statemachine.state_data(machine) {
-        statemachine.Single(state) ->
-          option.Some(animation.SingleAnimation(state))
+      let anim_playback = case statemachine.state_data(machine) {
+        statemachine.Single(state) -> option.Some(model.SingleAnimation(state))
         statemachine.BlendingData(from:, to:, factor:) ->
-          option.Some(animation.BlendedAnimations(from, to, factor))
+          option.Some(model.BlendedAnimations(from, to, factor))
       }
 
       // Show the character model with animation
@@ -315,9 +313,10 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
           object: model.get_scene(data),
           transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_euler_rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
-          animation: animation,
+          animation: anim_playback,
           physics: option.None,
           material: option.None,
+          transparent: False,
         )
 
       scene.empty(id: "scene", transform: transform.identity, children: [

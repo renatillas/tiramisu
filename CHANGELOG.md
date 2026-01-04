@@ -169,14 +169,51 @@ New module for value interpolation:
 
 #### `tiramisu/simulate`
 
-New module for physics simulation helpers:
+New module for headless game testing without a browser (similar to `lustre/dev/simulate`):
 
-- `simulate.step()` - Step physics world with fixed timestep
-- `simulate.raycast()` - Cast ray into physics world
-- `simulate.raycast_all()` - Get all ray intersections
-- `simulate.get_body_position()` / `simulate.get_body_rotation()` - Query body state
-- `simulate.apply_force()` / `simulate.apply_impulse()` - Apply forces
-- `simulate.set_linear_velocity()` / `simulate.set_angular_velocity()` - Set velocities
+**Types:**
+- `Simulation(model, msg)` - A running headless simulation
+- `RecordedEffect(msg)` - Effects captured during simulation
+
+**Lifecycle:**
+- `simulate.start()` - Start a headless simulation from init/update/view functions
+- `simulate.frame()` - Advance simulation by one frame
+- `simulate.frames()` - Advance simulation by multiple frames
+
+**Message Dispatching:**
+- `simulate.dispatch()` - Queue a message for the next frame
+- `simulate.dispatch_now()` - Process a message immediately
+
+**State Inspection:**
+- `simulate.model()` - Get current model state
+- `simulate.view()` - Get current scene graph
+- `simulate.effects()` - Get recorded effects from last frame
+- `simulate.physics_world()` - Get current physics world
+- `simulate.frame_count()` - Get number of frames simulated
+- `simulate.total_time()` - Get total simulated time
+- `simulate.input_state()` - Get current input state
+
+**Input Simulation:**
+- `simulate.with_key_pressed()` - Simulate key being held
+- `simulate.with_key_just_pressed()` - Simulate key just pressed this frame
+- `simulate.with_key_released()` - Simulate key released this frame
+- `simulate.with_mouse_position()` - Set simulated mouse position
+- `simulate.with_mouse_delta()` - Set simulated mouse movement
+- `simulate.with_left_button_pressed()` - Simulate left mouse held
+- `simulate.with_left_button_just_pressed()` - Simulate left mouse click
+- `simulate.with_right_button_pressed()` - Simulate right mouse held
+- `simulate.with_input()` - Set complete input state
+- `simulate.clear_input()` - Reset all input to defaults
+
+**Physics Helpers:**
+- `simulate.step_physics()` - Step physics simulation
+- `simulate.get_body_transform()` - Get transform of physics body by ID
+- `simulate.get_collision_events()` - Get collision events from physics
+
+**Effect Helpers:**
+- `simulate.clear_effects()` - Clear recorded effects
+- `simulate.has_effect()` - Check if specific effect was dispatched
+- `simulate.dispatched_messages()` - Get all messages from dispatch effects
 
 ### Removed Modules
 

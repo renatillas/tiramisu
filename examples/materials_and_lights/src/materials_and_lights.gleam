@@ -219,10 +219,11 @@ fn update(
 
       // Calculate forward/right vectors based on NEW camera rotation
       // For movement, we only use yaw (horizontal rotation) to avoid flying up/down
-      let forward_x = maths.sin(cam_yaw)
-      let forward_z = maths.cos(cam_yaw)
-      let right_x = maths.cos(cam_yaw)
-      let right_z = 0.0 -. maths.sin(cam_yaw)
+      // Negated to match the view direction (camera looks at -Z when yaw=0)
+      let forward_x = 0.0 -. maths.sin(cam_yaw)
+      let forward_z = 0.0 -. maths.cos(cam_yaw)
+      let right_x = 0.0 -. maths.cos(cam_yaw)
+      let right_z = maths.sin(cam_yaw)
 
       // Handle movement input (WASD)
       let vec3.Vec3(cam_x, cam_y, cam_z) = model.camera_position
@@ -326,26 +327,27 @@ fn view(model: Model, _) -> scene.Node {
   let assert Ok(camera) =
     camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
 
-  // Calculate look-at target for FPS camera
-  // This ensures pitch and yaw work correctly in world space
+  // FPS camera using look_at
   let vec3.Vec3(cam_pitch, cam_yaw, _) = model.camera_rotation
   let vec3.Vec3(cam_x, cam_y, cam_z) = model.camera_position
 
   // Calculate forward direction from yaw and pitch
-  let forward_x = maths.sin(cam_yaw) *. maths.cos(cam_pitch)
+  let forward_x = 0.0 -. maths.sin(cam_yaw) *. maths.cos(cam_pitch)
   let forward_y = maths.sin(cam_pitch)
-  let forward_z = maths.cos(cam_yaw) *. maths.cos(cam_pitch)
+  let forward_z = 0.0 -. maths.cos(cam_yaw) *. maths.cos(cam_pitch)
 
-  // Look-at target is position + forward direction
   let look_at_target =
     vec3.Vec3(cam_x +. forward_x, cam_y +. forward_y, cam_z +. forward_z)
 
-  let camera = camera
+  let cam_transform =
+    transform.at(position: model.camera_position)
+    |> transform.look_at(transform.at(look_at_target), option.None)
+
   let camera =
     scene.camera(
       id: "main_camera",
       camera:,
-      transform: transform.at(position: model.camera_position),
+      transform: cam_transform,
       active: True,
       viewport: option.None,
       postprocessing: option.None,
@@ -574,7 +576,6 @@ fn view(model: Model, _) -> scene.Node {
   scene.empty(id: "scene", transform: transform.identity, children: [
     camera,
     lights,
-    camera,
     spheres,
     ground,
   ])

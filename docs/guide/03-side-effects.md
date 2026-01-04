@@ -5,7 +5,6 @@ So far, we've focused on pure functions: `update` takes a Model and Message, ret
 But games need to interact with the world. You need to:
 
 - Schedule the next frame
-- Play sound effects
 - Load assets from URLs
 - Read from local storage
 - Request fullscreen mode
@@ -70,9 +69,9 @@ effect.dispatch(SpawnEnemy(position))
 Messages dispatched this frame are processed next frame. This creates the game loop:
 
 ```
-Frame 1: Process Tick → dispatch Tick
-Frame 2: Process Tick → dispatch Tick
-Frame 3: Process Tick → dispatch Tick
+Frame 1: Process Tick -> dispatch Tick
+Frame 2: Process Tick -> dispatch Tick
+Frame 3: Process Tick -> dispatch Tick
 ...
 ```
 
@@ -175,14 +174,14 @@ The `effect.dispatch(Tick)` schedules Tick for the next frame. Since effects are
 
 ```
 Frame 1: Tick queued from init
-         → update(Tick) runs
-         → dispatch(Tick) effect processed
-         → Tick queued for next frame
+         -> update(Tick) runs
+         -> dispatch(Tick) effect processed
+         -> Tick queued for next frame
 
 Frame 2: Tick in queue
-         → update(Tick) runs
-         → dispatch(Tick) effect processed
-         → Tick queued for next frame
+         -> update(Tick) runs
+         -> dispatch(Tick) effect processed
+         -> Tick queued for next frame
 
 ...forever
 ```
@@ -288,37 +287,6 @@ fn update(model, msg, ctx) {
 }
 ```
 
-### Playing audio
-
-Audio is played through the scene graph, not effects. Add an `audio` node to your view:
-
-```gleam
-fn view(model, ctx) {
-  scene.empty(
-    id: "root",
-    transform: transform.identity,
-    children: [
-      // ... other nodes
-      case model.play_jump_sound, model.sound {
-        True, Some(buffer) ->
-          scene.audio(
-            id: "jump-sound",
-            audio: audio.GlobalAudio(
-              buffer: buffer,
-              config: audio.config()
-                |> audio.with_state(audio.Playing)
-                |> audio.with_volume(0.8),
-            ),
-          )
-        _, _ -> scene.empty(id: "no-sound", transform: transform.identity, children: [])
-      },
-    ],
-  )
-}
-```
-
-See the [Audio guide](08-audio.md) for details on positional audio, looping, and audio groups.
-
 ## Background effects
 
 The `background.set` effect changes the scene background:
@@ -407,10 +375,10 @@ Understanding when effects execute is crucial:
 
 ```
 Frame Timeline:
-─────────────────────────────────────────────────────────────────────
+---------------------------------------------------------------------
   update()  update()  update()  view()  render  EFFECTS PROCESSED
-     │         │         │                           │
-     └─────────┴─────────┴───────────────────────────┘
+     |         |         |                           |
+     +---------+---------+---------------------------+
           Effects collected here              Run here
 ```
 

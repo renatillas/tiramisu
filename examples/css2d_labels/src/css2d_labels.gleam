@@ -35,14 +35,14 @@ pub fn main() {
   |> tiramisu.start("body", tiramisu.FullScreen, option.None)
 }
 
-fn css2d_label_element() -> Element(Msg) {
+fn css2d_label_element(string) -> Element(Msg) {
   html.div(
     [
       attribute.class(
         "bg-white/80 text-black-400 px-3 py-2 rounded font-sans text-sm font-medium shadow-lg",
       ),
     ],
-    [element.text("CSS2D - Always On Top")],
+    [element.text("CSS2D - Always On Top - " <> string)],
   )
 }
 
@@ -136,9 +136,11 @@ fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
           physics: None,
         ),
         // CSS2D Label - always visible on top
-        scene.css2d_label(
+        scene.css2d(
           id: "cube-label",
-          html: element.to_string(css2d_label_element()),
+          html: element.to_string(
+            css2d_label_element(float.to_string(model.rotation)),
+          ),
           transform: transform.at(position: vec3.Vec3(0.0, 1.0, 0.0)),
         ),
       ],

@@ -179,16 +179,15 @@ As games grow, split them into modules. Each module follows the same MVU pattern
 
 ```
 src/
-├── my_game.gleam              # Main module - routes messages
-├── my_game/
-│   ├── player.gleam           # Player movement, health, inventory
-│   ├── player/
-│   │   └── magic.gleam        # Nested: spells, projectiles
-│   ├── enemy.gleam            # Enemy AI, spawning, attacks
-│   ├── map.gleam              # Level geometry, loading
-│   └── game_physics.gleam     # Physics coordination
-└── my_game/
-    └── ui.gleam               # Lustre UI integration
++-- my_game.gleam              # Main module - routes messages
++-- my_game/
+    +-- player.gleam           # Player movement, health, inventory
+    +-- player/
+    |   +-- magic.gleam        # Nested: spells, projectiles
+    +-- enemy.gleam            # Enemy AI, spawning, attacks
+    +-- map.gleam              # Level geometry, loading
+    +-- game_physics.gleam     # Physics coordination
+    +-- ui.gleam               # Lustre UI integration
 ```
 
 ### Module Interface
@@ -224,18 +223,18 @@ This creates a tree structure:
 
 ```
 Msg (main)
-├── PlayerMsg(player.Msg)
-│   ├── Tick
-│   ├── TakeDamage(Float)
-│   └── MagicMsg(magic.Msg)
-│       ├── Tick
-│       ├── CastSpell
-│       └── RemoveProjectile(Int)
-├── EnemyMsg(enemy.Msg)
-│   ├── Tick
-│   └── TakeProjectileDamage(id, damage)
-└── PhysicsMsg(game_physics.Msg)
-    └── Tick
++-- PlayerMsg(player.Msg)
+|   +-- Tick
+|   +-- TakeDamage(Float)
+|   +-- MagicMsg(magic.Msg)
+|       +-- Tick
+|       +-- CastSpell
+|       +-- RemoveProjectile(Int)
++-- EnemyMsg(enemy.Msg)
+|   +-- Tick
+|   +-- TakeProjectileDamage(id, damage)
++-- PhysicsMsg(game_physics.Msg)
+    +-- Tick
 ```
 
 ---

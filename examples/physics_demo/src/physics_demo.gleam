@@ -548,7 +548,11 @@ fn view(model: Model, context: tiramisu.Context) -> scene.Node {
     scene.camera(
       id: "main-camera",
       camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 8.0, 15.0)),
+      transform: transform.look_at(
+        from: transform.at(vec3.Vec3(0.0, 8.0, 15.0)),
+        to: transform.identity,
+        up: option.None,
+      ),
       active: True,
       viewport: option.None,
       postprocessing: option.None,

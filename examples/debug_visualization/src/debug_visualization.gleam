@@ -138,7 +138,7 @@ fn view(model: Model, _) -> scene.Node {
     |> scene.camera(
       id: "main-camera",
       camera: _,
-      transform: transform.at(position: vec3.Vec3(0.0, 10.0, 15.0)),
+      transform: transform.at(position: vec3.Vec3(0.0, 5.0, 15.0)),
       active: True,
       viewport: option.None,
       postprocessing: option.None,

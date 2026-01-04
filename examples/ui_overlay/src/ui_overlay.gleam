@@ -21,8 +21,22 @@ import tiramisu/ui
 import vec/vec3
 
 // =============================================================================
-// Lustre UI Types
+// Shared Bridge Message Type
 // =============================================================================
+
+/// Single message type for bridge communication between Lustre and Tiramisu.
+/// Both sides understand all messages - sender ignores messages meant for receiver.
+pub type BridgeMsg {
+  // Game → UI
+  UpdateScore(Int)
+  UpdateHealth(Float)
+  SetGameState(GameState)
+
+  // UI → Game
+  StartGame
+  PauseGame
+  ResumeGame
+}
 
 pub type GameState {
   Menu
@@ -30,10 +44,14 @@ pub type GameState {
   Paused
 }
 
+// =============================================================================
+// Lustre UI Types
+// =============================================================================
+
 /// Lustre model - stores UI state and the bridge
 pub type UIModel {
   UIModel(
-    bridge: ui.Bridge(UIMsg, GameMsg),
+    bridge: ui.Bridge(BridgeMsg),
     state: GameState,
     score: Int,
     health: Float,
@@ -42,11 +60,11 @@ pub type UIModel {
 
 /// Messages for the Lustre UI
 pub type UIMsg {
-  StartGame
-  PauseGame
-  ResumeGame
-  UpdateScore(Int)
-  UpdateHealth(Float)
+  UIFromBridge(BridgeMsg)
+  // UI-only messages
+  StartClicked
+  PauseClicked
+  ResumeClicked
 }
 
 // =============================================================================
@@ -55,7 +73,7 @@ pub type UIMsg {
 
 pub type GameModel {
   GameModel(
-    bridge: ui.Bridge(UIMsg, GameMsg),
+    bridge: ui.Bridge(BridgeMsg),
     rotation: Float,
     position: vec3.Vec3(Float),
     score: Int,
@@ -66,9 +84,8 @@ pub type GameModel {
 
 /// Messages for the Tiramisu game
 pub type GameMsg {
+  GameFromBridge(BridgeMsg)
   Tick
-  Pause
-  Resume
 }
 
 // =============================================================================
@@ -84,40 +101,53 @@ pub fn main() {
     lustre.application(init, update, view)
     |> lustre.start("#app", bridge)
 
-  // 3. Start Tiramisu game with the same bridge
+  // 3. Start Tiramisu game with the same bridge and wrapper
   let assert Ok(_) =
     tiramisu.application(game_init(bridge, _), game_update, game_view)
-    |> tiramisu.start("#game", tiramisu.FullScreen, Some(bridge))
+    |> tiramisu.start(
+      "#game",
+      tiramisu.FullScreen,
+      Some(#(bridge, GameFromBridge)),
+    )
 }
 
 // =============================================================================
 // Lustre Init/Update/View
 // =============================================================================
 
-fn init(bridge: ui.Bridge(UIMsg, GameMsg)) -> #(UIModel, effect.Effect(UIMsg)) {
+fn init(bridge: ui.Bridge(BridgeMsg)) -> #(UIModel, effect.Effect(UIMsg)) {
   #(
     UIModel(bridge: bridge, state: Menu, score: 0, health: 100.0),
-    // Register Lustre's dispatch with the bridge
-    ui.register_lustre(bridge),
+    // Register Lustre's dispatch with the bridge and wrapper
+    ui.register_lustre(bridge, UIFromBridge),
   )
 }
 
 fn update(model: UIModel, msg: UIMsg) {
   case msg {
-    StartGame -> #(
+    // Handle bridge messages from game
+    UIFromBridge(bridge_msg) ->
+      case bridge_msg {
+        UpdateScore(score) -> #(UIModel(..model, score:), effect.none())
+        UpdateHealth(health) -> #(UIModel(..model, health:), effect.none())
+        SetGameState(state) -> #(UIModel(..model, state:), effect.none())
+        // Ignore messages we send (UI → Game)
+        StartGame | PauseGame | ResumeGame -> #(model, effect.none())
+      }
+
+    // UI-only button clicks
+    StartClicked -> #(
       UIModel(..model, state: Playing),
-      ui.to_tiramisu(model.bridge, Resume),
+      ui.send(model.bridge, StartGame),
     )
-    PauseGame -> #(
+    PauseClicked -> #(
       UIModel(..model, state: Paused),
-      ui.to_tiramisu(model.bridge, Pause),
+      ui.send(model.bridge, PauseGame),
     )
-    ResumeGame -> #(
+    ResumeClicked -> #(
       UIModel(..model, state: Playing),
-      ui.to_tiramisu(model.bridge, Resume),
+      ui.send(model.bridge, ResumeGame),
     )
-    UpdateScore(score) -> #(UIModel(..model, score:), effect.none())
-    UpdateHealth(health) -> #(UIModel(..model, health:), effect.none())
   }
 }
 
@@ -158,7 +188,7 @@ fn menu_overlay() -> Element(UIMsg) {
           ]),
           html.button(
             [
-              event.on_click(StartGame),
+              event.on_click(StartClicked),
               class(
                 "px-7 py-4 text-lg cursor-pointer bg-[#4ecdc4] text-white border-none rounded-[5px]",
               ),
@@ -210,7 +240,7 @@ fn pause_overlay(model: UIModel) -> Element(UIMsg) {
             html.h2([], [element.text("Paused")]),
             html.button(
               [
-                event.on_click(ResumeGame),
+                event.on_click(ResumeClicked),
                 class(
                   "px-7 py-4 text-lg cursor-pointer bg-[#4ecdc4] text-white border-none rounded-[5px] mt-5",
                 ),
@@ -254,7 +284,7 @@ fn health_color(health: Float) -> String {
 // Tiramisu Game Init/Update/View
 // =============================================================================
 
-fn game_init(bridge: ui.Bridge(UIMsg, GameMsg), _ctx: tiramisu.Context) {
+fn game_init(bridge: ui.Bridge(BridgeMsg), _ctx: tiramisu.Context) {
   #(
     GameModel(
       bridge:,
@@ -271,9 +301,31 @@ fn game_init(bridge: ui.Bridge(UIMsg, GameMsg), _ctx: tiramisu.Context) {
 
 fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
   case msg {
-    Pause -> #(GameModel(..model, paused: True), game_effect.none(), None)
-
-    Resume -> #(GameModel(..model, paused: False), game_effect.none(), None)
+    // Handle bridge messages from UI
+    GameFromBridge(bridge_msg) ->
+      case bridge_msg {
+        StartGame -> #(
+          GameModel(..model, paused: False),
+          game_effect.none(),
+          None,
+        )
+        PauseGame -> #(
+          GameModel(..model, paused: True),
+          game_effect.none(),
+          None,
+        )
+        ResumeGame -> #(
+          GameModel(..model, paused: False),
+          game_effect.none(),
+          None,
+        )
+        // Ignore messages we send (Game → UI)
+        UpdateScore(_) | UpdateHealth(_) | SetGameState(_) -> #(
+          model,
+          game_effect.none(),
+          None,
+        )
+      }
 
     Tick -> {
       case model.paused {
@@ -326,20 +378,21 @@ fn game_update(model: GameModel, msg: GameMsg, ctx: tiramisu.Context) {
               rotation: new_rotation,
               position: new_position,
               score: new_score,
+              paused: should_pause,
             )
 
           // Build effects - always tick, always update UI, optionally pause
           let effects = case should_pause {
             True -> [
               game_effect.dispatch(Tick),
-              ui.to_lustre(model.bridge, UpdateScore(new_score)),
-              ui.to_lustre(model.bridge, UpdateHealth(model.health)),
-              ui.to_lustre(model.bridge, PauseGame),
+              ui.send_to_ui(model.bridge, UpdateScore(new_score)),
+              ui.send_to_ui(model.bridge, UpdateHealth(model.health)),
+              ui.send_to_ui(model.bridge, SetGameState(Paused)),
             ]
             False -> [
               game_effect.dispatch(Tick),
-              ui.to_lustre(model.bridge, UpdateScore(new_score)),
-              ui.to_lustre(model.bridge, UpdateHealth(model.health)),
+              ui.send_to_ui(model.bridge, UpdateScore(new_score)),
+              ui.send_to_ui(model.bridge, UpdateHealth(model.health)),
             ]
           }
 
