@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v7.0.0 2026-01-10
 
 ### Bug Fixes
 
@@ -10,7 +10,6 @@
   - Added `CSS3DRenderer` type and FFI bindings to savoiardi
   - Added `init_css3d_renderer`, `render_css3d`, and `update_css3d_renderer_size` functions
 
-## v7.0.0-rc1 - 2026-01-04
 
 ### Major Breaking Changes
 
@@ -272,53 +271,6 @@ New module for headless game testing without a browser (similar to `lustre/dev/s
 - Many redundant examples removed (~24k lines removed)
 - All examples updated to v7 API
 - Example games (tetris, snake, snake2D) updated to v7 API
-
-### Migration Guide
-
-1. **Update entry point:**
-   ```gleam
-   // Change tiramisu.run(...) to:
-   tiramisu.application(init, update, view)
-   |> tiramisu.start("#game", tiramisu.FullScreen, option.None)
-   ```
-
-2. **Remove generic ID parameters:**
-   ```gleam
-   // Remove (id) from all types
-   fn view(model: Model, ctx: Context) -> scene.Node { ... }
-   ```
-
-3. **Update effect.tick to effect.dispatch:**
-   ```gleam
-   effect.dispatch(Tick)  // Instead of effect.tick(Tick)
-   ```
-
-4. **Update delta_time usage:**
-   ```gleam
-   let dt = duration.to_seconds(ctx.delta_time)  // Convert Duration to Float
-   ```
-
-5. **Update canvas dimensions:**
-   ```gleam
-   let width = ctx.canvas_size.x
-   let height = ctx.canvas_size.y
-   ```
-
-6. **Remove look_at from cameras** - Use transform-based positioning
-
-7. **Update bridge usage:**
-   ```gleam
-   // Define shared BridgeMsg type
-   // Use ui.send() and ui.send_to_ui() instead of dispatch_to_*
-   // Pass #(bridge, wrapper) to tiramisu.start()
-   ```
-
-8. **Update animation references:**
-   ```gleam
-   // animation.* functions are now in model.*
-   model.new_animation(clip)
-   model.set_loop(anim, model.LoopRepeat)
-   ```
 
 ## v6.1.0 - 2025-11-26
 
