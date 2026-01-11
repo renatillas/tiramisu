@@ -47,13 +47,6 @@ type Msg {
   Tick
 }
 
-type Ids {
-  Scene
-  Cube
-  MainCamera
-  Sun
-}
-
 pub fn main() {
   tiramisu.application(init, update, view)
   |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
@@ -85,9 +78,9 @@ fn view(model: Model, _ctx: tiramisu.Context) {
     |> material.build()
   let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
 
-  scene.empty(id: Scene, transform: transform.identity, children: [
+  scene.empty(id: "scene", transform: transform.identity, children: [
     scene.camera(
-      id: MainCamera,
+      id: "main-camera",
       camera: cam,
       transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
       look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
@@ -96,7 +89,7 @@ fn view(model: Model, _ctx: tiramisu.Context) {
       postprocessing: option.None,
     ),
     scene.mesh(
-      id: Cube,
+      id: "cube",
       geometry: cube_geo,
       material: cube_mat,
       transform: transform.identity
@@ -104,7 +97,7 @@ fn view(model: Model, _ctx: tiramisu.Context) {
       physics: option.None,
     ),
     scene.light(
-      id: Sun,
+      id: "sun",
       light: sun,
       transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
     ),

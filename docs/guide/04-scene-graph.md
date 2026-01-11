@@ -182,16 +182,18 @@ scene.audio(
 )
 ```
 
-### scene.model3d
+### scene.object_3d
 
-Load external 3D models (GLTF/GLB):
+Load external 3D models (GLTF/GLB/FBX/OBJ/STL):
 
 ```gleam
-scene.model3d(
+scene.object_3d(
   id: "character",
-  model: loaded_model,
+  object: loaded_object,
   transform: character_transform,
-  animations: Some(animation_state),
+  animation: option.Some(animation_state),
+  physics: option.None,
+  transparent: False,
 )
 ```
 

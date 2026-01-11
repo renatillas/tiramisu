@@ -89,8 +89,8 @@ fn my_scene() -> scene.Node {
   let cube_geo = geometry.box(1.0, 1.0, 1.0)
   let cube_mat = material.basic(color: 0x4ecdc4)
 
-  scene.group(id: "root", transform: transform.identity, children: [
-    scene.mesh(id: "cube", geometry: cube_geo, material: cube_mat, ...),
+  scene.empty(id: "root", transform: transform.identity, children: [
+    scene.mesh(id: "cube", geometry: cube_geo, material: cube_mat, transform: transform.identity, physics: option.None),
     // camera, lights, etc.
   ])
 }
