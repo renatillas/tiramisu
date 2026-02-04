@@ -950,7 +950,7 @@ pub fn get_transform(
   let rotation_quat = get_body_rotation_ffi(rapier_body)
 
   Ok(
-    transform.identity
+    transform.identity()
     |> transform.with_position(vec3.Vec3(
       translation.x,
       translation.y,
@@ -1555,11 +1555,11 @@ pub fn create_body(
   }
 
   // Set transform
-  let pos = transform.position(transform)
+  let pos = transform.position
   set_body_desc_translation_ffi(body_desc, pos.x, pos.y, pos.z)
 
   // Get quaternion rotation directly from transform
-  let quat = transform.rotation_quaternion(transform)
+  let quat = transform.rotation
   set_body_desc_rotation_ffi(body_desc, quat.x, quat.y, quat.z, quat.w)
 
   // Set damping
@@ -1613,11 +1613,11 @@ pub fn create_body(
   }
 
   // Set collider offset (position)
-  let pos = transform.position(offset)
+  let pos = offset.position
   set_collider_translation_ffi(collider_desc, pos.x, pos.y, pos.z)
 
   // Set collider offset (rotation) - get quaternion directly from transform
-  let quat = transform.rotation_quaternion(offset)
+  let quat = offset.rotation
   set_collider_rotation_ffi(collider_desc, quat.x, quat.y, quat.z, quat.w)
 
   // Set collider properties
@@ -1699,8 +1699,8 @@ pub fn update_body_transform(
   case dict.get(world.rapier_bodies, id) {
     Ok(rapier_body) -> {
       // Get position and rotation from transform
-      let position = transform.position(transform)
-      let quaternion = transform.rotation_quaternion(transform)
+      let position = transform.position
+      let quaternion = transform.rotation
 
       // Update the rigid body's position and rotation in Rapier
       // wake_up = True to ensure kinematic bodies apply their new position

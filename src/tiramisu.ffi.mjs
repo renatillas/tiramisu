@@ -1,378 +1,239 @@
-// Tiramisu FFI - Game engine specific functionality
-// Contains functions that are NOT pure Three.js bindings
-import * as THREE from 'three';
+// FFI implementation for Tiramisu subscriptions
 
-// ============================================================================
-// PHYSICS - Rapier physics engine integration
-// ============================================================================
+import { Ok as Result$Ok } from "./gleam.mjs";
+import { milliseconds } from "../gleam_time/gleam/time/duration.mjs";
 
-import RAPIER from '@dimforge/rapier3d-compat';
+// Global state for tick subscription
+let tickSubscriptionActive = false;
+let tickHandler = null;
+let tickDispatch = null;
+let previousTimestamp = null;
+let inputState = null;
 
-// Initialize Rapier (must be called before creating world)
-await RAPIER.init();
+// Global state for Three.js rendering (set by platform)
+let globalRenderer = null;
+let globalScene = null;
 
-// ============================================================================
-// CANVAS/PAINT INTEGRATION
-// These functions integrate with the paint library for 2D canvas rendering
-// ============================================================================
+// Initialize input state (will be populated by input manager)
+function initializeInputState() {
+  return {
+    // Keyboard state
+    keys_pressed: new Set(),
+    keys_just_pressed: new Set(),
+    keys_just_released: new Set(),
 
-/**
- * Create a canvas texture from a paint.Picture (encoded as string)
- * Uses the paint library's global rendering function set up by define_web_component()
- * @param {string} encodedPicture - Encoded paint.Picture string (from paint/encode.to_string)
- * @param {number} width - Canvas width in pixels
- * @param {number} height - Canvas height in pixels
- * @returns {THREE.CanvasTexture}
- */
-export function createCanvasTextureFromPicture(encodedPicture, width, height) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+    // Mouse state
+    mouse_position: { x: 0, y: 0 },
+    mouse_buttons_pressed: new Set(),
+    mouse_buttons_just_pressed: new Set(),
+    mouse_buttons_just_released: new Set(),
+    mouse_delta: { x: 0, y: 0 },
+    mouse_wheel_delta: 0,
 
-  // Clear canvas with transparent background
-  ctx.clearRect(0, 0, width, height);
+    // Touch state
+    touches: [],
 
-  // Use paint's global rendering function
-  // This is set up by paint's define_web_component() call
-  const display = window.PAINT_STATE?.["display_on_rendering_context_with_default_drawing_state"];
-
-  if (!display) {
-    console.error('Paint library not initialized. Make sure to call canvas.define_web_component() before rendering sprites.');
-    return new THREE.CanvasTexture(canvas);
-  }
-
-  try {
-    display(encodedPicture, ctx);
-  } catch (error) {
-    console.error('Failed to render paint.Picture:', error);
-  }
-
-  // Create texture
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.needsUpdate = true;
-
-  return texture;
+    // Gamepad state
+    gamepads: []
+  };
 }
 
-/**
- * Create a plane mesh with texture for canvas drawing
- * @param {THREE.Texture} texture
- * @param {number} width - World space width
- * @param {number} height - World space height
- * @returns {THREE.Mesh}
- */
-export function createCanvasPlane(texture, width, height) {
-  const geometry = new THREE.PlaneGeometry(width, height);
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthWrite: true,
-    alphaTest: 0.1,  // Discard fully transparent pixels to avoid z-fighting
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  return mesh;
-}
-
-/**
- * Update canvas texture
- * @param {THREE.Object3D} object
- * @param {THREE.Texture} texture
- */
-export function updateCanvasTexture(object, texture) {
-  if (object.material && object.material.map) {
-    object.material.map.dispose();
-    object.material.map = texture;
-    object.material.needsUpdate = true;
-  }
-}
-
-/**
- * Update canvas plane size
- * @param {THREE.Object3D} object
- * @param {number} width
- * @param {number} height
- */
-export function updateCanvasSize(object, width, height) {
-  if (object.geometry) {
-    object.geometry.dispose();
-    object.geometry = new THREE.PlaneGeometry(width, height);
-  }
-}
-
-/**
- * Get cached encoded picture from canvas object's userData
- * Performance optimization: avoid recreating textures when picture hasn't changed
- * @param {THREE.Object3D} object
- * @returns {string} Cached encoded picture, or empty string if not cached
- */
-export function getCanvasCachedPicture(object) {
-  return object.userData?.cachedEncodedPicture || '';
-}
-
-/**
- * Store encoded picture in canvas object's userData for comparison next frame
- * Performance optimization: tracks picture changes to skip texture recreation
- * @param {THREE.Object3D} object
- * @param {string} encodedPicture
- */
-export function setCanvasCachedPicture(object, encodedPicture) {
-  if (!object.userData) {
-    object.userData = {};
-  }
-  object.userData.cachedEncodedPicture = encodedPicture;
-}
-
-// ============================================================================
-// DEBUG VISUALIZATION HELPERS
-// ============================================================================
-
-/**
- * Create a wireframe box debug visualization
- * @param {Object} min - Minimum corner {x, y, z}
- * @param {Object} max - Maximum corner {x, y, z}
- * @param {number} color - Hex color
- * @returns {THREE.LineSegments} Wireframe box
- */
-export function createDebugBox(min, max, color) {
-  const geometry = new THREE.BoxGeometry(
-    max.x - min.x,
-    max.y - min.y,
-    max.z - min.z
-  );
-  const edges = new THREE.EdgesGeometry(geometry);
-  const material = new THREE.LineBasicMaterial({ color: color });
-  const wireframe = new THREE.LineSegments(edges, material);
-
-  // Position at center of box
-  wireframe.position.set(
-    (min.x + max.x) / 2,
-    (min.y + max.y) / 2,
-    (min.z + max.z) / 2
-  );
-
-  geometry.dispose(); // Clean up the geometry since we only need edges
-  return wireframe;
-}
-
-/**
- * Create a wireframe sphere debug visualization
- * @param {Object} center - Center position {x, y, z}
- * @param {number} radius - Sphere radius
- * @param {number} color - Hex color
- * @returns {THREE.LineSegments} Wireframe sphere
- */
-export function createDebugSphere(center, radius, color) {
-  const geometry = new THREE.SphereGeometry(radius, 16, 12);
-  const edges = new THREE.EdgesGeometry(geometry);
-  const material = new THREE.LineBasicMaterial({ color: color });
-  const wireframe = new THREE.LineSegments(edges, material);
-
-  wireframe.position.set(center.x, center.y, center.z);
-
-  geometry.dispose();
-  return wireframe;
-}
-
-/**
- * Create a line between two points
- * @param {Object} from - Start position {x, y, z}
- * @param {Object} to - End position {x, y, z}
- * @param {number} color - Hex color
- * @returns {THREE.Line} Debug line
- */
-export function createDebugLine(from, to, color) {
-  const points = [
-    new THREE.Vector3(from.x, from.y, from.z),
-    new THREE.Vector3(to.x, to.y, to.z)
-  ];
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({ color: color });
-  return new THREE.Line(geometry, material);
-}
-
-/**
- * Create coordinate axes (X=red, Y=green, Z=blue)
- * @param {Object} origin - Origin position {x, y, z}
- * @param {number} size - Length of each axis
- * @returns {THREE.Group} Group containing three axes
- */
-export function createDebugAxes(origin, size) {
-  const axes = new THREE.Group();
-
-  // X axis (red)
-  const xPoints = [
-    new THREE.Vector3(origin.x, origin.y, origin.z),
-    new THREE.Vector3(origin.x + size, origin.y, origin.z)
-  ];
-  const xGeometry = new THREE.BufferGeometry().setFromPoints(xPoints);
-  const xMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-  axes.add(new THREE.Line(xGeometry, xMaterial));
-
-  // Y axis (green)
-  const yPoints = [
-    new THREE.Vector3(origin.x, origin.y, origin.z),
-    new THREE.Vector3(origin.x, origin.y + size, origin.z)
-  ];
-  const yGeometry = new THREE.BufferGeometry().setFromPoints(yPoints);
-  const yMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-  axes.add(new THREE.Line(yGeometry, yMaterial));
-
-  // Z axis (blue)
-  const zPoints = [
-    new THREE.Vector3(origin.x, origin.y, origin.z),
-    new THREE.Vector3(origin.x, origin.y, origin.z + size)
-  ];
-  const zGeometry = new THREE.BufferGeometry().setFromPoints(zPoints);
-  const zMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
-  axes.add(new THREE.Line(zGeometry, zMaterial));
-
-  return axes;
-}
-
-/**
- * Create a grid on the XZ plane
- * @param {number} size - Total size of the grid
- * @param {number} divisions - Number of grid divisions
- * @param {number} color - Hex color
- * @returns {THREE.GridHelper} Grid helper
- */
-export function createDebugGrid(size, divisions, color) {
-  return new THREE.GridHelper(size, divisions, color, color);
-}
-
-/**
- * Create a point marker (small sphere)
- * @param {Object} position - Position {x, y, z}
- * @param {number} size - Size of the point marker
- * @param {number} color - Hex color
- * @returns {THREE.Mesh} Point mesh
- */
-export function createDebugPoint(position, size, color) {
-  const geometry = new THREE.SphereGeometry(size, 8, 6);
-  const material = new THREE.MeshBasicMaterial({ color: color });
-  const sphere = new THREE.Mesh(geometry, material);
-  sphere.position.set(position.x, position.y, position.z);
-  return sphere;
-}
-
-// ============================================================================
-// AUDIO FADE FUNCTIONS
-// ============================================================================
-
-/**
- * Play audio with fade in effect
- * @param {THREE.Audio} audio
- * @param {number} fadeDurationMs - Fade duration in milliseconds
- * @param {number} targetVolume - Target volume (0.0 to 1.0)
- */
-export function playAudioWithFadeIn(audio, fadeDurationMs, targetVolume) {
-  if (!audio.buffer) {
-    console.warn('[Tiramisu] Cannot play audio without buffer');
+// Subscribe to game ticks using requestAnimationFrame
+export function subscribe_to_ticks(handler, dispatch) {
+  if (tickSubscriptionActive) {
+    console.warn("Tick subscription already active");
     return;
   }
 
-  audio.setVolume(0.0);
-  if (!audio.isPlaying) {
-    try {
-      audio.play();
-    } catch (error) {
-      console.error('[Tiramisu] Failed to play audio:', error);
-      return;
-    }
+  tickHandler = handler;
+  tickDispatch = dispatch;
+  tickSubscriptionActive = true;
+  previousTimestamp = null;
+
+  // Initialize input state if not already done
+  if (!inputState) {
+    inputState = initializeInputState();
+    setupInputListeners();
   }
 
-  const startTime = Date.now();
-  const fadeInterval = setInterval(() => {
-    const elapsed = Date.now() - startTime;
-    const progress = Math.min(elapsed / fadeDurationMs, 1.0);
-    const currentVolume = progress * targetVolume;
-    audio.setVolume(currentVolume);
+  // Start the animation loop
+  function tick(timestamp) {
+    if (!tickSubscriptionActive) return;
 
-    if (progress >= 1.0) {
-      clearInterval(fadeInterval);
-    }
-  }, 16); // ~60fps
-}
+    // Calculate delta time
+    const delta = previousTimestamp === null ? 16.67 : timestamp - previousTimestamp;
+    previousTimestamp = timestamp;
 
-/**
- * Stop audio with fade out effect
- * @param {THREE.Audio} audio
- * @param {number} fadeDurationMs - Fade duration in milliseconds
- * @param {boolean} pauseInsteadOfStop - If true, pause instead of stop
- */
-export function stopAudioWithFadeOut(audio, fadeDurationMs, pauseInsteadOfStop) {
-  if (!audio.isPlaying) return;
+    // Get canvas dimensions (from first canvas element for now)
+    const canvas = document.querySelector('canvas');
+    const canvasSize = canvas
+      ? { x: canvas.width, y: canvas.height }
+      : { x: 800, y: 600 };
 
-  const startVolume = audio.getVolume();
-  const startTime = Date.now();
+    // Create Context
+    // Use public API to create Duration from milliseconds
+    const deltaMs = Math.floor(delta);
 
-  const fadeInterval = setInterval(() => {
-    const elapsed = Date.now() - startTime;
-    const progress = Math.min(elapsed / fadeDurationMs, 1.0);
-    const currentVolume = startVolume * (1.0 - progress);
-    audio.setVolume(currentVolume);
+    const context = {
+      delta_time: milliseconds(deltaMs), // Use public duration.milliseconds() API
+      input: createGleamInputState(),
+      canvas_size: canvasSize,
+      physics_world: { isNone: true } // Option(PhysicsWorld) - None for now
+    };
 
-    if (progress >= 1.0) {
-      clearInterval(fadeInterval);
-      if (pauseInsteadOfStop) {
-        audio.pause();
-      } else {
-        audio.stop();
+    // Dispatch the message (this triggers Lustre update + vdom reconciliation)
+    const msg = handler(context);
+    dispatch(msg);
+
+    // Clear "just pressed/released" state for next frame
+    clearFrameInputState();
+
+    // Render the Three.js scene AFTER the reconciler has updated objects
+    if (globalRenderer && globalScene) {
+      const camera = findActiveCamera(globalScene);
+      if (camera) {
+        globalRenderer.render(globalScene, camera);
       }
-      audio.setVolume(startVolume);
     }
-  }, 16); // ~60fps
-}
 
-// ============================================================================
-// AUDIO CONTEXT MANAGEMENT
-// These functions use the game's actual AudioListener instead of creating new ones
-// ============================================================================
-
-/**
- * Get AudioContext state from AudioListener
- * @param {THREE.AudioListener} audioListener - The game's audio listener
- * @returns {string} - 'suspended', 'running', or 'closed'
- */
-export function getAudioContextStateFromListener(audioListener) {
-  return audioListener.context.state;
-}
-
-/**
- * Resume AudioContext from AudioListener
- * @param {THREE.AudioListener} audioListener - The game's audio listener
- */
-export function resumeAudioContextFromListener(audioListener) {
-  if (audioListener.context.state === 'suspended') {
-    audioListener.context.resume();
-  }
-}
-
-// ============================================================================
-// CSS2D RENDERER HELPERS
-// ============================================================================
-
-/**
- * Append an element to a container
- * Used to add CSS2D renderer's DOM element to the game container
- * @param {HTMLElement} container - The container element
- * @param {HTMLElement} element - The element to append
- */
-export function appendElementToContainer(container, element) {
-  // Ensure container has relative positioning for absolute children
-  const containerPosition = window.getComputedStyle(container).position;
-  if (containerPosition === 'static') {
-    container.style.position = 'relative';
+    // Schedule next frame
+    requestAnimationFrame(tick);
   }
 
-  // Style the CSS2D renderer element to overlay the canvas
-  element.style.position = 'absolute';
-  element.style.top = '0';
-  element.style.left = '0';
-  element.style.pointerEvents = 'none';
-  container.appendChild(element);
+  // Start first tick
+  requestAnimationFrame(tick);
+}
+
+// Convert JavaScript input state to Gleam InputState format
+function createGleamInputState() {
+  // For now, return a minimal input state
+  // This should match the InputState type from tiramisu/input.gleam
+  return {
+    keys_pressed: Array.from(inputState.keys_pressed),
+    keys_just_pressed: Array.from(inputState.keys_just_pressed),
+    keys_just_released: Array.from(inputState.keys_just_released),
+    mouse_position: inputState.mouse_position,
+    mouse_buttons_pressed: Array.from(inputState.mouse_buttons_pressed),
+    mouse_buttons_just_pressed: Array.from(inputState.mouse_buttons_just_pressed),
+    mouse_buttons_just_released: Array.from(inputState.mouse_buttons_just_released),
+    mouse_delta: inputState.mouse_delta,
+    mouse_wheel_delta: inputState.mouse_wheel_delta,
+    touches: inputState.touches,
+    gamepads: inputState.gamepads
+  };
+}
+
+// Setup global input listeners
+function setupInputListeners() {
+  // Keyboard events
+  window.addEventListener('keydown', (e) => {
+    if (!inputState.keys_pressed.has(e.key)) {
+      inputState.keys_just_pressed.add(e.key);
+    }
+    inputState.keys_pressed.add(e.key);
+  });
+
+  window.addEventListener('keyup', (e) => {
+    inputState.keys_pressed.delete(e.key);
+    inputState.keys_just_released.add(e.key);
+  });
+
+  // Mouse events
+  window.addEventListener('mousemove', (e) => {
+    const prevX = inputState.mouse_position.x;
+    const prevY = inputState.mouse_position.y;
+    inputState.mouse_position = { x: e.clientX, y: e.clientY };
+    inputState.mouse_delta = {
+      x: e.clientX - prevX,
+      y: e.clientY - prevY
+    };
+  });
+
+  window.addEventListener('mousedown', (e) => {
+    if (!inputState.mouse_buttons_pressed.has(e.button)) {
+      inputState.mouse_buttons_just_pressed.add(e.button);
+    }
+    inputState.mouse_buttons_pressed.add(e.button);
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    inputState.mouse_buttons_pressed.delete(e.button);
+    inputState.mouse_buttons_just_released.add(e.button);
+  });
+
+  window.addEventListener('wheel', (e) => {
+    inputState.mouse_wheel_delta += e.deltaY;
+  });
+
+  // Touch events
+  window.addEventListener('touchstart', (e) => {
+    inputState.touches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY
+    }));
+  });
+
+  window.addEventListener('touchmove', (e) => {
+    inputState.touches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY
+    }));
+  });
+
+  window.addEventListener('touchend', (e) => {
+    inputState.touches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY
+    }));
+  });
+}
+
+// Clear "just pressed/released" state after each frame
+function clearFrameInputState() {
+  inputState.keys_just_pressed.clear();
+  inputState.keys_just_released.clear();
+  inputState.mouse_buttons_just_pressed.clear();
+  inputState.mouse_buttons_just_released.clear();
+  inputState.mouse_delta = { x: 0, y: 0 };
+  inputState.mouse_wheel_delta = 0;
+}
+
+// Stop the tick subscription
+export function unsubscribe_from_ticks() {
+  tickSubscriptionActive = false;
+  tickHandler = null;
+  tickDispatch = null;
+  previousTimestamp = null;
+}
+
+// Set the renderer and scene for rendering (called by platform)
+export function setRendererAndScene(renderer, scene) {
+  globalRenderer = renderer;
+  globalScene = scene;
+}
+
+// Find the active camera in the scene
+function findActiveCamera(scene) {
+  let activeCamera = null;
+
+  // Search for a camera marked as active
+  scene.traverse((object) => {
+    if (object.isCamera && object.userData?.["data-active"] === "true") {
+      activeCamera = object;
+    }
+  });
+
+  // If no active camera found, use the first camera
+  if (!activeCamera) {
+    scene.traverse((object) => {
+      if (object.isCamera && !activeCamera) {
+        activeCamera = object;
+      }
+    });
+  }
+
+  return activeCamera;
 }

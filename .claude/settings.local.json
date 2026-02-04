@@ -23,7 +23,8 @@
       "Read(//Users/renata-amutio/Projects/renatillas/mascarpone/src/**)",
       "Read(//Users/renata-amutio/Projects/renatillas/pondering_my_orb/src/**)",
       "Bash(xargs cat:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
