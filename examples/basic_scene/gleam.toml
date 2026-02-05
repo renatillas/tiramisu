@@ -1,4 +1,4 @@
-name = "physics_demo"
+name = "basic_scene"
 version = "1.0.0"
 target = "javascript"
 
@@ -6,14 +6,12 @@ target = "javascript"
 gleam_stdlib = ">= 0.64.0 and < 2.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 tiramisu = { path = "../.." }
-cocoa = { path = "../../../../cocoa" }
 vec = ">= 3.0.3 and < 4.0.0"
 quaterni = ">= 1.0.1 and < 2.0.0"
-gleam_time = ">= 1.6.0 and < 2.0.0"
 
 [tools.lustre.html]
 scripts = [
-  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.14.0/+esm\" } }" }
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
 ]
 stylesheets = [
   { content = "body { margin: 0; padding: 0; overflow: hidden; } canvas { display: block; }" }

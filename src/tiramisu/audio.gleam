@@ -1,312 +1,361 @@
-//// Audio playback for sound effects and music.
+//// The tiramisu-audio web component.
 ////
-//// Tiramisu supports both global (2D) audio that plays at constant volume, and
-//// positional (3D) audio that varies based on distance from the camera/listener.
-//// Audio is added to the scene graph as `scene.audio` nodes.
+//// This component creates a global (non-positional) audio source.
+//// Audio plays at constant volume regardless of camera/listener position.
+//// Use for background music, UI sounds, and ambient audio.
 ////
-//// ## Loading Audio
+//// ## Usage
 ////
-//// ```gleam
-//// let load_sfx = audio.load_audio(
-////   url: "sounds/jump.wav",
-////   on_success: SoundLoaded,
-////   on_error: SoundFailed,
-//// )
+//// ```html
+//// <tiramisu-audio
+////   id="music"
+////   src="sounds/background.mp3"
+////   volume="0.5"
+////   loop="true"
+////   playing="true"
+//// ></tiramisu-audio>
 //// ```
 ////
-//// ## Playing Global Audio (2D)
+//// ## Attributes
 ////
-//// ```gleam
-//// scene.audio(
-////   id: "background-music",
-////   audio: audio.GlobalAudio(
-////     buffer: music_buffer,
-////     config: audio.config()
-////       |> audio.with_state(audio.Playing)
-////       |> audio.with_loop(True)
-////       |> audio.with_volume(0.5)
-////       |> audio.with_group(audio.Music),
-////   ),
-//// )
-//// ```
-////
-//// ## Playing Positional Audio (3D)
-////
-//// ```gleam
-//// scene.audio(
-////   id: "waterfall",
-////   audio: audio.PositionalAudio(
-////     buffer: waterfall_buffer,
-////     config: audio.playing(),
-////     ref_distance: 1.0,
-////     rolloff_factor: 1.0,
-////     max_distance: 100.0,
-////   ),
-//// )
-//// ```
-////
-//// ## Audio Groups
-////
-//// Group audio for volume control (SFX, Music, Voice, Ambient, or Custom).
-////
+//// - `id`: Unique identifier for the audio (required)
+//// - `src`: URL to the audio file (required)
+//// - `volume`: Volume level 0.0-1.0 (default: 1.0)
+//// - `loop`: Whether to loop playback (default: "false")
+//// - `playing`: Whether to play/pause (default: "false")
+//// - `playback-rate`: Playback speed multiplier (default: 1.0)
 
+// IMPORTS ---------------------------------------------------------------------
+
+import gleam/dynamic
+import gleam/float
 import gleam/javascript/promise
-import gleam/option
-import gleam/time/duration
+import gleam/option.{type Option, None, Some}
+import lustre
+import lustre/attribute.{type Attribute}
+import lustre/component
+import lustre/effect.{type Effect}
+import lustre/element.{type Element}
+import lustre/element/html
 import savoiardi
+import tiramisu/context.{type SceneContext, SceneContext}
+import tiramisu/internal/dom
 
-import tiramisu/effect
+// TYPES -----------------------------------------------------------------------
 
-// --- Public Types ---
-
-/// Audio buffer type wrapping the Web Audio API AudioBuffer
-pub type Buffer =
-  savoiardi.AudioBuffer
-
-/// Audio group categories for volume control
-pub type Group {
-  /// Sound effects (footsteps, gunshots, etc.)
-  SFX
-  /// Background music
-  Music
-  /// Voice lines and dialogue
-  Voice
-  /// Ambient sounds (wind, rain, etc.)
-  Ambient
-  /// Custom group with a name
-  Custom(String)
-}
-
-/// Audio playback state
-pub type AudioState {
-  /// Audio is playing
-  Playing
-  /// Audio is stopped (reset to beginning)
-  Stopped
-  /// Audio is paused (can be resumed)
-  Paused
-}
-
-/// Fade configuration for smooth transitions
-pub type FadeConfig {
-  /// No fade (instant transition)
-  NoFade
-  /// Fade in/out over specified milliseconds
-  Fade(duration: duration.Duration)
-}
-
-/// Audio playback configuration
-pub type Config {
-  AudioConfig(
-    /// Playback state (Playing, Stopped, Paused)
-    state: AudioState,
-    /// Volume (0.0 to 1.0)
+/// The model for the audio component.
+pub type Model {
+  Model(
+    /// The audio ID
+    id: String,
+    /// Scene context from parent renderer
+    scene_context: Option(SceneContext),
+    /// The audio listener (shared across all audio in the scene)
+    listener: Option(savoiardi.AudioListener),
+    /// The audio object
+    audio: Option(savoiardi.Audio),
+    /// The loaded audio buffer
+    buffer: Option(savoiardi.AudioBuffer),
+    /// Source URL
+    src: Option(String),
+    /// Whether currently loading
+    loading: Bool,
+    /// Volume level (0.0-1.0)
     volume: Float,
-    /// Whether to loop the audio
+    /// Whether to loop
     loop: Bool,
-    /// Playback rate (1.0 = normal speed)
+    /// Whether playing
+    playing: Bool,
+    /// Playback rate multiplier
     playback_rate: Float,
-    /// Fade configuration for state transitions
-    fade: FadeConfig,
-    /// Audio group for volume control (optional)
-    group: option.Option(Group),
-    /// Callback when audio ends (for non-looping audio)
-    on_end: option.Option(fn() -> Nil),
   )
 }
 
-/// Type of audio (global or positional)
-pub type Audio {
-  /// Global audio (2D, same volume everywhere)
-  GlobalAudio(buffer: Buffer, config: Config)
-  /// Positional audio (3D, volume based on distance)
-  PositionalAudio(
-    buffer: Buffer,
-    config: Config,
-    /// Maximum hearing distance
-    ref_distance: Float,
-    /// How quickly audio fades with distance
-    rolloff_factor: Float,
-    /// Maximum distance where audio can be heard
-    max_distance: Float,
-  )
+/// Messages for the audio component.
+pub type Msg {
+  /// Scene ID found via DOM traversal
+  SceneIdFound(String)
+  /// ID attribute changed
+  IdChanged(String)
+  /// Source URL attribute changed
+  SrcChanged(String)
+  /// Audio buffer loaded successfully
+  BufferLoaded(savoiardi.AudioBuffer)
+  /// Audio buffer failed to load
+  BufferLoadError
+  /// Volume attribute changed
+  VolumeChanged(Float)
+  /// Loop attribute changed
+  LoopChanged(Bool)
+  /// Playing attribute changed
+  PlayingChanged(Bool)
+  /// Playback rate attribute changed
+  PlaybackRateChanged(Float)
 }
 
-/// Opaque handle to a THREE.Audio or THREE.PositionalAudio object
-pub type AudioSource
+// COMPONENT -------------------------------------------------------------------
 
-// --- Constructor Functions ---
+/// The tag name for the audio component.
+pub const tag_name = "tiramisu-audio"
 
-/// Create default audio config (stopped, no fade)
-pub fn config() -> Config {
-  AudioConfig(
-    state: Stopped,
-    volume: 1.0,
-    loop: False,
-    playback_rate: 1.0,
-    fade: NoFade,
-    group: option.None,
-    on_end: option.None,
-  )
+/// Register the tiramisu-audio component as a custom element.
+pub fn register() -> Result(Nil, lustre.Error) {
+  let app =
+    lustre.component(init, update, view, [
+      component.on_attribute_change("id", fn(v) { Ok(IdChanged(v)) }),
+      component.on_attribute_change("src", fn(v) { Ok(SrcChanged(v)) }),
+      component.on_attribute_change("volume", parse_float_attr(VolumeChanged)),
+      component.on_attribute_change("loop", parse_bool_attr(LoopChanged)),
+      component.on_attribute_change("playing", parse_bool_attr(PlayingChanged)),
+      component.on_attribute_change(
+        "playback-rate",
+        parse_float_attr(PlaybackRateChanged),
+      ),
+    ])
+
+  lustre.register(app, tag_name)
 }
 
-/// Create audio config that starts playing
-pub fn playing() -> Config {
-  AudioConfig(
-    state: Playing,
-    volume: 1.0,
-    loop: False,
-    playback_rate: 1.0,
-    fade: NoFade,
-    group: option.None,
-    on_end: option.None,
-  )
-}
+// ELEMENTS --------------------------------------------------------------------
 
-/// Set playback state (Playing, Stopped, Paused)
-pub fn with_state(config: Config, state: AudioState) -> Config {
-  AudioConfig(..config, state: state)
-}
-
-/// Set audio to playing
-pub fn with_playing(config: Config) -> Config {
-  AudioConfig(..config, state: Playing)
-}
-
-/// Set audio to stopped
-pub fn with_stopped(config: Config) -> Config {
-  AudioConfig(..config, state: Stopped)
-}
-
-/// Set audio to paused
-pub fn with_paused(config: Config) -> Config {
-  AudioConfig(..config, state: Paused)
-}
-
-/// Set fade configuration
-pub fn with_fade(config: Config, duration: duration.Duration) -> Config {
-  AudioConfig(..config, fade: Fade(duration))
-}
-
-/// Set no fade (instant transitions)
-pub fn with_no_fade(config: Config) -> Config {
-  AudioConfig(..config, fade: NoFade)
-}
-
-/// Set volume in config (0.0 to 1.0)
-pub fn with_volume(config: Config, volume: Float) -> Config {
-  AudioConfig(..config, volume: volume)
-}
-
-/// Set looping in config
-pub fn with_loop(config: Config, loop: Bool) -> Config {
-  AudioConfig(..config, loop: loop)
-}
-
-/// Set playback rate in config (1.0 = normal, 2.0 = double speed, etc.)
-pub fn with_playback_rate(config: Config, rate: Float) -> Config {
-  AudioConfig(..config, playback_rate: rate)
-}
-
-/// Set audio group in config
-pub fn with_group(config: Config, group: Group) -> Config {
-  AudioConfig(..config, group: option.Some(group))
-}
-
-/// Set callback to be called when audio ends (for non-looping audio)
+/// Create a tiramisu-audio element (global audio).
 ///
-/// This is useful for one-shot sounds like SFX where you need to know
-/// when the sound has finished playing.
+/// Global audio plays at constant volume regardless of camera position.
+/// Use for background music, UI sounds, and ambient audio.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// audio.config()
-/// |> audio.with_state(audio.Playing)
-/// |> audio.with_on_end(fn() {
-///   // Audio finished playing
-///   io.println("SFX finished!")
-/// })
+/// import tiramisu/audio
+///
+/// audio.audio("background_music", [
+///   audio.src("sounds/music.mp3"),
+///   audio.volume(0.5),
+///   audio.loop(True),
+///   audio.playing(model.music_playing),
+/// ], [])
 /// ```
-pub fn with_on_end(config: Config, callback: fn() -> Nil) -> Config {
-  AudioConfig(..config, on_end: option.Some(callback))
+///
+pub fn audio(
+  id: String,
+  attributes: List(Attribute(msg)),
+  children: List(Element(msg)),
+) -> Element(msg) {
+  element.element(tag_name, [attribute.id(id), ..attributes], children)
 }
 
-/// Create global audio (2D, same volume everywhere)
-pub fn global(buffer: Buffer, config: Config) -> Audio {
-  GlobalAudio(buffer: buffer, config: config)
+// ATTRIBUTES ------------------------------------------------------------------
+
+/// Set the source URL for the audio file.
+///
+pub fn src(url: String) -> Attribute(msg) {
+  attribute.attribute("src", url)
 }
 
-/// Create a default positional audio configuration
-pub fn positional(buffer: Buffer, config: Config) -> Audio {
-  PositionalAudio(
-    buffer: buffer,
-    config: config,
-    ref_distance: 1.0,
-    rolloff_factor: 1.0,
-    max_distance: 10_000.0,
-  )
+/// Set the volume level (0.0-1.0).
+///
+pub fn volume(level: Float) -> Attribute(msg) {
+  attribute.attribute("volume", float.to_string(level))
 }
 
-/// Set reference distance for positional audio
-pub fn with_ref_distance(audio: Audio, distance: Float) -> Audio {
-  case audio {
-    PositionalAudio(buffer, config, _, rolloff, max) ->
-      PositionalAudio(
-        buffer: buffer,
-        config: config,
-        ref_distance: distance,
-        rolloff_factor: rolloff,
-        max_distance: max,
-      )
-    GlobalAudio(_, _) -> audio
+/// Set whether the audio should loop.
+///
+pub fn loop(should_loop: Bool) -> Attribute(msg) {
+  attribute.attribute("loop", case should_loop {
+    True -> "true"
+    False -> "false"
+  })
+}
+
+/// Set whether the audio is playing.
+///
+/// Toggle this to play/pause the audio.
+///
+pub fn playing(is_playing: Bool) -> Attribute(msg) {
+  attribute.attribute("playing", case is_playing {
+    True -> "true"
+    False -> "false"
+  })
+}
+
+/// Set the playback rate (1.0 = normal speed).
+///
+pub fn playback_rate(rate: Float) -> Attribute(msg) {
+  attribute.attribute("playback-rate", float.to_string(rate))
+}
+
+// INIT ------------------------------------------------------------------------
+
+fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
+  let model =
+    Model(
+      id: "",
+      scene_context: None,
+      listener: None,
+      audio: None,
+      buffer: None,
+      src: None,
+      loading: False,
+      volume: 1.0,
+      loop: False,
+      playing: False,
+      playback_rate: 1.0,
+    )
+
+  #(model, effect.after_paint(discover_scene_id))
+}
+
+fn discover_scene_id(dispatch: fn(Msg) -> Nil, root: dynamic.Dynamic) -> Nil {
+  case dom.find_parent_scene_id(root) {
+    Some(scene_id) -> dispatch(SceneIdFound(scene_id))
+    None ->
+      dom.listen_for_scene_ready(root, fn(scene_id) {
+        dispatch(SceneIdFound(scene_id))
+      })
   }
 }
 
-/// Set rolloff factor for positional audio
-pub fn with_rolloff_factor(audio: Audio, factor: Float) -> Audio {
-  case audio {
-    PositionalAudio(buffer, config, ref, _, max) ->
-      PositionalAudio(
-        buffer: buffer,
-        config: config,
-        ref_distance: ref,
-        rolloff_factor: factor,
-        max_distance: max,
-      )
-    GlobalAudio(_, _) -> audio
+// UPDATE ----------------------------------------------------------------------
+
+fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+  case msg {
+    SceneIdFound(scene_id) -> {
+      let ctx = SceneContext(scene_id:)
+      // Create listener and audio object
+      let listener = savoiardi.create_audio_listener()
+      let audio_obj = savoiardi.create_audio(listener)
+
+      // Apply initial settings
+      savoiardi.set_audio_volume(audio_obj, model.volume)
+      savoiardi.set_audio_loop(audio_obj, model.loop)
+      savoiardi.set_audio_playback_rate(audio_obj, model.playback_rate)
+
+      let new_model =
+        Model(
+          ..model,
+          scene_context: Some(ctx),
+          listener: Some(listener),
+          audio: Some(audio_obj),
+        )
+
+      // If we already have a src, start loading
+      case model.src {
+        Some(url) -> #(
+          Model(..new_model, loading: True),
+          load_audio_effect(url),
+        )
+        None -> #(new_model, effect.none())
+      }
+    }
+
+    IdChanged(id) -> {
+      #(Model(..model, id:), effect.none())
+    }
+
+    SrcChanged(url) -> {
+      let new_model = Model(..model, src: Some(url), loading: True)
+      // Start loading if we have context
+      case model.scene_context {
+        Some(_) -> #(new_model, load_audio_effect(url))
+        None -> #(new_model, effect.none())
+      }
+    }
+
+    BufferLoaded(buffer) -> {
+      case model.audio {
+        Some(audio_obj) -> {
+          savoiardi.set_audio_buffer(audio_obj, buffer)
+          // If playing was requested, start now
+          case model.playing {
+            True -> savoiardi.play_audio(audio_obj)
+            False -> Nil
+          }
+          #(Model(..model, buffer: Some(buffer), loading: False), effect.none())
+        }
+        None -> #(Model(..model, loading: False), effect.none())
+      }
+    }
+
+    BufferLoadError -> {
+      #(Model(..model, loading: False), effect.none())
+    }
+
+    VolumeChanged(vol) -> {
+      case model.audio {
+        Some(audio_obj) -> savoiardi.set_audio_volume(audio_obj, vol)
+        None -> Nil
+      }
+      #(Model(..model, volume: vol), effect.none())
+    }
+
+    LoopChanged(should_loop) -> {
+      case model.audio {
+        Some(audio_obj) -> savoiardi.set_audio_loop(audio_obj, should_loop)
+        None -> Nil
+      }
+      #(Model(..model, loop: should_loop), effect.none())
+    }
+
+    PlayingChanged(is_playing) -> {
+      case model.audio, model.buffer {
+        Some(audio_obj), Some(_) -> {
+          case is_playing {
+            True -> savoiardi.play_audio(audio_obj)
+            False -> savoiardi.pause_audio(audio_obj)
+          }
+        }
+        _, _ -> Nil
+      }
+      #(Model(..model, playing: is_playing), effect.none())
+    }
+
+    PlaybackRateChanged(rate) -> {
+      case model.audio {
+        Some(audio_obj) -> savoiardi.set_audio_playback_rate(audio_obj, rate)
+        None -> Nil
+      }
+      #(Model(..model, playback_rate: rate), effect.none())
+    }
   }
 }
 
-/// Set maximum distance for positional audio
-pub fn with_max_distance(audio: Audio, distance: Float) -> Audio {
-  case audio {
-    PositionalAudio(buffer, config, ref, rolloff, _) ->
-      PositionalAudio(
-        buffer: buffer,
-        config: config,
-        ref_distance: ref,
-        rolloff_factor: rolloff,
-        max_distance: distance,
-      )
-    GlobalAudio(_, _) -> audio
-  }
-}
-
-/// Load an audio file from URL
-pub fn load_audio(
-  url url: String,
-  on_success on_success: fn(savoiardi.AudioBuffer) -> msg,
-  on_error on_error: msg,
-) -> effect.Effect(msg) {
-  let promise =
+fn load_audio_effect(url: String) -> Effect(Msg) {
+  effect.from(fn(dispatch) {
     savoiardi.load_audio(url)
     |> promise.map(fn(result) {
       case result {
-        Ok(data) -> on_success(data)
-        Error(Nil) -> on_error
+        Ok(buffer) -> dispatch(BufferLoaded(buffer))
+        Error(_) -> dispatch(BufferLoadError)
       }
     })
+    Nil
+  })
+}
 
-  effect.from_promise(promise)
+// VIEW ------------------------------------------------------------------------
+
+fn view(_model: Model) -> Element(Msg) {
+  // Audio component has no visual representation
+  html.div([attribute.style("display", "none")], [])
+}
+
+// HELPERS ---------------------------------------------------------------------
+
+fn parse_float_attr(to_msg: fn(Float) -> Msg) -> fn(String) -> Result(Msg, Nil) {
+  fn(v) {
+    case float.parse(v) {
+      Ok(f) -> Ok(to_msg(f))
+      Error(_) -> Error(Nil)
+    }
+  }
+}
+
+fn parse_bool_attr(to_msg: fn(Bool) -> Msg) -> fn(String) -> Result(Msg, Nil) {
+  fn(v) {
+    case v {
+      "true" | "1" | "" -> Ok(to_msg(True))
+      "false" | "0" -> Ok(to_msg(False))
+      _ -> Error(Nil)
+    }
+  }
 }

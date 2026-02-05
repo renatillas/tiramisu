@@ -1,377 +1,335 @@
-/// Declarative Audio Demo
-///
-/// Demonstrates the declarative audio API where audio state is expressed
-/// in the view function, not through imperative commands.
-///
-/// Key concepts:
-/// - Audio state (Playing, Stopped, Paused) is part of the model
-/// - Fade configuration is declarative
-/// - Volume controls are per-audio-source in the model
-/// - The view function expresses desired audio state
-/// - The renderer automatically handles transitions
-import gleam/dict.{type Dict}
+//// Audio Demo Example
+////
+//// Demonstrates tiramisu's audio components:
+//// - Global audio: Background music that plays at constant volume
+//// - Positional audio: A sound attached to a moving ball
+////   - Volume and panning change based on distance from camera
+////
+//// Click the buttons to toggle audio playback.
+//// Watch how the positional audio changes as the ball moves!
+
 import gleam/float
-import gleam/int
-import gleam/io
-import gleam/list
-import gleam/option
 import gleam/time/duration
+import gleam_community/maths
+import lustre
+import lustre/attribute.{class}
+import lustre/effect.{type Effect}
+import lustre/element/html
+import lustre/event
+import quaternion
 import tiramisu
 import tiramisu/audio
+import tiramisu/audio_positional
 import tiramisu/camera
-import tiramisu/effect
-import tiramisu/input
-import tiramisu/scene
+import tiramisu/light
+import tiramisu/mesh
+import tiramisu/renderer
+import tiramisu/tick.{type TickContext}
 import tiramisu/transform
 import vec/vec3
+import vec/vec3f
 
-pub type Id {
-  Scene
-  Main
-  MusicCube
-  MusicBg
-  SfxCube
-  MusicGroup
-  SfxGroup
-  Ambient
-  Sun
-  SfxBeep(Int)
+// TYPES -----------------------------------------------------------------------
+
+/// Application state
+pub type Model {
+  Model(
+    /// Time accumulator for ball movement
+    time: Float,
+    /// Ball position (moves in a circle)
+    ball_x: Float,
+    ball_z: Float,
+    /// Whether background music is playing
+    music_playing: Bool,
+    /// Whether positional audio is playing
+    sound_playing: Bool,
+  )
 }
 
-pub fn main() {
-  let assert Ok(Nil) =
-    tiramisu.application(init, update, view)
-    |> tiramisu.start("body", tiramisu.FullScreen, option.None)
+/// Messages for state updates
+pub type Msg {
+  /// Animation tick
+  Tick(TickContext)
+  /// Toggle background music
+  ToggleMusic
+  /// Toggle positional sound
+  ToggleSound
+}
+
+// AUDIO URLs ------------------------------------------------------------------
+
+// Using free audio samples from reliable CORS-friendly sources
+// Background music - ambient electronic loop from soundhelix
+const music_url = "ambient.mp3"
+
+// Positional sound - a short beep/ping sound from soundjay
+const beep_url = "beep.mp3"
+
+// CONSTANTS -------------------------------------------------------------------
+
+// Ball movement radius
+const orbit_radius = 5.0
+
+// Ball movement speed
+const orbit_speed = 0.5
+
+// MAIN ------------------------------------------------------------------------
+
+pub fn main() -> Nil {
+  // Register all Tiramisu web components
+  let assert Ok(_) = tiramisu.register()
+
+  // Start a Lustre app with effects support
+  let app = lustre.application(init, update, view)
+  let assert Ok(_) = lustre.start(app, "#app", Nil)
+
   Nil
 }
 
-// --- Model ---
+// INIT ------------------------------------------------------------------------
 
-pub type Model {
-  Model(
-    rotation: Float,
-    // Declarative audio states - these control what's in the view
-    music_state: audio.AudioState,
-    // For overlapping SFX, we track multiple instances with unique IDs
-    // Each instance has its own state (Playing or Stopped)
-    sfx_instances: Dict(Int, audio.AudioState),
-    next_sfx_id: Int,
-    // Audio buffers loaded from assets
-    music_buffer: option.Option(audio.Buffer),
-    sfx_buffer: option.Option(audio.Buffer),
-    loading: Bool,
-    // Individual volume controls (0.0 to 1.0)
-    music_volume: Float,
-    sfx_volume: Float,
-  )
-}
-
-pub type Msg {
-  Tick
-  MusicLoaded(audio.Buffer)
-  SfxLoaded(audio.Buffer)
-  LoadError
-}
-
-// --- Init ---
-
-fn init(
-  _ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(_)) {
-  io.println("🎵 Declarative Audio Demo")
-  io.println("========================")
-  io.println("")
-  io.println("Loading audio assets...")
-  io.println("")
-
-  #(
+fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
+  let initial_model =
     Model(
-      rotation: 0.0,
-      music_state: audio.Stopped,
-      sfx_instances: dict.new(),
-      next_sfx_id: 0,
-      music_buffer: option.None,
-      sfx_buffer: option.None,
-      loading: True,
-      music_volume: 0.7,
-      sfx_volume: 1.0,
-    ),
-    effect.batch([
-      effect.dispatch(Tick),
-      // Load audio assets using callback-based API
-      audio.load_audio(
-        url: "music.ogg",
-        on_success: MusicLoaded,
-        on_error: LoadError,
-      ),
-      audio.load_audio(
-        url: "sfx.wav",
-        on_success: SfxLoaded,
-        on_error: LoadError,
-      ),
-    ]),
-    option.None,
-  )
+      time: 0.0,
+      ball_x: orbit_radius,
+      ball_z: 0.0,
+      music_playing: False,
+      sound_playing: False,
+    )
+
+  // Subscribe to tick updates for animation
+  #(initial_model, tick.subscribe("", Tick))
 }
 
-// --- Update ---
+// UPDATE ----------------------------------------------------------------------
 
-fn update(
-  model: Model,
-  msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(_)) {
+fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    Tick -> {
-      let new_rotation = model.rotation +. duration.to_seconds(ctx.delta_time)
+    Tick(ctx) -> {
+      let dt = duration.to_seconds(ctx.delta_time)
+      let new_time = model.time +. dt *. orbit_speed
 
-      // Keep a maximum of 10 recent SFX instances to prevent unbounded growth
-      // Since the audio is short (0.139s), keeping 10 instances is plenty
-      let sfx_instances = case dict.size(model.sfx_instances) > 10 {
-        True -> {
-          // Remove the oldest instances (lowest IDs)
-          let sorted =
-            model.sfx_instances
-            |> dict.to_list
-            |> list.sort(fn(a, b) {
-              let #(id_a, _) = a
-              let #(id_b, _) = b
-              int.compare(id_a, id_b)
-            })
-
-          // Keep only the newest 10
-          sorted
-          |> list.drop(list.length(sorted) - 10)
-          |> dict.from_list
-        }
-        False -> model.sfx_instances
-      }
-
-      // Check for space key press to create a NEW SFX instance
-      // Use is_key_just_pressed to only trigger on the first frame of the press
-      let #(sfx_instances, next_sfx_id) = case
-        input.is_key_just_pressed(ctx.input, input.Space)
-      {
-        True -> {
-          // Create a new SFX instance with unique ID
-          let new_instances =
-            sfx_instances
-            |> dict.insert(model.next_sfx_id, audio.Playing)
-          #(new_instances, model.next_sfx_id + 1)
-        }
-        False -> #(sfx_instances, model.next_sfx_id)
-      }
-
-      // Check for music control keys (1, 2, 3)
-      let music_state = case
-        input.is_key_just_pressed(ctx.input, input.Digit1),
-        input.is_key_just_pressed(ctx.input, input.Digit2),
-        input.is_key_just_pressed(ctx.input, input.Digit3)
-      {
-        True, _, _ -> audio.Playing
-        _, True, _ -> audio.Stopped
-        _, _, True -> audio.Paused
-        _, _, _ -> model.music_state
-      }
-
-      // Volume controls
-      // Q/A - Decrease/Increase Music volume
-      // W/S - Decrease/Increase SFX volume
-      let volume_delta = 0.1
-
-      // Check volume key presses
-      let music_vol_dec = input.is_key_just_pressed(ctx.input, input.KeyQ)
-      let music_vol_inc = input.is_key_just_pressed(ctx.input, input.KeyA)
-      let sfx_vol_dec = input.is_key_just_pressed(ctx.input, input.KeyW)
-      let sfx_vol_inc = input.is_key_just_pressed(ctx.input, input.KeyS)
-
-      // Music volume control
-      let music_volume = case music_vol_dec, music_vol_inc {
-        True, _ -> {
-          let new_vol = model.music_volume -. volume_delta
-          let clamped = case new_vol <. 0.0 {
-            True -> 0.0
-            False -> new_vol
-          }
-          io.println("Music Volume: " <> float_to_percentage(clamped))
-          clamped
-        }
-        _, True -> {
-          let new_vol = model.music_volume +. volume_delta
-          let clamped = case new_vol >. 1.0 {
-            True -> 1.0
-            False -> new_vol
-          }
-          io.println("Music Volume: " <> float_to_percentage(clamped))
-          clamped
-        }
-        _, _ -> model.music_volume
-      }
-
-      // SFX volume control
-      let sfx_volume = case sfx_vol_dec, sfx_vol_inc {
-        True, _ -> {
-          let new_vol = model.sfx_volume -. volume_delta
-          let clamped = case new_vol <. 0.0 {
-            True -> 0.0
-            False -> new_vol
-          }
-          io.println("SFX Volume: " <> float_to_percentage(clamped))
-          clamped
-        }
-        _, True -> {
-          let new_vol = model.sfx_volume +. volume_delta
-          let clamped = case new_vol >. 1.0 {
-            True -> 1.0
-            False -> new_vol
-          }
-          io.println("SFX Volume: " <> float_to_percentage(clamped))
-          clamped
-        }
-        _, _ -> model.sfx_volume
-      }
+      // Move ball in a circle around the origin
+      let ball_x = maths.cos(new_time) *. orbit_radius
+      let ball_z = maths.sin(new_time) *. orbit_radius
 
       #(
-        Model(
-          ..model,
-          rotation: new_rotation,
-          sfx_instances: sfx_instances,
-          next_sfx_id: next_sfx_id,
-          music_state: music_state,
-          music_volume: music_volume,
-          sfx_volume: sfx_volume,
+        Model(..model, time: new_time, ball_x: ball_x, ball_z: ball_z),
+        effect.none(),
+      )
+    }
+
+    ToggleMusic -> {
+      #(Model(..model, music_playing: !model.music_playing), effect.none())
+    }
+
+    ToggleSound -> {
+      #(Model(..model, sound_playing: !model.sound_playing), effect.none())
+    }
+  }
+}
+
+// VIEW ------------------------------------------------------------------------
+
+fn view(model: Model) {
+  html.div([class("container")], [
+    // 3D Scene
+    renderer.renderer(
+      [
+        renderer.width(600),
+        renderer.height(500),
+        renderer.background("#1a1a2e"),
+      ],
+      [
+        // Camera (the listener position)
+        camera.camera(
+          "main",
+          [
+            camera.fov(60.0),
+            camera.transform(
+              transform.at(vec3.Vec3(0.0, 8.0, 12.0))
+              |> transform.with_look_at(vec3f.zero),
+            ),
+            camera.active(True),
+          ],
+          [],
         ),
-        effect.dispatch(Tick),
-        option.None,
-      )
-    }
-
-    MusicLoaded(buffer) -> {
-      io.println("✅ Music loaded successfully")
-      print_instructions(model.sfx_buffer)
-      #(
-        Model(..model, music_buffer: option.Some(buffer), loading: False),
-        effect.none(),
-        option.None,
-      )
-    }
-
-    SfxLoaded(buffer) -> {
-      io.println("✅ SFX loaded successfully")
-      print_instructions(model.music_buffer)
-      #(
-        Model(..model, sfx_buffer: option.Some(buffer), loading: False),
-        effect.none(),
-        option.None,
-      )
-    }
-
-    LoadError -> {
-      io.println("❌ Failed to load audio")
-      #(Model(..model, loading: False), effect.none(), option.None)
-    }
-  }
-}
-
-fn print_instructions(other_buffer_loaded: option.Option(a)) -> Nil {
-  case other_buffer_loaded {
-    option.Some(_) -> {
-      io.println("")
-      io.println("Controls:")
-      io.println("  [1] Start/Resume music (1000ms fade-in from stopped)")
-      io.println("  [2] Stop music (with 800ms fade-out)")
-      io.println("  [3] Pause music (press [1] to resume)")
-      io.println("  [SPACE] Play SFX (overlapping sounds - press rapidly!)")
-      io.println("")
-      io.println("Volume Controls:")
-      io.println("  [Q/A] Decrease/Increase Music volume")
-      io.println("  [W/S] Decrease/Increase SFX volume")
-      io.println("")
-    }
-    option.None -> Nil
-  }
-}
-
-fn float_to_percentage(value: Float) -> String {
-  let percentage = value *. 100.0
-  let rounded = float.round(percentage)
-  int.to_string(rounded) <> "%"
-}
-
-// --- View ---
-
-fn view(model: Model, _ctx: tiramisu.Context) -> scene.Node {
-  let assert Ok(cam) =
-    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-
-  // Music audio config - declarative!
-  // Individual volume is multiplied by group volume for final output
-  let music_config =
-    audio.config()
-    |> audio.with_volume(model.music_volume)
-    |> audio.with_loop(True)
-    |> audio.with_group(audio.Music)
-    |> audio.with_state(model.music_state)
-    |> audio.with_fade(duration.seconds(1))
-
-  // Build scene nodes based on loaded assets
-  let music_nodes = case model.music_buffer {
-    option.Some(buffer) -> [
-      scene.audio(
-        id: "music_background",
-        audio: audio.global(buffer, music_config),
-      ),
-    ]
-    option.None -> []
-  }
-
-  // Create audio nodes for all active SFX instances
-  let sfx_audio = case model.sfx_buffer {
-    option.Some(buffer) -> {
-      model.sfx_instances
-      |> dict.to_list
-      |> list.map(fn(instance) {
-        let #(id, state) = instance
-        let sfx_config =
-          audio.config()
-          |> audio.with_volume(model.sfx_volume)
-          |> audio.with_loop(False)
-          |> audio.with_group(audio.SFX)
-          |> audio.with_state(state)
-          |> audio.with_no_fade()
-
-        scene.audio(
-          id: "beep" <> int.to_string(id),
-          audio: audio.global(buffer, sfx_config),
-        )
-      })
-    }
-    option.None -> []
-  }
-
-  scene.empty(id: "scene", transform: transform.identity, children: [
-    scene.camera(
-      id: "main",
-      camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 10.0)),
-      active: True,
-      viewport: option.None,
-      postprocessing: option.None,
+        // Ground plane
+        mesh.mesh(
+          "ground",
+          [
+            mesh.geometry_plane(20.0, 20.0),
+            mesh.color(0x2d3436),
+            mesh.metalness(0.1),
+            mesh.roughness(0.9),
+            mesh.transform(
+              transform.at(vec3.Vec3(0.0, 0.0, 0.0))
+              |> transform.with_rotation(
+                quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
+              ),
+            ),
+          ],
+          [],
+        ),
+        // Center marker (shows where origin is)
+        mesh.mesh(
+          "center",
+          [
+            mesh.geometry_cylinder_simple(0.3, 0.1),
+            mesh.color(0x666666),
+            mesh.transform(transform.at(vec3.Vec3(0.0, 0.05, 0.0))),
+          ],
+          [],
+        ),
+        // Orbit path visualization (ring on ground)
+        mesh.mesh(
+          "orbit_path",
+          [
+            mesh.geometry_torus_simple(orbit_radius, 0.05),
+            mesh.color(0x444444),
+            mesh.transform(
+              transform.at(vec3.Vec3(0.0, 0.01, 0.0))
+              |> transform.with_rotation(
+                quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
+              ),
+            ),
+          ],
+          [],
+        ),
+        // Moving ball (sound source)
+        audio_positional.audio_positional(
+          "ball_sound",
+          [
+            audio_positional.src(beep_url),
+            audio_positional.volume(1.0),
+            audio_positional.loop(True),
+            audio_positional.playing(model.sound_playing),
+            audio_positional.audio_transform(
+              transform.at(vec3.Vec3(model.ball_x, 0.5, model.ball_z)),
+            ),
+            audio_positional.ref_distance(2.0),
+            audio_positional.max_distance(20.0),
+            audio_positional.rolloff_factor(1.0),
+          ],
+          [
+            mesh.mesh(
+              "sound_ball",
+              [
+                mesh.geometry_sphere_simple(0.5),
+                mesh.color(case model.sound_playing {
+                  True -> 0xff6b6b
+                  False -> 0x666666
+                }),
+                mesh.metalness(0.3),
+                mesh.roughness(0.4),
+              ],
+              [],
+            ),
+          ],
+        ),
+        // Lights
+        light.light(
+          "ambient",
+          [
+            light.light_type("ambient"),
+            light.color(0xffffff),
+            light.intensity(0.4),
+          ],
+          [],
+        ),
+        light.light(
+          "sun",
+          [
+            light.light_type("directional"),
+            light.color(0xffffff),
+            light.intensity(1.0),
+            light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+          ],
+          [],
+        ),
+        // Global audio (background music)
+        audio.audio(
+          "background_music",
+          [
+            audio.src(music_url),
+            audio.volume(0.3),
+            audio.loop(True),
+            audio.playing(model.music_playing),
+          ],
+          [],
+        ),
+      ],
     ),
-    scene.empty(
-      id: "music-group",
-      transform: transform.identity
-        |> transform.translate(by: vec3.Vec3(-3.0, 0.0, 0.0))
-        |> transform.rotate_y(model.rotation),
-      children: music_nodes,
-    ),
-    // SFX cube (right) - one-shot sounds
-    scene.empty(
-      id: "sfx-group",
-      transform: transform.identity
-        |> transform.translate(by: vec3.Vec3(3.0, 0.0, 0.0))
-        |> transform.rotate_y(model.rotation *. -1.5),
-      children: sfx_audio,
-    ),
+    // Info panel
+    html.div([class("info")], [
+      html.h3([], [html.text("Audio Demo")]),
+      // Controls
+      html.div([class("controls")], [
+        html.button(
+          [
+            attribute.class(case model.music_playing {
+              True -> "playing"
+              False -> ""
+            }),
+            event.on_click(ToggleMusic),
+          ],
+          [
+            html.text(case model.music_playing {
+              True -> "⏹ Stop Music"
+              False -> "▶ Play Music"
+            }),
+          ],
+        ),
+        html.button(
+          [
+            attribute.class(case model.sound_playing {
+              True -> "playing"
+              False -> ""
+            }),
+            event.on_click(ToggleSound),
+          ],
+          [
+            html.text(case model.sound_playing {
+              True -> "⏹ Stop Ball Sound"
+              False -> "▶ Play Ball Sound"
+            }),
+          ],
+        ),
+      ]),
+      html.h3([attribute.style("margin-top", "15px")], [
+        html.text("Sound Source"),
+      ]),
+      info_row("Ball X", float_to_string_1(model.ball_x)),
+      info_row("Ball Z", float_to_string_1(model.ball_z)),
+      info_row("Orbit Radius", float.to_string(orbit_radius) <> " units"),
+      html.h3([attribute.style("margin-top", "15px")], [
+        html.text("Audio Types"),
+      ]),
+      info_row("Music", "Global (constant volume)"),
+      info_row("Ball", "Positional (3D panning)"),
+      html.div([class("note")], [
+        html.text(
+          "The ball orbits the center. When positional audio is playing, "
+          <> "notice how the sound pans left/right and changes volume "
+          <> "as the ball moves closer or farther from the camera.",
+        ),
+      ]),
+    ]),
   ])
+}
+
+// HELPERS ---------------------------------------------------------------------
+
+fn info_row(label: String, value: String) {
+  html.div([class("info-row")], [
+    html.span([], [html.text(label)]),
+    html.span([], [html.text(value)]),
+  ])
+}
+
+fn float_to_string_1(f: Float) -> String {
+  f
+  |> float.to_precision(1)
+  |> float.to_string()
 }

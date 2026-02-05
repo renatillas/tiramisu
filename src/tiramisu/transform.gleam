@@ -1,12 +1,25 @@
 //// Transform type for representing position, rotation, and scale.
 ////
-//// This module provides the Transform type used internally by the physics system
-//// for representing transforms on rigid bodies and colliders.
+//// This module provides the Transform type and parsing for web components.
 ////
-//// Note: For scene graph transforms, use the attribute module instead.
+//// ## Attribute Format
+////
+//// ```
+//// transform="pos:0,1,0 quat:0,0,0,1 scale:2,2,2"
+//// ```
+////
+//// Parts can be omitted to use defaults:
+//// - `pos:x,y,z` - Position (default: 0,0,0)
+//// - `quat:x,y,z,w` - Rotation as quaternion (default: 0,0,0,1 identity)
+//// - `scale:x,y,z` - Scale (default: 1,1,1)
 
+import gleam/float
+import gleam/int
+import gleam/list
+import gleam/string
 import quaternion.{type Quaternion}
 import vec/vec3.{type Vec3}
+import vec/vec3f
 
 // TYPES -----------------------------------------------------------------------
 
@@ -18,13 +31,11 @@ pub type Transform {
 // CONSTRUCTORS ----------------------------------------------------------------
 
 /// Create an identity transform (position at origin, no rotation, scale of 1).
-pub fn identity() -> Transform {
-  Transform(
-    position: vec3.Vec3(0.0, 0.0, 0.0),
-    rotation: quaternion.identity,
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  )
-}
+pub const identity = Transform(
+  position: vec3.Vec3(0.0, 0.0, 0.0),
+  rotation: quaternion.identity,
+  scale: vec3.Vec3(1.0, 1.0, 1.0),
+)
 
 /// Create a transform at a specific position.
 pub fn at(position pos: Vec3(Float)) -> Transform {
@@ -60,22 +71,8 @@ pub fn with_position(transform: Transform, position: Vec3(Float)) -> Transform {
 }
 
 /// Set the rotation of a transform using a quaternion.
-pub fn with_quaternion_rotation(
-  transform: Transform,
-  rotation: Quaternion,
-) -> Transform {
+pub fn with_rotation(transform: Transform, rotation: Quaternion) -> Transform {
   Transform(..transform, rotation: rotation)
-}
-
-/// Set the rotation of a transform using Euler angles (in radians).
-pub fn with_euler_rotation(
-  transform: Transform,
-  x: Float,
-  y: Float,
-  z: Float,
-) -> Transform {
-  let quat = euler_to_quaternion(x, y, z)
-  Transform(..transform, rotation: quat)
 }
 
 /// Set the scale of a transform.
@@ -88,30 +85,103 @@ pub fn with_uniform_scale(transform: Transform, scale: Float) -> Transform {
   Transform(..transform, scale: vec3.Vec3(scale, scale, scale))
 }
 
-// HELPERS ---------------------------------------------------------------------
-
-/// Convert Euler angles (in radians) to a quaternion.
-/// Order: YXZ (yaw, pitch, roll)
-fn euler_to_quaternion(x: Float, y: Float, z: Float) -> Quaternion {
-  let cx = cos(x /. 2.0)
-  let cy = cos(y /. 2.0)
-  let cz = cos(z /. 2.0)
-  let sx = sin(x /. 2.0)
-  let sy = sin(y /. 2.0)
-  let sz = sin(z /. 2.0)
-
-  quaternion.Quaternion(
-    x: sx *. cy *. cz +. cx *. sy *. sz,
-    y: cx *. sy *. cz -. sx *. cy *. sz,
-    z: cx *. cy *. sz +. sx *. sy *. cz,
-    w: cx *. cy *. cz -. sx *. sy *. sz,
-  )
+/// Set the rotation to look at a target point from the current position.
+pub fn with_look_at(transform: Transform, target: Vec3(Float)) -> Transform {
+  let direction = vec3f.subtract(target, transform.position) |> vec3f.normalize
+  let forward = vec3.Vec3(0.0, 0.0, -1.0)
+  let up = vec3.Vec3(0.0, 1.0, 0.0)
+  let rotation = quaternion.look_at(forward:, target: direction, up:)
+  Transform(..transform, rotation:)
 }
 
-// FFI -------------------------------------------------------------------------
+// PARSING ---------------------------------------------------------------------
 
-@external(javascript, "./transform.ffi.mjs", "cos")
-fn cos(x: Float) -> Float
+/// Parse a transform string in the format "pos:x,y,z quat:x,y,z,w scale:x,y,z".
+/// Parts can be omitted to use defaults.
+pub fn parse(input: String) -> Transform {
+  let parts = string.split(input, " ") |> list.map(string.trim)
 
-@external(javascript, "./transform.ffi.mjs", "sin")
-fn sin(x: Float) -> Float
+  let pos = find_and_parse_vec3(parts, "pos:", vec3.Vec3(0.0, 0.0, 0.0))
+  let rot = find_and_parse_quaternion(parts, "quat:", quaternion.identity)
+  let scl = find_and_parse_vec3(parts, "scale:", vec3.Vec3(1.0, 1.0, 1.0))
+
+  Transform(position: pos, rotation: rot, scale: scl)
+}
+
+fn find_and_parse_vec3(
+  parts: List(String),
+  prefix: String,
+  default: Vec3(Float),
+) -> Vec3(Float) {
+  case list.find(parts, fn(p) { string.starts_with(p, prefix) }) {
+    Ok(part) -> {
+      let value_str = string.drop_start(part, string.length(prefix))
+      parse_vec3(value_str, default)
+    }
+    Error(_) -> default
+  }
+}
+
+fn find_and_parse_quaternion(
+  parts: List(String),
+  prefix: String,
+  default: Quaternion,
+) -> Quaternion {
+  case list.find(parts, fn(p) { string.starts_with(p, prefix) }) {
+    Ok(part) -> {
+      let value_str = string.drop_start(part, string.length(prefix))
+      parse_quaternion(value_str, default)
+    }
+    Error(_) -> default
+  }
+}
+
+fn parse_vec3(input: String, default: Vec3(Float)) -> Vec3(Float) {
+  case string.split(input, ",") |> list.map(string.trim) {
+    [x_str, y_str, z_str] -> {
+      case parse_number(x_str), parse_number(y_str), parse_number(z_str) {
+        Ok(x), Ok(y), Ok(z) -> vec3.Vec3(x, y, z)
+        _, _, _ -> default
+      }
+    }
+    _ -> default
+  }
+}
+
+fn parse_quaternion(input: String, default: Quaternion) -> Quaternion {
+  case string.split(input, ",") |> list.map(string.trim) {
+    [x_str, y_str, z_str, w_str] -> {
+      case
+        parse_number(x_str),
+        parse_number(y_str),
+        parse_number(z_str),
+        parse_number(w_str)
+      {
+        Ok(x), Ok(y), Ok(z), Ok(w) -> quaternion.Quaternion(x:, y:, z:, w:)
+        _, _, _, _ -> default
+      }
+    }
+    _ -> default
+  }
+}
+
+fn parse_number(input: String) -> Result(Float, Nil) {
+  case float.parse(input) {
+    Ok(f) -> Ok(f)
+    Error(_) -> {
+      case int.parse(input) {
+        Ok(i) -> Ok(int.to_float(i))
+        Error(_) -> Error(Nil)
+      }
+    }
+  }
+}
+
+// QUATERNION EXTRACTION -------------------------------------------------------
+
+/// Extract quaternion components (x, y, z, w) from a transform's rotation.
+/// Use this for passing directly to Three.js quaternion.set().
+pub fn to_quaternion_xyzw(transform: Transform) -> #(Float, Float, Float, Float) {
+  let quaternion.Quaternion(x:, y:, z:, w:) = transform.rotation
+  #(x, y, z, w)
+}

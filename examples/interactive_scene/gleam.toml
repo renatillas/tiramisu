@@ -1,0 +1,22 @@
+name = "interactive_scene"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.64.0 and < 2.0.0"
+gleam_time = ">= 1.6.0 and < 2.0.0"
+lustre = ">= 5.3.5 and < 6.0.0"
+tiramisu = { path = "../.." }
+vec = ">= 3.0.3 and < 4.0.0"
+quaterni = ">= 1.0.1 and < 2.0.0"
+
+[tools.lustre.html]
+scripts = [
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
+]
+stylesheets = [
+  { content = "body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; background: #111; color: #fff; } .container { display: flex; gap: 20px; } .controls { display: flex; flex-direction: column; gap: 10px; padding: 15px; background: #222; border-radius: 8px; min-width: 200px; } .controls button { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: transform 0.1s; } .controls button:hover { transform: scale(1.02); } .controls button:active { transform: scale(0.98); } .color-btn { color: white; } .controls label { display: flex; flex-direction: column; gap: 5px; } .controls input[type=range] { width: 100%; } h3 { margin: 0 0 10px 0; font-size: 14px; color: #888; text-transform: uppercase; } canvas { display: block; border-radius: 8px; }" }
+]
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.3.4 and < 3.0.0"

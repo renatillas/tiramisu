@@ -1,105 +1,131 @@
-//// Tiramisu - Game engine subscriptions and utilities.
+//// Tiramisu - A 3D game engine using web components.
 ////
-//// This module provides the main subscription API for game loops, similar to
-//// how OpenTUI provides keyboard subscriptions. Instead of passing context as
-//// a parameter, your game subscribes to tick events that include the context.
+//// Tiramisu provides declarative 3D scene construction through custom HTML
+//// elements. Use these components in any Lustre application or plain HTML.
 ////
-//// ## Example
+//// ## Quick Start
 ////
 //// ```gleam
 //// import lustre
-//// import lustre/effect
+//// import lustre/element/html
 //// import tiramisu
-//// import tiramisu/context.{type Context}
-//// import tiramisu/platform
-////
-//// type Msg {
-////   Tick(Context)
-//// }
-////
-//// fn init(_flags) -> #(Model, Effect(Msg)) {
-////   #(Model(...), tiramisu.subscribe_to_ticks(Tick))
-//// }
-////
-//// fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
-////   case msg {
-////     Tick(ctx) -> {
-////       let delta = duration.to_seconds(ctx.delta_time)
-////       let new_x = model.x +. delta *. model.velocity
-////       #(Model(..model, x: new_x), effect.none())
-////     }
-////   }
-//// }
+//// import tiramisu/renderer
+//// import tiramisu/mesh
+//// import tiramisu/camera
+//// import tiramisu/light
 ////
 //// pub fn main() {
-////   let assert Ok(platform) = platform.platform("#game")
-////   let app = lustre.application(init, update, view)
-////   let assert Ok(_) = lustre.start(app, on: platform, with: Nil)
-////   Nil
+////   // Register all Tiramisu web components
+////   let assert Ok(_) = tiramisu.register()
+////
+////   // Start a simple Lustre app that uses them
+////   let app = lustre.element(view())
+////   let assert Ok(_) = lustre.start(app, "#app", Nil)
+//// }
+////
+//// fn view() {
+////   html.div([], [
+////     renderer.renderer([renderer.background("#1a1a2e")], [
+////       camera.camera("main", [camera.fov(75.0), camera.active(True)], []),
+////       mesh.mesh("cube", [mesh.geometry_box(2.0, 2.0, 2.0), mesh.color(0xff6b6b)], []),
+////       light.light("sun", [light.light_type("directional"), light.intensity(1.0)], []),
+////     ]),
+////   ])
 //// }
 //// ```
-
-// RE-EXPORTS ------------------------------------------------------------------
-
-// Re-export commonly used types and modules
-pub type Context =
-  context.Context
+////
+//// ## Pure HTML Usage
+////
+//// ```html
+//// <script type="module">
+////   import { register } from './tiramisu.mjs';
+////   register();
+//// </script>
+////
+//// <tiramisu-renderer background="#1a1a2e">
+////   <tiramisu-camera id="main" position="0,5,10" active="true"></tiramisu-camera>
+////   <tiramisu-mesh id="cube" geometry="box:2,2,2" color="#ff6b6b"></tiramisu-mesh>
+////   <tiramisu-light id="sun" type="directional" intensity="1"></tiramisu-light>
+//// </tiramisu-renderer>
+//// ```
+////
+//// ## Components
+////
+//// - `<tiramisu-renderer>`: The main container that owns the WebGL renderer and scene
+//// - `<tiramisu-mesh>`: A 3D mesh with geometry and material
+//// - `<tiramisu-camera>`: A perspective or orthographic camera
+//// - `<tiramisu-light>`: Ambient, directional, point, or spot lighting
+//// - `<tiramisu-empty>`: An invisible group for hierarchical organization
 
 // IMPORTS ---------------------------------------------------------------------
 
-import lustre/effect.{type Effect}
-import tiramisu/context
+import gleam/result
+import lustre
+import tiramisu/audio
+import tiramisu/audio_positional
+import tiramisu/camera
+import tiramisu/empty
+import tiramisu/light
+import tiramisu/mesh
+import tiramisu/renderer
 
-// SUBSCRIPTION EFFECTS --------------------------------------------------------
+// REGISTRATION ----------------------------------------------------------------
 
-/// Subscribe to game tick events. Dispatches `handler(Context)` on every
-/// animation frame (typically 60 FPS). Call this in your `init` function
-/// to start receiving tick events with frame timing and input state.
+/// Register all Tiramisu web components.
 ///
-/// The Context includes:
-/// - `delta_time`: Duration since last frame
-/// - `input`: Current keyboard/mouse/touch/gamepad state
-/// - `canvas_size`: Current canvas dimensions
-/// - `physics_world`: Optional physics world reference
+/// Call this once at application startup before using any Tiramisu elements.
+/// Returns `Error` if any component registration fails.
 ///
 /// ## Example
 ///
 /// ```gleam
-/// type Msg {
-////   Tick(Context)
-////   UserAction
-//// }
-////
-//// fn init(_) -> #(Model, Effect(Msg)) {
-////   #(Model(...), tiramisu.subscribe_to_ticks(Tick))
-//// }
-////
-//// fn update(model, msg) {
-////   case msg {
-////     Tick(ctx) -> {
-////       let delta_seconds = duration.to_seconds(ctx.delta_time)
-////       let new_rotation = model.rotation +. delta_seconds
-////       #(Model(..model, rotation: new_rotation), effect.none())
-////     }
-////     UserAction -> // ...
-////   }
-//// }
+/// pub fn main() {
+///   let assert Ok(_) = tiramisu.register()
+///   // Now you can use <tiramisu-renderer>, <tiramisu-mesh>, etc.
+/// }
 /// ```
-pub fn subscribe_to_ticks(handler: fn(Context) -> msg) -> Effect(msg) {
-  effect.from(do_subscribe_to_ticks(handler, _))
+///
+pub fn register() -> Result(Nil, lustre.Error) {
+  use _ <- result.try(renderer.register())
+  use _ <- result.try(mesh.register())
+  use _ <- result.try(camera.register())
+  use _ <- result.try(light.register())
+  use _ <- result.try(empty.register())
+  use _ <- result.try(audio.register())
+  use _ <- result.try(audio_positional.register())
+  Ok(Nil)
 }
 
-// PLATFORM INTEGRATION --------------------------------------------------------
+/// Register individual components if you don't need all of them.
+///
+/// This is useful if you want to minimize bundle size by only including
+/// the components you actually use.
+///
+pub fn register_renderer() -> Result(Nil, lustre.Error) {
+  renderer.register()
+}
 
-/// Set the renderer and scene for the integrated render loop.
-/// This is called internally by the platform - you don't need to call this.
-@external(javascript, "./tiramisu.ffi.mjs", "setRendererAndScene")
-pub fn set_renderer_and_scene(renderer: a, scene: b) -> Nil
+pub fn register_mesh() -> Result(Nil, lustre.Error) {
+  mesh.register()
+}
 
-// FFI -------------------------------------------------------------------------
+pub fn register_camera() -> Result(Nil, lustre.Error) {
+  camera.register()
+}
 
-@external(javascript, "./tiramisu.ffi.mjs", "subscribe_to_ticks")
-fn do_subscribe_to_ticks(
-  handler: fn(Context) -> msg,
-  dispatch: fn(msg) -> Nil,
-) -> Nil
+pub fn register_light() -> Result(Nil, lustre.Error) {
+  light.register()
+}
+
+pub fn register_empty() -> Result(Nil, lustre.Error) {
+  empty.register()
+}
+
+pub fn register_audio() -> Result(Nil, lustre.Error) {
+  audio.register()
+}
+
+pub fn register_audio_positional() -> Result(Nil, lustre.Error) {
+  audio_positional.register()
+}
+

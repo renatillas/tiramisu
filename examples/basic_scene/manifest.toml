@@ -52,9 +52,7 @@ packages = [
 ]
 
 [requirements]
-gleam_community_maths = { version = ">= 2.0.0 and < 3.0.0" }
 gleam_stdlib = { version = ">= 0.64.0 and < 2.0.0" }
-gleam_time = { version = ">= 1.6.0 and < 2.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }
 lustre_dev_tools = { version = ">= 2.3.4 and < 3.0.0" }
 quaterni = { version = ">= 1.0.1 and < 2.0.0" }

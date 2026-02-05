@@ -24,7 +24,10 @@
       "Read(//Users/renata-amutio/Projects/renatillas/pondering_my_orb/src/**)",
       "Bash(xargs cat:*)",
       "Bash(git show:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:api.github.com)",
+      "mcp__gleam_packages__get_module_info",
+      "mcp__gleam_packages__search_functions"
     ],
     "deny": [],
     "ask": []
