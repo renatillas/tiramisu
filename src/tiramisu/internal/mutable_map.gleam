@@ -16,7 +16,6 @@ pub type MutableMap(key, value)
 
 ///
 ///
-@external(erlang, "maps", "new")
 @external(javascript, "./mutable_map.ffi.mjs", "empty")
 pub fn new() -> MutableMap(key, value)
 
@@ -70,3 +69,12 @@ pub fn size(map: MutableMap(key, value)) -> Int
 pub fn is_empty(map: MutableMap(key, value)) -> Bool {
   size(map) == 0
 }
+
+/// Fold over all entries in the map. The callback receives the accumulator,
+/// key, and value for each entry. Order is insertion order (JS Map guarantee).
+@external(javascript, "./mutable_map.ffi.mjs", "fold")
+pub fn fold(
+  map: MutableMap(key, value),
+  initial: acc,
+  callback: fn(acc, key, value) -> acc,
+) -> acc

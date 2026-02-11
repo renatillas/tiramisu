@@ -16,6 +16,7 @@ import tiramisu/light
 import tiramisu/mesh
 import tiramisu/renderer
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 pub fn main() -> Nil {
@@ -31,7 +32,11 @@ pub fn main() -> Nil {
 fn view() {
   html.div([attribute.id("app")], [
     renderer.renderer(
-      [renderer.width(800), renderer.height(600), renderer.background("#1a1a2e")],
+      [
+        renderer.width(800),
+        renderer.height(600),
+        renderer.background("#1a1a2e"),
+      ],
       [
         // Camera looking at the scene
         camera.camera(
@@ -47,7 +52,7 @@ fn view() {
         mesh.mesh(
           "cube",
           [
-            mesh.geometry_box(2.0, 2.0, 2.0),
+            mesh.geometry_box(vec3.Vec3(2.0, 2.0, 2.0)),
             mesh.color(0xff6b6b),
             mesh.metalness(0.3),
             mesh.roughness(0.7),
@@ -83,7 +88,7 @@ fn view() {
         mesh.mesh(
           "ground",
           [
-            mesh.geometry_plane(20.0, 20.0),
+            mesh.geometry_plane(vec2.Vec2(20.0, 20.0)),
             mesh.color(0x2d3436),
             mesh.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))

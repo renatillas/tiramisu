@@ -26,6 +26,7 @@ import tiramisu/mesh
 import tiramisu/renderer
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 import vec/vec3f
 
@@ -99,7 +100,7 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
     )
 
   // Subscribe to tick updates for animation
-  #(initial_model, tick.subscribe("", Tick))
+  #(initial_model, tick.subscribe("main", Tick))
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -137,6 +138,7 @@ fn view(model: Model) {
     // 3D Scene
     renderer.renderer(
       [
+        renderer.scene_id("main"),
         renderer.width(600),
         renderer.height(500),
         renderer.background("#1a1a2e"),
@@ -159,7 +161,7 @@ fn view(model: Model) {
         mesh.mesh(
           "ground",
           [
-            mesh.geometry_plane(20.0, 20.0),
+            mesh.geometry_plane(vec2.Vec2(20.0, 20.0)),
             mesh.color(0x2d3436),
             mesh.metalness(0.1),
             mesh.roughness(0.9),

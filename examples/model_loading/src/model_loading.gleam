@@ -5,12 +5,14 @@
 //// - The mesh component handles loading automatically
 //// - Rotation animation via tick updates
 
+import gleam/dynamic/decode
 import gleam/float
 import gleam/time/duration
 import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
 import lustre/element/html
+import lustre/event
 import quaternion
 import tiramisu
 import tiramisu/camera
@@ -19,6 +21,7 @@ import tiramisu/mesh
 import tiramisu/renderer
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 // TYPES -----------------------------------------------------------------------
@@ -35,6 +38,7 @@ pub type Model {
 pub type Msg {
   /// Animation tick
   Tick(TickContext)
+  ModelLoaded(String)
 }
 
 // MODEL URL -------------------------------------------------------------------
@@ -61,7 +65,7 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
   let initial_model = Model(rotation: 0.0)
 
   // Subscribe to tick updates for animation
-  #(initial_model, tick.subscribe("", Tick))
+  #(initial_model, tick.subscribe("main", Tick))
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -76,6 +80,10 @@ fn update(m: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
       #(Model(rotation: new_rotation), effect.none())
     }
+    ModelLoaded(mesh_id) -> {
+      echo "Model loaded with id: " <> mesh_id
+      #(Model(rotation: m.rotation), effect.none())
+    }
   }
 }
 
@@ -86,6 +94,7 @@ fn view(m: Model) {
     // 3D Scene
     renderer.renderer(
       [
+        renderer.scene_id("main"),
         renderer.width(600),
         renderer.height(500),
         renderer.background("#1a1a2e"),
@@ -105,7 +114,7 @@ fn view(m: Model) {
         mesh.mesh(
           "ground",
           [
-            mesh.geometry_plane(10.0, 10.0),
+            mesh.geometry_plane(vec2.Vec2(10.0, 10.0)),
             mesh.color(0x2d3436),
             mesh.metalness(0.1),
             mesh.roughness(0.9),
@@ -129,6 +138,13 @@ fn view(m: Model) {
                 quaternion.from_euler(vec3.Vec3(0.0, m.rotation, 0.0)),
               ),
             ),
+            event.on("tiramisu:model-loaded", {
+              use mesh_id <- decode.then(decode.at(
+                ["detail", "id"],
+                decode.string,
+              ))
+              decode.success(ModelLoaded(mesh_id))
+            }),
           ],
           [],
         ),

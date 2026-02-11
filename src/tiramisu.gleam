@@ -1,7 +1,9 @@
 //// Tiramisu - A 3D game engine using web components.
 ////
 //// Tiramisu provides declarative 3D scene construction through custom HTML
-//// elements. Use these components in any Lustre application or plain HTML.
+//// elements. Only the renderer is a web component — all other elements
+//// (mesh, camera, light, empty, audio) are plain DOM elements parsed from
+//// the light DOM.
 ////
 //// ## Quick Start
 ////
@@ -15,10 +17,10 @@
 //// import tiramisu/light
 ////
 //// pub fn main() {
-////   // Register all Tiramisu web components
+////   // Register the tiramisu-renderer web component
 ////   let assert Ok(_) = tiramisu.register()
 ////
-////   // Start a simple Lustre app that uses them
+////   // Start a simple Lustre app that uses it
 ////   let app = lustre.element(view())
 ////   let assert Ok(_) = lustre.start(app, "#app", Nil)
 //// }
@@ -43,89 +45,44 @@
 //// </script>
 ////
 //// <tiramisu-renderer background="#1a1a2e">
-////   <tiramisu-camera id="main" position="0,5,10" active="true"></tiramisu-camera>
+////   <tiramisu-camera id="main" transform="pos:0,5,10" active="true"></tiramisu-camera>
 ////   <tiramisu-mesh id="cube" geometry="box:2,2,2" color="#ff6b6b"></tiramisu-mesh>
 ////   <tiramisu-light id="sun" type="directional" intensity="1"></tiramisu-light>
 //// </tiramisu-renderer>
 //// ```
 ////
-//// ## Components
+//// ## Elements
 ////
-//// - `<tiramisu-renderer>`: The main container that owns the WebGL renderer and scene
+//// - `<tiramisu-renderer>`: The main container (only web component) that owns the WebGL renderer and scene
 //// - `<tiramisu-mesh>`: A 3D mesh with geometry and material
 //// - `<tiramisu-camera>`: A perspective or orthographic camera
 //// - `<tiramisu-light>`: Ambient, directional, point, or spot lighting
 //// - `<tiramisu-empty>`: An invisible group for hierarchical organization
+//// - `<tiramisu-audio>`: Global (non-positional) audio
+//// - `<tiramisu-audio-positional>`: 3D positional audio
 
 // IMPORTS ---------------------------------------------------------------------
 
-import gleam/result
 import lustre
-import tiramisu/audio
-import tiramisu/audio_positional
-import tiramisu/camera
-import tiramisu/empty
-import tiramisu/light
-import tiramisu/mesh
 import tiramisu/renderer
 
 // REGISTRATION ----------------------------------------------------------------
 
-/// Register all Tiramisu web components.
+/// Register the tiramisu-renderer web component.
 ///
 /// Call this once at application startup before using any Tiramisu elements.
-/// Returns `Error` if any component registration fails.
+/// Only the renderer needs registration — all other elements are plain DOM
+/// elements that the renderer parses from its light DOM.
 ///
 /// ## Example
 ///
 /// ```gleam
 /// pub fn main() {
 ///   let assert Ok(_) = tiramisu.register()
-///   // Now you can use <tiramisu-renderer>, <tiramisu-mesh>, etc.
+///   // Now you can use <tiramisu-renderer> with child elements
 /// }
 /// ```
 ///
 pub fn register() -> Result(Nil, lustre.Error) {
-  use _ <- result.try(renderer.register())
-  use _ <- result.try(mesh.register())
-  use _ <- result.try(camera.register())
-  use _ <- result.try(light.register())
-  use _ <- result.try(empty.register())
-  use _ <- result.try(audio.register())
-  use _ <- result.try(audio_positional.register())
-  Ok(Nil)
-}
-
-/// Register individual components if you don't need all of them.
-///
-/// This is useful if you want to minimize bundle size by only including
-/// the components you actually use.
-///
-pub fn register_renderer() -> Result(Nil, lustre.Error) {
   renderer.register()
 }
-
-pub fn register_mesh() -> Result(Nil, lustre.Error) {
-  mesh.register()
-}
-
-pub fn register_camera() -> Result(Nil, lustre.Error) {
-  camera.register()
-}
-
-pub fn register_light() -> Result(Nil, lustre.Error) {
-  light.register()
-}
-
-pub fn register_empty() -> Result(Nil, lustre.Error) {
-  empty.register()
-}
-
-pub fn register_audio() -> Result(Nil, lustre.Error) {
-  audio.register()
-}
-
-pub fn register_audio_positional() -> Result(Nil, lustre.Error) {
-  audio_positional.register()
-}
-

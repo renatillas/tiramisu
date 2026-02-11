@@ -8,13 +8,17 @@
 
 import gleam/float
 import gleam/int
+import gleam/list
 import gleam/time/duration
+
 import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
 import lustre/element/html
 import lustre/event
+
 import quaternion
+
 import tiramisu
 import tiramisu/camera
 import tiramisu/light
@@ -22,6 +26,8 @@ import tiramisu/mesh
 import tiramisu/renderer
 import tiramisu/tick
 import tiramisu/transform
+
+import vec/vec2
 import vec/vec3
 
 // TYPES -----------------------------------------------------------------------
@@ -92,7 +98,7 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
     )
 
   // Subscribe to tick updates for animation
-  #(model, tick.subscribe("", Tick))
+  #(model, tick.subscribe("main", Tick))
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -144,6 +150,7 @@ fn view(model: Model) {
         renderer.width(600),
         renderer.height(500),
         renderer.background("#1a1a2e"),
+        renderer.scene_id("main"),
       ],
       [
         // Camera
@@ -164,21 +171,24 @@ fn view(model: Model) {
             mesh.color(model.cube_color),
             mesh.metalness(model.metalness),
             mesh.roughness(model.roughness),
-            mesh.wireframe(model.wireframe),
             mesh.transform(
               transform.at(vec3.Vec3(0.0, 1.5, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(0.0, model.rotation, 0.0)),
               ),
             ),
-          ],
+          ]
+            |> list.append(case model.wireframe {
+              True -> [mesh.wireframe()]
+              False -> []
+            }),
           [],
         ),
         // Ground plane
         mesh.mesh(
           "ground",
           [
-            mesh.geometry_plane(15.0, 15.0),
+            mesh.geometry_plane(vec2.Vec2(15.0, 15.0)),
             mesh.color(0x2d3436),
             mesh.metalness(0.1),
             mesh.roughness(0.9),

@@ -5,7 +5,7 @@
 // in Gleam code - this just provides the ID-based lookup needed for
 // cross-component communication via Lustre's context system.
 
-import { Option$Some, Option$None } from "../../../gleam_stdlib/gleam/option.mjs";
+import { Option$Some, Option$None, Option$Some$0, Option$isSome } from "../../../gleam_stdlib/gleam/option.mjs";
 import { broadcastTick } from "../tick.ffi.mjs";
 
 // REGISTRIES ------------------------------------------------------------------
@@ -64,12 +64,12 @@ export function registerRenderer(renderer, container, config) {
   const actualContainer = config.container || container;
 
   // Set initial size from config or container
-  const width = config.width?.isNone
-    ? actualContainer.clientWidth || 800
-    : config.width[0];
-  const height = config.height?.isNone
-    ? actualContainer.clientHeight || 600
-    : config.height[0];
+  const width = Option$isSome(config.width)
+    ? Option$Some$0(config.width)
+    : actualContainer.clientWidth || 800;
+  const height = Option$isSome(config.height)
+    ? Option$Some$0(config.height)
+    : actualContainer.clientHeight || 600;
 
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -370,10 +370,97 @@ export function getCamera(id) {
   return camData ? Option$Some(camData.camera) : Option$None();
 }
 
+// Reparent an object to a new parent
+export function reparentObject(id, newParentId, sceneId) {
+  const data = objects.get(id);
+  if (!data) return;
+
+  const newParent = getParentObject(sceneId, newParentId);
+  if (!newParent) return;
+
+  // Three.js add() automatically removes from old parent
+  newParent.add(data.object);
+  data.parentId = newParentId;
+}
+
 // Set renderer background color
 export function setRendererBackground(id, color) {
   const info = renderers.get(id);
   if (info) {
     info.renderer.setClearColor(parseInt(color.replace("#", ""), 16));
+  }
+}
+
+// AUDIO LISTENER REGISTRY -----------------------------------------------------
+
+const audioListeners = new Map();
+
+export function storeAudioListener(sceneId, listener) {
+  audioListeners.set(sceneId, listener);
+}
+
+export function getStoredAudioListener(sceneId) {
+  const listener = audioListeners.get(sceneId);
+  return listener ? Option$Some(listener) : Option$None();
+}
+
+// Attach an AudioListener to the active camera for a given scene.
+// Uses camera.add() on objects created by savoiardi (no direct THREE import).
+export function attachListenerToActiveCamera(sceneId, listener) {
+  for (const [, camData] of cameras) {
+    if (camData.sceneId === sceneId && camData.active) {
+      camData.camera.add(listener);
+      return;
+    }
+  }
+  // Fallback: attach to scene root so audio still works
+  const scene = scenes.get(sceneId);
+  if (scene) scene.add(listener);
+}
+
+// MODEL LOADING HELPERS -------------------------------------------------------
+
+// Replace an existing object's 3D model with a newly loaded one.
+// Preserves position, rotation, scale, and visibility from the old object.
+export function replaceObjectModel(id, newObject) {
+  const data = objects.get(id);
+  if (!data) return;
+
+  const old = data.object;
+  newObject.position.copy(old.position);
+  newObject.quaternion.copy(old.quaternion);
+  newObject.scale.copy(old.scale);
+  newObject.visible = old.visible;
+  newObject.name = id;
+
+  if (old.parent) {
+    old.parent.add(newObject);
+    old.parent.remove(old);
+  }
+
+  // Dispose old geometry/materials
+  old.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
+      else obj.material.dispose();
+    }
+  });
+
+  data.object = newObject;
+}
+
+// Dispatch a custom event on a DOM element found by ID.
+// Used to notify Lustre apps when models finish loading.
+export function dispatchMeshEvent(meshId, eventName) {
+  const el = document.getElementById(meshId);
+  if (el) {
+    el.dispatchEvent(
+      new CustomEvent(eventName, {
+        bubbles: true,
+        composed: true,
+        detail: { id: meshId },
+      })
+    );
   }
 }

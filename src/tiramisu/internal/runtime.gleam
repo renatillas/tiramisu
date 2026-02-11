@@ -11,8 +11,8 @@
 
 import gleam/option.{type Option}
 import savoiardi.{
-  type Camera, type Geometry, type Light, type Material, type Object3D,
-  type Renderer, type Scene,
+  type Audio, type AudioListener, type Camera, type Geometry, type Light,
+  type Material, type Object3D, type PositionalAudio, type Renderer, type Scene,
 }
 
 // TYPES -----------------------------------------------------------------------
@@ -327,6 +327,85 @@ pub fn set_visible(ref: ObjectRef, visible: Bool) -> Nil {
   set_visible_ffi(ref.id, visible)
 }
 
+/// Reparent an object to a new parent. Three.js add() automatically
+/// removes from the old parent.
+pub fn reparent_object(
+  ref: ObjectRef,
+  new_parent_id: String,
+  scene: SceneRef,
+) -> Nil {
+  reparent_object_ffi(ref.id, new_parent_id, scene.id)
+}
+
+// AUDIO OPERATIONS ------------------------------------------------------------
+
+/// Store an AudioListener for a scene.
+pub fn store_audio_listener(scene: SceneRef, listener: AudioListener) -> Nil {
+  store_audio_listener_ffi(scene.id, listener)
+}
+
+/// Get the stored AudioListener for a scene.
+pub fn get_audio_listener(scene: SceneRef) -> Option(AudioListener) {
+  get_audio_listener_ffi(scene.id)
+}
+
+/// Attach an AudioListener to the active camera for a scene.
+pub fn attach_listener_to_camera(
+  scene: SceneRef,
+  listener: AudioListener,
+) -> Nil {
+  attach_listener_to_camera_ffi(scene.id, listener)
+}
+
+/// Register an Audio object in the scene graph.
+/// Audio extends Object3D, so the existing registerAndAddObject FFI works.
+pub fn add_audio(
+  scene: SceneRef,
+  parent_id: String,
+  id: String,
+  audio: Audio,
+) -> ObjectRef {
+  let object_id = register_audio_ffi(scene.id, parent_id, id, audio)
+  ObjectRef(id: object_id)
+}
+
+/// Register a PositionalAudio object in the scene graph.
+/// PositionalAudio extends Object3D, so the existing registerAndAddObject FFI works.
+pub fn add_positional_audio(
+  scene: SceneRef,
+  parent_id: String,
+  id: String,
+  audio: PositionalAudio,
+) -> ObjectRef {
+  let object_id =
+    register_positional_audio_ffi(scene.id, parent_id, id, audio)
+  ObjectRef(id: object_id)
+}
+
+/// Get an Audio object from the registry by its reference.
+pub fn get_audio(ref: ObjectRef) -> Option(Audio) {
+  get_audio_ffi(ref.id)
+}
+
+/// Get a PositionalAudio object from the registry by its reference.
+pub fn get_positional_audio(ref: ObjectRef) -> Option(PositionalAudio) {
+  get_positional_audio_ffi(ref.id)
+}
+
+// MODEL LOADING OPERATIONS ----------------------------------------------------
+
+/// Replace an existing object's 3D model with a newly loaded one.
+/// Preserves position, rotation, scale, and visibility from the old object.
+pub fn replace_object_model(ref: ObjectRef, new_object: Object3D) -> Nil {
+  replace_object_model_ffi(ref.id, new_object)
+}
+
+/// Dispatch a custom event on a DOM element found by ID.
+/// Used to notify Lustre apps about model load status.
+pub fn dispatch_mesh_event(mesh_id: String, event_name: String) -> Nil {
+  dispatch_mesh_event_ffi(mesh_id, event_name)
+}
+
 // FFI DECLARATIONS ------------------------------------------------------------
 
 // Scene registry
@@ -420,3 +499,55 @@ fn remove_object_ffi(id: String) -> Nil
 
 @external(javascript, "./runtime.ffi.mjs", "setVisible")
 fn set_visible_ffi(id: String, visible: Bool) -> Nil
+
+@external(javascript, "./runtime.ffi.mjs", "reparentObject")
+fn reparent_object_ffi(
+  id: String,
+  new_parent_id: String,
+  scene_id: String,
+) -> Nil
+
+// Audio registry
+@external(javascript, "./runtime.ffi.mjs", "storeAudioListener")
+fn store_audio_listener_ffi(scene_id: String, listener: AudioListener) -> Nil
+
+@external(javascript, "./runtime.ffi.mjs", "getStoredAudioListener")
+fn get_audio_listener_ffi(scene_id: String) -> Option(AudioListener)
+
+@external(javascript, "./runtime.ffi.mjs", "attachListenerToActiveCamera")
+fn attach_listener_to_camera_ffi(
+  scene_id: String,
+  listener: AudioListener,
+) -> Nil
+
+// Audio extends Object3D — reuses registerAndAddObject at JS level
+@external(javascript, "./runtime.ffi.mjs", "registerAndAddObject")
+fn register_audio_ffi(
+  scene_id: String,
+  parent_id: String,
+  id: String,
+  audio: Audio,
+) -> String
+
+// PositionalAudio extends Object3D — reuses registerAndAddObject at JS level
+@external(javascript, "./runtime.ffi.mjs", "registerAndAddObject")
+fn register_positional_audio_ffi(
+  scene_id: String,
+  parent_id: String,
+  id: String,
+  audio: PositionalAudio,
+) -> String
+
+// Audio retrieval — reuses getObject at JS level, different Gleam type
+@external(javascript, "./runtime.ffi.mjs", "getObject")
+fn get_audio_ffi(id: String) -> Option(Audio)
+
+@external(javascript, "./runtime.ffi.mjs", "getObject")
+fn get_positional_audio_ffi(id: String) -> Option(PositionalAudio)
+
+// Model loading
+@external(javascript, "./runtime.ffi.mjs", "replaceObjectModel")
+fn replace_object_model_ffi(id: String, new_object: Object3D) -> Nil
+
+@external(javascript, "./runtime.ffi.mjs", "dispatchMeshEvent")
+fn dispatch_mesh_event_ffi(mesh_id: String, event_name: String) -> Nil

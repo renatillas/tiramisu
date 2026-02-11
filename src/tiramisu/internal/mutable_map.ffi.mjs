@@ -30,3 +30,12 @@ export function remove(map, key) {
 export function size(map) {
   return map ? map.size : 0;
 }
+
+export function fold(map, initial, callback) {
+  if (!map) return initial;
+  let acc = initial;
+  map.forEach((value, key) => {
+    acc = callback(acc, key, value);
+  });
+  return acc;
+}
