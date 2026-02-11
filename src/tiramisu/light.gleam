@@ -193,7 +193,7 @@ pub fn intensity(value: Float) -> Attribute(msg) {
 ///
 pub fn cast_shadow(enabled: Bool) -> Attribute(msg) {
   attribute.attribute("cast-shadow", case enabled {
-    True -> "true"
+    True -> ""
     False -> "false"
   })
 }

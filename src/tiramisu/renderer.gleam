@@ -37,12 +37,7 @@
 ////    tick.subscribe("my-scene", Tick)
 ////    ```
 ////
-//// 2. Use the global handler (empty string) to receive ticks from all scenes:
-////    ```gleam
-////    tick.subscribe("", Tick)
-////    ```
-////
-//// 3. Listen for the `tiramisu:scene-ready` event to get the scene ID dynamically:
+//// 2. Listen for the `tiramisu:scene-ready` event to get the scene ID dynamically:
 ////    ```gleam
 ////    renderer.on_scene_ready(fn(scene_id) { SceneReady(scene_id) })
 ////    ```
@@ -53,6 +48,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/option.{type Option, None, Some}
+
 import lustre
 import lustre/attribute.{type Attribute}
 import lustre/component
@@ -60,6 +56,7 @@ import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
+
 import tiramisu/context.{SceneContext}
 import tiramisu/internal/runtime.{type RendererRef, type SceneRef}
 
@@ -87,6 +84,7 @@ pub type Model {
   )
 }
 
+/// Tick context
 /// Messages for the renderer component.
 pub type Msg {
   /// Scene and renderer have been initialized
@@ -113,41 +111,38 @@ pub const tag_name = "tiramisu-renderer"
 /// Register the tiramisu-renderer component as a custom element.
 pub fn register() -> Result(Nil, lustre.Error) {
   let app =
-    lustre.component(
-      init,
-      update,
-      view,
-      [
-        // Attribute handlers
-        component.on_attribute_change("width", fn(v) {
-          case int.parse(v) {
-            Ok(n) -> Ok(WidthChanged(n))
-            Error(_) -> Error(Nil)
-          }
-        }),
-        component.on_attribute_change("height", fn(v) {
-          case int.parse(v) {
-            Ok(n) -> Ok(HeightChanged(n))
-            Error(_) -> Error(Nil)
-          }
-        }),
-        component.on_attribute_change("background", fn(v) { Ok(BackgroundChanged(v)) }),
-        component.on_attribute_change("antialias", fn(v) {
-          case v {
-            "true" | "1" | "" -> Ok(AntialiasChanged(True))
-            "false" | "0" -> Ok(AntialiasChanged(False))
-            _ -> Error(Nil)
-          }
-        }),
-        component.on_attribute_change("alpha", fn(v) {
-          case v {
-            "true" | "1" -> Ok(AlphaChanged(True))
-            "false" | "0" | "" -> Ok(AlphaChanged(False))
-            _ -> Error(Nil)
-          }
-        }),
-      ],
-    )
+    lustre.component(init, update, view, [
+      // Attribute handlers
+      component.on_attribute_change("width", fn(v) {
+        case int.parse(v) {
+          Ok(n) -> Ok(WidthChanged(n))
+          Error(_) -> Error(Nil)
+        }
+      }),
+      component.on_attribute_change("height", fn(v) {
+        case int.parse(v) {
+          Ok(n) -> Ok(HeightChanged(n))
+          Error(_) -> Error(Nil)
+        }
+      }),
+      component.on_attribute_change("background", fn(v) {
+        Ok(BackgroundChanged(v))
+      }),
+      component.on_attribute_change("antialias", fn(v) {
+        case v {
+          "true" | "1" | "" -> Ok(AntialiasChanged(True))
+          "false" | "0" -> Ok(AntialiasChanged(False))
+          _ -> Error(Nil)
+        }
+      }),
+      component.on_attribute_change("alpha", fn(v) {
+        case v {
+          "true" | "1" | "" -> Ok(AlphaChanged(True))
+          "false" | "0" -> Ok(AlphaChanged(False))
+          _ -> Error(Nil)
+        }
+      }),
+    ])
 
   lustre.register(app, tag_name)
 }
@@ -209,7 +204,7 @@ pub fn height(pixels: Int) -> Attribute(msg) {
 ///
 pub fn antialias(enabled: Bool) -> Attribute(msg) {
   attribute.attribute("antialias", case enabled {
-    True -> "true"
+    True -> ""
     False -> "false"
   })
 }
@@ -218,7 +213,7 @@ pub fn antialias(enabled: Bool) -> Attribute(msg) {
 ///
 pub fn alpha(enabled: Bool) -> Attribute(msg) {
   attribute.attribute("alpha", case enabled {
-    True -> "true"
+    True -> ""
     False -> "false"
   })
 }
@@ -346,7 +341,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     Resized(width:, height:) -> {
       let new_model = Model(..model, width:, height:)
       let resize_effect = case model.renderer_ref {
-        Some(ref) -> effect.from(fn(_) { runtime.resize_renderer(ref, width, height) })
+        Some(ref) ->
+          effect.from(fn(_) { runtime.resize_renderer(ref, width, height) })
         None -> effect.none()
       }
       #(new_model, resize_effect)
@@ -355,9 +351,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     WidthChanged(width) -> {
       let new_model = Model(..model, width:)
       case model.renderer_ref {
-        Some(ref) -> #(new_model, effect.from(fn(_) {
-          runtime.resize_renderer(ref, width, model.height)
-        }))
+        Some(ref) -> #(
+          new_model,
+          effect.from(fn(_) {
+            runtime.resize_renderer(ref, width, model.height)
+          }),
+        )
         None -> #(new_model, effect.none())
       }
     }
@@ -365,9 +364,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     HeightChanged(height) -> {
       let new_model = Model(..model, height:)
       case model.renderer_ref {
-        Some(ref) -> #(new_model, effect.from(fn(_) {
-          runtime.resize_renderer(ref, model.width, height)
-        }))
+        Some(ref) -> #(
+          new_model,
+          effect.from(fn(_) {
+            runtime.resize_renderer(ref, model.width, height)
+          }),
+        )
         None -> #(new_model, effect.none())
       }
     }
@@ -375,9 +377,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     BackgroundChanged(background) -> {
       let new_model = Model(..model, background:)
       case model.renderer_ref {
-        Some(ref) -> #(new_model, effect.from(fn(_) {
-          set_background_ffi(ref, background)
-        }))
+        Some(ref) -> #(
+          new_model,
+          effect.from(fn(_) { set_background_ffi(ref, background) }),
+        )
         None -> #(new_model, effect.none())
       }
     }
@@ -405,13 +408,10 @@ fn provide_scene_context(scene_id: String) -> Effect(Msg) {
 fn view(_model: Model) -> Element(Msg) {
   // The renderer component renders a container div with a slot for children.
   // The canvas is appended to the shadow root by the FFI during initialization.
-  html.div(
-    [],
-    [
-      // Slot for child components (mesh, camera, light, empty)
-      component.default_slot([], []),
-    ],
-  )
+  html.div([], [
+    // Slot for child components (mesh, camera, light, empty)
+    component.default_slot([], []),
+  ])
 }
 
 // FFI DECLARATIONS ------------------------------------------------------------

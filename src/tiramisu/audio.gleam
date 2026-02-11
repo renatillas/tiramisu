@@ -336,7 +336,7 @@ fn load_audio_effect(url: String) -> Effect(Msg) {
 
 fn view(_model: Model) -> Element(Msg) {
   // Audio component has no visual representation
-  html.div([attribute.style("display", "none")], [])
+  html.div([], [])
 }
 
 // HELPERS ---------------------------------------------------------------------

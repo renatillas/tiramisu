@@ -27,7 +27,7 @@ export function getRendererConfig(shadowRoot) {
  * Returns an empty string if not set.
  */
 export function getSceneIdFromHost(shadowRoot) {
-  const host = shadowRoot.host || shadowRoot;
+  const host = shadowRoot.host;
   return host.getAttribute("scene-id") || "";
 }
 
@@ -35,7 +35,7 @@ export function getSceneIdFromHost(shadowRoot) {
  * Set the scene ID on the renderer's host element and dispatch an event.
  */
 export function setSceneIdOnHost(shadowRoot, sceneId) {
-  const host = shadowRoot.host || shadowRoot;
+  const host = shadowRoot.host;
   host.setAttribute("data-scene-id", sceneId);
 
   const event = new CustomEvent("tiramisu:scene-ready", {

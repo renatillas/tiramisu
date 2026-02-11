@@ -115,16 +115,6 @@ pub fn empty(
   element.element(tag_name, [attribute.id(id), ..attributes], children)
 }
 
-/// Alias for `empty` - creates a group node.
-///
-pub fn group(
-  id: String,
-  attributes: List(Attribute(msg)),
-  children: List(Element(msg)),
-) -> Element(msg) {
-  empty(id, attributes, children)
-}
-
 // ATTRIBUTES ------------------------------------------------------------------
 
 /// Set the full transform of the group.
@@ -317,6 +307,3 @@ fn parse_bool_attr(to_msg: fn(Bool) -> Msg) -> fn(String) -> Result(Msg, Nil) {
     }
   }
 }
-// FFI DECLARATIONS ------------------------------------------------------------
-// DOM operations (findParentSceneId, listenForSceneReady) are now in
-// tiramisu/internal/dom module. This component has no additional FFI.

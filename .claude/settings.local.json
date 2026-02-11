@@ -27,7 +27,9 @@
       "Bash(ls:*)",
       "WebFetch(domain:api.github.com)",
       "mcp__gleam_packages__get_module_info",
-      "mcp__gleam_packages__search_functions"
+      "mcp__gleam_packages__search_functions",
+      "WebFetch(domain:rapier.rs)",
+      "WebFetch(domain:sbcode.net)"
     ],
     "deny": [],
     "ask": []

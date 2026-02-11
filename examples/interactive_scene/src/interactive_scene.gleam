@@ -140,7 +140,11 @@ fn view(model: Model) {
   html.div([class("container")], [
     // 3D Scene
     renderer.renderer(
-      [renderer.width(600), renderer.height(500), renderer.background("#1a1a2e")],
+      [
+        renderer.width(600),
+        renderer.height(500),
+        renderer.background("#1a1a2e"),
+      ],
       [
         // Camera
         camera.camera(
@@ -156,7 +160,7 @@ fn view(model: Model) {
         mesh.mesh(
           "cube",
           [
-            mesh.geometry_box(2.0, 2.0, 2.0),
+            mesh.geometry_box(vec3.Vec3(2.0, 2.0, 2.0)),
             mesh.color(model.cube_color),
             mesh.metalness(model.metalness),
             mesh.roughness(model.roughness),

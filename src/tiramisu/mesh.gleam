@@ -37,17 +37,22 @@ import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
+
 import lustre
 import lustre/attribute.{type Attribute}
 import lustre/component
 import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
+
 import savoiardi
+
 import tiramisu/context.{type SceneContext, SceneContext}
 import tiramisu/internal/dom
 import tiramisu/internal/runtime.{type ObjectRef}
 import tiramisu/transform.{type Transform}
+
+import vec/vec2
 import vec/vec3
 
 // TYPES -----------------------------------------------------------------------
@@ -212,15 +217,15 @@ pub fn src(url: String) -> Attribute(msg) {
 
 /// Set a box geometry with width, height, and depth.
 ///
-pub fn geometry_box(width: Float, height: Float, depth: Float) -> Attribute(msg) {
+pub fn geometry_box(shape: vec3.Vec3(Float)) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
     "box:"
-      <> float.to_string(width)
+      <> float.to_string(shape.x)
       <> ","
-      <> float.to_string(height)
+      <> float.to_string(shape.y)
       <> ","
-      <> float.to_string(depth),
+      <> float.to_string(shape.z),
   )
 }
 
@@ -228,17 +233,16 @@ pub fn geometry_box(width: Float, height: Float, depth: Float) -> Attribute(msg)
 ///
 pub fn geometry_sphere(
   radius: Float,
-  width_segments: Int,
-  height_segments: Int,
+  segments: vec2.Vec2(Int),
 ) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
     "sphere:"
       <> float.to_string(radius)
       <> ","
-      <> int.to_string(width_segments)
+      <> int.to_string(segments.x)
       <> ","
-      <> int.to_string(height_segments),
+      <> int.to_string(segments.y),
   )
 }
 
@@ -250,20 +254,20 @@ pub fn geometry_sphere_simple(radius: Float) -> Attribute(msg) {
 
 /// Set a plane geometry with width and height.
 ///
-pub fn geometry_plane(width: Float, height: Float) -> Attribute(msg) {
+pub fn geometry_plane(size: vec2.Vec2(Float)) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
-    "plane:" <> float.to_string(width) <> "," <> float.to_string(height),
+    "plane:" <> float.to_string(size.x) <> "," <> float.to_string(size.y),
   )
 }
 
 /// Set a cylinder geometry.
 ///
 pub fn geometry_cylinder(
-  radius_top: Float,
-  radius_bottom: Float,
-  height: Float,
-  segments: Int,
+  radius_top radius_top: Float,
+  radius_bottom radius_bottom: Float,
+  height height: Float,
+  segments segments: Int,
 ) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
@@ -290,9 +294,9 @@ pub fn geometry_cylinder_simple(radius: Float, height: Float) -> Attribute(msg) 
 /// Set a cone geometry.
 ///
 pub fn geometry_cone(
-  radius: Float,
-  height: Float,
-  segments: Int,
+  radius radius: Float,
+  height height: Float,
+  segments segments: Int,
 ) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
@@ -317,10 +321,10 @@ pub fn geometry_cone_simple(radius: Float, height: Float) -> Attribute(msg) {
 /// Set a torus geometry.
 ///
 pub fn geometry_torus(
-  radius: Float,
-  tube: Float,
-  radial_segments: Int,
-  tubular_segments: Int,
+  radius radius: Float,
+  tube tube: Float,
+  radial_segments radial_segments: Int,
+  tubular_segments tubular_segments: Int,
 ) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
@@ -352,13 +356,13 @@ pub fn geometry_torus_simple(radius: Float, tube: Float) -> Attribute(msg) {
 /// mesh.color(0xff0000)  // Red
 /// ```
 ///
-pub fn color(hex: Int) -> Attribute(msg) {
+pub fn color(hex hex: Int) -> Attribute(msg) {
   attribute.attribute("color", "#" <> int.to_base16(hex))
 }
 
 /// Set the base color of the material (as a hex string).
 ///
-pub fn color_string(hex: String) -> Attribute(msg) {
+pub fn color_string(hex hex: String) -> Attribute(msg) {
   attribute.attribute("color", hex)
 }
 
@@ -425,7 +429,7 @@ pub fn transform(t: Transform) -> Attribute(msg) {
 ///
 pub fn visible(is_visible: Bool) -> Attribute(msg) {
   attribute.attribute("visible", case is_visible {
-    True -> "true"
+    True -> ""
     False -> "false"
   })
 }
