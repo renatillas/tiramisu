@@ -13,7 +13,7 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/effect
 import tiramisu/geometry
-import tiramisu/input
+import input
 import tiramisu/light
 import tiramisu/material
 import tiramisu/scene

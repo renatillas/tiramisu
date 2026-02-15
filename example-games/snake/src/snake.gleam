@@ -15,7 +15,7 @@ import tiramisu/background
 import tiramisu/camera
 import tiramisu/effect.{type Effect}
 import tiramisu/geometry
-import tiramisu/input
+import input
 import tiramisu/light
 import tiramisu/material
 import tiramisu/scene

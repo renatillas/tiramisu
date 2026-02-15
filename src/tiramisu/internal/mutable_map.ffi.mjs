@@ -1,5 +1,7 @@
+import { Result$Ok, Result$Error } from "../../../prelude.mjs";
+
 export function empty() {
-  return null;
+  return new Map();
 }
 
 export function get(map, key) {
@@ -38,4 +40,10 @@ export function fold(map, initial, callback) {
     acc = callback(acc, key, value);
   });
   return acc;
+}
+
+
+export function safe_get(map, key) {
+  if (!map || !map.has(key)) return Result$Error();
+  return Result$Ok(map.get(key));
 }

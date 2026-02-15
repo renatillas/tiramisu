@@ -301,6 +301,32 @@ pub fn visible() -> Attribute(msg) {
   attribute.attribute("visible", "")
 }
 
+/// Enable shadow casting on the mesh.
+///
+/// The mesh will cast shadows onto other meshes that have `receive_shadow`
+/// enabled. Requires a light with `cast_shadow` set to `True`.
+///
+/// ## Example
+///
+/// ```gleam
+/// mesh.mesh("player", [
+///   mesh.geometry_box(vec3.Vec3(1.0, 2.0, 1.0)),
+///   mesh.cast_shadow(),
+///   mesh.receive_shadow(),
+/// ], [])
+/// ```
+pub fn cast_shadow() -> Attribute(msg) {
+  attribute.attribute("cast-shadow", "")
+}
+
+/// Enable shadow receiving on the mesh.
+///
+/// The mesh will show shadows cast by other meshes. Requires a light
+/// with `cast_shadow` set to `True`.
+pub fn receive_shadow() -> Attribute(msg) {
+  attribute.attribute("receive-shadow", "")
+}
+
 // EVENTS ----------------------------------------------------------------------
 
 /// Listen for the model-loaded event.

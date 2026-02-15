@@ -78,3 +78,7 @@ pub fn fold(
   initial: acc,
   callback: fn(acc, key, value) -> acc,
 ) -> acc
+
+/// Safe get returning Option. Returns None if key not found.
+@external(javascript, "./mutable_map.ffi.mjs", "safe_get")
+pub fn get(map: MutableMap(key, value), key: key) -> Result(value, Nil)

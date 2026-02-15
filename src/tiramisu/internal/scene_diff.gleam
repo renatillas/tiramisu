@@ -127,26 +127,60 @@ fn diff_node(
       key: id,
       geometry: og,
       src: os,
+      material_type: omt,
       color: oc,
       metalness: om,
       roughness: or_,
       opacity: oo,
       wireframe: ow,
+      emissive: oe,
+      emissive_intensity: oei,
+      side: osd,
+      color_map: ocm,
+      normal_map: onm,
+      ao_map: oam,
+      roughness_map: orm,
+      metalness_map: omm,
+      displacement_map: odm,
+      displacement_scale: ods,
+      displacement_bias: odb,
+      shininess: osh,
+      alpha_test: oat,
+      transparent: otr,
       transform: ot,
       visible: ov,
+      cast_shadow: ocs,
+      receive_shadow: ors,
       physics_controlled: opc,
       ..,
     ),
       scene.MeshNode(
         geometry: ng,
         src: ns,
+        material_type: nmt,
         color: nc,
         metalness: nm,
         roughness: nr,
         opacity: no,
         wireframe: nw,
+        emissive: ne,
+        emissive_intensity: nei,
+        side: nsd,
+        color_map: ncm,
+        normal_map: nnm,
+        ao_map: nam,
+        roughness_map: nrm,
+        metalness_map: nmm,
+        displacement_map: ndm,
+        displacement_scale: nds,
+        displacement_bias: ndb,
+        shininess: nsh,
+        alpha_test: nat,
+        transparent: ntr,
         transform: nt,
         visible: nv,
+        cast_shadow: ncs,
+        receive_shadow: nrs,
         physics_controlled: npc,
         ..,
       )
@@ -159,18 +193,54 @@ fn diff_node(
         True -> patches
         False -> [scene_patch.UpdateMeshSrc(id:, src: ns), ..patches]
       }
+      // Material type change requires full material rebuild; otherwise check
+      // individual material properties
       let patches = case
-        oc == nc && om == nm && or_ == nr && oo == no && ow == nw
+        omt == nmt
+        && oc == nc
+        && om == nm
+        && or_ == nr
+        && oo == no
+        && ow == nw
+        && oe == ne
+        && oei == nei
+        && osd == nsd
+        && ocm == ncm
+        && onm == nnm
+        && oam == nam
+        && orm == nrm
+        && omm == nmm
+        && odm == ndm
+        && ods == nds
+        && odb == ndb
+        && osh == nsh
+        && oat == nat
+        && otr == ntr
       {
         True -> patches
         False -> [
           scene_patch.UpdateMeshMaterial(
             id:,
+            material_type: nmt,
             color: nc,
             metalness: nm,
             roughness: nr,
             opacity: no,
             wireframe: nw,
+            emissive: ne,
+            emissive_intensity: nei,
+            side: nsd,
+            color_map: ncm,
+            normal_map: nnm,
+            ao_map: nam,
+            roughness_map: nrm,
+            metalness_map: nmm,
+            displacement_map: ndm,
+            displacement_scale: nds,
+            displacement_bias: ndb,
+            shininess: nsh,
+            alpha_test: nat,
+            transparent: ntr,
           ),
           ..patches
         ]
@@ -178,6 +248,18 @@ fn diff_node(
       let patches = case ov == nv {
         True -> patches
         False -> [scene_patch.UpdateMeshVisibility(id:, visible: nv), ..patches]
+      }
+      // Shadow property updates
+      let patches = case ocs == ncs && ors == nrs {
+        True -> patches
+        False -> [
+          scene_patch.UpdateMeshShadow(
+            id:,
+            cast_shadow: ncs,
+            receive_shadow: nrs,
+          ),
+          ..patches
+        ]
       }
       // Skip transform updates for physics-controlled meshes
       let patches = case npc {
@@ -401,13 +483,30 @@ fn create_patches(
       key: id,
       geometry:,
       src:,
+      material_type:,
       color:,
       metalness:,
       roughness:,
       opacity:,
       wireframe:,
+      emissive:,
+      emissive_intensity:,
+      side:,
+      color_map:,
+      normal_map:,
+      ao_map:,
+      roughness_map:,
+      metalness_map:,
+      displacement_map:,
+      displacement_scale:,
+      displacement_bias:,
+      shininess:,
+      alpha_test:,
+      transparent:,
       transform:,
       visible:,
+      cast_shadow:,
+      receive_shadow:,
       ..,
     ) -> [
       scene_patch.CreateMesh(
@@ -415,13 +514,30 @@ fn create_patches(
         parent_id:,
         geometry:,
         src:,
+        material_type:,
         color:,
         metalness:,
         roughness:,
         opacity:,
         wireframe:,
+        emissive:,
+        emissive_intensity:,
+        side:,
+        color_map:,
+        normal_map:,
+        ao_map:,
+        roughness_map:,
+        metalness_map:,
+        displacement_map:,
+        displacement_scale:,
+        displacement_bias:,
+        shininess:,
+        alpha_test:,
+        transparent:,
         transform:,
         visible:,
+        cast_shadow:,
+        receive_shadow:,
       ),
       ..patches
     ]

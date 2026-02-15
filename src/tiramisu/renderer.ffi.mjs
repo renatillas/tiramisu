@@ -2,8 +2,7 @@
 
 import { Option$Some, Option$None } from "../../gleam_stdlib/gleam/option.mjs";
 import { Result$Ok, Result$Error, toList } from "../../prelude.mjs";
-import { setRendererBackground } from "./internal/runtime.ffi.mjs";
-import { RendererConfig$RendererConfig } from "./internal/runtime.mjs";
+import { RendererConfig$RendererConfig } from "./renderer.mjs";
 
 /**
  * Get renderer configuration from the shadow root's host element.
@@ -31,14 +30,14 @@ export function getSceneIdFromHost(host) {
   if (scene_id) {
     return Result$Ok(scene_id);
   }
-  return Result$Error();
+  return Result$Error(undefined);
 }
 
 /**
  * Set the scene ID on the renderer's host element and dispatch an event.
  */
 export function setSceneIdOnHost(host, sceneId) {
-  host.setAttribute("data-scene-id", host);
+  host.setAttribute("data-scene-id", sceneId);
 
   const event = new CustomEvent("tiramisu:scene-ready", {
     bubbles: true,
@@ -49,10 +48,12 @@ export function setSceneIdOnHost(host, sceneId) {
 }
 
 /**
- * Set the background color of a renderer.
+ * Generate a unique scene ID for renderers without a user-set scene-id.
  */
-export function setBackground(rendererRef, color) {
-  setRendererBackground(rendererRef.id, color);
+let sceneCounter = 0;
+export function generateSceneId() {
+  sceneCounter += 1;
+  return "scene_" + sceneCounter + "_" + Date.now().toString(36);
 }
 
 /**
@@ -96,13 +97,34 @@ export function setupMutationObserver(hostElement, callback) {
       "transform",
       "visible",
       "physics-controlled",
+      // Material properties
+      "material-type",
+      "emissive",
+      "emissive-intensity",
+      "side",
+      // Texture map URLs
+      "color-map",
+      "normal-map",
+      "ao-map",
+      "roughness-map",
+      "metalness-map",
+      "displacement-map",
+      "displacement-scale",
+      "displacement-bias",
+      "shininess",
+      "alpha-test",
+      "transparent",
+      "receive-shadow",
+      // Camera
       "type",
       "fov",
       "near",
       "far",
       "active",
+      // Light
       "intensity",
       "cast-shadow",
+      // Audio
       "volume",
       "loop",
       "playing",
@@ -113,7 +135,6 @@ export function setupMutationObserver(hostElement, callback) {
     ],
   });
 
-  return observer;
 }
 
 export function elementTagName(element) {
@@ -129,5 +150,5 @@ export function elementAttribute(element, key) {
   if (val !== null) {
     return Result$Ok(val);
   }
-  return Result$Error();
+  return Result$Error(undefined);
 }
