@@ -6,7 +6,7 @@ target = "javascript"
 gleam_stdlib = ">= 0.64.0 and < 2.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 tiramisu = { path = "../.." }
-cacao = { path = "../../../../cacao" }
+cacao = { git = "http://github.com/renatillas/cacao", ref = "main"}
 vec = ">= 3.0.3 and < 4.0.0"
 quaterni = ">= 1.0.1 and < 2.0.0"
 gleam_time = ">= 1.6.0 and < 2.0.0"
