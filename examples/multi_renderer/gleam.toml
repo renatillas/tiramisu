@@ -1,0 +1,23 @@
+name = "multi_renderer"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.64.0 and < 2.0.0"
+lustre = ">= 5.3.5 and < 6.0.0"
+tiramisu = { path = "../.." }
+vec = ">= 3.0.3 and < 4.0.0"
+quaterni = ">= 1.0.1 and < 2.0.0"
+gleam_time = ">= 1.7.0 and < 2.0.0"
+gleam_community_maths = ">= 2.0.1 and < 3.0.0"
+
+[tools.lustre.html]
+scripts = [
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
+]
+stylesheets = [
+  { content = "body { margin: 0; padding: 20px; background: #111; font-family: sans-serif; color: #eee; } .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } h1 { margin: 0 0 20px; } h2 { margin: 0 0 8px; font-size: 14px; opacity: 0.7; }" }
+]
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.3.4 and < 3.0.0"

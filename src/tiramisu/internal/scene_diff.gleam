@@ -1,9 +1,9 @@
 //// Pure Gleam scene diff algorithm.
 ////
 //// Compares two scene trees and produces a minimal list of patches.
-//// Uses MutableMap for O(1) lookups by node ID. The algorithm:
+//// Uses Dict for O(1) lookups by node ID. The algorithm:
 ////
-//// 1. Flatten the old tree into a MutableMap(id -> #(SceneNode, parent_id))
+//// 1. Flatten the old tree into a Dict(id -> #(SceneNode, parent_id))
 //// 2. Walk the new tree recursively, tracking parent_id:
 ////    - If the node exists in the old map: compare properties, emit updates,
 ////      check for reparent, delete from old map (marks as visited)
@@ -12,9 +12,9 @@
 ////
 //// This is O(n) where n = total nodes.
 
+import gleam/dict.{type Dict}
 import gleam/list
 
-import tiramisu/internal/mutable_map.{type MutableMap}
 import tiramisu/internal/scene.{type SceneNode}
 import tiramisu/internal/scene_patch.{type ScenePatch}
 
@@ -28,15 +28,14 @@ pub fn diff(
   scene_id: String,
 ) -> List(ScenePatch) {
   // Step 1: Flatten old tree into a lookup map
-
-  let old_map = mutable_map.new() |> flatten(old_scene, scene_id)
+  let old_map = flatten(dict.new(), old_scene, scene_id)
 
   // Step 2: Walk new tree, emitting patches
-  let patches = walk(new_scene, scene_id, old_map, [])
+  let #(patches, old_map) = walk(new_scene, scene_id, old_map, [])
 
   // Step 3: Remaining entries in old_map are removals
   let patches =
-    mutable_map.fold(old_map, patches, fn(acc, id, _entry) {
+    dict.fold(old_map, patches, fn(acc, id, _entry) {
       [scene_patch.Remove(id:), ..acc]
     })
 
@@ -46,19 +45,19 @@ pub fn diff(
 
 // FLATTEN ---------------------------------------------------------------------
 
-/// Recursively flatten a scene tree into a MutableMap(id -> #(node, parent_id)).
+/// Recursively flatten a scene tree into a Dict(id -> #(node, parent_id)).
 fn flatten(
-  map: MutableMap(String, #(SceneNode, String)),
+  map: Dict(String, #(SceneNode, String)),
   nodes: List(SceneNode),
   parent_id: String,
-) -> MutableMap(String, #(SceneNode, String)) {
+) -> Dict(String, #(SceneNode, String)) {
   list.fold(nodes, map, fn(acc, node) {
     let id = scene.key(node)
     // Skip nodes without IDs — they can't be diffed
     case id {
       "" -> flatten(acc, scene.children(node), parent_id)
       _ -> {
-        let acc = mutable_map.insert(acc, id, #(node, parent_id))
+        let acc = dict.insert(acc, id, #(node, parent_id))
         flatten(acc, scene.children(node), id)
       }
     }
@@ -68,45 +67,47 @@ fn flatten(
 // WALK ------------------------------------------------------------------------
 
 /// Walk the new scene tree, comparing against the old map.
+/// Returns the accumulated patches and the remaining old map entries
+/// (unvisited nodes = removals).
 fn walk(
   nodes: List(SceneNode),
   parent_id: String,
-  old_map: MutableMap(String, #(SceneNode, String)),
+  old_map: Dict(String, #(SceneNode, String)),
   patches: List(ScenePatch),
-) -> List(ScenePatch) {
-  list.fold(nodes, patches, fn(acc, node) {
+) -> #(List(ScenePatch), Dict(String, #(SceneNode, String))) {
+  list.fold(nodes, #(patches, old_map), fn(acc, node) {
+    let #(patches, old_map) = acc
     let id = scene.key(node)
     case id {
       // Skip nodes without IDs
-      "" -> walk(scene.children(node), parent_id, old_map, acc)
+      "" -> walk(scene.children(node), parent_id, old_map, patches)
       _ -> {
-        case mutable_map.has_key(old_map, id) {
-          True -> {
-            // Node exists in old tree — compare and update
-            let #(old_node, old_parent_id) = mutable_map.unsafe_get(old_map, id)
-            let _ = mutable_map.delete(old_map, id)
+        case dict.get(old_map, id) {
+          Ok(#(old_node, old_parent_id)) -> {
+            // Node exists in old tree — mark as visited by removing from map
+            let old_map = dict.delete(old_map, id)
 
             // Check for reparent
-            let acc = case old_parent_id == parent_id {
-              True -> acc
+            let patches = case old_parent_id == parent_id {
+              True -> patches
               False -> [
                 scene_patch.Reparent(id:, new_parent_id: parent_id),
-                ..acc
+                ..patches
               ]
             }
 
             // Compare properties and emit update patches
-            let acc = diff_node(old_node, node, acc)
+            let patches = diff_node(old_node, node, patches)
 
             // Recurse into children
-            walk(scene.children(node), id, old_map, acc)
+            walk(scene.children(node), id, old_map, patches)
           }
-          False -> {
+          Error(Nil) -> {
             // New node — emit create patch
-            let acc = create_patches(node, parent_id, acc)
+            let patches = create_patches(node, parent_id, patches)
 
             // Recurse into children
-            walk(scene.children(node), id, old_map, acc)
+            walk(scene.children(node), id, old_map, patches)
           }
         }
       }
@@ -380,6 +381,7 @@ fn diff_node(
       loop: ol,
       playing: op,
       playback_rate: opr,
+      detune: od,
     ),
       scene.AudioNode(
         src: ns,
@@ -387,10 +389,11 @@ fn diff_node(
         loop: nl,
         playing: np,
         playback_rate: npr,
+        detune: nd,
         ..,
       )
     -> {
-      case os == ns && ov == nv && ol == nl && op == np && opr == npr {
+      case os == ns && ov == nv && ol == nl && op == np && opr == npr && od == nd {
         True -> patches
         False -> [
           scene_patch.UpdateAudioProps(
@@ -400,6 +403,7 @@ fn diff_node(
             loop: nl,
             playing: np,
             playback_rate: npr,
+            detune: nd,
           ),
           ..patches
         ]
@@ -413,6 +417,7 @@ fn diff_node(
       loop: ol,
       playing: op,
       playback_rate: opr,
+      detune: od,
       transform: ot,
       ref_distance: ord,
       max_distance: omd,
@@ -425,6 +430,7 @@ fn diff_node(
         loop: nl,
         playing: np,
         playback_rate: npr,
+        detune: nd,
         transform: nt,
         ref_distance: nrd,
         max_distance: nmd,
@@ -438,6 +444,7 @@ fn diff_node(
         && ol == nl
         && op == np
         && opr == npr
+        && od == nd
         && ot == nt
         && ord == nrd
         && omd == nmd
@@ -452,6 +459,7 @@ fn diff_node(
             loop: nl,
             playing: np,
             playback_rate: npr,
+            detune: nd,
             transform: nt,
             ref_distance: nrd,
             max_distance: nmd,
@@ -459,6 +467,98 @@ fn diff_node(
           ),
           ..patches
         ]
+      }
+    }
+
+    // Debug nodes are immutable — any change means remove + recreate
+    scene.DebugNode(key: id, debug_type: odt, size: os, divisions: od, color: oc, transform: ot),
+      scene.DebugNode(debug_type: ndt, size: ns, divisions: nd, color: nc, transform: nt, ..)
+    -> {
+      case odt == ndt && os == ns && od == nd && oc == nc && ot == nt {
+        True -> patches
+        False -> [scene_patch.Remove(id:), ..patches]
+      }
+    }
+
+    // LOD: transform only; children handled by recursive walk
+    scene.LodNode(key: id, transform: ot, ..),
+      scene.LodNode(transform: nt, ..)
+    -> {
+      case ot == nt {
+        True -> patches
+        False -> [scene_patch.UpdateTransform(id:, transform: nt), ..patches]
+      }
+    }
+
+    scene.InstancedMeshNode(
+      key: id,
+      geometry: og, material_type: omt, color: oc,
+      metalness: om, roughness: or_, opacity: oo, wireframe: ow, transparent: otr,
+      instances: oi, transform: ot, visible: ov,
+      cast_shadow: ocs, receive_shadow: ors, ..
+    ),
+      scene.InstancedMeshNode(
+        geometry: ng, material_type: nmt, color: nc,
+        metalness: nm, roughness: nr, opacity: no, wireframe: nw, transparent: ntr,
+        instances: ni, transform: nt, visible: nv,
+        cast_shadow: ncs, receive_shadow: nrs, ..
+      )
+    -> {
+      // Geometry change requires full remove + recreate
+      let patches = case og == ng {
+        True -> patches
+        False -> [scene_patch.Remove(id:), ..patches]
+      }
+      // Only emit granular updates if geometry didn't change
+      case og == ng {
+        False -> patches
+        True -> {
+          let patches = case
+            omt == nmt && oc == nc && om == nm && or_ == nr
+            && oo == no && ow == nw && otr == ntr
+          {
+            True -> patches
+            False -> [
+              scene_patch.UpdateInstancedMeshMaterial(
+                id:,
+                material_type: nmt, color: nc, metalness: nm,
+                roughness: nr, opacity: no, wireframe: nw, transparent: ntr,
+              ),
+              ..patches
+            ]
+          }
+          let patches = case oi == ni {
+            True -> patches
+            False -> [
+              scene_patch.UpdateInstancedMeshInstances(id:, instances: ni),
+              ..patches
+            ]
+          }
+          let patches = case ov == nv {
+            True -> patches
+            False -> [
+              scene_patch.UpdateInstancedMeshVisibility(id:, visible: nv),
+              ..patches
+            ]
+          }
+          let patches = case ocs == ncs && ors == nrs {
+            True -> patches
+            False -> [
+              scene_patch.UpdateInstancedMeshShadow(
+                id:, cast_shadow: ncs, receive_shadow: nrs,
+              ),
+              ..patches
+            ]
+          }
+          let patches = case ot == nt {
+            True -> patches
+            False -> [
+              scene_patch.UpdateTransform(id:, transform: nt),
+              ..patches
+            ]
+          }
+          patches
+        }
       }
     }
 
@@ -507,6 +607,7 @@ fn create_patches(
       visible:,
       cast_shadow:,
       receive_shadow:,
+      distance:,
       ..,
     ) -> [
       scene_patch.CreateMesh(
@@ -538,6 +639,7 @@ fn create_patches(
         visible:,
         cast_shadow:,
         receive_shadow:,
+        distance:,
       ),
       ..patches
     ]
@@ -589,7 +691,7 @@ fn create_patches(
       ..patches
     ]
 
-    scene.AudioNode(key: id, src:, volume:, loop:, playing:, playback_rate:) -> [
+    scene.AudioNode(key: id, src:, volume:, loop:, playing:, playback_rate:, detune:) -> [
       scene_patch.CreateAudio(
         id:,
         src:,
@@ -597,6 +699,7 @@ fn create_patches(
         loop:,
         playing:,
         playback_rate:,
+        detune:,
       ),
       ..patches
     ]
@@ -608,6 +711,7 @@ fn create_patches(
       loop:,
       playing:,
       playback_rate:,
+      detune:,
       transform:,
       ref_distance:,
       max_distance:,
@@ -622,10 +726,66 @@ fn create_patches(
         loop:,
         playing:,
         playback_rate:,
+        detune:,
         transform:,
         ref_distance:,
         max_distance:,
         rolloff_factor:,
+      ),
+      ..patches
+    ]
+
+    scene.DebugNode(key: id, debug_type:, size:, divisions:, color:, transform:) -> [
+      scene_patch.CreateDebug(
+        id:,
+        parent_id:,
+        debug_type:,
+        size:,
+        divisions:,
+        color:,
+        transform:,
+      ),
+      ..patches
+    ]
+
+    scene.LodNode(key: id, transform:, ..) -> [
+      scene_patch.CreateLod(id:, parent_id:, transform:),
+      ..patches
+    ]
+
+    scene.InstancedMeshNode(
+      key: id,
+      geometry:,
+      material_type:,
+      color:,
+      metalness:,
+      roughness:,
+      opacity:,
+      wireframe:,
+      transparent:,
+      instances:,
+      transform:,
+      visible:,
+      cast_shadow:,
+      receive_shadow:,
+      ..,
+    ) -> [
+      scene_patch.CreateInstancedMesh(
+        id:,
+        parent_id:,
+        geometry:,
+        material_type:,
+        color:,
+        metalness:,
+        roughness:,
+        opacity:,
+        wireframe:,
+        transparent:,
+        instances:,
+        transform:,
+        visible:,
+        cast_shadow:,
+        receive_shadow:,
       ),
       ..patches
     ]

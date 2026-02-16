@@ -31,7 +31,7 @@ vec = ">= 3.0.1 and < 4.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 quaterni = ">= 1.0.0 and < 2.0.0"
 gleam_time = ">= 1.6.0 and < 2.0.0"
-savoiardi = { git = "http://github.com/renatillas/savoiardi", ref = "main"}
+savoiardi = { path = "../savoiardi" }
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

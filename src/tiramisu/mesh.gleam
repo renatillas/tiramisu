@@ -327,6 +327,15 @@ pub fn receive_shadow() -> Attribute(msg) {
   attribute.attribute("receive-shadow", "")
 }
 
+/// Set the LOD distance threshold for this mesh.
+///
+/// Only meaningful when the mesh is a child of a `<tiramisu-lod>` element.
+/// The LOD system will show this mesh when the camera is at least `d` units
+/// away. Use 0.0 for the highest detail level.
+pub fn distance(d: Float) -> Attribute(msg) {
+  attribute.attribute("distance", float.to_string(d))
+}
+
 // EVENTS ----------------------------------------------------------------------
 
 /// Listen for the model-loaded event.

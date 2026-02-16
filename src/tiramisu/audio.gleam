@@ -24,6 +24,7 @@
 //// - `loop`: Whether to loop playback (default: "false")
 //// - `playing`: Whether to play/pause (default: "false")
 //// - `playback-rate`: Playback speed multiplier (default: 1.0)
+//// - `detune`: Pitch shift in cents (default: 0.0, 100 = 1 semitone up)
 
 // IMPORTS ---------------------------------------------------------------------
 
@@ -103,4 +104,13 @@ pub fn playing(is_playing: Bool) -> Attribute(msg) {
 ///
 pub fn playback_rate(rate: Float) -> Attribute(msg) {
   attribute.attribute("playback-rate", float.to_string(rate))
+}
+
+/// Set the detune (pitch shift) in cents.
+///
+/// 100 cents = 1 semitone, 1200 cents = 1 octave up.
+/// Use negative values to pitch down. Default is 0.0 (no shift).
+///
+pub fn detune(cents: Float) -> Attribute(msg) {
+  attribute.attribute("detune", float.to_string(cents))
 }

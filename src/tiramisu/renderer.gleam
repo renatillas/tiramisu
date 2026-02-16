@@ -6,6 +6,15 @@
 //// DOM children into a Gleam scene description, diffs it in pure Gleam,
 //// and applies patches to Three.js via the instance-scoped registry.
 ////
+//// ## Architecture
+////
+//// - **Registry** — purely functional, lives as `Option(Registry)` in
+////   the Model. Updated through Lustre's message dispatch cycle.
+//// - **RenderLoop** — opaque FFI type, owns minimal mutable state for
+////   60fps rendering (active camera).
+//// - **Async operations** — model loading dispatches `RegistryTransform`
+////   messages, always applied to the latest registry.
+////
 //// ## Usage
 ////
 //// ```html
@@ -49,7 +58,9 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 
+import tiramisu/internal/dom
 import tiramisu/internal/registry.{type Registry}
+import tiramisu/internal/render_loop.{type RenderLoop}
 import tiramisu/internal/scene.{type SceneNode}
 import tiramisu/internal/scene_apply
 import tiramisu/internal/scene_diff
@@ -62,12 +73,14 @@ import savoiardi
 /// The model for the renderer component.
 pub type Model {
   Model(
-    /// Instance-scoped registry (scene, renderer, objects, cameras)
+    /// Instance-scoped registry (purely functional)
     registry: Option(Registry),
+    /// Render loop (owns per-frame mutable state)
+    render_loop: Option(RenderLoop),
     /// Scene ID for tick subscriptions and context
     scene_id: Option(String),
     /// Reference to the host element for DOM parsing
-    host: Option(Element(Msg)),
+    host: Option(dom.Element),
     /// Previous scene tree for diffing
     previous_scene: List(SceneNode),
     /// Canvas width
@@ -88,14 +101,15 @@ pub type Msg {
   /// Scene and renderer have been initialized
   Initialized(
     registry: Registry,
+    render_loop: RenderLoop,
     scene_id: String,
-    host: element.Element(Msg),
+    host: dom.Element,
     initial_scene: List(SceneNode),
   )
   /// Light DOM children changed — re-parse, diff, and apply
   DomMutated
-  /// Scene has been reconciled — update the previous_scene
-  SceneReconciled(List(SceneNode))
+  /// Async registry mutation (model loading, etc.) — always applied to latest registry
+  RegistryTransform(fn(Registry) -> Registry)
   /// Width attribute changed
   WidthChanged(Int)
   /// Height attribute changed
@@ -242,6 +256,7 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       registry: None,
+      render_loop: None,
       scene_id: None,
       host: None,
       previous_scene: [],
@@ -257,11 +272,11 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
 }
 
 fn do_init(dispatch: fn(Msg) -> Nil, root: Dynamic) -> Nil {
-  // Get host element
-  let host = get_host(root)
+  // Get host element from shadow root
+  let host = dom.shadow_root_host(root)
 
   // Check for user-defined scene ID
-  let user_set_scene_id = get_scene_id(host) |> result.unwrap("")
+  let user_set_scene_id = dom.get_scene_id_from_host(host) |> result.unwrap("")
 
   // Create scene via savoiardi
   let scene = savoiardi.create_scene()
@@ -274,10 +289,10 @@ fn do_init(dispatch: fn(Msg) -> Nil, root: Dynamic) -> Nil {
 
   // Always set the data-scene-id attribute and dispatch the scene-ready event,
   // even when the user provided a scene-id attribute, so cocoa etc. can discover it.
-  set_scene_id(host, sid)
+  dom.set_scene_id_on_host(host, sid)
 
   // Get config from host element attributes
-  let config = get_renderer_config(host)
+  let config = dom.get_renderer_config(host)
 
   // Create renderer using savoiardi
   let renderer =
@@ -302,35 +317,48 @@ fn do_init(dispatch: fn(Msg) -> Nil, root: Dynamic) -> Nil {
 
   // Append canvas to container (shadow root div)
   let canvas = savoiardi.get_renderer_dom_element(renderer)
-  registry.append_canvas_to_container(root, canvas)
+  dom.append_canvas_to_container(root, canvas)
 
-  // Create instance-scoped registry
+  // Create instance-scoped registry (purely functional)
   let reg = registry.new(scene, sid, renderer)
 
-  // Start the render loop
-  let reg = registry.start_render_loop(reg)
+  // Start the render loop (owns per-frame mutable state)
+  let loop = render_loop.start(scene, renderer, sid)
 
-  // Set up MutationObserver
-  let host = get_host(root)
-  setup_mutation_observer(host, fn() { dispatch(DomMutated) })
+  // Set up MutationObserver to trigger scene diff/patch on DOM changes.
+  dom.setup_mutation_observer(host, fn() { dispatch(DomMutated) })
 
   // Do the initial scene parse and apply
   let initial_scene = parse_children(host)
   let patches = scene_diff.diff([], initial_scene, sid)
-  scene_apply.apply_patches(reg, patches)
+  let on_async = fn(transform) { dispatch(RegistryTransform(transform)) }
+  let reg = scene_apply.apply_patches(reg, loop, patches, on_async)
 
-  dispatch(Initialized(registry: reg, scene_id: sid, host:, initial_scene:))
+  dispatch(Initialized(
+    registry: reg,
+    render_loop: loop,
+    scene_id: sid,
+    host:,
+    initial_scene:,
+  ))
 }
 
 // UPDATE ----------------------------------------------------------------------
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    Initialized(registry: reg, scene_id: sid, host:, initial_scene:) -> {
+    Initialized(
+      registry: reg,
+      render_loop: loop,
+      scene_id: sid,
+      host:,
+      initial_scene:,
+    ) -> {
       let new_model =
         Model(
           ..model,
           registry: Some(reg),
+          render_loop: Some(loop),
           scene_id: Some(sid),
           host: Some(host),
           previous_scene: initial_scene,
@@ -339,22 +367,39 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     DomMutated -> {
-      case model.scene_id, model.host, model.registry {
-        Some(sid), Some(host), Some(reg) -> {
-          // Parse the DOM, diff against previous scene, apply patches
+      case model.scene_id, model.host, model.registry, model.render_loop {
+        Some(sid), Some(host), Some(_reg), Some(loop) -> {
+          // Parse the DOM, diff against previous scene
           let new_scene = parse_children(host)
           let patches = scene_diff.diff(model.previous_scene, new_scene, sid)
+          // Apply patches via RegistryTransform to avoid stale registry races.
+          // The transform is dispatched as a message and always applied to the
+          // latest registry, ensuring async operations (model loading) don't
+          // get overwritten.
           #(
             Model(..model, previous_scene: new_scene),
-            effect.from(fn(_) { scene_apply.apply_patches(reg, patches) }),
+            effect.from(fn(dispatch) {
+              let on_async = fn(transform) {
+                dispatch(RegistryTransform(transform))
+              }
+              dispatch(RegistryTransform(fn(reg) {
+                scene_apply.apply_patches(reg, loop, patches, on_async)
+              }))
+            }),
           )
         }
-        _, _, _ -> #(model, effect.none())
+        _, _, _, _ -> #(model, effect.none())
       }
     }
 
-    SceneReconciled(new_scene) -> {
-      #(Model(..model, previous_scene: new_scene), effect.none())
+    RegistryTransform(transform) -> {
+      case model.registry {
+        Some(reg) -> {
+          let new_reg = transform(reg)
+          #(Model(..model, registry: Some(new_reg)), effect.none())
+        }
+        None -> #(model, effect.none())
+      }
     }
 
     WidthChanged(w) -> {
@@ -362,9 +407,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       case model.registry {
         Some(reg) -> #(
           new_model,
-          effect.from(fn(_) { registry.resize(reg, w, model.height) }),
+          effect.from(fn(_) {
+            registry.resize(reg, w, model.height)
+          }),
         )
-        None -> #(new_model, effect.none())
+        _ -> #(new_model, effect.none())
       }
     }
 
@@ -373,9 +420,11 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       case model.registry {
         Some(reg) -> #(
           new_model,
-          effect.from(fn(_) { registry.resize(reg, model.width, h) }),
+          effect.from(fn(_) {
+            registry.resize(reg, model.width, h)
+          }),
         )
-        None -> #(new_model, effect.none())
+        _ -> #(new_model, effect.none())
       }
     }
 
@@ -384,7 +433,9 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       case model.registry {
         Some(reg) -> #(
           new_model,
-          effect.from(fn(_) { set_renderer_background(reg.renderer, bg) }),
+          effect.from(fn(_) {
+            set_renderer_background(reg.renderer, bg)
+          }),
         )
         None -> #(new_model, effect.none())
       }
@@ -404,8 +455,8 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
 fn view(_model: Model) -> Element(Msg) {
   // The renderer renders a container div for the WebGL canvas.
-  // No <slot> needed — children are in the light DOM and parsed directly.
-  html.div([], [])
+  // position:relative allows CSS renderer overlays to position absolutely within.
+  html.div([attribute.style("position", "relative")], [])
 }
 
 // HELPERS ---------------------------------------------------------------------
@@ -421,232 +472,165 @@ fn set_renderer_background(renderer: savoiardi.Renderer, color: String) -> Nil {
 
 // FFI DECLARATIONS ------------------------------------------------------------
 
-/// Renderer configuration from host element attributes.
-pub type RendererConfig {
-  RendererConfig(
-    width: Option(Int),
-    height: Option(Int),
-    background: String,
-    antialias: Bool,
-    alpha: Bool,
-  )
-}
-
-@external(javascript, "./renderer.ffi.mjs", "getRendererConfig")
-fn get_renderer_config(host: Element(msg)) -> RendererConfig
-
-@external(javascript, "./renderer.ffi.mjs", "getSceneIdFromHost")
-fn get_scene_id(host: Element(msg)) -> Result(String, Nil)
-
-@external(javascript, "./renderer.ffi.mjs", "setSceneIdOnHost")
-fn set_scene_id(host: Element(msg), scene_id: String) -> Nil
-
-@external(javascript, "./renderer.ffi.mjs", "getHostElement")
-fn get_host(root: Dynamic) -> Element(msg)
-
-@external(javascript, "./renderer.ffi.mjs", "setupMutationObserver")
-fn setup_mutation_observer(host: Element(msg), callback: fn() -> Nil) -> Nil
-
-@external(javascript, "./renderer.ffi.mjs", "elementTagName")
-pub fn element_tag_name(element: element.Element(msg)) -> String
-
 @external(javascript, "./renderer.ffi.mjs", "generateSceneId")
 fn generate_scene_id() -> String
 
-fn parse_element(element: Element(a)) -> SceneNode {
-  let tag = element_tag_name(element) |> string.lowercase
-  let key = get_element_attribute(element, "id") |> result.unwrap("")
+fn parse_element(el: dom.Element) -> SceneNode {
+  let tag = dom.tag_name(el) |> string.lowercase
+  let key = dom.get_attribute(el, "id") |> result.unwrap("")
   case tag {
-    "tiramisu-mesh" -> parse_mesh(element, key)
-    "tiramisu-camera" -> parse_camera(element, key)
-    "tiramisu-light" -> parse_light(element, key)
-    "tiramisu-empty" -> parse_empty(element, key)
-    "tiramisu-audio" -> parse_audio(element, key)
-    "tiramisu-audio-positional" -> parse_positional_audio(element, key)
-    _ -> scene.UnknownNode(key:, tag:, children: parse_children(element))
+    "tiramisu-mesh" -> parse_mesh(el, key)
+    "tiramisu-camera" -> parse_camera(el, key)
+    "tiramisu-light" -> parse_light(el, key)
+    "tiramisu-empty" -> parse_empty(el, key)
+    "tiramisu-audio" -> parse_audio(el, key)
+    "tiramisu-audio-positional" -> parse_positional_audio(el, key)
+    "tiramisu-debug" -> parse_debug(el, key)
+    "tiramisu-lod" -> parse_lod(el, key)
+    "tiramisu-instanced-mesh" -> parse_instanced_mesh(el, key)
+    _ -> scene.UnknownNode(key:, tag:, children: parse_children(el))
   }
 }
 
-fn parse_mesh(element: Element(a), key: String) -> SceneNode {
+fn parse_mesh(el: dom.Element, key: String) -> SceneNode {
   scene.MeshNode(
     key:,
-    geometry: get_element_attribute(element, "geometry") |> result.unwrap(""),
-    src: get_element_attribute(element, "src") |> result.unwrap(""),
-    material_type: get_element_attribute(element, "material-type")
+    geometry: attr(el, "geometry"),
+    src: attr(el, "src"),
+    material_type: dom.get_attribute(el, "material-type")
       |> result.unwrap("standard"),
-    color: get_element_attribute(element, "color") |> result.unwrap("#ffffff"),
-    metalness: get_element_attribute(element, "metalness")
-      |> result.try(float.parse)
-      |> result.unwrap(0.5),
-    roughness: get_element_attribute(element, "roughness")
-      |> result.try(float.parse)
-      |> result.unwrap(0.5),
-    opacity: get_element_attribute(element, "opacity")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    wireframe: get_element_attribute(element, "wireframe")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    emissive: get_element_attribute(element, "emissive")
-      |> result.unwrap("#000000"),
-    emissive_intensity: get_element_attribute(element, "emissive-intensity")
-      |> result.try(float.parse)
-      |> result.unwrap(0.0),
-    side: get_element_attribute(element, "side") |> result.unwrap("front"),
-    color_map: get_element_attribute(element, "color-map") |> result.unwrap(""),
-    normal_map: get_element_attribute(element, "normal-map")
-      |> result.unwrap(""),
-    ao_map: get_element_attribute(element, "ao-map") |> result.unwrap(""),
-    roughness_map: get_element_attribute(element, "roughness-map")
-      |> result.unwrap(""),
-    metalness_map: get_element_attribute(element, "metalness-map")
-      |> result.unwrap(""),
-    displacement_map: get_element_attribute(element, "displacement-map")
-      |> result.unwrap(""),
-    displacement_scale: get_element_attribute(element, "displacement-scale")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    displacement_bias: get_element_attribute(element, "displacement-bias")
-      |> result.try(float.parse)
-      |> result.unwrap(0.0),
-    shininess: get_element_attribute(element, "shininess")
-      |> result.try(float.parse)
-      |> result.unwrap(30.0),
-    alpha_test: get_element_attribute(element, "alpha-test")
-      |> result.try(float.parse)
-      |> result.unwrap(0.0),
-    transparent: get_element_attribute(element, "transparent")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    transform: get_element_attribute(element, "transform")
-      |> result.map(transform.parse)
-      |> result.unwrap(transform.identity),
-    visible: get_element_attribute(element, "visible")
-      |> result.try(parse_bool)
-      |> result.unwrap(True),
-    cast_shadow: get_element_attribute(element, "cast-shadow")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    receive_shadow: get_element_attribute(element, "receive-shadow")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    physics_controlled: get_element_attribute(element, "physics-controlled")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    children: parse_children(element),
+    color: dom.get_attribute(el, "color") |> result.unwrap("#ffffff"),
+    metalness: float_attr(el, "metalness", 0.5),
+    roughness: float_attr(el, "roughness", 0.5),
+    opacity: float_attr(el, "opacity", 1.0),
+    wireframe: bool_attr(el, "wireframe", False),
+    emissive: dom.get_attribute(el, "emissive") |> result.unwrap("#000000"),
+    emissive_intensity: float_attr(el, "emissive-intensity", 0.0),
+    side: dom.get_attribute(el, "side") |> result.unwrap("front"),
+    color_map: attr(el, "color-map"),
+    normal_map: attr(el, "normal-map"),
+    ao_map: attr(el, "ao-map"),
+    roughness_map: attr(el, "roughness-map"),
+    metalness_map: attr(el, "metalness-map"),
+    displacement_map: attr(el, "displacement-map"),
+    displacement_scale: float_attr(el, "displacement-scale", 1.0),
+    displacement_bias: float_attr(el, "displacement-bias", 0.0),
+    shininess: float_attr(el, "shininess", 30.0),
+    alpha_test: float_attr(el, "alpha-test", 0.0),
+    transparent: bool_attr(el, "transparent", False),
+    transform: transform_attr(el),
+    visible: bool_attr(el, "visible", True),
+    cast_shadow: bool_attr(el, "cast-shadow", False),
+    receive_shadow: bool_attr(el, "receive-shadow", False),
+    physics_controlled: bool_attr(el, "physics-controlled", False),
+    distance: float_attr(el, "distance", 0.0),
+    children: parse_children(el),
   )
 }
 
-fn parse_camera(element: Element(a), key: String) -> SceneNode {
+fn parse_camera(el: dom.Element, key: String) -> SceneNode {
   scene.CameraNode(
     key:,
-    camera_type: get_element_attribute(element, "type")
+    camera_type: dom.get_attribute(el, "type")
       |> result.unwrap("perspective"),
-    fov: get_element_attribute(element, "fov")
-      |> result.try(float.parse)
-      |> result.unwrap(75.0),
-    near: get_element_attribute(element, "near")
-      |> result.try(float.parse)
-      |> result.unwrap(0.1),
-    far: get_element_attribute(element, "far")
-      |> result.try(float.parse)
-      |> result.unwrap(1000.0),
-    transform: get_element_attribute(element, "transform")
-      |> result.map(transform.parse)
-      |> result.unwrap(transform.identity),
-    active: get_element_attribute(element, "active")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
+    fov: float_attr(el, "fov", 75.0),
+    near: float_attr(el, "near", 0.1),
+    far: float_attr(el, "far", 1000.0),
+    transform: transform_attr(el),
+    active: bool_attr(el, "active", False),
   )
 }
 
-fn parse_light(element: Element(a), key: String) -> SceneNode {
+fn parse_light(el: dom.Element, key: String) -> SceneNode {
   scene.LightNode(
     key:,
-    light_type: get_element_attribute(element, "type")
-      |> result.unwrap("point"),
-    color: get_element_attribute(element, "color") |> result.unwrap("#ffffff"),
-    intensity: get_element_attribute(element, "intensity")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    transform: get_element_attribute(element, "transform")
-      |> result.map(transform.parse)
-      |> result.unwrap(transform.identity),
-    cast_shadow: get_element_attribute(element, "cast-shadow")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
+    light_type: dom.get_attribute(el, "type") |> result.unwrap("point"),
+    color: dom.get_attribute(el, "color") |> result.unwrap("#ffffff"),
+    intensity: float_attr(el, "intensity", 1.0),
+    transform: transform_attr(el),
+    cast_shadow: bool_attr(el, "cast-shadow", False),
   )
 }
 
-fn parse_empty(element: Element(a), key: String) -> SceneNode {
+fn parse_empty(el: dom.Element, key: String) -> SceneNode {
   scene.EmptyNode(
     key:,
-    transform: get_element_attribute(element, "transform")
-      |> result.map(transform.parse)
-      |> result.unwrap(transform.identity),
-    visible: get_element_attribute(element, "visible")
-      |> result.try(parse_bool)
-      |> result.unwrap(True),
-    children: parse_children(element),
+    transform: transform_attr(el),
+    visible: bool_attr(el, "visible", True),
+    children: parse_children(el),
   )
 }
 
-fn parse_audio(element: Element(a), key: String) -> SceneNode {
+fn parse_audio(el: dom.Element, key: String) -> SceneNode {
   scene.AudioNode(
     key:,
-    src: get_element_attribute(element, "src") |> result.unwrap(""),
-    volume: get_element_attribute(element, "volume")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    loop: get_element_attribute(element, "loop")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    playing: get_element_attribute(element, "playing")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    playback_rate: get_element_attribute(element, "playback-rate")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
+    src: attr(el, "src"),
+    volume: float_attr(el, "volume", 1.0),
+    loop: bool_attr(el, "loop", False),
+    playing: bool_attr(el, "playing", False),
+    playback_rate: float_attr(el, "playback-rate", 1.0),
+    detune: float_attr(el, "detune", 0.0),
   )
 }
 
-fn parse_positional_audio(element: Element(a), key: String) -> SceneNode {
+fn parse_positional_audio(el: dom.Element, key: String) -> SceneNode {
   scene.PositionalAudioNode(
     key:,
-    src: get_element_attribute(element, "src") |> result.unwrap(""),
-    volume: get_element_attribute(element, "volume")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    loop: get_element_attribute(element, "loop")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    playing: get_element_attribute(element, "playing")
-      |> result.try(parse_bool)
-      |> result.unwrap(False),
-    playback_rate: get_element_attribute(element, "playback-rate")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    transform: get_element_attribute(element, "transform")
-      |> result.map(transform.parse)
-      |> result.unwrap(transform.identity),
-    ref_distance: get_element_attribute(element, "ref-distance")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    max_distance: get_element_attribute(element, "max-distance")
-      |> result.try(float.parse)
-      |> result.unwrap(100.0),
-    rolloff_factor: get_element_attribute(element, "rolloff-factor")
-      |> result.try(float.parse)
-      |> result.unwrap(1.0),
-    children: parse_children(element),
+    src: attr(el, "src"),
+    volume: float_attr(el, "volume", 1.0),
+    loop: bool_attr(el, "loop", False),
+    playing: bool_attr(el, "playing", False),
+    playback_rate: float_attr(el, "playback-rate", 1.0),
+    detune: float_attr(el, "detune", 0.0),
+    transform: transform_attr(el),
+    ref_distance: float_attr(el, "ref-distance", 1.0),
+    max_distance: float_attr(el, "max-distance", 100.0),
+    rolloff_factor: float_attr(el, "rolloff-factor", 1.0),
+    children: parse_children(el),
   )
 }
 
-@external(javascript, "./renderer.ffi.mjs", "elementAttribute")
-fn get_element_attribute(
-  element: Element(msg),
-  attribute: String,
-) -> Result(String, Nil)
+fn parse_debug(el: dom.Element, key: String) -> SceneNode {
+  scene.DebugNode(
+    key:,
+    debug_type: dom.get_attribute(el, "type") |> result.unwrap("axes"),
+    size: float_attr(el, "size", 5.0),
+    divisions: dom.get_attribute(el, "divisions")
+      |> result.try(int.parse)
+      |> result.unwrap(10),
+    color: dom.get_attribute(el, "color") |> result.unwrap("#888888"),
+    transform: transform_attr(el),
+  )
+}
+
+fn parse_lod(el: dom.Element, key: String) -> SceneNode {
+  scene.LodNode(
+    key:,
+    transform: transform_attr(el),
+    children: parse_children(el),
+  )
+}
+
+fn parse_instanced_mesh(el: dom.Element, key: String) -> SceneNode {
+  scene.InstancedMeshNode(
+    key:,
+    geometry: attr(el, "geometry"),
+    material_type: dom.get_attribute(el, "material-type")
+      |> result.unwrap("standard"),
+    color: dom.get_attribute(el, "color") |> result.unwrap("#ffffff"),
+    metalness: float_attr(el, "metalness", 0.5),
+    roughness: float_attr(el, "roughness", 0.5),
+    opacity: float_attr(el, "opacity", 1.0),
+    wireframe: bool_attr(el, "wireframe", False),
+    transparent: bool_attr(el, "transparent", False),
+    instances: attr(el, "instances"),
+    transform: transform_attr(el),
+    visible: bool_attr(el, "visible", True),
+    cast_shadow: bool_attr(el, "cast-shadow", False),
+    receive_shadow: bool_attr(el, "receive-shadow", False),
+    children: parse_children(el),
+  )
+}
 
 fn parse_bool(value: String) -> Result(Bool, Nil) {
   case value {
@@ -656,9 +640,30 @@ fn parse_bool(value: String) -> Result(Bool, Nil) {
   }
 }
 
-fn parse_children(element: Element(a)) -> List(SceneNode) {
-  list.map(get_element_children(element), parse_element)
+fn parse_children(el: dom.Element) -> List(SceneNode) {
+  list.map(dom.children(el), parse_element)
 }
 
-@external(javascript, "./renderer.ffi.mjs", "elementChildren")
-fn get_element_children(element: Element(msg)) -> List(Element(msg))
+// Attribute parsing helpers — reduce repetition in parse functions
+
+fn attr(el: dom.Element, name: String) -> String {
+  dom.get_attribute(el, name) |> result.unwrap("")
+}
+
+fn float_attr(el: dom.Element, name: String, default: Float) -> Float {
+  dom.get_attribute(el, name)
+  |> result.try(float.parse)
+  |> result.unwrap(default)
+}
+
+fn bool_attr(el: dom.Element, name: String, default: Bool) -> Bool {
+  dom.get_attribute(el, name)
+  |> result.try(parse_bool)
+  |> result.unwrap(default)
+}
+
+fn transform_attr(el: dom.Element) -> transform.Transform {
+  dom.get_attribute(el, "transform")
+  |> result.map(transform.parse)
+  |> result.unwrap(transform.identity)
+}

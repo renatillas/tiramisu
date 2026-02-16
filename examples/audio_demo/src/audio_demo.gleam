@@ -4,11 +4,14 @@
 //// - Global audio: Background music that plays at constant volume
 //// - Positional audio: A sound attached to a moving ball
 ////   - Volume and panning change based on distance from camera
+//// - Detune (pitch shift): Adjust pitch in cents (100 = 1 semitone)
 ////
 //// Click the buttons to toggle audio playback.
+//// Use pitch controls to shift the audio pitch up or down.
 //// Watch how the positional audio changes as the ball moves!
 
 import gleam/float
+import gleam/int
 import gleam/time/duration
 import gleam_community/maths
 import lustre
@@ -44,6 +47,10 @@ pub type Model {
     music_playing: Bool,
     /// Whether positional audio is playing
     sound_playing: Bool,
+    /// Music pitch shift in cents (100 = 1 semitone)
+    music_detune: Float,
+    /// Positional sound pitch shift in cents
+    sound_detune: Float,
   )
 }
 
@@ -55,6 +62,10 @@ pub type Msg {
   ToggleMusic
   /// Toggle positional sound
   ToggleSound
+  /// Shift music pitch by given cents
+  ShiftMusicPitch(Float)
+  /// Shift positional sound pitch by given cents
+  ShiftSoundPitch(Float)
 }
 
 // AUDIO URLs ------------------------------------------------------------------
@@ -97,6 +108,8 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
       ball_z: 0.0,
       music_playing: False,
       sound_playing: False,
+      music_detune: 0.0,
+      sound_detune: 0.0,
     )
 
   // Subscribe to tick updates for animation
@@ -127,6 +140,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     ToggleSound -> {
       #(Model(..model, sound_playing: !model.sound_playing), effect.none())
+    }
+
+    ShiftMusicPitch(cents) -> {
+      #(
+        Model(..model, music_detune: model.music_detune +. cents),
+        effect.none(),
+      )
+    }
+
+    ShiftSoundPitch(cents) -> {
+      #(
+        Model(..model, sound_detune: model.sound_detune +. cents),
+        effect.none(),
+      )
     }
   }
 }
@@ -207,6 +234,7 @@ fn view(model: Model) {
             audio_positional.volume(1.0),
             audio_positional.loop(True),
             audio_positional.playing(model.sound_playing),
+            audio_positional.detune(model.sound_detune),
             audio_positional.audio_transform(
               transform.at(vec3.Vec3(model.ball_x, 0.5, model.ball_z)),
             ),
@@ -258,6 +286,7 @@ fn view(model: Model) {
             audio.volume(0.3),
             audio.loop(True),
             audio.playing(model.music_playing),
+            audio.detune(model.music_detune),
           ],
           [],
         ),
@@ -283,6 +312,21 @@ fn view(model: Model) {
             }),
           ],
         ),
+        // Music pitch controls
+        html.div([class("pitch-controls")], [
+          html.span([class("pitch-label")], [html.text("Music Pitch")]),
+          html.button(
+            [class("pitch-btn"), event.on_click(ShiftMusicPitch(-100.0))],
+            [html.text("-")],
+          ),
+          html.span([class("pitch-value")], [
+            html.text(float_to_string_0(model.music_detune) <> "c"),
+          ]),
+          html.button(
+            [class("pitch-btn"), event.on_click(ShiftMusicPitch(100.0))],
+            [html.text("+")],
+          ),
+        ]),
         html.button(
           [
             attribute.class(case model.sound_playing {
@@ -298,6 +342,21 @@ fn view(model: Model) {
             }),
           ],
         ),
+        // Ball sound pitch controls
+        html.div([class("pitch-controls")], [
+          html.span([class("pitch-label")], [html.text("Ball Pitch")]),
+          html.button(
+            [class("pitch-btn"), event.on_click(ShiftSoundPitch(-100.0))],
+            [html.text("-")],
+          ),
+          html.span([class("pitch-value")], [
+            html.text(float_to_string_0(model.sound_detune) <> "c"),
+          ]),
+          html.button(
+            [class("pitch-btn"), event.on_click(ShiftSoundPitch(100.0))],
+            [html.text("+")],
+          ),
+        ]),
       ]),
       html.h3([attribute.style("margin-top", "15px")], [
         html.text("Sound Source"),
@@ -309,12 +368,16 @@ fn view(model: Model) {
         html.text("Audio Types"),
       ]),
       info_row("Music", "Global (constant volume)"),
+      info_row("Music Detune", float_to_string_0(model.music_detune) <> " cents"),
       info_row("Ball", "Positional (3D panning)"),
+      info_row("Ball Detune", float_to_string_0(model.sound_detune) <> " cents"),
       html.div([class("note")], [
         html.text(
           "The ball orbits the center. When positional audio is playing, "
           <> "notice how the sound pans left/right and changes volume "
-          <> "as the ball moves closer or farther from the camera.",
+          <> "as the ball moves closer or farther from the camera. "
+          <> "Use the pitch controls to shift audio up or down "
+          <> "(each step = 100 cents = 1 semitone).",
         ),
       ]),
     ]),
@@ -334,4 +397,10 @@ fn float_to_string_1(f: Float) -> String {
   f
   |> float.to_precision(1)
   |> float.to_string()
+}
+
+fn float_to_string_0(f: Float) -> String {
+  f
+  |> float.round()
+  |> int.to_string()
 }

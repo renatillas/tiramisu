@@ -1,56 +1,269 @@
-//// Shared DOM operations for Tiramisu web components.
+//// Centralized DOM operations for Tiramisu web components.
 ////
-//// This module provides browser-specific DOM operations that cannot be
-//// implemented in pure Gleam. These include:
-//// - Finding parent elements in the DOM tree
-//// - Setting up event listeners
-//// - Dispatching custom events
+//// This module is the single entry point for all DOM manipulation. It
+//// provides an opaque Element type and combines pure Gleam logic with
+//// FFI primitives for operations that require direct JS interop.
 ////
-//// All components (mesh, camera, light, empty) use these functions to
-//// discover the parent renderer and receive scene context.
+//// Other tiramisu modules should import this module instead of using
+//// their own DOM FFI.
 
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{type Option}
+import gleam/result
 
-/// Find the parent tiramisu-renderer element and get its scene ID.
-/// Walks up the DOM tree from the shadow root's host element.
-/// Returns Some(scene_id) if found, None otherwise.
-@external(javascript, "./dom.ffi.mjs", "findParentSceneId")
-pub fn find_parent_scene_id(shadow_root: Dynamic) -> Option(String)
+// ============================================================================
+// ELEMENT TYPE
+// ============================================================================
 
-/// Set up a listener for the tiramisu:scene-ready custom event.
-/// The callback is called with the scene ID when the renderer initializes.
-/// This is used when the renderer hasn't been initialized yet at the time
-/// a child component mounts.
-@external(javascript, "./dom.ffi.mjs", "listenForSceneReady")
-pub fn listen_for_scene_ready(
-  shadow_root: Dynamic,
-  callback: fn(String) -> Nil,
-) -> Nil
+/// Opaque type representing a real DOM Element.
+/// This is distinct from Lustre's virtual DOM Element(msg).
+pub type Element
 
-/// Set an attribute on the host element of a shadow root.
-@external(javascript, "./dom.ffi.mjs", "setHostAttribute")
-pub fn set_host_attribute(
-  shadow_root: Dynamic,
-  name: String,
-  value: String,
-) -> Nil
+// ============================================================================
+// SHADOW ROOT → HOST
+// ============================================================================
 
-/// Get an attribute from the host element of a shadow root.
-@external(javascript, "./dom.ffi.mjs", "getHostAttribute")
-pub fn get_host_attribute(shadow_root: Dynamic, name: String) -> Option(String)
+/// Get the host element from a shadow root.
+/// Lustre's after_paint passes the shadow root as Dynamic — this extracts
+/// the host element (the <tiramisu-renderer> custom element itself).
+@external(javascript, "./dom.ffi.mjs", "shadowRootHost")
+pub fn shadow_root_host(shadow_root: Dynamic) -> Element
 
-/// Dispatch a custom event from the host element.
+// ============================================================================
+// ATTRIBUTE ACCESS
+// ============================================================================
+
+/// Get an attribute from a DOM element.
+@external(javascript, "./dom.ffi.mjs", "getAttribute")
+pub fn get_attribute(el: Element, name: String) -> Result(String, Nil)
+
+/// Set an attribute on a DOM element.
+@external(javascript, "./dom.ffi.mjs", "setAttribute")
+pub fn set_attribute(el: Element, name: String, value: String) -> Nil
+
+/// Find the closest ancestor matching a CSS selector.
+@external(javascript, "./dom.ffi.mjs", "closest")
+pub fn closest(el: Element, selector: String) -> Result(Element, Nil)
+
+// ============================================================================
+// ELEMENT INTROSPECTION
+// ============================================================================
+
+/// Get an element's tag name (e.g. "TIRAMISU-MESH").
+@external(javascript, "./dom.ffi.mjs", "tagName")
+pub fn tag_name(el: Element) -> String
+
+/// Get an element's direct children as a Gleam List.
+@external(javascript, "./dom.ffi.mjs", "children")
+pub fn children(el: Element) -> List(Element)
+
+/// Get an element's innerHTML.
+@external(javascript, "./dom.ffi.mjs", "innerHTML")
+pub fn inner_html(el: Element) -> String
+
+/// Get an element's parent element.
+@external(javascript, "./dom.ffi.mjs", "parentElement")
+pub fn parent_element(el: Element) -> Result(Element, Nil)
+
+// ============================================================================
+// INLINE STYLE
+// ============================================================================
+
+/// Set an inline style property on an element.
+@external(javascript, "./dom.ffi.mjs", "setStyle")
+pub fn set_style(el: Element, property: String, value: String) -> Nil
+
+// ============================================================================
+// CUSTOM EVENTS
+// ============================================================================
+
+/// Dispatch a custom event from an element.
 /// The event bubbles and is composed (crosses shadow DOM boundaries).
 @external(javascript, "./dom.ffi.mjs", "dispatchCustomEvent")
 pub fn dispatch_custom_event(
-  shadow_root: Dynamic,
+  el: Element,
   event_name: String,
   detail: a,
 ) -> Nil
 
-/// Find the immediate parent tiramisu element (mesh, empty, camera, etc.)
+// ============================================================================
+// JS PROPERTY ACCESS (for Three.js object storage on DOM elements)
+// ============================================================================
+
+/// Set an arbitrary JavaScript property on an element.
+@external(javascript, "./dom.ffi.mjs", "setProperty")
+pub fn set_property(el: Element, name: String, value: a) -> Nil
+
+/// Delete an arbitrary JavaScript property from an element.
+@external(javascript, "./dom.ffi.mjs", "deleteProperty")
+pub fn delete_property(el: Element, name: String) -> Nil
+
+// ============================================================================
+// DOCUMENT LOOKUP
+// ============================================================================
+
+/// Look up a DOM element by its ID.
+@external(javascript, "./dom.ffi.mjs", "getElementById")
+pub fn get_element_by_id(id: String) -> Result(Element, Nil)
+
+/// Append a child element to a parent element.
+@external(javascript, "./dom.ffi.mjs", "appendChild")
+pub fn append_child(parent: Element, child: Element) -> Nil
+
+// ============================================================================
+// SCENE-READY LISTENER (one-shot event with detail access)
+// ============================================================================
+
+/// Set up a one-shot listener for the tiramisu:scene-ready custom event.
+/// The callback is called with the scene ID when the renderer initializes.
+@external(javascript, "./dom.ffi.mjs", "listenForSceneReady")
+pub fn listen_for_scene_ready(
+  host: Element,
+  callback: fn(String) -> Nil,
+) -> Nil
+
+// ============================================================================
+// MUTATION OBSERVER
+// ============================================================================
+
+/// Set up a MutationObserver on the host element's light DOM children.
+/// Uses queueMicrotask to batch rapid DOM mutations into a single callback.
+@external(javascript, "./dom.ffi.mjs", "setupMutationObserver")
+pub fn setup_mutation_observer(
+  host: Element,
+  callback: fn() -> Nil,
+) -> Nil
+
+// ============================================================================
+// DOM TREE WALKING
+// ============================================================================
+
+/// Find the immediate parent tiramisu element (mesh, empty, camera, light, audio)
 /// and return its ID. Returns None if no parent object is found before
 /// reaching the renderer. This enables proper hierarchical transforms.
 @external(javascript, "./dom.ffi.mjs", "findParentObjectId")
-pub fn find_parent_object_id(shadow_root: Dynamic) -> Option(String)
+pub fn find_parent_object_id(host: Element) -> Option(String)
+
+// ============================================================================
+// COMPOSITE OPERATIONS (pure Gleam, composing primitives)
+// ============================================================================
+
+/// Find the parent tiramisu-renderer element and get its scene ID.
+pub fn find_parent_scene_id(host: Element) -> Option(String) {
+  case closest(host, "tiramisu-renderer") {
+    Ok(renderer) ->
+      case get_attribute(renderer, "data-scene-id") {
+        Ok(scene_id) -> option.Some(scene_id)
+        Error(Nil) -> option.None
+      }
+    Error(Nil) -> option.None
+  }
+}
+
+/// Get the scene-id attribute from a host element.
+pub fn get_scene_id_from_host(host: Element) -> Result(String, Nil) {
+  get_attribute(host, "scene-id")
+}
+
+/// Set the data-scene-id attribute and dispatch the scene-ready event.
+pub fn set_scene_id_on_host(host: Element, scene_id: String) -> Nil {
+  set_attribute(host, "data-scene-id", scene_id)
+  dispatch_custom_event(
+    host,
+    "tiramisu:scene-ready",
+    create_scene_ready_detail(scene_id),
+  )
+}
+
+/// Create a scene-ready event detail with camelCase key for JS compatibility.
+@external(javascript, "./dom.ffi.mjs", "createSceneReadyDetail")
+fn create_scene_ready_detail(scene_id: String) -> Dynamic
+
+/// Get the renderer configuration from a host element's attributes.
+pub fn get_renderer_config(host: Element) -> RendererConfig {
+  let width = case get_attribute(host, "width") {
+    Ok(w) ->
+      case parse_int(w) {
+        Ok(n) -> option.Some(n)
+        Error(Nil) -> option.None
+      }
+    Error(Nil) -> option.None
+  }
+  let height = case get_attribute(host, "height") {
+    Ok(h) ->
+      case parse_int(h) {
+        Ok(n) -> option.Some(n)
+        Error(Nil) -> option.None
+      }
+    Error(Nil) -> option.None
+  }
+  let background =
+    get_attribute(host, "background")
+    |> result.unwrap("#000000")
+  let antialias = case get_attribute(host, "antialias") {
+    Ok("false") -> False
+    _ -> True
+  }
+  let alpha = case get_attribute(host, "alpha") {
+    Ok("true") -> True
+    _ -> False
+  }
+  RendererConfig(width:, height:, background:, antialias:, alpha:)
+}
+
+/// Renderer configuration parsed from host element attributes.
+pub type RendererConfig {
+  RendererConfig(
+    width: Option(Int),
+    height: Option(Int),
+    background: String,
+    antialias: Bool,
+    alpha: Bool,
+  )
+}
+
+/// Store a Three.js object reference on its corresponding DOM element.
+/// This enables external integrations (cacao physics, etc.) to find
+/// the Three.js object via document.getElementById(id)._object3d.
+pub fn store_object_on_dom(id: String, object: a) -> Nil {
+  case get_element_by_id(id) {
+    Ok(el) -> set_property(el, "_object3d", object)
+    Error(Nil) -> Nil
+  }
+}
+
+/// Clear a Three.js object reference from a DOM element.
+pub fn clear_object_from_dom(id: String) -> Nil {
+  case get_element_by_id(id) {
+    Ok(el) -> delete_property(el, "_object3d")
+    Error(Nil) -> Nil
+  }
+}
+
+/// Dispatch a custom event on a DOM element found by ID.
+/// Used to notify Lustre apps about model load status.
+pub fn dispatch_mesh_event(mesh_id: String, event_name: String) -> Nil {
+  case get_element_by_id(mesh_id) {
+    Ok(el) ->
+      dispatch_custom_event(el, event_name, create_mesh_event_detail(mesh_id))
+    Error(Nil) -> Nil
+  }
+}
+
+/// Create a mesh event detail with the right JS key format.
+@external(javascript, "./dom.ffi.mjs", "createMeshEventDetail")
+fn create_mesh_event_detail(id: String) -> Dynamic
+
+/// Append a canvas to a container (shadow root div).
+/// Also sets display:block on the canvas.
+/// Uses generic types because both container (shadow root) and canvas
+/// (savoiardi.Canvas) are opaque types that are DOM elements at runtime.
+@external(javascript, "./dom.ffi.mjs", "appendCanvasToContainer")
+pub fn append_canvas_to_container(container: a, canvas: b) -> Nil
+
+// ============================================================================
+// INTERNAL HELPERS
+// ============================================================================
+
+@external(javascript, "./dom.ffi.mjs", "parseInt10")
+fn parse_int(value: String) -> Result(Int, Nil)

@@ -47,6 +47,8 @@ pub type SceneNode {
     cast_shadow: Bool,
     receive_shadow: Bool,
     physics_controlled: Bool,
+    // LOD distance (only used when parented to a LodNode)
+    distance: Float,
     children: List(SceneNode),
   )
   CameraNode(
@@ -79,6 +81,7 @@ pub type SceneNode {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
   )
   PositionalAudioNode(
     key: String,
@@ -87,10 +90,41 @@ pub type SceneNode {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
     transform: Transform,
     ref_distance: Float,
     max_distance: Float,
     rolloff_factor: Float,
+    children: List(SceneNode),
+  )
+  DebugNode(
+    key: String,
+    debug_type: String,
+    size: Float,
+    divisions: Int,
+    color: String,
+    transform: Transform,
+  )
+  LodNode(
+    key: String,
+    transform: Transform,
+    children: List(SceneNode),
+  )
+  InstancedMeshNode(
+    key: String,
+    geometry: String,
+    material_type: String,
+    color: String,
+    metalness: Float,
+    roughness: Float,
+    opacity: Float,
+    wireframe: Bool,
+    transparent: Bool,
+    instances: String,
+    transform: Transform,
+    visible: Bool,
+    cast_shadow: Bool,
+    receive_shadow: Bool,
     children: List(SceneNode),
   )
   /// Unknown elements (cocoa physics components, etc.) — preserved as pass-through.
@@ -109,6 +143,9 @@ pub fn key(node: SceneNode) -> String {
     EmptyNode(key:, ..) -> key
     AudioNode(key:, ..) -> key
     PositionalAudioNode(key:, ..) -> key
+    DebugNode(key:, ..) -> key
+    LodNode(key:, ..) -> key
+    InstancedMeshNode(key:, ..) -> key
     UnknownNode(key:, ..) -> key
   }
 }
@@ -119,8 +156,10 @@ pub fn children(node: SceneNode) -> List(SceneNode) {
     MeshNode(children:, ..) -> children
     EmptyNode(children:, ..) -> children
     PositionalAudioNode(children:, ..) -> children
+    LodNode(children:, ..) -> children
+    InstancedMeshNode(children:, ..) -> children
     UnknownNode(children:, ..) -> children
-    _ -> []
+    CameraNode(..) | LightNode(..) | AudioNode(..) | DebugNode(..) -> []
   }
 }
 
@@ -133,6 +172,9 @@ pub fn tag(node: SceneNode) -> String {
     EmptyNode(..) -> "tiramisu-empty"
     AudioNode(..) -> "tiramisu-audio"
     PositionalAudioNode(..) -> "tiramisu-audio-positional"
+    DebugNode(..) -> "tiramisu-debug"
+    LodNode(..) -> "tiramisu-lod"
+    InstancedMeshNode(..) -> "tiramisu-instanced-mesh"
     UnknownNode(tag:, ..) -> tag
   }
 }

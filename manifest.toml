@@ -15,7 +15,7 @@ packages = [
   { name = "houdini", version = "1.2.0", build_tools = ["gleam"], requirements = [], otp_app = "houdini", source = "hex", outer_checksum = "5DB1053F1AF828049C2B206D4403C18970ABEF5C18671CA3C2D2ED0DD64F6385" },
   { name = "lustre", version = "5.6.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_json", "gleam_otp", "gleam_stdlib", "houdini"], otp_app = "lustre", source = "hex", outer_checksum = "EE558CD4DB9F09FCC16417ADF0183A3C2DAC3E4B21ED3AC0CAE859792AB810CA" },
   { name = "quaterni", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib", "vec"], otp_app = "quaterni", source = "hex", outer_checksum = "96A9645E9D0704ADC2F782B23A48BDF4ADEF97355768A2A69D534C8C909CFFC3" },
-  { name = "savoiardi", version = "3.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], source = "git", repo = "http://github.com/renatillas/savoiardi", commit = "67066bb46244a3bf562b41a9d60f4611a4f1d71f" },
+  { name = "savoiardi", version = "3.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], source = "local", path = "../savoiardi" },
   { name = "vec", version = "3.2.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "8DA5BE21486120F19E2FD0D0990747D19116E528662EFE98C49685C3D7801F12" },
 ]
 
@@ -28,5 +28,5 @@ gleamy_bench = { version = ">= 0.6.0 and < 1.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }
 quaterni = { version = ">= 1.0.0 and < 2.0.0" }
-savoiardi = { git = "http://github.com/renatillas/savoiardi", ref = "main" }
+savoiardi = { path = "../savoiardi" }
 vec = { version = ">= 3.0.1 and < 4.0.0" }

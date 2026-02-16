@@ -38,6 +38,7 @@ pub type ScenePatch {
     visible: Bool,
     cast_shadow: Bool,
     receive_shadow: Bool,
+    distance: Float,
   )
   CreateCamera(
     id: String,
@@ -71,6 +72,7 @@ pub type ScenePatch {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
   )
   CreatePositionalAudio(
     id: String,
@@ -80,10 +82,38 @@ pub type ScenePatch {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
     transform: Transform,
     ref_distance: Float,
     max_distance: Float,
     rolloff_factor: Float,
+  )
+  CreateDebug(
+    id: String,
+    parent_id: String,
+    debug_type: String,
+    size: Float,
+    divisions: Int,
+    color: String,
+    transform: Transform,
+  )
+  CreateLod(id: String, parent_id: String, transform: Transform)
+  CreateInstancedMesh(
+    id: String,
+    parent_id: String,
+    geometry: String,
+    material_type: String,
+    color: String,
+    metalness: Float,
+    roughness: Float,
+    opacity: Float,
+    wireframe: Bool,
+    transparent: Bool,
+    instances: String,
+    transform: Transform,
+    visible: Bool,
+    cast_shadow: Bool,
+    receive_shadow: Bool,
   )
   // -- Updates (granular per-property to minimize JS work) --------------------
   UpdateTransform(id: String, transform: Transform)
@@ -135,6 +165,7 @@ pub type ScenePatch {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
   )
   UpdatePositionalAudio(
     id: String,
@@ -143,12 +174,26 @@ pub type ScenePatch {
     loop: Bool,
     playing: Bool,
     playback_rate: Float,
+    detune: Float,
     transform: Transform,
     ref_distance: Float,
     max_distance: Float,
     rolloff_factor: Float,
   )
   UpdateGroupVisibility(id: String, visible: Bool)
+  UpdateInstancedMeshInstances(id: String, instances: String)
+  UpdateInstancedMeshMaterial(
+    id: String,
+    material_type: String,
+    color: String,
+    metalness: Float,
+    roughness: Float,
+    opacity: Float,
+    wireframe: Bool,
+    transparent: Bool,
+  )
+  UpdateInstancedMeshVisibility(id: String, visible: Bool)
+  UpdateInstancedMeshShadow(id: String, cast_shadow: Bool, receive_shadow: Bool)
   // -- Structure --------------------------------------------------------------
   Remove(id: String)
   Reparent(id: String, new_parent_id: String)

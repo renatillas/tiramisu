@@ -1,0 +1,6 @@
+*.beam
+.lustre
+*.ez
+/build
+erl_crash.dump
+node_modules

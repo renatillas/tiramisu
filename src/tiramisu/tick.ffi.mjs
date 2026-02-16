@@ -54,7 +54,7 @@ export function broadcastTick(sceneId, deltaMs) {
 
   const ctx = TickContext$TickContext(deltaTime, timestamp);
 
-  // Call ALL handlers subscribed to this scene
+  // Call handlers subscribed to this scene
   for (const [, sub] of subscriptions) {
     if (sub.sceneId === sceneId) {
       sub.handler(ctx);
