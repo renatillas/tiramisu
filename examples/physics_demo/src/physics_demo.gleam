@@ -14,6 +14,8 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/time/duration
 import tiramisu/material
+import tiramisu/scene
+import vec/vec2
 import vec/vec3f
 
 import lustre
@@ -25,7 +27,6 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/light
 import tiramisu/mesh
-import tiramisu/renderer
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
 
@@ -62,22 +63,23 @@ pub type Msg {
   // Body query callbacks
   GotPlayerPosition(vec3.Vec3(Float))
   GotPlayerVelocity(vec3.Vec3(Float))
-  RendererCreatedSceneId(String)
 }
 
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  let assert Ok(_) = tiramisu.register()
+  let world = cacao.world()
+  let assert Ok(_) =
+    tiramisu.register([cacao.extension(world), ..tiramisu.builtin_extensions()])
 
   let app = lustre.application(init, update, view)
-  let assert Ok(_) = lustre.start(app, "#app", Nil)
+  let assert Ok(_) = lustre.start(app, "#app", world)
   Nil
 }
 
 // INIT ------------------------------------------------------------------------
 
-fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
+fn init(world) -> #(Model, effect.Effect(Msg)) {
   let model =
     Model(
       input: input.new(),
@@ -86,7 +88,13 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       ground_distance: 0.0,
       in_trigger: False,
     )
-  #(model, cacao.init(vec3.Vec3(0.0, -9.81, 0.0), PhysicsReady))
+  #(
+    model,
+    effect.batch([
+      cacao.init(vec3.Vec3(0.0, -9.81, 0.0), world, PhysicsReady),
+      tick.subscribe("main", Tick),
+    ]),
+  )
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -101,10 +109,6 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   case msg {
     PhysicsReady(world) -> {
       #(Model(..model, physics: Some(world)), effect.none())
-    }
-
-    RendererCreatedSceneId(scene_id) -> {
-      #(model, tick.subscribe(scene_id, Tick))
     }
 
     KeyDown(key) -> #(
@@ -269,17 +273,17 @@ fn apply_movement(
 // VIEW ------------------------------------------------------------------------
 
 fn view(_model: Model) {
-  renderer.renderer(
+  tiramisu.scene(
+    "main",
     [
-      renderer.width(800),
-      renderer.height(600),
-      renderer.background("#1a1a2e"),
+      attribute.width(800),
+      attribute.height(600),
+      scene.background_color(0x1a1a2e),
       // Make the renderer focusable so it can receive keyboard events
       attribute.attribute("tabindex", "0"),
       // Capture keyboard input via event.code (physical key position)
       input.on_keydown(KeyDown),
       input.on_keyup(KeyUp),
-      renderer.on_scene_ready(RendererCreatedSceneId),
     ],
     [
       // Camera looking at the scene from above and behind
@@ -287,7 +291,7 @@ fn view(_model: Model) {
         "main",
         [
           camera.fov(75.0),
-          camera.transform(
+          transform.transform(
             transform.at(vec3.Vec3(0.0, 8.0, 14.0))
             |> transform.with_look_at(vec3.Vec3(0.0, 0.0, 0.0)),
           ),
@@ -303,7 +307,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x00ff88),
-          mesh.transform(transform.at(vec3.Vec3(0.0, 2.0, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(0.0, 2.0, 0.0))),
 
           material.cast_shadow(True),
 
@@ -328,7 +332,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xff6b6b),
-          mesh.transform(transform.at(vec3.Vec3(3.0, 2.0, -2.0))),
+          transform.transform(transform.at(vec3.Vec3(3.0, 2.0, -2.0))),
 
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -342,7 +346,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xe05050),
-          mesh.transform(transform.at(vec3.Vec3(4.0, 2.0, -2.0))),
+          transform.transform(transform.at(vec3.Vec3(4.0, 2.0, -2.0))),
 
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -357,7 +361,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x4ecdc4),
-          mesh.transform(transform.at(vec3.Vec3(3.5, 2.0, -2.0))),
+          transform.transform(transform.at(vec3.Vec3(3.5, 2.0, -2.0))),
 
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -371,7 +375,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x3498db),
-          mesh.transform(transform.at(vec3.Vec3(4.5, 2.0, -2.0))),
+          transform.transform(transform.at(vec3.Vec3(4.5, 2.0, -2.0))),
 
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -388,7 +392,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(3.0, 2.0, 3.0)),
           mesh.color(0xffaa00),
-          mesh.transform(transform.at(vec3.Vec3(-3.0, 1.0, 3.0))),
+          transform.transform(transform.at(vec3.Vec3(-3.0, 1.0, 3.0))),
 
           material.opacity(0.2),
 
@@ -404,9 +408,9 @@ fn view(_model: Model) {
       tiramisu.mesh(
         "sphere",
         [
-          mesh.sphere_simple(0.5),
+          mesh.sphere(radius: 0.5, segments: vec2.Vec2(16, 16)),
           mesh.color(0xfeca57),
-          mesh.transform(transform.at(vec3.Vec3(1.0, 2.0, 2.0))),
+          transform.transform(transform.at(vec3.Vec3(1.0, 2.0, 2.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Ball(0.5)),
           cacao.restitution(0.8),
@@ -421,7 +425,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xe056a0),
-          mesh.transform(transform.at(vec3.Vec3(-6.0, 1.0, -1.0))),
+          transform.transform(transform.at(vec3.Vec3(-6.0, 1.0, -1.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.1),
@@ -433,7 +437,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x9b59b6),
-          mesh.transform(transform.at(vec3.Vec3(-6.0, 2.0, -1.0))),
+          transform.transform(transform.at(vec3.Vec3(-6.0, 2.0, -1.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.1),
@@ -445,7 +449,7 @@ fn view(_model: Model) {
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x3498db),
-          mesh.transform(transform.at(vec3.Vec3(-6.0, 3.0, -1.0))),
+          transform.transform(transform.at(vec3.Vec3(-6.0, 3.0, -1.0))),
 
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -463,7 +467,7 @@ fn view(_model: Model) {
           mesh.color(0x2d3436),
           material.receive_shadow(True),
 
-          mesh.transform(transform.at(vec3.Vec3(0.0, -0.5, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(0.0, -0.5, 0.0))),
           cacao.body_type(cacao.Fixed),
           cacao.collider(cacao.Cuboid(15.0, 0.5, 15.0)),
           cacao.friction(0.8),
@@ -474,7 +478,7 @@ fn view(_model: Model) {
       tiramisu.light(
         "ambient",
         [
-          light.type_(light.Ambient),
+          light.kind(light.Ambient),
           light.color(0xffffff),
           light.intensity(0.1),
         ],
@@ -484,10 +488,10 @@ fn view(_model: Model) {
       tiramisu.light(
         "sun",
         [
-          light.type_(light.Directional),
+          light.kind(light.Directional),
           light.color(0xffffff),
           light.intensity(5.0),
-          light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+          transform.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
           light.cast_shadow(True),
         ],
         [],

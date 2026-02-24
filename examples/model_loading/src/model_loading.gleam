@@ -6,6 +6,7 @@
 //// - Rotation animation via tick updates
 
 import gleam/float
+import gleam/int
 import gleam/time/duration
 import lustre
 import lustre/attribute.{class}
@@ -30,6 +31,8 @@ pub type Model {
   Model(
     /// Rotation angle for the model
     rotation: Float,
+    /// Smoothed frames per second (exponential moving average)
+    fps: Float,
   )
 }
 
@@ -49,7 +52,7 @@ const model_url = "https://threejs.org/examples/models/gltf/Soldier.glb"
 
 pub fn main() -> Nil {
   // Register all Tiramisu web components
-  let assert Ok(_) = tiramisu.register()
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
 
   // Start a Lustre app with effects support
   let app = lustre.application(init, update, view)
@@ -61,7 +64,7 @@ pub fn main() -> Nil {
 // INIT ------------------------------------------------------------------------
 
 fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
-  let initial_model = Model(rotation: 0.0)
+  let initial_model = Model(rotation: 0.0, fps: 0.0)
 
   // Subscribe to tick updates for animation
   #(initial_model, tick.subscribe("main", Tick))
@@ -73,15 +76,20 @@ fn update(m: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     Tick(ctx) -> {
       let dt = duration.to_seconds(ctx.delta_time)
-
-      // Slowly rotate the model
       let new_rotation = m.rotation +. dt *. 0.5
-
-      #(Model(rotation: new_rotation), effect.none())
+      let current_fps = case dt >. 0.0 {
+        True -> 1.0 /. dt
+        False -> m.fps
+      }
+      let smooth_fps = case m.fps == 0.0 {
+        True -> current_fps
+        False -> m.fps *. 0.9 +. current_fps *. 0.1
+      }
+      #(Model(rotation: new_rotation, fps: smooth_fps), effect.none())
     }
     ModelLoaded(mesh_id) -> {
       echo "Model loaded with id: " <> mesh_id
-      #(Model(rotation: m.rotation), effect.none())
+      #(m, effect.none())
     }
   }
 }
@@ -135,7 +143,7 @@ fn view(m: Model) {
             transform.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
-                quaternion.from_euler(vec3.Vec3(0.0, m.rotation, 0.0)),
+                quaternion.from_euler(vec3.Vec3(0.0, 0.0, 0.0)),
               ),
             ),
             material.cast_shadow(True),
@@ -169,6 +177,7 @@ fn view(m: Model) {
       info_row("Source", "Soldier.glb"),
       info_row("Format", "GLTF/GLB"),
       info_row("Rotation", float_to_string_2(m.rotation) <> " rad"),
+      info_row("FPS", int.to_string(float.round(m.fps))),
       html.div(
         [
           class("status"),

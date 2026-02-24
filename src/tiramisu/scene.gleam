@@ -1,5 +1,5 @@
+import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import gleam/float
 import gleam/int
 import gleam/json
 import gleam/list
@@ -15,10 +15,11 @@ import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 
+import tiramisu/extension
 import tiramisu/internal/dom
 import tiramisu/internal/registry.{type Registry}
 import tiramisu/internal/render_loop.{type RenderLoop}
-import tiramisu/internal/scene.{type SceneNode}
+import tiramisu/internal/scene
 import tiramisu/internal/scene_apply
 import tiramisu/internal/scene_diff
 import tiramisu/transform
@@ -39,7 +40,7 @@ pub type Model {
     /// Reference to the host element for DOM parsing
     host: Option(dom.Element),
     /// Previous scene tree for diffing
-    previous_scene: List(SceneNode),
+    previous_scene: List(scene.Node),
     /// Canvas width
     width: Int,
     /// Canvas height
@@ -50,6 +51,8 @@ pub type Model {
     antialias: Bool,
     /// Transparent background
     alpha: Bool,
+    /// Compiled extensions (built-ins + user-provided)
+    extensions: extension.Extensions,
   )
 }
 
@@ -61,7 +64,7 @@ pub type Msg {
     render_loop: RenderLoop,
     scene_id: String,
     host: dom.Element,
-    initial_scene: List(SceneNode),
+    initial_scene: List(scene.Node),
   )
   /// Light DOM children changed — re-parse, diff, and apply
   DomMutated
@@ -86,9 +89,14 @@ pub type Msg {
 pub const tag = "tiramisu-scene"
 
 @internal
-pub fn register() -> Result(Nil, lustre.Error) {
+pub fn register(
+  extensions: List(extension.Extension),
+) -> Result(Nil, lustre.Error) {
+  // Merge built-ins first so built-in tags always take precedence
+  let extensions = extension.from_list(extensions)
+
   let app =
-    lustre.component(init, update, view, [
+    lustre.component(fn(_) { init(extensions) }, update, view, [
       component.on_attribute_change("width", fn(v) {
         case int.parse(v) {
           Ok(n) -> Ok(WidthChanged(n))
@@ -118,13 +126,11 @@ pub fn register() -> Result(Nil, lustre.Error) {
 // ATTRIBUTES ------------------------------------------------------------------
 
 /// Set the background color for the renderer (as hex int).
-///
 pub fn background_color(hex: Int) -> Attribute(msg) {
   attribute.attribute("background", "#" <> int.to_base16(hex))
 }
 
 /// Enable or disable antialiasing.
-///
 pub fn antialias(enabled: Bool) -> Attribute(msg) {
   case enabled {
     True -> attribute.attribute("antialias", "")
@@ -133,7 +139,6 @@ pub fn antialias(enabled: Bool) -> Attribute(msg) {
 }
 
 /// Enable or disable transparent background (alpha).
-///
 pub fn alpha(enabled: Bool) -> Attribute(msg) {
   case enabled {
     True -> attribute.attribute("alpha", "")
@@ -143,7 +148,7 @@ pub fn alpha(enabled: Bool) -> Attribute(msg) {
 
 // INIT ------------------------------------------------------------------------
 
-fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
+fn init(exts: extension.Extensions) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       registry: None,
@@ -156,68 +161,59 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
       background: "#000000",
       antialias: True,
       alpha: False,
+      extensions: exts,
     )
 
-  // Initialize the scene and renderer after the component is mounted
-  #(model, effect.after_paint(do_init))
+  #(model, effect.after_paint(do_init(exts)))
 }
 
-fn do_init(dispatch: fn(Msg) -> Nil, root: Dynamic) -> Nil {
-  // Get host element from shadow root
-  let host = dom.shadow_root_host(root)
+fn do_init(exts: extension.Extensions) -> fn(fn(Msg) -> Nil, Dynamic) -> Nil {
+  fn(dispatch, root) {
+    let host = dom.shadow_root_host(root)
+    let scene_id = dom.get_scene_id_from_host(host) |> result.unwrap("")
+    let gleam_scene = savoiardi.create_scene()
+    let config = dom.get_renderer_config(host)
+    let w = config.width |> option.unwrap(1920) |> int.to_float
+    let h = config.height |> option.unwrap(1080) |> int.to_float
 
-  // Check for user-defined scene ID
-  let scene_id = dom.get_scene_id_from_host(host) |> result.unwrap("")
+    let renderer =
+      savoiardi.create_renderer(savoiardi.RendererOptions(
+        antialias: config.antialias,
+        alpha: config.alpha,
+        dimensions: option.Some(vec2.Vec2(w, h)),
+      ))
+    savoiardi.enable_renderer_shadow_map(renderer, True)
+    set_renderer_background(renderer, config.background)
 
-  // Create scene via savoiardi
-  let scene = savoiardi.create_scene()
+    let canvas = savoiardi.get_renderer_dom_element(renderer)
+    dom.append_canvas_to_container(root, canvas)
 
-  // Get config from host element attributes
-  let config = dom.get_renderer_config(host)
+    let reg = registry.new(gleam_scene, scene_id, renderer)
+    let render_loop = render_loop.start(gleam_scene, renderer, scene_id)
 
-  let w = config.width |> option.unwrap(1920) |> int.to_float
-  let h = config.height |> option.unwrap(1080) |> int.to_float
+    // Set up MutationObserver with all extension-observed attributes
+    let observed_attrs = extension.all_observed_attributes(exts)
+    dom.setup_mutation_observer(host, observed_attrs, fn() {
+      dispatch(DomMutated)
+    })
 
-  // Create renderer using savoiardi
-  let renderer =
-    savoiardi.create_renderer(savoiardi.RendererOptions(
-      antialias: config.antialias,
-      alpha: config.alpha,
-      dimensions: option.Some(vec2.Vec2(w, h)),
+    let on_async = fn(registry_transform) {
+      dispatch(PatcherModifiedRegistry(registry_transform))
+    }
+
+    let initial_scene = parse_children(host, exts)
+    let patches = scene_diff.diff([], initial_scene, scene_id)
+    let registry =
+      scene_apply.apply_patches(reg, render_loop, patches, exts, on_async)
+
+    dispatch(Initialized(
+      registry:,
+      render_loop:,
+      scene_id:,
+      host:,
+      initial_scene:,
     ))
-  savoiardi.enable_renderer_shadow_map(renderer, True)
-
-  // Set background color
-  set_renderer_background(renderer, config.background)
-
-  // Append canvas to container (shadow root div)
-  let canvas = savoiardi.get_renderer_dom_element(renderer)
-  dom.append_canvas_to_container(root, canvas)
-
-  // Create instance-scoped registry
-  let reg = registry.new(scene, scene_id, renderer)
-
-  // Start the render loop (owns per-frame mutable state)
-  let render_loop = render_loop.start(scene, renderer, scene_id)
-
-  // Set up MutationObserver to trigger scene diff/patch on DOM changes.
-  dom.setup_mutation_observer(host, fn() { dispatch(DomMutated) })
-
-  // Do the initial scene parse and apply
-  let initial_scene = parse_children(host)
-  let patches = scene_diff.diff([], initial_scene, scene_id)
-  let on_async = fn(registry_transform) {
-    dispatch(PatcherModifiedRegistry(registry_transform))
   }
-  let registry = scene_apply.apply_patches(reg, render_loop, patches, on_async)
-
-  dispatch(Initialized(
-    registry:,
-    render_loop:,
-    scene_id:,
-    host:,
-    initial_scene:,
-  ))
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -246,25 +242,22 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 
     DomMutated -> {
       case model.scene_id, model.host, model.registry, model.render_loop {
-        Some(sid), Some(host), Some(_reg), Some(loop) -> {
-          // Parse the DOM, diff against previous scene
-          let new_scene = parse_children(host)
+        Some(sid), Some(host), Some(reg), Some(loop) -> {
+          let new_scene = parse_children(host, model.extensions)
           let patches = scene_diff.diff(model.previous_scene, new_scene, sid)
-          // Apply patches via RegistryTransform to avoid stale registry races.
-          // The transform is dispatched as a message and always applied to the
-          // latest registry, ensuring async operations (model loading) don't
-          // get overwritten.
+
           #(
             Model(..model, previous_scene: new_scene),
-            // TODO: Weird hack: I don't like this
             effect.from(fn(dispatch) {
-              dispatch(
-                PatcherModifiedRegistry(fn(reg) {
-                  scene_apply.apply_patches(reg, loop, patches, fn(transform) {
-                    dispatch(PatcherModifiedRegistry(transform))
-                  })
-                }),
-              )
+              let registry =
+                scene_apply.apply_patches(
+                  reg,
+                  loop,
+                  patches,
+                  model.extensions,
+                  fn(transform) { dispatch(PatcherModifiedRegistry(transform)) },
+                )
+              dispatch(PatcherModifiedRegistry(fn(_) { registry }))
             }),
           )
         }
@@ -331,9 +324,56 @@ fn view(_model: Model) -> Element(Msg) {
   html.div([], [])
 }
 
+// DOM PARSING -----------------------------------------------------------------
+
+/// Parse a single DOM element into a SceneNode.
+/// All attrs except `id` and `transform` are captured into the attrs dict.
+fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
+  let tag = dom.tag_name(el) |> string.lowercase
+  let attrs = dom.get_all_attributes(el)
+  let key = dict.get(attrs, "id") |> result.unwrap("")
+  let transform =
+    dict.get(attrs, "transform")
+    |> result.map(transform.parse)
+    |> result.unwrap(transform.identity)
+  // Strip id and transform — they're stored separately on the node
+  let node_attrs =
+    attrs
+    |> dict.delete("id")
+    |> dict.delete("transform")
+
+  // Only produce a scene node for known/registered tags — skip everything else
+  case extension.get_node(exts, tag) {
+    Ok(_) ->
+      scene.SceneNode(
+        key:,
+        tag:,
+        transform:,
+        children: parse_children(el, exts),
+        attrs: node_attrs,
+      )
+    Error(Nil) ->
+      // Unknown tag — pass through as a transparent structural node
+      // (no Three.js object, but children are still parsed)
+      scene.SceneNode(
+        key:,
+        tag:,
+        transform:,
+        children: parse_children(el, exts),
+        attrs: dict.new(),
+      )
+  }
+}
+
+fn parse_children(
+  el: dom.Element,
+  exts: extension.Extensions,
+) -> List(scene.Node) {
+  list.map(dom.children(el), fn(child) { parse_element(child, exts) })
+}
+
 // HELPERS ---------------------------------------------------------------------
 
-/// Set background color on a renderer. Parses hex string to int.
 fn set_renderer_background(renderer: savoiardi.Renderer, color: String) -> Nil {
   let color =
     color
@@ -346,199 +386,10 @@ fn set_renderer_background(renderer: savoiardi.Renderer, color: String) -> Nil {
   }
 }
 
-fn parse_element(el: dom.Element) -> SceneNode {
-  let tag = dom.tag_name(el) |> string.lowercase
-  let key = dom.get_attribute(el, "id") |> result.unwrap("")
-  case tag {
-    "tiramisu-mesh" -> parse_mesh(el, key)
-    "tiramisu-camera" -> parse_camera(el, key)
-    "tiramisu-light" -> parse_light(el, key)
-    "tiramisu-empty" -> parse_empty(el, key)
-    "tiramisu-global-audio" -> parse_audio(el, key)
-    "tiramisu-positional-audio" -> parse_positional_audio(el, key)
-    "tiramisu-debug" -> parse_debug(el, key)
-    "tiramisu-instanced-mesh" -> parse_instanced_mesh(el, key)
-    _ ->
-      scene.UnknownNode(
-        key:,
-        tag:,
-        transform: transform_attribute(el),
-        children: parse_children(el),
-      )
-  }
-}
-
-fn parse_mesh(el: dom.Element, key: String) -> SceneNode {
-  scene.MeshNode(
-    key:,
-    geometry: optional_attribute(el, "geometry"),
-    src: optional_attribute(el, "src"),
-    material_type: optional_attribute(el, "material-type"),
-    color: optional_attribute(el, "color"),
-    metalness: optional_float_attribute(el, "metalness"),
-    roughness: optional_float_attribute(el, "roughness"),
-    opacity: optional_float_attribute(el, "opacity"),
-    wireframe: optional_bool_attribute(el, "wireframe"),
-    emissive: optional_attribute(el, "emissive"),
-    emissive_intensity: optional_float_attribute(el, "emissive-intensity"),
-    side: optional_attribute(el, "side"),
-    color_map: optional_attribute(el, "color-map"),
-    normal_map: optional_attribute(el, "normal-map"),
-    ao_map: optional_attribute(el, "ambient-occlusion-map"),
-    roughness_map: optional_attribute(el, "roughness-map"),
-    metalness_map: optional_attribute(el, "metalness-map"),
-    displacement_map: optional_attribute(el, "displacement-map"),
-    displacement_scale: optional_float_attribute(el, "displacement-scale"),
-    displacement_bias: optional_float_attribute(el, "displacement-bias"),
-    shininess: optional_float_attribute(el, "shininess"),
-    alpha_test: optional_float_attribute(el, "alpha-test"),
-    transparent: optional_bool_attribute(el, "transparent"),
-    transform: transform_attribute(el),
-    visible: optional_bool_attribute(el, "visible"),
-    cast_shadow: optional_bool_attribute(el, "cast-shadow"),
-    receive_shadow: optional_bool_attribute(el, "receive-shadow"),
-    physics_controlled: optional_bool_attribute(el, "physics-controlled"),
-    children: parse_children(el),
-  )
-}
-
-fn parse_camera(el: dom.Element, key: String) -> SceneNode {
-  scene.CameraNode(
-    key:,
-    camera_type: optional_attribute(el, "camera-type"),
-    fov: optional_float_attribute(el, "fov"),
-    near: optional_float_attribute(el, "near"),
-    far: optional_float_attribute(el, "far"),
-    transform: transform_attribute(el),
-    active: optional_bool_attribute(el, "active"),
-    children: parse_children(el),
-  )
-}
-
-fn parse_light(el: dom.Element, key: String) -> SceneNode {
-  scene.LightNode(
-    key:,
-    light_type: optional_attribute(el, "light-type"),
-    color: optional_attribute(el, "color"),
-    intensity: optional_float_attribute(el, "intensity"),
-    transform: transform_attribute(el),
-    cast_shadow: optional_bool_attribute(el, "cast-shadow"),
-    children: parse_children(el),
-  )
-}
-
-fn parse_empty(el: dom.Element, key: String) -> SceneNode {
-  scene.EmptyNode(
-    key:,
-    transform: transform_attribute(el),
-    visible: optional_bool_attribute(el, "visible"),
-    children: parse_children(el),
-  )
-}
-
-fn parse_audio(el: dom.Element, key: String) -> SceneNode {
-  scene.AudioNode(
-    key:,
-    src: optional_attribute(el, "src"),
-    volume: optional_float_attribute(el, "volume"),
-    loop: optional_bool_attribute(el, "loop"),
-    playing: optional_bool_attribute(el, "playing"),
-    playback_rate: optional_float_attribute(el, "playback-rate"),
-    detune: optional_float_attribute(el, "detune"),
-    transform: transform_attribute(el),
-    children: parse_children(el),
-  )
-}
-
-fn parse_positional_audio(el: dom.Element, key: String) -> SceneNode {
-  scene.PositionalAudioNode(
-    key:,
-    src: optional_attribute(el, "src"),
-    volume: optional_float_attribute(el, "volume"),
-    loop: optional_bool_attribute(el, "loop"),
-    playing: optional_bool_attribute(el, "playing"),
-    playback_rate: optional_float_attribute(el, "playback-rate"),
-    detune: optional_float_attribute(el, "detune"),
-    transform: transform_attribute(el),
-    ref_distance: optional_float_attribute(el, "ref-distance"),
-    max_distance: optional_float_attribute(el, "max-distance"),
-    rolloff_factor: optional_float_attribute(el, "rolloff-factor"),
-    children: parse_children(el),
-  )
-}
-
-fn parse_debug(el: dom.Element, key: String) -> SceneNode {
-  scene.DebugNode(
-    key:,
-    debug_type: optional_attribute(el, "type"),
-    size: optional_float_attribute(el, "size"),
-    divisions: optional_int_attribute(el, "divisions"),
-    color: optional_attribute(el, "color"),
-    transform: transform_attribute(el),
-    children: parse_children(el),
-  )
-}
-
-fn parse_instanced_mesh(el: dom.Element, key: String) -> SceneNode {
-  scene.InstancedMeshNode(
-    key:,
-    geometry: optional_attribute(el, "geometry"),
-    material_type: optional_attribute(el, "material-type"),
-    color: optional_attribute(el, "color"),
-    metalness: optional_float_attribute(el, "metalness"),
-    roughness: optional_float_attribute(el, "roughness"),
-    opacity: optional_float_attribute(el, "opacity"),
-    wireframe: optional_bool_attribute(el, "wireframe"),
-    transparent: optional_bool_attribute(el, "transparent"),
-    instances: optional_attribute(el, "instances"),
-    transform: transform_attribute(el),
-    visible: optional_bool_attribute(el, "visible"),
-    cast_shadow: optional_bool_attribute(el, "cast-shadow"),
-    receive_shadow: optional_bool_attribute(el, "receive-shadow"),
-    children: parse_children(el),
-  )
-}
-
 fn parse_bool(value: String) -> Result(Bool, Nil) {
   case value {
     "" | "true" -> Ok(True)
     "false" -> Ok(False)
     _ -> Error(Nil)
   }
-}
-
-fn parse_children(el: dom.Element) -> List(SceneNode) {
-  list.map(dom.children(el), parse_element)
-}
-
-fn transform_attribute(el: dom.Element) -> transform.Transform {
-  dom.get_attribute(el, "transform")
-  |> result.map(transform.parse)
-  |> result.unwrap(transform.identity)
-}
-
-/// Return `Some(value)` if the attribute exists, `None` otherwise.
-fn optional_attribute(el: dom.Element, name: String) -> Option(String) {
-  dom.get_attribute(el, name) |> option.from_result
-}
-
-/// Return `Some(f)` if the attribute exists and parses as a float, `None` otherwise.
-fn optional_float_attribute(el: dom.Element, name: String) -> Option(Float) {
-  dom.get_attribute(el, name)
-  |> result.try(float.parse)
-  |> option.from_result
-}
-
-/// Return `Some(b)` if the attribute exists and parses as a bool, `None` otherwise.
-fn optional_bool_attribute(el: dom.Element, name: String) -> Option(Bool) {
-  dom.get_attribute(el, name)
-  |> result.try(parse_bool)
-  |> option.from_result
-}
-
-/// Return `Some(i)` if the attribute exists and parses as an int, `None` otherwise.
-fn optional_int_attribute(el: dom.Element, name: String) -> Option(Int) {
-  dom.get_attribute(el, name)
-  |> result.try(int.parse)
-  |> option.from_result
 }

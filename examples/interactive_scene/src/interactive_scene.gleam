@@ -100,6 +100,8 @@ pub type Model {
     cast_shadow: Bool,
     /// Whether the ground receives shadows
     receive_shadow: Bool,
+    /// Smoothed frames per second (exponential moving average)
+    fps: Float,
   )
 }
 
@@ -168,8 +170,12 @@ pub type Msg {
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  // Register all Tiramisu web components
-  let assert Ok(_) = tiramisu.register()
+  let assert Ok(_) =
+    tiramisu.register([
+      camera.extension(),
+      light.extension(),
+      mesh.extension(),
+    ])
 
   // Start a Lustre app with effects support
   let app = lustre.application(init, update, view)
@@ -209,6 +215,7 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
       opacity: 1.0,
       cast_shadow: True,
       receive_shadow: True,
+      fps: 0.0,
     )
 
   // Subscribe to tick updates for animation
@@ -220,13 +227,22 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     Tick(ctx) -> {
+      let dt = duration.to_seconds(ctx.delta_time)
+      // Compute smoothed FPS using exponential moving average
+      let current_fps = case dt >. 0.0 {
+        True -> 1.0 /. dt
+        False -> model.fps
+      }
+      let smooth_fps = case model.fps == 0.0 {
+        True -> current_fps
+        False -> model.fps *. 0.9 +. current_fps *. 0.1
+      }
       let new_model = case model.animating {
         True -> {
-          let dt = duration.to_seconds(ctx.delta_time)
           let new_rotation = model.rotation +. dt *. model.rotation_speed
-          Model(..model, rotation: new_rotation)
+          Model(..model, rotation: new_rotation, fps: smooth_fps)
         }
-        False -> model
+        False -> Model(..model, fps: smooth_fps)
       }
       #(
         Model(..new_model, input_state: input.end_frame(new_model.input_state)),
@@ -519,7 +535,11 @@ fn view(model: Model) -> Element(Msg) {
       {
         let #(mx, my) = input.mouse_position(model.input_state)
         html.div(
-          [class("bg-black/70 text-teal-400 px-4 py-2 font-mono text-xs")],
+          [
+            class(
+              "bg-black/70 text-teal-400 px-4 py-2 font-mono text-xs flex justify-between",
+            ),
+          ],
           [
             html.text(
               "Mouse: "
@@ -528,6 +548,9 @@ fn view(model: Model) -> Element(Msg) {
               <> int.to_string(float.round(my))
               <> "  |  Left-click: cycle color  |  Right-click: wireframe  |  Scroll: displacement",
             ),
+            html.span([class("text-yellow-400 font-bold")], [
+              html.text(int.to_string(float.round(model.fps)) <> " FPS"),
+            ]),
           ],
         )
       },

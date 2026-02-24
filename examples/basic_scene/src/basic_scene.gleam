@@ -24,8 +24,8 @@ import vec/vec2
 import vec/vec3
 
 pub fn main() -> Nil {
-  // Register all Tiramisu web components
-  let assert Ok(_) = tiramisu.register()
+  // Register the Tiramisu web component
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
 
   // Start a simple Lustre app
   let app = lustre.element(view())

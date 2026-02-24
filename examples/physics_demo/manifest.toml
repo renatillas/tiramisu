@@ -4,10 +4,10 @@
 packages = [
   { name = "argv", version = "1.0.2", build_tools = ["gleam"], requirements = [], otp_app = "argv", source = "hex", outer_checksum = "BA1FF0929525DEBA1CE67256E5ADF77A7CDDFE729E3E3F57A5BDCAA031DED09D" },
   { name = "booklet", version = "1.1.0", build_tools = ["gleam"], requirements = [], otp_app = "booklet", source = "hex", outer_checksum = "08E0FDB78DC4D8A5D3C80295B021505C7D2A2E7B6C6D5EAB7286C36F4A53C851" },
-  { name = "cacao", version = "1.0.0", build_tools = ["gleam"], requirements = ["estoque", "gleam_javascript", "gleam_stdlib", "gleam_time", "lustre", "quaterni", "vec"], source = "git", repo = "http://github.com/renatillas/cacao", commit = "4b0d89504b0b47b818839921dd9c2bc31d8cfec1" },
+  { name = "cacao", version = "1.0.0", build_tools = ["gleam"], requirements = ["estoque", "gleam_javascript", "gleam_stdlib", "gleam_time", "lustre", "quaterni", "savoiardi", "tiramisu", "vec"], source = "local", path = "../../../cacao" },
   { name = "directories", version = "1.2.0", build_tools = ["gleam"], requirements = ["envoy", "gleam_stdlib", "platform", "simplifile"], otp_app = "directories", source = "hex", outer_checksum = "D13090CFCDF6759B87217E8DDD73A75903A700148A82C1D33799F333E249BF9E" },
   { name = "envoy", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "envoy", source = "hex", outer_checksum = "850DA9D29D2E5987735872A2B5C81035146D7FE19EFC486129E44440D03FD832" },
-  { name = "estoque", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib"], source = "git", repo = "https://github.com/renatillas/estoque", commit = "840a9b15186e2a1a46396b70a703598a85e76ab4" },
+  { name = "estoque", version = "1.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib"], source = "local", path = "../../../estoque" },
   { name = "exception", version = "2.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "exception", source = "hex", outer_checksum = "329D269D5C2A314F7364BD2711372B6F2C58FA6F39981572E5CA68624D291F8C" },
   { name = "filepath", version = "1.1.2", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "filepath", source = "hex", outer_checksum = "B06A9AF0BF10E51401D64B98E4B627F1D2E48C154967DA7AF4D0914780A6D40A" },
   { name = "gleam_community_ansi", version = "1.4.4", build_tools = ["gleam"], requirements = ["gleam_community_colour", "gleam_regexp", "gleam_stdlib"], otp_app = "gleam_community_ansi", source = "hex", outer_checksum = "1B3AEA6074AB34D5F0674744F36DDC7290303A03295507E2DEC61EDD6F5777FE" },
@@ -43,14 +43,14 @@ packages = [
   { name = "simplifile", version = "2.3.2", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "E049B4DACD4D206D87843BCF4C775A50AE0F50A52031A2FFB40C9ED07D6EC70A" },
   { name = "snag", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "snag", source = "hex", outer_checksum = "274F41D6C3ECF99F7686FDCE54183333E41D2C1CA5A3A673F9A8B2C7A4401077" },
   { name = "telemetry", version = "1.3.0", build_tools = ["rebar3"], requirements = [], otp_app = "telemetry", source = "hex", outer_checksum = "7015FC8919DBE63764F4B4B87A95B7C0996BD539E0D499BE6EC9D7F3875B79E6" },
-  { name = "tiramisu", version = "7.0.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_javascript", "gleam_stdlib", "gleam_time", "lustre", "quaterni", "savoiardi", "vec"], source = "local", path = "../.." },
+  { name = "tiramisu", version = "7.0.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_javascript", "gleam_json", "gleam_stdlib", "gleam_time", "lustre", "quaterni", "savoiardi", "vec"], source = "local", path = "../.." },
   { name = "tom", version = "2.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_time"], otp_app = "tom", source = "hex", outer_checksum = "90791DA4AACE637E30081FE77049B8DB850FBC8CACC31515376BCC4E59BE1DD2" },
   { name = "vec", version = "3.2.1", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "05A6617AAB325400B8F513EEAEAF797ED17DC912AE3FB0592703F9108BF0B5C0" },
   { name = "wisp", version = "2.2.0", build_tools = ["gleam"], requirements = ["directories", "exception", "filepath", "gleam_crypto", "gleam_erlang", "gleam_http", "gleam_json", "gleam_stdlib", "houdini", "logging", "marceau", "mist", "simplifile"], otp_app = "wisp", source = "hex", outer_checksum = "655163D4DE19E3DD4AC75813A991BFD5523CB4FF2FC5F9F58FD6FB39D5D1806D" },
 ]
 
 [requirements]
-cacao = { git = "http://github.com/renatillas/cacao", ref = "main" }
+cacao = { path = "../../../cacao" }
 gleam_stdlib = { version = ">= 0.64.0 and < 2.0.0" }
 gleam_time = { version = ">= 1.6.0 and < 2.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }

@@ -49,8 +49,7 @@ pub fn subscribe(
   handler: fn(TickContext) -> msg,
 ) -> Effect(msg) {
   effect.from(fn(dispatch) {
-    let _key =
-      subscribe_to_ticks(scene_id, fn(ctx) { dispatch(handler(ctx)) })
+    let _key = subscribe_to_ticks(scene_id, fn(ctx) { dispatch(handler(ctx)) })
     Nil
   })
 }

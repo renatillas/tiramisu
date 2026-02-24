@@ -143,8 +143,18 @@ export function deleteProperty(element, name) {
 /**
  * Set up a MutationObserver on the host element's light DOM children.
  * Uses queueMicrotask to batch rapid DOM mutations into a single callback.
+ * `observedAttrs` is a Gleam List(String) of all attribute names to watch,
+ * collected from all registered extension handlers (built-in + user-defined).
  */
-export function setupMutationObserver(hostElement, callback) {
+export function setupMutationObserver(hostElement, observedAttrs, callback) {
+  // Convert Gleam linked list to JS array
+  const filter = [];
+  let node = observedAttrs;
+  while (node.tail) {
+    filter.push(node.head);
+    node = node.tail;
+  }
+
   let scheduled = false;
   const observer = new MutationObserver(() => {
     if (!scheduled) {
@@ -160,63 +170,7 @@ export function setupMutationObserver(hostElement, callback) {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: [
-      "id",
-      "geometry",
-      "src",
-      "color",
-      "metalness",
-      "roughness",
-      "opacity",
-      "wireframe",
-      "transform",
-      "visible",
-      "physics-controlled",
-      // Material properties
-      "material-type",
-      "emissive",
-      "emissive-intensity",
-      "side",
-      // Texture map URLs
-      "color-map",
-      "normal-map",
-      "ambient-occlusion-map",
-      "roughness-map",
-      "metalness-map",
-      "displacement-map",
-      "displacement-scale",
-      "displacement-bias",
-      "shininess",
-      "alpha-test",
-      "transparent",
-      "receive-shadow",
-      // Camera
-      "camera-type",
-      "fov",
-      "near",
-      "far",
-      "active",
-      // Light
-      "light-type",
-      "intensity",
-      "cast-shadow",
-      // Audio
-      "volume",
-      "loop",
-      "playing",
-      "playback-rate",
-      "detune",
-      "ref-distance",
-      "max-distance",
-      "rolloff-factor",
-      // Debug
-      "size",
-      "divisions",
-      // InstancedMesh
-      "instances",
-      // LOD
-      "distance",
-    ],
+    attributeFilter: filter,
   });
 }
 
@@ -242,6 +196,22 @@ export function createMeshEventDetail(id) {
 export function appendCanvasToContainer(container, canvas) {
   container.appendChild(canvas);
   canvas.style.display = "block";
+}
+
+// ============================================================================
+// ATTRIBUTE INTROSPECTION
+// ============================================================================
+
+/**
+ * Get all attributes on an element as a Gleam List(#(String, String)).
+ * Each entry is a Gleam tuple (two-element JS array) of [name, value].
+ */
+export function getAllAttributesList(element) {
+  const pairs = [];
+  for (const attr of element.attributes) {
+    pairs.push([attr.name, attr.value]);
+  }
+  return toList(pairs);
 }
 
 // ============================================================================

@@ -7,8 +7,10 @@
 //// Other tiramisu modules should import this module instead of using
 //// their own DOM FFI.
 
+import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/int
+import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 
@@ -105,8 +107,13 @@ pub fn append_child(parent: Element, child: Element) -> Nil
 
 /// Set up a MutationObserver on the host element's light DOM children.
 /// Uses queueMicrotask to batch rapid DOM mutations into a single callback.
+/// `additional_observed_attrs` is prepended to the built-in attribute filter.
 @external(javascript, "./dom.ffi.mjs", "setupMutationObserver")
-pub fn setup_mutation_observer(host: Element, callback: fn() -> Nil) -> Nil
+pub fn setup_mutation_observer(
+  host: Element,
+  observed_attrs: List(String),
+  callback: fn() -> Nil,
+) -> Nil
 
 // ============================================================================
 // DOM TREE WALKING
@@ -117,6 +124,19 @@ pub fn setup_mutation_observer(host: Element, callback: fn() -> Nil) -> Nil
 /// reaching the renderer. This enables proper hierarchical transforms.
 @external(javascript, "./dom.ffi.mjs", "findParentObjectId")
 pub fn find_parent_object_id(host: Element) -> Result(String, Nil)
+
+// ============================================================================
+// ATTRIBUTE INTROSPECTION
+// ============================================================================
+
+/// Get all attributes on an element as a Dict(String, String).
+pub fn get_all_attributes(el: Element) -> Dict(String, String) {
+  get_all_attributes_list(el)
+  |> list.fold(dict.new(), fn(acc, pair) { dict.insert(acc, pair.0, pair.1) })
+}
+
+@external(javascript, "./dom.ffi.mjs", "getAllAttributesList")
+fn get_all_attributes_list(el: Element) -> List(#(String, String))
 
 // ============================================================================
 // COMPOSITE OPERATIONS (pure Gleam, composing primitives)

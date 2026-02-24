@@ -19,9 +19,8 @@ import gleam/int
 import gleam/option.{type Option}
 import quaternion
 import savoiardi.{
-  type Audio, type AudioListener, type Camera, type InstancedMesh,
-  type Light, type Material, type Object3D, type PositionalAudio, type Renderer,
-  type Scene,
+  type Audio, type AudioListener, type Camera, type InstancedMesh, type Light,
+  type Material, type Object3D, type PositionalAudio, type Renderer, type Scene,
 }
 import tiramisu/internal/dom
 import tiramisu/transform
@@ -35,15 +34,9 @@ pub type ObjectEntry {
   ObjectEntry(object: Object3D, parent_id: String, kind: ObjectKind)
 }
 
-/// What kind of object is registered.
+/// What kind of object is registered (the element's tag name).
 pub type ObjectKind {
-  MeshObject
-  CameraObject
-  LightObject
-  GroupObject
-  AudioObject
-  DebugObject
-  InstancedMeshObject
+  ObjectKind(tag: String)
 }
 
 /// Metadata about a registered camera.
@@ -229,7 +222,7 @@ pub fn register_camera(
     dict.insert(
       registry.objects,
       id,
-      ObjectEntry(object: obj, parent_id:, kind: CameraObject),
+      ObjectEntry(object: obj, parent_id:, kind: ObjectKind("tiramisu-camera")),
     )
   dom.store_object_on_dom(id, obj)
   Registry(..registry, cameras: cameras, objects: objects)
@@ -263,10 +256,10 @@ pub fn find_active_camera(registry: Registry) -> Option(Camera) {
 
 // LIGHT HELPERS ---------------------------------------------------------------
 
-/// Get a Light by its ID. Returns Some only if the object's kind is LightObject.
+/// Get a Light by its ID. Returns Some only if the object's kind is a light.
 pub fn get_light(registry: Registry, id: String) -> Option(Light) {
   case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, kind: LightObject, ..)) ->
+    Ok(ObjectEntry(object:, kind: ObjectKind(tag: "tiramisu-light"), ..)) ->
       option.Some(savoiardi.object3d_to_light(object))
     _ -> option.None
   }
@@ -331,7 +324,7 @@ pub fn register_audio(
     id,
     savoiardi.audio_to_object3d(audio),
     parent_id,
-    AudioObject,
+    ObjectKind("tiramisu-global-audio"),
   )
 }
 
@@ -347,7 +340,7 @@ pub fn register_positional_audio(
     id,
     savoiardi.positional_audio_to_object3d(audio),
     parent_id,
-    AudioObject,
+    ObjectKind("tiramisu-positional-audio"),
   )
 }
 
@@ -355,7 +348,7 @@ pub fn register_positional_audio(
 /// Audio extends Object3D so we retrieve it and cast.
 pub fn get_audio(registry: Registry, id: String) -> Result(Audio, Nil) {
   case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, kind: AudioObject, ..)) ->
+    Ok(ObjectEntry(object:, kind: ObjectKind(tag: "tiramisu-global-audio"), ..)) ->
       Ok(savoiardi.object3d_to_audio(object))
     _ -> Error(Nil)
   }
@@ -367,8 +360,11 @@ pub fn get_positional_audio(
   id: String,
 ) -> Result(PositionalAudio, Nil) {
   case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, kind: AudioObject, ..)) ->
-      Ok(savoiardi.object3d_to_positional_audio(object))
+    Ok(ObjectEntry(
+      object:,
+      kind: ObjectKind(tag: "tiramisu-positional-audio"),
+      ..,
+    )) -> Ok(savoiardi.object3d_to_positional_audio(object))
     _ -> Error(Nil)
   }
 }
@@ -464,8 +460,11 @@ pub fn get_instanced_mesh(
   id: String,
 ) -> Result(InstancedMesh, Nil) {
   case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, kind: InstancedMeshObject, ..)) ->
-      Ok(savoiardi.object3d_to_instanced_mesh(object))
+    Ok(ObjectEntry(
+      object:,
+      kind: ObjectKind(tag: "tiramisu-instanced-mesh"),
+      ..,
+    )) -> Ok(savoiardi.object3d_to_instanced_mesh(object))
     _ -> Error(Nil)
   }
 }

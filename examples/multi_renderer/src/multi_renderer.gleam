@@ -18,7 +18,7 @@ import tiramisu/camera
 import tiramisu/light
 import tiramisu/material
 import tiramisu/mesh
-import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/tick
 import tiramisu/transform
 import vec/vec2
@@ -41,7 +41,7 @@ type Msg {
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  let assert Ok(_) = tiramisu.register()
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
 
   let app = lustre.application(init:, update:, view:)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
@@ -103,11 +103,6 @@ fn view(model: Model) -> Element(Msg) {
         html.h2([], [element.text("Scene C — Wireframes")]),
         wireframe_scene(model),
       ]),
-      // Renderer 4: Minimal scene (just camera + light + sphere)
-      html.div([], [
-        html.h2([], [element.text("Scene D — Minimal")]),
-        minimal_scene(model),
-      ]),
     ]),
   ])
 }
@@ -118,19 +113,19 @@ fn warm_scene(model: Model) -> Element(Msg) {
   // Orbit: radius 6, speed 0.5 rad/s
   let cx = maths.sin(model.time *. 0.5) *. 6.0
   let cz = maths.cos(model.time *. 0.5) *. 6.0
-  renderer.renderer(
+  tiramisu.scene(
+    "warm",
     [
-      renderer.width(480),
-      renderer.height(360),
-      renderer.background("#2d1b00"),
-      renderer.scene_id("warm"),
+      attribute.width(480),
+      attribute.height(360),
+      scene.background_color(0x2d1b00),
     ],
     [
       tiramisu.camera(
         "warm-cam",
         [
           camera.fov(60.0),
-          camera.transform(
+          transform.transform(
             transform.at(vec3.Vec3(cx, 3.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -146,7 +141,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
           mesh.color(0xff4444),
           material.metalness(0.3),
           material.roughness(0.7),
-          mesh.transform(transform.at(vec3.Vec3(-2.0, 0.75, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(-2.0, 0.75, 0.0))),
         ],
         [],
       ),
@@ -154,11 +149,11 @@ fn warm_scene(model: Model) -> Element(Msg) {
       tiramisu.mesh(
         "warm-sphere",
         [
-          mesh.sphere_simple(1.0),
+          mesh.sphere(1.0, segments: vec2.Vec2(32, 16)),
           mesh.color(0xff8800),
           material.metalness(0.6),
           material.roughness(0.3),
-          mesh.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
         ],
         [],
       ),
@@ -166,11 +161,11 @@ fn warm_scene(model: Model) -> Element(Msg) {
       tiramisu.mesh(
         "warm-cone",
         [
-          mesh.cone_simple(0.8, 2.0),
+          mesh.cone(radius: 0.8, height: 2.0, segments: 32),
           mesh.color(0xffcc00),
           material.metalness(0.4),
           material.roughness(0.5),
-          mesh.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
         ],
         [],
       ),
@@ -180,7 +175,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
         [
           mesh.plane(vec2.Vec2(12.0, 12.0)),
           mesh.color(0x3d2b1f),
-          mesh.transform(
+          transform.transform(
             transform.at(vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -193,7 +188,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
       tiramisu.light(
         "warm-ambient",
         [
-          light.type_(light.Ambient),
+          light.kind(light.Ambient),
           light.color(0xffddaa),
           light.intensity(0.3),
         ],
@@ -202,10 +197,10 @@ fn warm_scene(model: Model) -> Element(Msg) {
       tiramisu.light(
         "warm-sun",
         [
-          light.type_(light.Directional),
+          light.kind(light.Directional),
           light.color(0xffaa44),
           light.intensity(1.2),
-          light.transform(transform.at(vec3.Vec3(3.0, 8.0, 5.0))),
+          transform.transform(transform.at(vec3.Vec3(3.0, 8.0, 5.0))),
           light.cast_shadow(True),
         ],
         [],
@@ -220,19 +215,19 @@ fn cool_scene(model: Model) -> Element(Msg) {
   // Orbit: radius 8, speed 0.3 rad/s, opposite direction
   let cx = maths.sin(model.time *. -0.3) *. 8.0
   let cz = maths.cos(model.time *. -0.3) *. 8.0
-  renderer.renderer(
+  tiramisu.scene(
+    "cool",
     [
-      renderer.width(480),
-      renderer.height(360),
-      renderer.background("#001122"),
-      renderer.scene_id("cool"),
+      attribute.width(480),
+      attribute.height(360),
+      scene.background_color(0x001122),
     ],
     [
       tiramisu.camera(
         "cool-cam",
         [
           camera.fov(50.0),
-          camera.transform(
+          transform.transform(
             transform.at(vec3.Vec3(cx, 4.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -244,11 +239,16 @@ fn cool_scene(model: Model) -> Element(Msg) {
       tiramisu.mesh(
         "cool-torus",
         [
-          mesh.torus_simple(1.2, 0.4),
+          mesh.torus(
+            radius: 1.2,
+            tube: 0.4,
+            radial_segments: 32,
+            tubular_segments: 16,
+          ),
           mesh.color(0x4488ff),
           material.metalness(0.8),
           material.roughness(0.1),
-          mesh.transform(transform.at(vec3.Vec3(-2.0, 1.5, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(-2.0, 1.5, 0.0))),
         ],
         [],
       ),
@@ -256,11 +256,16 @@ fn cool_scene(model: Model) -> Element(Msg) {
       tiramisu.mesh(
         "cool-cyl",
         [
-          mesh.cylinder_simple(0.6, 2.5),
+          mesh.cylinder(
+            radius_top: 0.6,
+            radius_bottom: 2.5,
+            height: 0.5,
+            segments: 32,
+          ),
           mesh.color(0x00cccc),
           material.metalness(0.5),
           material.roughness(0.4),
-          mesh.transform(transform.at(vec3.Vec3(2.0, 1.25, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(2.0, 1.25, 0.0))),
         ],
         [],
       ),
@@ -272,7 +277,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
           mesh.color(0x8844ff),
           material.metalness(0.7),
           material.roughness(0.2),
-          mesh.transform(
+          transform.transform(
             transform.at(vec3.Vec3(0.0, 0.8, 1.5))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(0.3, 0.7, 0.0)),
@@ -287,7 +292,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
         [
           mesh.plane(vec2.Vec2(16.0, 16.0)),
           mesh.color(0x112233),
-          mesh.transform(
+          transform.transform(
             transform.at(vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -300,7 +305,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
       tiramisu.light(
         "cool-ambient",
         [
-          light.type_(light.Ambient),
+          light.kind(light.Ambient),
           light.color(0x6688cc),
           light.intensity(0.4),
         ],
@@ -309,10 +314,10 @@ fn cool_scene(model: Model) -> Element(Msg) {
       tiramisu.light(
         "cool-sun",
         [
-          light.type_(light.Directional),
+          light.kind(light.Directional),
           light.color(0xaaccff),
           light.intensity(1.0),
-          light.transform(transform.at(vec3.Vec3(-4.0, 10.0, 6.0))),
+          transform.transform(transform.at(vec3.Vec3(-4.0, 10.0, 6.0))),
           light.cast_shadow(True),
         ],
         [],
@@ -327,19 +332,19 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
   // Orbit: radius 8, speed 0.3 rad/s, opposite direction
   let cx = maths.sin(model.time *. -0.3) *. 8.0
   let cz = maths.cos(model.time *. -0.3) *. 8.0
-  renderer.renderer(
+  tiramisu.scene(
+    "wire",
     [
-      renderer.width(480),
-      renderer.height(360),
-      renderer.background("#0a0a0a"),
-      renderer.scene_id("wire"),
+      attribute.width(480),
+      attribute.height(360),
+      scene.background_color(0x0a0a0a),
     ],
     [
       tiramisu.camera(
         "wire-cam",
         [
           camera.fov(70.0),
-          camera.transform(
+          transform.transform(
             transform.at(vec3.Vec3(cx, 4.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -351,7 +356,7 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
       tiramisu.empty(
         "wire-group",
         [
-          camera.transform(transform.at(vec3.Vec3(0.0, 0.0, 0.0))),
+          transform.transform(transform.at(vec3.Vec3(0.0, 0.0, 0.0))),
         ],
         [
           tiramisu.mesh(
@@ -359,7 +364,7 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
             [
               mesh.geometry_box(vec3.Vec3(1.5, 1.5, 1.5)),
               mesh.color(0x00ff88),
-              mesh.transform(transform.at(vec3.Vec3(-2.0, 1.0, 0.0))),
+              transform.transform(transform.at(vec3.Vec3(-2.0, 1.0, 0.0))),
               material.wireframe(True),
             ],
             [],
@@ -367,20 +372,10 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
           tiramisu.mesh(
             "wire-sphere",
             [
-              mesh.sphere_simple(1.0),
+              mesh.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
               mesh.color(0xff0088),
-              mesh.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+              transform.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
               material.wireframe(True),
-            ],
-            [],
-          ),
-          tiramisu.mesh(
-            "wire-torus",
-            [
-              mesh.torus_simple(0.8, 0.3),
-              mesh.color(0x8800ff),
-              material.wireframe(True),
-              mesh.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
             ],
             [],
           ),
@@ -389,68 +384,9 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
       tiramisu.light(
         "wire-ambient",
         [
-          light.type_(light.Ambient),
+          light.kind(light.Ambient),
           light.color(0xffffff),
           light.intensity(1.0),
-        ],
-        [],
-      ),
-    ],
-  )
-}
-
-// SCENE D — minimal -----------------------------------------------------------
-
-fn minimal_scene(model: Model) -> Element(Msg) {
-  let cx = maths.sin(model.time *. -0.3) *. 8.0
-  let cz = maths.cos(model.time *. -0.3) *. 8.0
-  renderer.renderer(
-    [
-      renderer.width(480),
-      renderer.height(360),
-      renderer.background("#1a0033"),
-      renderer.scene_id("mini"),
-    ],
-    [
-      tiramisu.camera(
-        "mini-cam",
-        [
-          camera.fov(45.0),
-          camera.transform(
-            transform.at(vec3.Vec3(cx, 0.0, cz))
-            |> transform.with_look_at(vec3f.zero),
-          ),
-          camera.active(True),
-        ],
-        [],
-      ),
-      // Single sphere
-      tiramisu.mesh(
-        "mini-sphere",
-        [
-          mesh.sphere_simple(1.5),
-          mesh.color(0xee66ff),
-          material.metalness(0.9),
-          material.roughness(0.05),
-        ],
-        [],
-      ),
-      tiramisu.light(
-        "mini-ambient",
-        [
-          light.type_(light.Ambient),
-          light.color(0x332244),
-          light.intensity(0.5),
-        ],
-        [],
-      ),
-      tiramisu.light(
-        "mini-point",
-        [
-          light.type_(light.Point),
-          light.color(0xffffff),
-          light.intensity(2.0),
-          light.transform(transform.at(vec3.Vec3(3.0, 3.0, 3.0))),
         ],
         [],
       ),

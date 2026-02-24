@@ -21,11 +21,12 @@ import lustre/element/html
 import lustre/event
 import quaternion
 import tiramisu
-import tiramisu/audio
 import tiramisu/camera
+import tiramisu/global_audio
 import tiramisu/light
 import tiramisu/material
 import tiramisu/mesh
+import tiramisu/positional_audio
 import tiramisu/scene
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
@@ -88,8 +89,8 @@ const orbit_speed = 0.5
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  // Register all Tiramisu web components
-  let assert Ok(_) = tiramisu.register()
+  // Register the Tiramisu web component
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
 
   // Start a Lustre app with effects support
   let app = lustre.application(init, update, view)
@@ -201,22 +202,6 @@ fn view(model: Model) {
           ],
           [],
         ),
-        // Center marker (shows where origin is)
-        tiramisu.mesh(
-          "center",
-          [
-            mesh.cylinder(
-              radius_top: 0.3,
-              radius_bottom: 0.3,
-              height: 0.1,
-              segments: 16,
-            ),
-            mesh.color(0x666666),
-            transform.transform(transform.at(vec3.Vec3(0.0, 0.5, 0.0))),
-          ],
-          [],
-        ),
-        // Orbit path visualization (ring on ground)
         tiramisu.mesh(
           "orbit_path",
           [
@@ -237,20 +222,20 @@ fn view(model: Model) {
           [],
         ),
         // Moving ball (sound source)
-        tiramisu.audio_positional(
+        tiramisu.positional_audio(
           "ball_sound",
           [
             attribute.src(beep_url),
-            audio.volume(1.0),
+            positional_audio.volume(1.0),
             attribute.loop(True),
-            audio.playing(model.sound_playing),
-            audio.detune(model.sound_detune),
+            positional_audio.playing(model.sound_playing),
+            positional_audio.detune(model.sound_detune),
             transform.transform(
               transform.at(vec3.Vec3(model.ball_x, 0.5, model.ball_z)),
             ),
-            audio.ref_distance(2.0),
-            audio.max_distance(20.0),
-            audio.rolloff_factor(1.0),
+            positional_audio.ref_distance(2.0),
+            positional_audio.max_distance(20.0),
+            positional_audio.rolloff_factor(1.0),
           ],
           [
             tiramisu.mesh(
@@ -293,10 +278,10 @@ fn view(model: Model) {
           "background_music",
           [
             attribute.src(music_url),
-            audio.volume(0.3),
+            global_audio.volume(0.3),
             attribute.loop(True),
-            audio.playing(model.music_playing),
-            audio.detune(model.music_detune),
+            global_audio.playing(model.music_playing),
+            global_audio.detune(model.music_detune),
           ],
           [],
         ),

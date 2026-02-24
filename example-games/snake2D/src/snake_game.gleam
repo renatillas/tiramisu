@@ -9,16 +9,19 @@ import gleam/option
 import gleam/result
 import gleam/string
 import gleam/time/duration
+import input
+import lustre
+import lustre/attribute
+import lustre/effect.{type Effect}
+import lustre/element.{type Element}
 import tiramisu
 import tiramisu/camera
-import tiramisu/effect
-import tiramisu/geometry
-import input
 import tiramisu/light
 import tiramisu/material
+import tiramisu/mesh
 import tiramisu/scene
+import tiramisu/tick
 import tiramisu/transform
-import vec/vec2
 import vec/vec3
 
 // =============================================================================
@@ -26,6 +29,12 @@ import vec/vec3
 // =============================================================================
 
 const box_width = 50.0
+
+/// Canvas width in world units (1 unit = 1 pixel with the orthographic camera).
+const canvas_width = 1920.0
+
+/// Canvas height in world units.
+const canvas_height = 1080.0
 
 const highscore_key = "Highscore"
 
@@ -40,8 +49,8 @@ pub type Model {
     tail: List(BoxData),
     beute_pos: #(Float, Float),
     game_state: GameState,
-    maybe_font: option.Option(geometry.Font),
     score_info: ScoreInfo,
+    input: input.InputState,
   )
 }
 
@@ -71,9 +80,11 @@ pub type Direction {
 }
 
 pub type Msg {
-  FontLoaded(geometry.Font)
-  FontLoadFailed
-  Tick
+  Tick(tick.TickContext)
+  KeyDown(input.Key)
+  KeyUp(input.Key)
+  MouseDown(input.MouseButton)
+  MouseUp(input.MouseButton)
 }
 
 type Color {
@@ -90,9 +101,10 @@ type Color {
 // =============================================================================
 
 pub fn main() -> Nil {
+  let assert Ok(_) = tiramisu.register([])
   let assert Ok(_) =
-    tiramisu.application(init, update, view)
-    |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
+    lustre.application(init, update, view)
+    |> lustre.start("#app", Nil)
   Nil
 }
 
@@ -100,7 +112,7 @@ pub fn main() -> Nil {
 // Init
 // =============================================================================
 
-pub fn init(ctx: tiramisu.Context) {
+pub fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
   let pot_highscore =
     get_localstorage(highscore_key)
     |> result.try(fn(x) {
@@ -108,38 +120,22 @@ pub fn init(ctx: tiramisu.Context) {
       Ok(val)
     })
   let highscore = option.from_result(pot_highscore)
-  #(
-    init_model(highscore, option.None, ctx),
-    effect.batch([
-      effect.dispatch(Tick),
-      geometry.load_font(
-        from: "fonts/helvetiker_regular.typeface.json",
-        on_success: FontLoaded,
-        on_error: FontLoadFailed,
-      ),
-    ]),
-    option.None,
-  )
+  #(init_model(highscore), tick.subscribe("snake", Tick))
 }
 
-fn init_model(
-  highscore: option.Option(Int),
-  maybe_font: option.Option(geometry.Font),
-  ctx: tiramisu.Context,
-) -> Model {
-  let init_beute_pos = random_pos(ctx)
+fn init_model(highscore: option.Option(Int)) -> Model {
   Model(
     time: 0.0,
     head: BoxData(x: 0.0, y: 0.0, direction: Right),
     tail: [],
-    beute_pos: init_beute_pos,
+    beute_pos: random_pos(),
     game_state: Running,
-    maybe_font: maybe_font,
     score_info: ScoreInfo(
       current_score: 0,
       highscore: highscore,
       new_high_score: False,
     ),
+    input: input.new(),
   )
 }
 
@@ -147,33 +143,46 @@ fn init_model(
 // Update
 // =============================================================================
 
-pub fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
-  let updatet_model = case msg {
-    Tick -> {
-      case model.game_state {
+pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
+  case msg {
+    Tick(ctx) -> {
+      let updated = case model.game_state {
         Running -> update_running_model(model, ctx)
         GameOver -> {
           case
-            input.is_left_button_just_pressed(ctx.input)
-            || input.is_key_just_pressed(ctx.input, input.Enter)
+            input.is_mouse_just_pressed(model.input, input.LeftButton)
+            || input.is_just_pressed(model.input, input.Enter)
           {
-            True -> {
-              init_model(model.score_info.highscore, model.maybe_font, ctx)
-            }
+            True -> init_model(model.score_info.highscore)
             False -> model
           }
         }
-        _ -> model
+        NotStarted -> model
       }
+      // Clear per-frame input state after game logic has consumed it
+      #(Model(..updated, input: input.end_frame(updated.input)), effect.none())
     }
-    FontLoaded(font) -> Model(..model, maybe_font: option.Some(font))
-    FontLoadFailed -> model
+    KeyDown(key) -> #(
+      Model(..model, input: input.key_down(model.input, key)),
+      effect.none(),
+    )
+    KeyUp(key) -> #(
+      Model(..model, input: input.key_up(model.input, key)),
+      effect.none(),
+    )
+    MouseDown(btn) -> #(
+      Model(..model, input: input.mouse_down(model.input, btn)),
+      effect.none(),
+    )
+    MouseUp(btn) -> #(
+      Model(..model, input: input.mouse_up(model.input, btn)),
+      effect.none(),
+    )
   }
-  #(updatet_model, effect.dispatch(Tick), option.None)
 }
 
-fn update_running_model(model: Model, ctx: tiramisu.Context) -> Model {
-  case check_game_over(model, ctx) {
+fn update_running_model(model: Model, ctx: tick.TickContext) -> Model {
+  case check_game_over(model) {
     True -> {
       let score = model.score_info.current_score
       let pot_new_highscore = case model.score_info.highscore {
@@ -181,7 +190,6 @@ fn update_running_model(model: Model, ctx: tiramisu.Context) -> Model {
           case score > highscore_val {
             True -> {
               set_localstorage(highscore_key, int.to_string(score))
-
               ScoreInfo(
                 ..model.score_info,
                 highscore: option.Some(score),
@@ -203,41 +211,35 @@ fn update_running_model(model: Model, ctx: tiramisu.Context) -> Model {
   }
 }
 
-fn check_game_over(model: Model, ctx: tiramisu.Context) -> Bool {
+fn check_game_over(model: Model) -> Bool {
   let hx = model.head.x
   let hy = model.head.y
   let border_check =
-    hx >. right_border(ctx)
-    || hx <. left_border(ctx)
-    || hy >. upper_border(ctx)
-    || hy <. down_border(ctx)
+    hx >. right_border()
+    || hx <. left_border()
+    || hy >. upper_border()
+    || hy <. down_border()
 
   let own_tail_check = list.any(model.tail, fn(a) { a.x == hx && a.y == hy })
   border_check || own_tail_check
 }
 
-fn calculate_new_beute_pos(
-  model: Model,
-  safety: Int,
-  ctx: tiramisu.Context,
-) -> #(Float, Float) {
-  let new_pos_candidate = random_pos(ctx)
+fn calculate_new_beute_pos(model: Model, safety: Int) -> #(Float, Float) {
+  let new_pos_candidate = random_pos()
   let is_too_close =
     list.append([model.head], model.tail)
     |> list.any(spawn_too_close(_, new_pos_candidate))
   case is_too_close && safety < 5 {
-    True -> {
-      calculate_new_beute_pos(model, safety + 1, ctx)
-    }
+    True -> calculate_new_beute_pos(model, safety + 1)
     False -> new_pos_candidate
   }
 }
 
-fn random_pos(ctx: tiramisu.Context) -> #(Float, Float) {
-  let abs_x = ctx.canvas_size.y -. 2.0 *. box_width
+fn random_pos() -> #(Float, Float) {
+  let abs_x = canvas_height -. 2.0 *. box_width
   let rand_x = float.round(abs_x /. box_width) - 1
 
-  let abs_y = ctx.canvas_size.y -. 2.0 *. horz_border_dist() -. 2.0 *. box_width
+  let abs_y = canvas_height -. 2.0 *. horz_border_dist() -. 2.0 *. box_width
   let rand_y = float.round(abs_y /. box_width) - 1
   #(
     int.to_float(int.random(rand_x) - rand_x / 2) *. box_width,
@@ -251,10 +253,10 @@ fn spawn_too_close(snake_element: BoxData, cand: #(Float, Float)) -> Bool {
   dist_x <. 2.0 *. box_width && dist_y <. 2.0 *. box_width
 }
 
-fn update_snake_beute(model: Model, ctx: tiramisu.Context) -> Model {
+fn update_snake_beute(model: Model, ctx: tick.TickContext) -> Model {
   let delta_seconds = duration.to_seconds(ctx.delta_time)
   let new_time = model.time +. delta_seconds /. 10.0
-  let new_direction = parse_direction_from_key(ctx, model)
+  let new_direction = parse_direction_from_key(model)
 
   let threshold = 0.02
   case new_time >. threshold {
@@ -267,7 +269,7 @@ fn update_snake_beute(model: Model, ctx: tiramisu.Context) -> Model {
 
       let new_beute_pos = case is_grefressen {
         False -> model.beute_pos
-        _ -> calculate_new_beute_pos(model, 0, ctx)
+        _ -> calculate_new_beute_pos(model, 0)
       }
 
       let enhanced_tail = case is_grefressen {
@@ -328,19 +330,19 @@ fn update_head_pos(box_data: BoxData, direction: Direction) -> #(Float, Float) {
   #(box_data.x +. horizontal_mov, box_data.y +. vertical_mov)
 }
 
-fn parse_direction_from_key(ctx: tiramisu.Context, model: Model) -> Direction {
+fn parse_direction_from_key(model: Model) -> Direction {
   let is_left =
-    input.is_key_just_pressed(ctx.input, input.ArrowLeft)
-    || input.is_key_just_pressed(ctx.input, input.KeyA)
+    input.is_just_pressed(model.input, input.ArrowLeft)
+    || input.is_just_pressed(model.input, input.A)
   let is_right =
-    input.is_key_just_pressed(ctx.input, input.ArrowRight)
-    || input.is_key_just_pressed(ctx.input, input.KeyD)
+    input.is_just_pressed(model.input, input.ArrowRight)
+    || input.is_just_pressed(model.input, input.D)
   let is_up =
-    input.is_key_just_pressed(ctx.input, input.ArrowUp)
-    || input.is_key_just_pressed(ctx.input, input.KeyW)
+    input.is_just_pressed(model.input, input.ArrowUp)
+    || input.is_just_pressed(model.input, input.W)
   let is_down =
-    input.is_key_just_pressed(ctx.input, input.ArrowDown)
-    || input.is_key_just_pressed(ctx.input, input.KeyS)
+    input.is_just_pressed(model.input, input.ArrowDown)
+    || input.is_just_pressed(model.input, input.S)
   case is_left, is_right, is_up, is_down {
     True, _, _, _ -> check_new_direction_is_possible(Left, model)
     _, True, _, _ -> check_new_direction_is_possible(Right, model)
@@ -421,46 +423,61 @@ fn update_tail_pos(head_pos: BoxData, tail_pos: List(BoxData)) -> List(BoxData) 
 // View
 // =============================================================================
 
-pub fn view(model: Model, ctx: tiramisu.Context) -> scene.Node {
-  let cam =
-    camera.camera_2d(size: vec2.Vec2(
-      float.round(ctx.canvas_size.x),
-      float.round(ctx.canvas_size.y),
-    ))
-
-  let init_elements = [
-    scene.camera(
-      id: "camera",
-      camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 0.0, 20.0)),
-      active: True,
-      viewport: option.None,
-      postprocessing: option.None,
-    ),
-    scene.light(
-      id: "ambient",
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 1.0)
-        light
-      },
-      transform: transform.identity,
-    ),
-  ]
-  let base_elements =
-    list.append(init_elements, create_static_view(ctx))
-    |> list.append(create_score_display(model, ctx))
-
-  let all_elements =
-    base_elements
-    |> list.append(case model.game_state {
-      Running -> create_running_game_view(model)
-      GameOver -> create_game_over(model)
-      _ -> []
-    })
-  scene.empty(
-    id: "rootNode",
-    children: all_elements,
-    transform: transform.at(position: vec3.Vec3(0.0, 0.0, 0.0)),
+pub fn view(model: Model) -> Element(Msg) {
+  tiramisu.scene(
+    "snake",
+    [
+      // Canvas dimensions — match the canvas_width/canvas_height constants so
+      // 1 world unit == 1 pixel in the orthographic camera below.
+      attribute.attribute("width", "1920"),
+      attribute.attribute("height", "1080"),
+      scene.background_color(0x000000),
+      // tabindex="0" allows the element to receive keyboard focus on click.
+      attribute.attribute("tabindex", "0"),
+      input.on_keydown(KeyDown),
+      input.on_keyup(KeyUp),
+      input.on_mousedown(MouseDown),
+      input.on_mouseup(MouseUp),
+    ],
+    [
+      tiramisu.camera(
+        "camera",
+        [
+          camera.kind(camera.Orthographic),
+          // Map world units 1:1 to pixels — left/right span the full canvas width,
+          // top/bottom span the full canvas height.
+          camera.left(-960.0),
+          camera.right(960.0),
+          camera.top(540.0),
+          camera.bottom(-540.0),
+          camera.near(0.1),
+          camera.far(100.0),
+          camera.active(True),
+          transform.transform(transform.at(vec3.Vec3(0.0, 0.0, 20.0))),
+        ],
+        [],
+      ),
+      tiramisu.light(
+        "ambient",
+        [
+          light.kind(light.Ambient),
+          light.color(0xffffff),
+          light.intensity(1.0),
+        ],
+        [],
+      ),
+      tiramisu.empty("rootNode", [transform.transform(transform.identity)], {
+        list.flatten([
+          create_static_view(),
+          case model.game_state {
+            Running -> create_running_game_view(model)
+            // GameOver and NotStarted: only the static borders remain visible.
+            // The player can restart by pressing Enter or clicking.
+            GameOver | NotStarted -> []
+          },
+        ])
+      }),
+    ],
   )
 }
 
@@ -475,259 +492,117 @@ fn color_hex(color: Color) -> Int {
   }
 }
 
-fn create_static_view(ctx: tiramisu.Context) -> List(scene.Node) {
-  let assert Ok(border_material) =
-    material.new()
-    |> material.with_color(color_hex(BorderColor))
-    |> material.with_metalness(0.2)
-    |> material.with_roughness(0.9)
-    |> material.build()
+fn create_static_view() -> List(Element(Msg)) {
+  let v_height = canvas_height -. 2.0 *. horz_border_dist()
+  // Horizontal border: full canvas width, thin depth
+  let h_border_geom =
+    mesh.geometry_box(vec3.Vec3(canvas_width, box_width /. 5.0, 1.0))
+  // Vertical border: narrow width, spans the play area height
+  let v_border_geom =
+    mesh.geometry_box(vec3.Vec3(box_width /. 5.0, v_height, 1.0))
+  let border_color = mesh.color(color_hex(BorderColor))
+  let border_metalness = material.metalness(0.2)
+  let border_roughness = material.roughness(0.9)
 
-  let assert Ok(horizontal_border_geometry) =
-    geometry.box(size: vec3.Vec3(ctx.canvas_size.x, box_width /. 5.0, 1.0))
-
-  let assert Ok(vertical_border_geometry) =
-    geometry.box(size: vec3.Vec3(
-      box_width /. 5.0,
-      ctx.canvas_size.y -. 2.0 *. horz_border_dist(),
-      1.0,
-    ))
-  let borders = [
-    scene.mesh(
-      id: "upperLine",
-      geometry: horizontal_border_geometry,
-      material: border_material,
-      transform: transform.at(position: vec3.Vec3(0.0, upper_border(ctx), 0.0)),
-      physics: option.None,
+  [
+    tiramisu.mesh(
+      "upperLine",
+      [
+        h_border_geom,
+        border_color,
+        border_metalness,
+        border_roughness,
+        transform.transform(transform.at(vec3.Vec3(0.0, upper_border(), 0.0))),
+      ],
+      [],
     ),
-    scene.mesh(
-      id: "downLine",
-      geometry: horizontal_border_geometry,
-      material: border_material,
-      transform: transform.at(position: vec3.Vec3(0.0, down_border(ctx), 0.0)),
-      physics: option.None,
+    tiramisu.mesh(
+      "downLine",
+      [
+        h_border_geom,
+        border_color,
+        border_metalness,
+        border_roughness,
+        transform.transform(transform.at(vec3.Vec3(0.0, down_border(), 0.0))),
+      ],
+      [],
     ),
-    scene.mesh(
-      id: "leftLine",
-      geometry: vertical_border_geometry,
-      material: border_material,
-      transform: transform.at(position: vec3.Vec3(left_border(ctx), 0.0, 0.0)),
-      physics: option.None,
+    tiramisu.mesh(
+      "leftLine",
+      [
+        v_border_geom,
+        border_color,
+        border_metalness,
+        border_roughness,
+        transform.transform(transform.at(vec3.Vec3(left_border(), 0.0, 0.0))),
+      ],
+      [],
     ),
-    scene.mesh(
-      id: "rightLine",
-      geometry: vertical_border_geometry,
-      material: border_material,
-      transform: transform.at(position: vec3.Vec3(right_border(ctx), 0.0, 0.0)),
-      physics: option.None,
+    tiramisu.mesh(
+      "rightLine",
+      [
+        v_border_geom,
+        border_color,
+        border_metalness,
+        border_roughness,
+        transform.transform(transform.at(vec3.Vec3(right_border(), 0.0, 0.0))),
+      ],
+      [],
     ),
   ]
-
-  borders
 }
 
-fn create_game_over(model: Model) {
-  let assert Ok(game_over_text_material) =
-    material.new()
-    |> material.with_color(color_hex(PrimeColor))
-    |> material.with_metalness(0.0)
-    |> material.with_roughness(0.7)
-    |> material.build()
-  let score_string =
-    "GAME OVER FINAL SCORE: " <> int.to_string(model.score_info.current_score)
-  let score_string_new_highscore = case model.score_info.new_high_score {
-    True -> score_string <> " (New Highscore)"
-    False -> score_string
-  }
-  let text_elements = case model.maybe_font {
-    option.Some(font) -> {
-      let assert Ok(game_over_text) =
-        geometry.text(
-          text: score_string_new_highscore,
-          font: font,
-          size: 50.0,
-          depth: 0.2,
-          curve_segments: 12,
-          bevel_enabled: True,
-          bevel_thickness: 0.05,
-          bevel_size: 0.02,
-          bevel_offset: 0.0,
-          bevel_segments: 5,
-        )
-
-      let text_scene =
-        scene.mesh(
-          id: "game over display",
-          geometry: game_over_text,
-          material: game_over_text_material,
-          transform: transform.at(position: vec3.Vec3(
-            0.0 -. 9.0 *. box_width,
-            0.0,
-            0.0,
-          )),
-          physics: option.None,
-        )
-
-      let assert Ok(restart_hint_text) =
-        geometry.text(
-          text: "Press Enter or left Mouse for restart",
-          font: font,
-          size: 30.0,
-          depth: 0.2,
-          curve_segments: 12,
-          bevel_enabled: True,
-          bevel_thickness: 0.05,
-          bevel_size: 0.02,
-          bevel_offset: 0.0,
-          bevel_segments: 5,
-        )
-
-      let assert Ok(restart_hint_material) =
-        material.new()
-        |> material.with_color(color_hex(SecColor))
-        |> material.with_metalness(0.2)
-        |> material.with_roughness(0.9)
-        |> material.build()
-
-      let restart_button_scene =
-        scene.mesh(
-          id: "restartHint",
-          geometry: restart_hint_text,
-          material: restart_hint_material,
-          transform: transform.at(position: vec3.Vec3(
-            0.0 -. 9.0 *. box_width,
-            0.0 -. box_width,
-            0.0,
-          )),
-          physics: option.None,
-        )
-      [text_scene, restart_button_scene]
-    }
-    _ -> []
-  }
-  text_elements
-}
-
-fn create_score_display(model: Model, ctx: tiramisu.Context) -> List(scene.Node) {
-  let assert Ok(score_text_material) =
-    material.new()
-    |> material.with_color(color_hex(SecColor))
-    |> material.with_metalness(0.0)
-    |> material.with_roughness(0.7)
-    |> material.build()
-  let score_string = "Score: " <> int.to_string(model.score_info.current_score)
-  let complete_score = case model.score_info.highscore {
-    option.Some(val) ->
-      score_string <> " (Highscore: " <> int.to_string(val) <> ")"
-    _ -> score_string
-  }
-  let text_elements = case model.maybe_font {
-    option.Some(font) -> {
-      let assert Ok(text) =
-        geometry.text(
-          text: complete_score,
-          font: font,
-          size: 36.0,
-          depth: 0.2,
-          curve_segments: 12,
-          bevel_enabled: True,
-          bevel_thickness: 0.05,
-          bevel_size: 0.02,
-          bevel_offset: 0.0,
-          bevel_segments: 5,
-        )
-
-      let text_scene =
-        scene.mesh(
-          id: "score_display",
-          geometry: text,
-          material: score_text_material,
-          transform: transform.at(position: vec3.Vec3(
-            0.0 -. 200.0,
-            upper_border(ctx) +. horz_border_dist() /. 2.0,
-            0.0,
-          )),
-          physics: option.None,
-        )
-      [text_scene]
-    }
-    _ -> []
-  }
-  text_elements
-}
-
-fn create_running_game_view(model: Model) -> List(scene.Node) {
-  let assert Ok(cube_geometry) =
-    geometry.box(size: vec3.Vec3(box_width, box_width, 1.0))
-  let assert Ok(head_material) =
-    material.new()
-    |> material.with_color(color_hex(SnakeHeadColor))
-    |> material.with_metalness(0.2)
-    |> material.with_roughness(0.9)
-    |> material.build()
-
-  let assert Ok(beute_material) =
-    material.new()
-    |> material.with_color(color_hex(BeuteColor))
-    |> material.with_metalness(0.2)
-    |> material.with_roughness(0.9)
-    |> material.build()
-
+fn create_running_game_view(model: Model) -> List(Element(Msg)) {
+  let cube_geom = mesh.geometry_box(vec3.Vec3(box_width, box_width, 1.0))
   let head_position = vec3.Vec3(model.head.x, model.head.y, 0.0)
-  let dynamic_elements = [
-    scene.mesh(
-      id: "snakeHead",
-      geometry: cube_geometry,
-      material: head_material,
-      transform: transform.at(position: head_position),
-      physics: option.None,
+  [
+    tiramisu.mesh(
+      "snakeHead",
+      [
+        cube_geom,
+        mesh.color(color_hex(SnakeHeadColor)),
+        material.metalness(0.2),
+        material.roughness(0.9),
+        transform.transform(transform.at(head_position)),
+      ],
+      [],
     ),
-    scene.mesh(
-      id: "beute",
-      geometry: cube_geometry,
-      material: beute_material,
-      transform: transform.at(position: vec3.Vec3(
-        model.beute_pos.0,
-        model.beute_pos.1,
-        0.0,
-      )),
-      physics: option.None,
+    tiramisu.mesh(
+      "beute",
+      [
+        cube_geom,
+        mesh.color(color_hex(BeuteColor)),
+        material.metalness(0.2),
+        material.roughness(0.9),
+        transform.transform(
+          transform.at(vec3.Vec3(model.beute_pos.0, model.beute_pos.1, 0.0)),
+        ),
+      ],
+      [],
     ),
     ..tail_elements(model)
   ]
-  dynamic_elements
 }
 
-fn tail_elements(model: Model) -> List(scene.Node) {
-  let assert Ok(cube_geometry) =
-    geometry.box(size: vec3.Vec3(box_width, box_width, 1.0))
-
-  let assert Ok(tail_material) =
-    material.new()
-    |> material.with_color(color_hex(SnakeTailColor))
-    |> material.with_metalness(0.2)
-    |> material.with_roughness(0.9)
-    |> material.build()
+fn tail_elements(model: Model) -> List(Element(Msg)) {
   model.tail
   |> list.map(fn(tail_element) { #(tail_element.x, tail_element.y) })
   |> list.index_map(fn(tuple, index) {
-    create_box_cell_mesh(tuple.0, tuple.1, index, cube_geometry, tail_material)
+    create_tail_element(tuple.0, tuple.1, index)
   })
 }
 
-fn create_box_cell_mesh(
-  x: Float,
-  y: Float,
-  index: Int,
-  cube_geometry: geometry.Geometry,
-  tail_material: material.Material,
-) -> scene.Node {
-  scene.mesh(
-    id: string.append("TailElement", int.to_string(index)),
-    geometry: cube_geometry,
-    material: tail_material,
-    transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
-    physics: option.None,
+fn create_tail_element(x: Float, y: Float, index: Int) -> Element(Msg) {
+  tiramisu.mesh(
+    string.append("TailElement", int.to_string(index)),
+    [
+      mesh.geometry_box(vec3.Vec3(box_width, box_width, 1.0)),
+      mesh.color(color_hex(SnakeTailColor)),
+      material.metalness(0.2),
+      material.roughness(0.9),
+      transform.transform(transform.at(vec3.Vec3(x, y, 0.0))),
+    ],
+    [],
   )
 }
 
@@ -735,28 +610,20 @@ fn create_box_cell_mesh(
 // Border Calculations
 // =============================================================================
 
-fn left_border(ctx: tiramisu.Context) -> Float {
-  0.0 -. half_vert_calc(ctx)
+fn left_border() -> Float {
+  0.0 -. canvas_width /. 2.0
 }
 
-fn right_border(ctx: tiramisu.Context) -> Float {
-  half_vert_calc(ctx)
+fn right_border() -> Float {
+  canvas_width /. 2.0
 }
 
-fn half_vert_calc(ctx: tiramisu.Context) -> Float {
-  ctx.canvas_size.x /. 2.0
+fn upper_border() -> Float {
+  canvas_height /. 2.0 -. horz_border_dist()
 }
 
-fn upper_border(ctx: tiramisu.Context) -> Float {
-  half_horz_calc(ctx)
-}
-
-fn down_border(ctx: tiramisu.Context) -> Float {
-  0.0 -. half_horz_calc(ctx)
-}
-
-fn half_horz_calc(ctx: tiramisu.Context) -> Float {
-  ctx.canvas_size.y /. 2.0 -. horz_border_dist()
+fn down_border() -> Float {
+  0.0 -. { canvas_height /. 2.0 -. horz_border_dist() }
 }
 
 fn horz_border_dist() -> Float {
