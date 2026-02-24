@@ -12,8 +12,10 @@
 ////
 //// This is O(n) where n = total nodes.
 
+import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/option
 
 import tiramisu/internal/scene.{type SceneNode}
 import tiramisu/internal/scene_patch.{type ScenePatch}
@@ -52,13 +54,13 @@ fn flatten(
   parent_id: String,
 ) -> Dict(String, #(SceneNode, String)) {
   list.fold(nodes, map, fn(acc, node) {
-    let id = scene.key(node)
+    let id = node.key
     // Skip nodes without IDs — they can't be diffed
     case id {
-      "" -> flatten(acc, scene.children(node), parent_id)
+      "" -> flatten(acc, node.children, parent_id)
       _ -> {
         let acc = dict.insert(acc, id, #(node, parent_id))
-        flatten(acc, scene.children(node), id)
+        flatten(acc, node.children, id)
       }
     }
   })
@@ -77,10 +79,10 @@ fn walk(
 ) -> #(List(ScenePatch), Dict(String, #(SceneNode, String))) {
   list.fold(nodes, #(patches, old_map), fn(acc, node) {
     let #(patches, old_map) = acc
-    let id = scene.key(node)
+    let id = node.key
     case id {
       // Skip nodes without IDs
-      "" -> walk(scene.children(node), parent_id, old_map, patches)
+      "" -> walk(node.children, parent_id, old_map, patches)
       _ -> {
         case dict.get(old_map, id) {
           Ok(#(old_node, old_parent_id)) -> {
@@ -100,14 +102,14 @@ fn walk(
             let patches = diff_node(old_node, node, patches)
 
             // Recurse into children
-            walk(scene.children(node), id, old_map, patches)
+            walk(node.children, id, old_map, patches)
           }
           Error(Nil) -> {
             // New node — emit create patch
             let patches = create_patches(node, parent_id, patches)
 
             // Recurse into children
-            walk(scene.children(node), id, old_map, patches)
+            walk(node.children, id, old_map, patches)
           }
         }
       }
@@ -126,434 +128,502 @@ fn diff_node(
   case old, new {
     scene.MeshNode(
       key: id,
-      geometry: og,
-      src: os,
-      material_type: omt,
-      color: oc,
-      metalness: om,
-      roughness: or_,
-      opacity: oo,
-      wireframe: ow,
-      emissive: oe,
-      emissive_intensity: oei,
-      side: osd,
-      color_map: ocm,
-      normal_map: onm,
-      ao_map: oam,
-      roughness_map: orm,
-      metalness_map: omm,
-      displacement_map: odm,
-      displacement_scale: ods,
-      displacement_bias: odb,
-      shininess: osh,
-      alpha_test: oat,
-      transparent: otr,
-      transform: ot,
-      visible: ov,
-      cast_shadow: ocs,
-      receive_shadow: ors,
-      physics_controlled: opc,
+      geometry: old_geometry,
+      src: old_src,
+      material_type: old_material_type,
+      color: old_color,
+      metalness: old_metalness,
+      roughness: old_roughness,
+      opacity: old_opacity,
+      wireframe: old_wireframe,
+      emissive: old_emissive,
+      emissive_intensity: old_emissive_intensity,
+      side: old_side,
+      color_map: old_color_map,
+      normal_map: old_normal_map,
+      ao_map: old_ao_map,
+      roughness_map: old_roughness_map,
+      metalness_map: old_metalness_map,
+      displacement_map: old_displacement_map,
+      displacement_scale: old_displacement_scale,
+      displacement_bias: old_displacement_bias,
+      shininess: old_shininess,
+      alpha_test: old_alpha_test,
+      transparent: old_transparent,
+      transform: old_transform,
+      visible: old_visible,
+      cast_shadow: old_cast_shadow,
+      receive_shadow: old_receive_shadow,
       ..,
     ),
       scene.MeshNode(
-        geometry: ng,
-        src: ns,
-        material_type: nmt,
-        color: nc,
-        metalness: nm,
-        roughness: nr,
-        opacity: no,
-        wireframe: nw,
-        emissive: ne,
-        emissive_intensity: nei,
-        side: nsd,
-        color_map: ncm,
-        normal_map: nnm,
-        ao_map: nam,
-        roughness_map: nrm,
-        metalness_map: nmm,
-        displacement_map: ndm,
-        displacement_scale: nds,
-        displacement_bias: ndb,
-        shininess: nsh,
-        alpha_test: nat,
-        transparent: ntr,
-        transform: nt,
-        visible: nv,
-        cast_shadow: ncs,
-        receive_shadow: nrs,
-        physics_controlled: npc,
+        geometry: new_geometry,
+        src: new_src,
+        material_type: new_material_type,
+        color: new_color,
+        metalness: new_metalness,
+        roughness: new_roughness,
+        opacity: new_opacity,
+        wireframe: new_wireframe,
+        emissive: new_emissive,
+        emissive_intensity: new_emissive_intensity,
+        side: new_side,
+        color_map: new_color_map,
+        normal_map: new_normal_map,
+        ao_map: new_ao_map,
+        roughness_map: new_roughness_map,
+        metalness_map: new_metalness_map,
+        displacement_map: new_displacement_map,
+        displacement_scale: new_displacement_scale,
+        displacement_bias: new_displacement_bias,
+        shininess: new_shininess,
+        alpha_test: new_alpha_test,
+        transparent: new_transparent,
+        transform: new_transform,
+        visible: new_visible,
+        cast_shadow: new_cast_shadow,
+        receive_shadow: new_receive_shadow,
+        physics_controlled: new_physics_controlled,
         ..,
       )
     -> {
-      let patches = case og == ng {
-        True -> patches
-        False -> [scene_patch.UpdateMeshGeometry(id:, geometry: ng), ..patches]
+      let patches = {
+        use <- bool.guard(old_geometry == new_geometry, patches)
+        [scene_patch.UpdateMeshGeometry(id:, geometry: new_geometry), ..patches]
       }
-      let patches = case os == ns {
-        True -> patches
-        False -> [scene_patch.UpdateMeshSrc(id:, src: ns), ..patches]
+      let patches = {
+        use <- bool.guard(old_src == new_src, patches)
+        [scene_patch.UpdateMeshSrc(id:, src: new_src), ..patches]
       }
       // Material type change requires full material rebuild; otherwise check
       // individual material properties
-      let patches = case
-        omt == nmt
-        && oc == nc
-        && om == nm
-        && or_ == nr
-        && oo == no
-        && ow == nw
-        && oe == ne
-        && oei == nei
-        && osd == nsd
-        && ocm == ncm
-        && onm == nnm
-        && oam == nam
-        && orm == nrm
-        && omm == nmm
-        && odm == ndm
-        && ods == nds
-        && odb == ndb
-        && osh == nsh
-        && oat == nat
-        && otr == ntr
-      {
-        True -> patches
-        False -> [
+      let material_unchanged =
+        old_material_type == new_material_type
+        && old_color == new_color
+        && old_metalness == new_metalness
+        && old_roughness == new_roughness
+        && old_opacity == new_opacity
+        && old_wireframe == new_wireframe
+        && old_emissive == new_emissive
+        && old_emissive_intensity == new_emissive_intensity
+        && old_side == new_side
+        && old_color_map == new_color_map
+        && old_normal_map == new_normal_map
+        && old_ao_map == new_ao_map
+        && old_roughness_map == new_roughness_map
+        && old_metalness_map == new_metalness_map
+        && old_displacement_map == new_displacement_map
+        && old_displacement_scale == new_displacement_scale
+        && old_displacement_bias == new_displacement_bias
+        && old_shininess == new_shininess
+        && old_alpha_test == new_alpha_test
+        && old_transparent == new_transparent
+      let patches = {
+        use <- bool.guard(material_unchanged, patches)
+        [
           scene_patch.UpdateMeshMaterial(
             id:,
-            material_type: nmt,
-            color: nc,
-            metalness: nm,
-            roughness: nr,
-            opacity: no,
-            wireframe: nw,
-            emissive: ne,
-            emissive_intensity: nei,
-            side: nsd,
-            color_map: ncm,
-            normal_map: nnm,
-            ao_map: nam,
-            roughness_map: nrm,
-            metalness_map: nmm,
-            displacement_map: ndm,
-            displacement_scale: nds,
-            displacement_bias: ndb,
-            shininess: nsh,
-            alpha_test: nat,
-            transparent: ntr,
+            material_type: new_material_type,
+            color: new_color,
+            metalness: new_metalness,
+            roughness: new_roughness,
+            opacity: new_opacity,
+            wireframe: new_wireframe,
+            emissive: new_emissive,
+            emissive_intensity: new_emissive_intensity,
+            side: new_side,
+            color_map: new_color_map,
+            normal_map: new_normal_map,
+            ao_map: new_ao_map,
+            roughness_map: new_roughness_map,
+            metalness_map: new_metalness_map,
+            displacement_map: new_displacement_map,
+            displacement_scale: new_displacement_scale,
+            displacement_bias: new_displacement_bias,
+            shininess: new_shininess,
+            alpha_test: new_alpha_test,
+            transparent: new_transparent,
           ),
           ..patches
         ]
       }
-      let patches = case ov == nv {
-        True -> patches
-        False -> [scene_patch.UpdateMeshVisibility(id:, visible: nv), ..patches]
+      let patches = {
+        use <- bool.guard(old_visible == new_visible, patches)
+        [scene_patch.UpdateMeshVisibility(id:, visible: new_visible), ..patches]
       }
-      // Shadow property updates
-      let patches = case ocs == ncs && ors == nrs {
-        True -> patches
-        False -> [
+      let patches = {
+        use <- bool.guard(
+          old_cast_shadow == new_cast_shadow
+            && old_receive_shadow == new_receive_shadow,
+          patches,
+        )
+        [
           scene_patch.UpdateMeshShadow(
             id:,
-            cast_shadow: ncs,
-            receive_shadow: nrs,
+            cast_shadow: new_cast_shadow,
+            receive_shadow: new_receive_shadow,
           ),
           ..patches
         ]
       }
       // Skip transform updates for physics-controlled meshes
-      let patches = case npc {
-        True -> patches
-        False ->
-          case ot == nt {
-            True -> patches
-            False -> [
-              scene_patch.UpdateTransform(id:, transform: nt),
-              ..patches
-            ]
-          }
+      let is_physics_controlled = option.unwrap(new_physics_controlled, False)
+      let patches = {
+        use <- bool.guard(
+          is_physics_controlled || old_transform == new_transform,
+          patches,
+        )
+        [scene_patch.UpdateTransform(id:, transform: new_transform), ..patches]
       }
-      // Suppress unused variable warnings
-      let _ = opc
       patches
     }
 
     scene.CameraNode(
       key: id,
-      camera_type: oct,
-      fov: of,
-      near: on,
-      far: ofa,
-      transform: ot,
-      active: oa,
+      camera_type: old_camera_type,
+      fov: old_fov,
+      near: old_near,
+      far: old_far,
+      transform: old_transform,
+      active: old_active,
+      ..,
     ),
       scene.CameraNode(
-        key: _,
-        camera_type: nct,
-        fov: nf,
-        near: nn,
-        far: nfa,
-        transform: nt,
-        active: na,
+        camera_type: new_camera_type,
+        fov: new_fov,
+        near: new_near,
+        far: new_far,
+        transform: new_transform,
+        active: new_active,
+        ..,
       )
     -> {
-      let patches = case oct == nct && of == nf && on == nn && ofa == nfa {
-        True -> patches
-        False -> [
+      let patches = {
+        use <- bool.guard(
+          old_camera_type == new_camera_type
+            && old_fov == new_fov
+            && old_near == new_near
+            && old_far == new_far,
+          patches,
+        )
+        [
           scene_patch.UpdateCameraProps(
             id:,
-            camera_type: nct,
-            fov: nf,
-            near: nn,
-            far: nfa,
+            camera_type: new_camera_type,
+            fov: new_fov,
+            near: new_near,
+            far: new_far,
           ),
           ..patches
         ]
       }
-      let patches = case oa == na {
-        True -> patches
-        False -> [scene_patch.UpdateCameraActive(id:, active: na), ..patches]
+      let patches = {
+        use <- bool.guard(old_active == new_active, patches)
+        [scene_patch.UpdateCameraActive(id:, active: new_active), ..patches]
       }
-      let patches = case ot == nt {
-        True -> patches
-        False -> [scene_patch.UpdateTransform(id:, transform: nt), ..patches]
+      let patches = {
+        use <- bool.guard(old_transform == new_transform, patches)
+        [scene_patch.UpdateTransform(id:, transform: new_transform), ..patches]
       }
       patches
     }
 
     scene.LightNode(
       key: id,
-      color: oc,
-      intensity: oi,
-      transform: ot,
-      cast_shadow: ocs,
+      color: old_color,
+      intensity: old_intensity,
+      transform: old_transform,
+      cast_shadow: old_cast_shadow,
       ..,
     ),
       scene.LightNode(
-        color: nc,
-        intensity: ni,
-        transform: nt,
-        cast_shadow: ncs,
+        color: new_color,
+        intensity: new_intensity,
+        transform: new_transform,
+        cast_shadow: new_cast_shadow,
         ..,
       )
     -> {
-      let patches = case oc == nc && oi == ni && ocs == ncs {
-        True -> patches
-        False -> [
+      let patches = {
+        use <- bool.guard(
+          old_color == new_color
+            && old_intensity == new_intensity
+            && old_cast_shadow == new_cast_shadow,
+          patches,
+        )
+        [
           scene_patch.UpdateLightProps(
             id:,
-            color: nc,
-            intensity: ni,
-            cast_shadow: ncs,
+            color: new_color,
+            intensity: new_intensity,
+            cast_shadow: new_cast_shadow,
           ),
           ..patches
         ]
       }
-      let patches = case ot == nt {
-        True -> patches
-        False -> [scene_patch.UpdateTransform(id:, transform: nt), ..patches]
+      let patches = {
+        use <- bool.guard(old_transform == new_transform, patches)
+        [scene_patch.UpdateTransform(id:, transform: new_transform), ..patches]
       }
       patches
     }
 
-    scene.EmptyNode(key: id, transform: ot, visible: ov, ..),
-      scene.EmptyNode(transform: nt, visible: nv, ..)
+    scene.EmptyNode(key: id, transform: old_transform, visible: old_visible, ..),
+      scene.EmptyNode(transform: new_transform, visible: new_visible, ..)
     -> {
-      let patches = case ov == nv {
-        True -> patches
-        False -> [
-          scene_patch.UpdateGroupVisibility(id:, visible: nv),
+      let patches = {
+        use <- bool.guard(old_visible == new_visible, patches)
+        [
+          scene_patch.UpdateGroupVisibility(id:, visible: new_visible),
           ..patches
         ]
       }
-      let patches = case ot == nt {
-        True -> patches
-        False -> [scene_patch.UpdateTransform(id:, transform: nt), ..patches]
+      let patches = {
+        use <- bool.guard(old_transform == new_transform, patches)
+        [scene_patch.UpdateTransform(id:, transform: new_transform), ..patches]
       }
       patches
     }
 
     scene.AudioNode(
       key: id,
-      src: os,
-      volume: ov,
-      loop: ol,
-      playing: op,
-      playback_rate: opr,
-      detune: od,
+      src: old_src,
+      volume: old_volume,
+      loop: old_loop,
+      playing: old_playing,
+      playback_rate: old_playback_rate,
+      detune: old_detune,
+      ..,
     ),
       scene.AudioNode(
-        src: ns,
-        volume: nv,
-        loop: nl,
-        playing: np,
-        playback_rate: npr,
-        detune: nd,
+        src: new_src,
+        volume: new_volume,
+        loop: new_loop,
+        playing: new_playing,
+        playback_rate: new_playback_rate,
+        detune: new_detune,
         ..,
       )
     -> {
-      case os == ns && ov == nv && ol == nl && op == np && opr == npr && od == nd {
-        True -> patches
-        False -> [
-          scene_patch.UpdateAudioProps(
-            id:,
-            src: ns,
-            volume: nv,
-            loop: nl,
-            playing: np,
-            playback_rate: npr,
-            detune: nd,
-          ),
-          ..patches
-        ]
-      }
+      use <- bool.guard(
+        old_src == new_src
+          && old_volume == new_volume
+          && old_loop == new_loop
+          && old_playing == new_playing
+          && old_playback_rate == new_playback_rate
+          && old_detune == new_detune,
+        patches,
+      )
+      [
+        scene_patch.UpdateAudioProps(
+          id:,
+          src: new_src,
+          volume: new_volume,
+          loop: new_loop,
+          playing: new_playing,
+          playback_rate: new_playback_rate,
+          detune: new_detune,
+        ),
+        ..patches
+      ]
     }
 
     scene.PositionalAudioNode(
       key: id,
-      src: os,
-      volume: ov,
-      loop: ol,
-      playing: op,
-      playback_rate: opr,
-      detune: od,
-      transform: ot,
-      ref_distance: ord,
-      max_distance: omd,
-      rolloff_factor: orf,
+      src: old_src,
+      volume: old_volume,
+      loop: old_loop,
+      playing: old_playing,
+      playback_rate: old_playback_rate,
+      detune: old_detune,
+      transform: old_transform,
+      ref_distance: old_ref_distance,
+      max_distance: old_max_distance,
+      rolloff_factor: old_rolloff_factor,
       ..,
     ),
       scene.PositionalAudioNode(
-        src: ns,
-        volume: nv,
-        loop: nl,
-        playing: np,
-        playback_rate: npr,
-        detune: nd,
-        transform: nt,
-        ref_distance: nrd,
-        max_distance: nmd,
-        rolloff_factor: nrf,
+        src: new_src,
+        volume: new_volume,
+        loop: new_loop,
+        playing: new_playing,
+        playback_rate: new_playback_rate,
+        detune: new_detune,
+        transform: new_transform,
+        ref_distance: new_ref_distance,
+        max_distance: new_max_distance,
+        rolloff_factor: new_rolloff_factor,
         ..,
       )
     -> {
-      case
-        os == ns
-        && ov == nv
-        && ol == nl
-        && op == np
-        && opr == npr
-        && od == nd
-        && ot == nt
-        && ord == nrd
-        && omd == nmd
-        && orf == nrf
-      {
-        True -> patches
-        False -> [
-          scene_patch.UpdatePositionalAudio(
-            id:,
-            src: ns,
-            volume: nv,
-            loop: nl,
-            playing: np,
-            playback_rate: npr,
-            detune: nd,
-            transform: nt,
-            ref_distance: nrd,
-            max_distance: nmd,
-            rolloff_factor: nrf,
-          ),
-          ..patches
-        ]
-      }
+      use <- bool.guard(
+        old_src == new_src
+          && old_volume == new_volume
+          && old_loop == new_loop
+          && old_playing == new_playing
+          && old_playback_rate == new_playback_rate
+          && old_detune == new_detune
+          && old_transform == new_transform
+          && old_ref_distance == new_ref_distance
+          && old_max_distance == new_max_distance
+          && old_rolloff_factor == new_rolloff_factor,
+        patches,
+      )
+      [
+        scene_patch.UpdatePositionalAudio(
+          id:,
+          src: new_src,
+          volume: new_volume,
+          loop: new_loop,
+          playing: new_playing,
+          playback_rate: new_playback_rate,
+          detune: new_detune,
+          transform: new_transform,
+          ref_distance: new_ref_distance,
+          max_distance: new_max_distance,
+          rolloff_factor: new_rolloff_factor,
+        ),
+        ..patches
+      ]
     }
 
     // Debug nodes are immutable — any change means remove + recreate
-    scene.DebugNode(key: id, debug_type: odt, size: os, divisions: od, color: oc, transform: ot),
-      scene.DebugNode(debug_type: ndt, size: ns, divisions: nd, color: nc, transform: nt, ..)
+    scene.DebugNode(
+      key: id,
+      debug_type: old_debug_type,
+      size: old_size,
+      divisions: old_divisions,
+      color: old_color,
+      transform: old_transform,
+      ..,
+    ),
+      scene.DebugNode(
+        debug_type: new_debug_type,
+        size: new_size,
+        divisions: new_divisions,
+        color: new_color,
+        transform: new_transform,
+        ..,
+      )
     -> {
-      case odt == ndt && os == ns && od == nd && oc == nc && ot == nt {
-        True -> patches
-        False -> [scene_patch.Remove(id:), ..patches]
-      }
-    }
-
-    // LOD: transform only; children handled by recursive walk
-    scene.LodNode(key: id, transform: ot, ..),
-      scene.LodNode(transform: nt, ..)
-    -> {
-      case ot == nt {
-        True -> patches
-        False -> [scene_patch.UpdateTransform(id:, transform: nt), ..patches]
-      }
+      use <- bool.guard(
+        old_debug_type == new_debug_type
+          && old_size == new_size
+          && old_divisions == new_divisions
+          && old_color == new_color
+          && old_transform == new_transform,
+        patches,
+      )
+      [scene_patch.Remove(id:), ..patches]
     }
 
     scene.InstancedMeshNode(
       key: id,
-      geometry: og, material_type: omt, color: oc,
-      metalness: om, roughness: or_, opacity: oo, wireframe: ow, transparent: otr,
-      instances: oi, transform: ot, visible: ov,
-      cast_shadow: ocs, receive_shadow: ors, ..
+      geometry: old_geometry,
+      material_type: old_material_type,
+      color: old_color,
+      metalness: old_metalness,
+      roughness: old_roughness,
+      opacity: old_opacity,
+      wireframe: old_wireframe,
+      transparent: old_transparent,
+      instances: old_instances,
+      transform: old_transform,
+      visible: old_visible,
+      cast_shadow: old_cast_shadow,
+      receive_shadow: old_receive_shadow,
+      ..,
     ),
       scene.InstancedMeshNode(
-        geometry: ng, material_type: nmt, color: nc,
-        metalness: nm, roughness: nr, opacity: no, wireframe: nw, transparent: ntr,
-        instances: ni, transform: nt, visible: nv,
-        cast_shadow: ncs, receive_shadow: nrs, ..
+        geometry: new_geometry,
+        material_type: new_material_type,
+        color: new_color,
+        metalness: new_metalness,
+        roughness: new_roughness,
+        opacity: new_opacity,
+        wireframe: new_wireframe,
+        transparent: new_transparent,
+        instances: new_instances,
+        transform: new_transform,
+        visible: new_visible,
+        cast_shadow: new_cast_shadow,
+        receive_shadow: new_receive_shadow,
+        ..,
       )
     -> {
       // Geometry change requires full remove + recreate
-      let patches = case og == ng {
-        True -> patches
-        False -> [scene_patch.Remove(id:), ..patches]
+      let patches = {
+        use <- bool.guard(old_geometry == new_geometry, patches)
+        [scene_patch.Remove(id:), ..patches]
       }
       // Only emit granular updates if geometry didn't change
-      case og == ng {
+      case old_geometry == new_geometry {
         False -> patches
         True -> {
-          let patches = case
-            omt == nmt && oc == nc && om == nm && or_ == nr
-            && oo == no && ow == nw && otr == ntr
-          {
-            True -> patches
-            False -> [
+          let patches = {
+            use <- bool.guard(
+              old_material_type == new_material_type
+                && old_color == new_color
+                && old_metalness == new_metalness
+                && old_roughness == new_roughness
+                && old_opacity == new_opacity
+                && old_wireframe == new_wireframe
+                && old_transparent == new_transparent,
+              patches,
+            )
+            [
               scene_patch.UpdateInstancedMeshMaterial(
                 id:,
-                material_type: nmt, color: nc, metalness: nm,
-                roughness: nr, opacity: no, wireframe: nw, transparent: ntr,
+                material_type: new_material_type,
+                color: new_color,
+                metalness: new_metalness,
+                roughness: new_roughness,
+                opacity: new_opacity,
+                wireframe: new_wireframe,
+                transparent: new_transparent,
               ),
               ..patches
             ]
           }
-          let patches = case oi == ni {
-            True -> patches
-            False -> [
-              scene_patch.UpdateInstancedMeshInstances(id:, instances: ni),
+          let patches = {
+            use <- bool.guard(old_instances == new_instances, patches)
+            [
+              scene_patch.UpdateInstancedMeshInstances(
+                id:,
+                instances: new_instances,
+              ),
               ..patches
             ]
           }
-          let patches = case ov == nv {
-            True -> patches
-            False -> [
-              scene_patch.UpdateInstancedMeshVisibility(id:, visible: nv),
+          let patches = {
+            use <- bool.guard(old_visible == new_visible, patches)
+            [
+              scene_patch.UpdateInstancedMeshVisibility(
+                id:,
+                visible: new_visible,
+              ),
               ..patches
             ]
           }
-          let patches = case ocs == ncs && ors == nrs {
-            True -> patches
-            False -> [
+          let patches = {
+            use <- bool.guard(
+              old_cast_shadow == new_cast_shadow
+                && old_receive_shadow == new_receive_shadow,
+              patches,
+            )
+            [
               scene_patch.UpdateInstancedMeshShadow(
-                id:, cast_shadow: ncs, receive_shadow: nrs,
+                id:,
+                cast_shadow: new_cast_shadow,
+                receive_shadow: new_receive_shadow,
               ),
               ..patches
             ]
           }
-          let patches = case ot == nt {
-            True -> patches
-            False -> [
-              scene_patch.UpdateTransform(id:, transform: nt),
+          let patches = {
+            use <- bool.guard(old_transform == new_transform, patches)
+            [
+              scene_patch.UpdateTransform(id:, transform: new_transform),
               ..patches
             ]
           }
@@ -563,10 +633,7 @@ fn diff_node(
     }
 
     // Type changed — remove old, create new (handled by remove + create)
-    _, _ -> {
-      let id = scene.key(old)
-      [scene_patch.Remove(id:), ..patches]
-    }
+    _, _ -> [scene_patch.Remove(id: old.key), ..patches]
   }
 }
 
@@ -607,7 +674,6 @@ fn create_patches(
       visible:,
       cast_shadow:,
       receive_shadow:,
-      distance:,
       ..,
     ) -> [
       scene_patch.CreateMesh(
@@ -639,7 +705,6 @@ fn create_patches(
         visible:,
         cast_shadow:,
         receive_shadow:,
-        distance:,
       ),
       ..patches
     ]
@@ -652,6 +717,7 @@ fn create_patches(
       far:,
       transform:,
       active:,
+      ..,
     ) -> [
       scene_patch.CreateCamera(
         id:,
@@ -673,6 +739,7 @@ fn create_patches(
       intensity:,
       transform:,
       cast_shadow:,
+      ..,
     ) -> [
       scene_patch.CreateLight(
         id:,
@@ -691,9 +758,19 @@ fn create_patches(
       ..patches
     ]
 
-    scene.AudioNode(key: id, src:, volume:, loop:, playing:, playback_rate:, detune:) -> [
+    scene.AudioNode(
+      key: id,
+      src:,
+      volume:,
+      loop:,
+      playing:,
+      playback_rate:,
+      detune:,
+      ..,
+    ) -> [
       scene_patch.CreateAudio(
         id:,
+        parent_id:,
         src:,
         volume:,
         loop:,
@@ -735,7 +812,15 @@ fn create_patches(
       ..patches
     ]
 
-    scene.DebugNode(key: id, debug_type:, size:, divisions:, color:, transform:) -> [
+    scene.DebugNode(
+      key: id,
+      debug_type:,
+      size:,
+      divisions:,
+      color:,
+      transform:,
+      ..,
+    ) -> [
       scene_patch.CreateDebug(
         id:,
         parent_id:,
@@ -745,11 +830,6 @@ fn create_patches(
         color:,
         transform:,
       ),
-      ..patches
-    ]
-
-    scene.LodNode(key: id, transform:, ..) -> [
-      scene_patch.CreateLod(id:, parent_id:, transform:),
       ..patches
     ]
 

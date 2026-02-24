@@ -13,6 +13,7 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/time/duration
+import tiramisu/material
 import vec/vec3f
 
 import lustre
@@ -282,7 +283,7 @@ fn view(_model: Model) {
     ],
     [
       // Camera looking at the scene from above and behind
-      camera.camera(
+      tiramisu.camera(
         "main",
         [
           camera.fov(75.0),
@@ -297,14 +298,15 @@ fn view(_model: Model) {
       // ---------------------------------------------------------------
       // Player — controllable box (belongs to group 4, collides with all)
       // ---------------------------------------------------------------
-      mesh.mesh(
+      tiramisu.mesh(
         "player",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x00ff88),
-          mesh.metalness(0.4),
-          mesh.roughness(0.6),
           mesh.transform(transform.at(vec3.Vec3(0.0, 2.0, 0.0))),
+
+          material.cast_shadow(True),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.0),
@@ -321,14 +323,13 @@ fn view(_model: Model) {
       // pass through each other but both collide with player (group 4)
       // ---------------------------------------------------------------
       // Red team — group 1, collides with group 1 + group 4
-      mesh.mesh(
+      tiramisu.mesh(
         "red1",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xff6b6b),
-          mesh.metalness(0.3),
-          mesh.roughness(0.7),
           mesh.transform(transform.at(vec3.Vec3(3.0, 2.0, -2.0))),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.3),
@@ -336,14 +337,13 @@ fn view(_model: Model) {
         ],
         [],
       ),
-      mesh.mesh(
+      tiramisu.mesh(
         "red2",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xe05050),
-          mesh.metalness(0.3),
-          mesh.roughness(0.7),
           mesh.transform(transform.at(vec3.Vec3(4.0, 2.0, -2.0))),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.3),
@@ -352,14 +352,13 @@ fn view(_model: Model) {
         [],
       ),
       // Blue team — group 2, collides with group 2 + group 4
-      mesh.mesh(
+      tiramisu.mesh(
         "blue1",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x4ecdc4),
-          mesh.metalness(0.5),
-          mesh.roughness(0.5),
           mesh.transform(transform.at(vec3.Vec3(3.5, 2.0, -2.0))),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.3),
@@ -367,14 +366,13 @@ fn view(_model: Model) {
         ],
         [],
       ),
-      mesh.mesh(
+      tiramisu.mesh(
         "blue2",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x3498db),
-          mesh.metalness(0.5),
-          mesh.roughness(0.5),
           mesh.transform(transform.at(vec3.Vec3(4.5, 2.0, -2.0))),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.3),
@@ -385,15 +383,15 @@ fn view(_model: Model) {
       // ---------------------------------------------------------------
       // Sensor trigger zone — detects player entry/exit
       // ---------------------------------------------------------------
-      mesh.mesh(
+      tiramisu.mesh(
         "trigger_zone",
         [
           mesh.geometry_box(vec3.Vec3(3.0, 2.0, 3.0)),
           mesh.color(0xffaa00),
-          mesh.metalness(0.0),
-          mesh.roughness(1.0),
-          mesh.opacity(0.2),
           mesh.transform(transform.at(vec3.Vec3(-3.0, 1.0, 3.0))),
+
+          material.opacity(0.2),
+
           cacao.body_type(cacao.Fixed),
           cacao.collider(cacao.Cuboid(1.5, 1.0, 1.5)),
           cacao.sensor(True),
@@ -403,13 +401,11 @@ fn view(_model: Model) {
       // ---------------------------------------------------------------
       // Pushable sphere
       // ---------------------------------------------------------------
-      mesh.mesh(
+      tiramisu.mesh(
         "sphere",
         [
-          mesh.geometry_sphere_simple(0.5),
+          mesh.sphere_simple(0.5),
           mesh.color(0xfeca57),
-          mesh.metalness(0.8),
-          mesh.roughness(0.2),
           mesh.transform(transform.at(vec3.Vec3(1.0, 2.0, 2.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Ball(0.5)),
@@ -420,13 +416,11 @@ fn view(_model: Model) {
       // ---------------------------------------------------------------
       // Stacked boxes — a small tower to knock over
       // ---------------------------------------------------------------
-      mesh.mesh(
+      tiramisu.mesh(
         "stack1",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0xe056a0),
-          mesh.metalness(0.3),
-          mesh.roughness(0.7),
           mesh.transform(transform.at(vec3.Vec3(-6.0, 1.0, -1.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -434,13 +428,11 @@ fn view(_model: Model) {
         ],
         [],
       ),
-      mesh.mesh(
+      tiramisu.mesh(
         "stack2",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x9b59b6),
-          mesh.metalness(0.3),
-          mesh.roughness(0.7),
           mesh.transform(transform.at(vec3.Vec3(-6.0, 2.0, -1.0))),
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
@@ -448,14 +440,13 @@ fn view(_model: Model) {
         ],
         [],
       ),
-      mesh.mesh(
+      tiramisu.mesh(
         "stack3",
         [
           mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
           mesh.color(0x3498db),
-          mesh.metalness(0.3),
-          mesh.roughness(0.7),
           mesh.transform(transform.at(vec3.Vec3(-6.0, 3.0, -1.0))),
+
           cacao.body_type(cacao.Dynamic),
           cacao.collider(cacao.Cuboid(0.5, 0.5, 0.5)),
           cacao.restitution(0.1),
@@ -465,13 +456,13 @@ fn view(_model: Model) {
       // ---------------------------------------------------------------
       // Static ground
       // ---------------------------------------------------------------
-      mesh.mesh(
+      tiramisu.mesh(
         "ground",
         [
           mesh.geometry_box(vec3.Vec3(30.0, 1.0, 30.0)),
           mesh.color(0x2d3436),
-          mesh.metalness(0.1),
-          mesh.roughness(0.9),
+          material.receive_shadow(True),
+
           mesh.transform(transform.at(vec3.Vec3(0.0, -0.5, 0.0))),
           cacao.body_type(cacao.Fixed),
           cacao.collider(cacao.Cuboid(15.0, 0.5, 15.0)),
@@ -480,22 +471,22 @@ fn view(_model: Model) {
         [],
       ),
       // Ambient light
-      light.light(
+      tiramisu.light(
         "ambient",
         [
-          light.light_type("ambient"),
+          light.type_(light.Ambient),
           light.color(0xffffff),
-          light.intensity(0.4),
+          light.intensity(0.1),
         ],
         [],
       ),
       // Directional light with shadows
-      light.light(
+      tiramisu.light(
         "sun",
         [
-          light.light_type("directional"),
+          light.type_(light.Directional),
           light.color(0xffffff),
-          light.intensity(1.0),
+          light.intensity(5.0),
           light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
           light.cast_shadow(True),
         ],

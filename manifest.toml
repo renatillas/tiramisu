@@ -22,6 +22,7 @@ packages = [
 [requirements]
 gleam_community_maths = { version = ">= 2.0.0 and < 3.0.0" }
 gleam_javascript = { version = ">= 1.0.0 and < 2.0.0" }
+gleam_json = { version = ">= 3.1.0 and < 4.0.0" }
 gleam_stdlib = { version = ">= 0.64.0 and < 2.0.0" }
 gleam_time = { version = ">= 1.6.0 and < 2.0.0" }
 gleamy_bench = { version = ">= 0.6.0 and < 1.0.0" }

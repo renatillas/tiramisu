@@ -1,29 +1,29 @@
 import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
 import gleam/set
 import gleam/time/duration
+
 import lustre
 import lustre/attribute
-import lustre/effect as lustre_effect
-import lustre/element
+import lustre/effect.{type Effect}
+import lustre/element.{type Element}
 import lustre/element/html
+
+import input
 import tetris/game
 import tetris/piece
 import tetris/position
 import tetris/ui
+
 import tiramisu
 import tiramisu/audio
-import tiramisu/background
 import tiramisu/camera
-import tiramisu/effect
-import tiramisu/geometry
-import input
 import tiramisu/light
-import tiramisu/material
-import tiramisu/scene
+import tiramisu/mesh
+import tiramisu/renderer
+import tiramisu/tick
 import tiramisu/transform
-import tiramisu/ui as tiramisu_ui
+
 import vec/vec3
 
 // Constants
@@ -33,285 +33,164 @@ const grid_width = 10
 
 const grid_height = 20
 
-// Shared bridge messages (Game <-> UI)
-pub type BridgeMsg {
-  // Game -> UI
-  UpdateGameState(game.GameState)
-  // UI -> Game
-  RestartGame
-}
-
 // Model
 pub type Model {
   Model(
-    bridge: tiramisu_ui.Bridge(BridgeMsg),
-    player_moved: Bool,
+    input_state: input.InputState,
     game_state: game.GameState,
     drop_timer: Float,
-    camera: camera.Camera,
     last_move_time: Float,
     last_rotate_time: Float,
-    previous_piece_shape: piece.Shape,
-    move_sound: option.Option(audio.Buffer),
+    // True only during the frame a player action occurred — used for one-shot audio
+    player_moved: Bool,
   )
 }
 
 // Messages
 pub type Msg {
-  Tick
-  FromBridge(BridgeMsg)
-  MoveSoundLoaded(audio.Buffer)
-  AudioLoadFailed
-  BackgroundSet
-  BackgroundFailed
+  Tick(tick.TickContext)
+  KeyDown(input.Key)
+  KeyUp(input.Key)
+  Restart
 }
 
 // Initialize
-pub fn init(
-  bridge: tiramisu_ui.Bridge(BridgeMsg),
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(a)) {
-  // Load move sound
-  let load_move_sound =
-    audio.load_audio(
-      url: "wav/Select-1-(Saw).wav",
-      on_success: MoveSoundLoaded,
-      on_error: AudioLoadFailed,
-    )
-
-  // Set background color
-  let set_background =
-    background.set(
-      ctx.scene,
-      background.Color(0x1a1a2e),
-      BackgroundSet,
-      BackgroundFailed,
-    )
-
-  let assert Ok(cam) =
-    camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-
-  let initial_game = game.new()
-
+pub fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
   let model =
     Model(
-      bridge:,
-      player_moved: False,
-      game_state: initial_game,
+      input_state: input.new(),
+      game_state: game.new(),
       drop_timer: 0.0,
-      camera: cam,
       last_move_time: 0.0,
       last_rotate_time: 0.0,
-      previous_piece_shape: initial_game.current_piece.piece_type,
-      move_sound: option.None,
+      player_moved: False,
     )
 
-  #(
-    model,
-    effect.batch([effect.dispatch(Tick), load_move_sound, set_background]),
-    option.None,
-  )
+  // Subscribe to the renderer's animation frame ticks
+  #(model, tick.subscribe("tetris", Tick))
 }
 
 // Update
-pub fn update(
-  model: Model,
-  msg: Msg,
-  ctx: tiramisu.Context,
-) -> #(Model, effect.Effect(Msg), option.Option(a)) {
+pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    MoveSoundLoaded(buffer) -> {
-      #(Model(..model, move_sound: Some(buffer)), effect.none(), option.None)
-    }
-    AudioLoadFailed | BackgroundSet | BackgroundFailed -> {
-      #(model, effect.none(), option.None)
-    }
-    FromBridge(RestartGame) -> {
-      let #(new_model, _, _) = init(model.bridge, ctx)
-      // Preserve loaded audio
-      let new_model = Model(..new_model, move_sound: model.move_sound)
-      #(
-        new_model,
-        effect.batch([
-          tiramisu_ui.send_to_ui(model.bridge, UpdateGameState(
-            new_model.game_state,
-          )),
-        ]),
-        option.None,
-      )
-    }
-    FromBridge(_) -> {
-      #(model, effect.none(), option.None)
-    }
-    Tick -> {
-      // Reset player_moved from previous frame (for audio one-shot behavior)
-      let model = case model.player_moved {
-        True -> Model(..model, player_moved: False)
-        False -> model
-      }
+    KeyDown(key) -> #(
+      Model(..model, input_state: input.key_down(model.input_state, key)),
+      effect.none(),
+    )
 
+    KeyUp(key) -> #(
+      Model(..model, input_state: input.key_up(model.input_state, key)),
+      effect.none(),
+    )
+
+    Restart -> {
+      let #(new_model, eff) = init(Nil)
+      #(new_model, eff)
+    }
+
+    Tick(ctx) -> {
+      // Reset player_moved from previous frame so audio plays only once per action
+      let model = Model(..model, player_moved: False)
+
+      let state = model.input_state
       let move_cooldown = 0.15
       let rotate_cooldown = 0.2
 
-      // Handle input with cooldowns
       let left_pressed =
-        input.is_key_pressed(ctx.input, input.ArrowLeft)
-        || input.is_key_pressed(ctx.input, input.KeyA)
+        input.is_pressed(state, input.ArrowLeft)
+        || input.is_pressed(state, input.A)
       let right_pressed =
-        input.is_key_pressed(ctx.input, input.ArrowRight)
-        || input.is_key_pressed(ctx.input, input.KeyD)
+        input.is_pressed(state, input.ArrowRight)
+        || input.is_pressed(state, input.D)
       let rotate_pressed =
-        input.is_key_pressed(ctx.input, input.ArrowUp)
-        || input.is_key_pressed(ctx.input, input.KeyW)
-      let drop_pressed = input.is_key_just_pressed(ctx.input, input.Space)
+        input.is_pressed(state, input.ArrowUp)
+        || input.is_pressed(state, input.W)
+      let drop_pressed = input.is_just_pressed(state, input.Space)
 
-      // Apply movements with cooldowns
       let can_move = model.last_move_time >=. move_cooldown
       let can_rotate = model.last_rotate_time >=. rotate_cooldown
 
-      let #(new_state, new_move_time, new_rotate_time, player_moved) = case
-        left_pressed && can_move,
-        right_pressed && can_move,
-        rotate_pressed && can_rotate,
-        drop_pressed
-      {
-        True, _, _, _ -> #(
-          game.move_left(model.game_state),
-          0.0,
-          model.last_rotate_time,
-          True,
-        )
-        _, True, _, _ -> #(
-          game.move_right(model.game_state),
-          0.0,
-          model.last_rotate_time,
-          True,
-        )
-        _, _, True, _ -> #(
-          game.rotate(model.game_state),
-          model.last_move_time,
-          0.0,
-          True,
-        )
-        _, _, _, True -> #(
-          game.hard_drop(model.game_state),
-          model.last_move_time,
-          model.last_rotate_time,
-          True,
-        )
-        _, _, _, _ -> #(
-          model.game_state,
-          model.last_move_time,
-          model.last_rotate_time,
-          False,
-        )
-      }
+      // Apply the first matching input with cooldown
+      let #(new_game_state, new_move_time, new_rotate_time, player_moved) =
+        case
+          left_pressed && can_move,
+          right_pressed && can_move,
+          rotate_pressed && can_rotate,
+          drop_pressed
+        {
+          True, _, _, _ -> #(
+            game.move_left(model.game_state),
+            0.0,
+            model.last_rotate_time,
+            True,
+          )
+          _, True, _, _ -> #(
+            game.move_right(model.game_state),
+            0.0,
+            model.last_rotate_time,
+            True,
+          )
+          _, _, True, _ -> #(
+            game.rotate(model.game_state),
+            model.last_move_time,
+            0.0,
+            True,
+          )
+          _, _, _, True -> #(
+            game.hard_drop(model.game_state),
+            model.last_move_time,
+            model.last_rotate_time,
+            True,
+          )
+          _, _, _, _ -> #(
+            model.game_state,
+            model.last_move_time,
+            model.last_rotate_time,
+            False,
+          )
+        }
 
-      // Accumulate drop timer
-      let updated_drop_timer =
-        model.drop_timer +. duration.to_seconds(ctx.delta_time)
-      let drop_interval = game.drop_interval(new_state.level)
-
-      // Auto-drop if timer reached
+      let delta_seconds = duration.to_seconds(ctx.delta_time)
+      let updated_drop_timer = model.drop_timer +. delta_seconds
+      let drop_interval = game.drop_interval(new_game_state.level)
       let should_auto_drop = updated_drop_timer >=. drop_interval
 
       let final_state = case should_auto_drop {
-        True -> game.tick(new_state)
-        False -> new_state
+        True -> game.tick(new_game_state)
+        False -> new_game_state
       }
 
-      // Detect if piece type changed (new piece spawned) by comparing before and after
+      // Detect piece change (new piece spawned) to reset the drop timer
       let piece_changed =
         final_state.current_piece.piece_type
-        != new_state.current_piece.piece_type
+        != new_game_state.current_piece.piece_type
 
-      // Reset timer if auto-dropped OR if new piece spawned
       let final_drop_timer = case should_auto_drop || piece_changed {
         True -> 0.0
         False -> updated_drop_timer
       }
 
-      // Update cooldown timers
-      let delta_seconds = duration.to_seconds(ctx.delta_time)
       let updated_move_time = new_move_time +. delta_seconds
       let updated_rotate_time = new_rotate_time +. delta_seconds
 
-      let updated_model =
+      let new_model =
         Model(
-          ..model,
-          player_moved:,
+          input_state: input.end_frame(state),
           game_state: final_state,
           drop_timer: final_drop_timer,
-          camera: model.camera,
           last_move_time: updated_move_time,
           last_rotate_time: updated_rotate_time,
-          previous_piece_shape: final_state.current_piece.piece_type,
+          player_moved:,
         )
 
-      #(
-        updated_model,
-        effect.batch([
-          effect.dispatch(Tick),
-          tiramisu_ui.send_to_ui(
-            model.bridge,
-            UpdateGameState(updated_model.game_state),
-          ),
-        ]),
-        option.None,
-      )
+      #(new_model, effect.none())
     }
   }
 }
 
 // View
-pub fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
-  // Only add audio node when player actually moved (for one-shot sound effect)
-  let move_audio_node = case model.move_sound, model.player_moved {
-    Some(buffer), True -> [
-      scene.audio(
-        id: "move-sfx",
-        audio: audio.GlobalAudio(
-          buffer:,
-          config: audio.config() |> audio.with_state(audio.Playing),
-        ),
-      ),
-    ]
-    _, _ -> []
-  }
-
-  // Camera
-  let camera_node =
-    scene.camera(
-      id: "main-camera",
-      camera: model.camera,
-      transform: transform.at(position: vec3.Vec3(5.0, 10.0, 25.0)),
-      active: True,
-      viewport: None,
-      postprocessing: None,
-    )
-
-  // Lights
-  let ambient_light =
-    scene.light(
-      id: "ambient-light",
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.5)
-        light
-      },
-      transform: transform.identity,
-    )
-
-  let directional_light =
-    scene.light(
-      id: "directional-light",
-      light: {
-        let assert Ok(light) = light.ambient(color: 0xffffff, intensity: 0.8)
-        light
-      },
-      transform: transform.at(position: vec3.Vec3(10.0, 15.0, 10.0)),
-    )
-
-  // Create blocks for current piece
+pub fn view(model: Model) -> Element(Msg) {
+  // Current piece blocks
   let current_piece_blocks =
     piece.get_piece_positions(model.game_state.current_piece)
     |> list.index_map(fn(pos, idx) {
@@ -322,163 +201,163 @@ pub fn view(model: Model, _context: tiramisu.Context) -> scene.Node {
       )
     })
 
-  // Create blocks for locked pieces
+  // Locked blocks
   let locked_blocks =
     set.to_list(model.game_state.board.locked_blocks)
     |> list.index_map(fn(pos, idx) { create_locked_block(pos, idx) })
 
-  // Create grid outline
-  let grid_outline = create_grid_outline()
+  // Move sound — only present when the player acted this frame (one-shot)
+  let move_audio_nodes = case model.player_moved {
+    True -> [
+      tiramisu.audio(
+        "move-sfx",
+        [
+          attribute.attribute("src", "wav/Select-1-(Saw).wav"),
+          audio.playing(True),
+        ],
+        [],
+      ),
+    ]
+    False -> []
+  }
 
-  // Combine all scene nodes
-  scene.empty(
-    id: "scene",
-    transform: transform.identity,
-    children: list.flatten([
-      [camera_node],
-      [ambient_light],
-      [directional_light],
-      [grid_outline],
-      current_piece_blocks,
-      locked_blocks,
-      move_audio_node,
-    ]),
+  html.div(
+    [
+      attribute.style("position", "relative"),
+      attribute.style("width", "fit-content"),
+    ],
+    [
+      // 3D scene rendered by the tiramisu-renderer web component
+      renderer.renderer(
+        [
+          renderer.background_color(0x1a1a2e),
+          renderer.scene_id("tetris"),
+          // tabindex makes the renderer focusable so keyboard events work
+          attribute.attribute("tabindex", "0"),
+          input.on_keydown(KeyDown),
+          input.on_keyup(KeyUp),
+        ],
+        list.flatten([
+          [
+            tiramisu.camera(
+              "main-camera",
+              [
+                camera.fov(75.0),
+                tiramisu.transform(transform.at(vec3.Vec3(5.0, 10.0, 25.0))),
+                camera.active(True),
+              ],
+              [],
+            ),
+            tiramisu.light(
+              "ambient-light",
+              [
+                light.light_type("ambient"),
+                tiramisu.color(0xffffff),
+                light.intensity(0.5),
+              ],
+              [],
+            ),
+            tiramisu.light(
+              "directional-light",
+              [
+                light.light_type("directional"),
+                tiramisu.color(0xffffff),
+                light.intensity(0.8),
+                tiramisu.transform(transform.at(vec3.Vec3(10.0, 15.0, 10.0))),
+              ],
+              [],
+            ),
+            create_grid_outline(),
+          ],
+          current_piece_blocks,
+          locked_blocks,
+          move_audio_nodes,
+        ]),
+      ),
+      // HTML overlay for score, next piece, controls, and game-over screen
+      html.div(
+        [
+          attribute.style("position", "absolute"),
+          attribute.style("top", "0"),
+          attribute.style("left", "0"),
+          attribute.style("width", "100%"),
+          attribute.style("height", "100%"),
+          attribute.style("pointer-events", "none"),
+          attribute.style("font-family", "sans-serif"),
+          attribute.style("color", "white"),
+        ],
+        [ui.view(model.game_state, Restart)],
+      ),
+    ],
   )
 }
 
-// Helper: Create a block for the current piece
+// Helper: Create a block for the active falling piece
 fn create_block(
   pos: position.Position,
   index: Int,
   color: Int,
-) -> scene.Node {
-  let assert Ok(geom) =
-    geometry.box(size: vec3.Vec3(block_size, block_size, block_size))
-  let assert Ok(mat) =
-    material.new()
-    |> material.with_color(color)
-    |> material.with_metalness(0.3)
-    |> material.with_roughness(0.7)
-    |> material.build()
-
+) -> Element(Msg) {
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
-  scene.mesh(
-    id: "current-block-" <> int.to_string(index),
-    geometry: geom,
-    material: mat,
-    transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
-    physics: None,
+  tiramisu.mesh(
+    "current-block-" <> int.to_string(index),
+    [
+      mesh.geometry_box(vec3.Vec3(block_size, block_size, block_size)),
+      tiramisu.color(color),
+      tiramisu.metalness(0.3),
+      tiramisu.roughness(0.7),
+      tiramisu.transform(transform.at(vec3.Vec3(x, y, 0.0))),
+    ],
+    [],
   )
 }
 
-// Helper: Create a locked block
-fn create_locked_block(pos: position.Position, index: Int) -> scene.Node {
-  let assert Ok(geom) =
-    geometry.box(size: vec3.Vec3(block_size, block_size, block_size))
-  let assert Ok(mat) =
-    material.new()
-    |> material.with_color(0x808080)
-    |> material.build()
-
+// Helper: Create a locked (settled) block
+fn create_locked_block(pos: position.Position, index: Int) -> Element(Msg) {
   let x = int.to_float(pos.x) *. block_size
   let y = int.to_float(pos.y) *. block_size
 
-  scene.mesh(
-    id: "locked-block-" <> int.to_string(index),
-    geometry: geom,
-    material: mat,
-    transform: transform.at(position: vec3.Vec3(x, y, 0.0)),
-    physics: None,
+  tiramisu.mesh(
+    "locked-block-" <> int.to_string(index),
+    [
+      mesh.geometry_box(vec3.Vec3(block_size, block_size, block_size)),
+      tiramisu.color(0x808080),
+      tiramisu.transform(transform.at(vec3.Vec3(x, y, 0.0))),
+    ],
+    [],
   )
 }
 
-// Helper: Create grid outline
-fn create_grid_outline() -> scene.Node {
-  let assert Ok(geom) =
-    geometry.box(size: vec3.Vec3(
-      int.to_float(grid_width) *. block_size +. 0.2,
-      int.to_float(grid_height) *. block_size +. 0.2,
-      0.1,
-    ))
-  let assert Ok(mat) =
-    material.new()
-    |> material.with_color(0x333333)
-    |> material.build()
-
-  scene.mesh(
-    id: "grid-outline",
-    geometry: geom,
-    material: mat,
-    transform: transform.at(position: vec3.Vec3(
-      int.to_float(grid_width) /. 2.0 -. 0.5,
-      int.to_float(grid_height) /. 2.0 -. 0.5,
-      -0.5,
-    )),
-    physics: None,
+// Helper: Dark backdrop box that frames the play field
+fn create_grid_outline() -> Element(Msg) {
+  tiramisu.mesh(
+    "grid-outline",
+    [
+      mesh.geometry_box(vec3.Vec3(
+        int.to_float(grid_width) *. block_size +. 0.2,
+        int.to_float(grid_height) *. block_size +. 0.2,
+        0.1,
+      )),
+      tiramisu.color(0x333333),
+      tiramisu.transform(transform.at(vec3.Vec3(
+        int.to_float(grid_width) /. 2.0 -. 0.5,
+        int.to_float(grid_height) /. 2.0 -. 0.5,
+        -0.5,
+      ))),
+    ],
+    [],
   )
-}
-
-// UI overlay state management
-pub type UiModel {
-  UiModel(bridge: tiramisu_ui.Bridge(BridgeMsg), game_state: game.GameState)
-}
-
-pub type UiMsg {
-  FromBridgeUi(BridgeMsg)
-  UiRestart
 }
 
 // Main entry point
-pub fn main() {
-  // Create a bridge for communication
-  let bridge = tiramisu_ui.new_bridge()
+pub fn main() -> Nil {
+  // Register the tiramisu-renderer custom element before starting the app
+  let assert Ok(_) = tiramisu.register()
 
-  // Start the UI overlay
-  let assert Ok(_) =
-    lustre.application(ui_init, ui_update, ui_view)
-    |> lustre.start("#app", bridge)
+  let app = lustre.application(init, update, view)
+  let assert Ok(_) = lustre.start(app, "#app", Nil)
 
-  // Start the game
-  let assert Ok(_) =
-    tiramisu.application(init(bridge, _), update, view)
-    |> tiramisu.start("#game", tiramisu.FullScreen, Some(#(bridge, FromBridge)))
   Nil
-}
-
-fn ui_init(bridge) {
-  #(
-    UiModel(bridge:, game_state: game.new()),
-    tiramisu_ui.register_lustre(bridge, FromBridgeUi),
-  )
-}
-
-fn ui_update(
-  model: UiModel,
-  msg: UiMsg,
-) -> #(UiModel, lustre_effect.Effect(UiMsg)) {
-  case msg {
-    FromBridgeUi(UpdateGameState(new_state)) -> #(
-      UiModel(..model, game_state: new_state),
-      lustre_effect.none(),
-    )
-    FromBridgeUi(_) -> #(model, lustre_effect.none())
-    UiRestart -> #(
-      UiModel(..model, game_state: game.new()),
-      tiramisu_ui.send(model.bridge, RestartGame),
-    )
-  }
-}
-
-fn ui_view(model: UiModel) -> element.Element(UiMsg) {
-  html.div(
-    [
-      attribute.id("ui-root"),
-      attribute.class(
-        "fixed top-0 left-0 w-full h-full pointer-events-none font-sans text-white",
-      ),
-    ],
-    [ui.view(model.game_state, UiRestart)],
-  )
 }

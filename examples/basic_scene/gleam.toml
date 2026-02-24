@@ -6,8 +6,8 @@ target = "javascript"
 gleam_stdlib = ">= 0.64.0 and < 2.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 tiramisu = { path = "../.." }
-vec = ">= 3.0.3 and < 4.0.0"
-quaterni = ">= 1.0.1 and < 2.0.0"
+quaterni = ">= 1.1.0 and < 2.0.0"
+vec = ">= 3.2.1 and < 4.0.0"
 
 [tools.lustre.html]
 scripts = [

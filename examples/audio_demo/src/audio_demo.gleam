@@ -22,11 +22,11 @@ import lustre/event
 import quaternion
 import tiramisu
 import tiramisu/audio
-import tiramisu/audio_positional
 import tiramisu/camera
 import tiramisu/light
+import tiramisu/material
 import tiramisu/mesh
-import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
 import vec/vec2
@@ -80,7 +80,7 @@ const beep_url = "beep.mp3"
 // CONSTANTS -------------------------------------------------------------------
 
 // Ball movement radius
-const orbit_radius = 5.0
+const orbit_radius = 10.0
 
 // Ball movement speed
 const orbit_speed = 0.5
@@ -163,20 +163,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 fn view(model: Model) {
   html.div([class("container")], [
     // 3D Scene
-    renderer.renderer(
+    tiramisu.scene(
+      "main",
       [
-        renderer.scene_id("main"),
-        renderer.width(600),
-        renderer.height(500),
-        renderer.background("#1a1a2e"),
+        attribute.width(600),
+        attribute.height(500),
+        scene.background_color(0x1a1a2e),
       ],
       [
         // Camera (the listener position)
-        camera.camera(
+        tiramisu.camera(
           "main",
           [
             camera.fov(60.0),
-            camera.transform(
+            transform.transform(
               transform.at(vec3.Vec3(0.0, 8.0, 12.0))
               |> transform.with_look_at(vec3f.zero),
             ),
@@ -185,14 +185,14 @@ fn view(model: Model) {
           [],
         ),
         // Ground plane
-        mesh.mesh(
+        tiramisu.mesh(
           "ground",
           [
-            mesh.geometry_plane(vec2.Vec2(20.0, 20.0)),
+            mesh.plane(vec2.Vec2(20.0, 20.0)),
             mesh.color(0x2d3436),
-            mesh.metalness(0.1),
-            mesh.roughness(0.9),
-            mesh.transform(
+            material.metalness(0.1),
+            material.roughness(0.9),
+            transform.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -202,22 +202,32 @@ fn view(model: Model) {
           [],
         ),
         // Center marker (shows where origin is)
-        mesh.mesh(
+        tiramisu.mesh(
           "center",
           [
-            mesh.geometry_cylinder_simple(0.3, 0.1),
+            mesh.cylinder(
+              radius_top: 0.3,
+              radius_bottom: 0.3,
+              height: 0.1,
+              segments: 16,
+            ),
             mesh.color(0x666666),
-            mesh.transform(transform.at(vec3.Vec3(0.0, 0.05, 0.0))),
+            transform.transform(transform.at(vec3.Vec3(0.0, 0.5, 0.0))),
           ],
           [],
         ),
         // Orbit path visualization (ring on ground)
-        mesh.mesh(
+        tiramisu.mesh(
           "orbit_path",
           [
-            mesh.geometry_torus_simple(orbit_radius, 0.05),
+            mesh.torus(
+              radius: orbit_radius,
+              tube: 0.05,
+              radial_segments: 16,
+              tubular_segments: 100,
+            ),
             mesh.color(0x444444),
-            mesh.transform(
+            transform.transform(
               transform.at(vec3.Vec3(0.0, 0.01, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -227,64 +237,64 @@ fn view(model: Model) {
           [],
         ),
         // Moving ball (sound source)
-        audio_positional.audio_positional(
+        tiramisu.audio_positional(
           "ball_sound",
           [
-            audio_positional.src(beep_url),
-            audio_positional.volume(1.0),
-            audio_positional.loop(True),
-            audio_positional.playing(model.sound_playing),
-            audio_positional.detune(model.sound_detune),
-            audio_positional.audio_transform(
+            attribute.src(beep_url),
+            audio.volume(1.0),
+            attribute.loop(True),
+            audio.playing(model.sound_playing),
+            audio.detune(model.sound_detune),
+            transform.transform(
               transform.at(vec3.Vec3(model.ball_x, 0.5, model.ball_z)),
             ),
-            audio_positional.ref_distance(2.0),
-            audio_positional.max_distance(20.0),
-            audio_positional.rolloff_factor(1.0),
+            audio.ref_distance(2.0),
+            audio.max_distance(20.0),
+            audio.rolloff_factor(1.0),
           ],
           [
-            mesh.mesh(
+            tiramisu.mesh(
               "sound_ball",
               [
-                mesh.geometry_sphere_simple(0.5),
+                mesh.sphere(radius: 0.5, segments: vec2.Vec2(16, 16)),
                 mesh.color(case model.sound_playing {
                   True -> 0xff6b6b
                   False -> 0x666666
                 }),
-                mesh.metalness(0.3),
-                mesh.roughness(0.4),
+                material.metalness(0.3),
+                material.roughness(0.4),
               ],
               [],
             ),
           ],
         ),
         // Lights
-        light.light(
+        tiramisu.light(
           "ambient",
           [
-            light.light_type("ambient"),
-            light.color(0xffffff),
+            light.kind(light.Ambient),
+            mesh.color(0xffffff),
             light.intensity(0.4),
           ],
           [],
         ),
-        light.light(
+        tiramisu.light(
           "sun",
           [
-            light.light_type("directional"),
+            light.kind(light.Directional),
             light.color(0xffffff),
             light.intensity(1.0),
-            light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+            transform.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
           ],
           [],
         ),
         // Global audio (background music)
-        audio.audio(
+        tiramisu.global_audio(
           "background_music",
           [
-            audio.src(music_url),
+            attribute.src(music_url),
             audio.volume(0.3),
-            audio.loop(True),
+            attribute.loop(True),
             audio.playing(model.music_playing),
             audio.detune(model.music_detune),
           ],
@@ -368,7 +378,10 @@ fn view(model: Model) {
         html.text("Audio Types"),
       ]),
       info_row("Music", "Global (constant volume)"),
-      info_row("Music Detune", float_to_string_0(model.music_detune) <> " cents"),
+      info_row(
+        "Music Detune",
+        float_to_string_0(model.music_detune) <> " cents",
+      ),
       info_row("Ball", "Positional (3D panning)"),
       info_row("Ball Detune", float_to_string_0(model.sound_detune) <> " cents"),
       html.div([class("note")], [

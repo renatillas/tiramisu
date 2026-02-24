@@ -1,24 +1,23 @@
 //// Model Loading Example
 ////
 //// Demonstrates loading and displaying GLTF models:
-//// - Using mesh.src() to load external 3D models
+//// - Using attribute.src() to load external 3D models
 //// - The mesh component handles loading automatically
 //// - Rotation animation via tick updates
 
-import gleam/dynamic/decode
 import gleam/float
 import gleam/time/duration
 import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
 import lustre/element/html
-import lustre/event
 import quaternion
 import tiramisu
 import tiramisu/camera
 import tiramisu/light
+import tiramisu/material
 import tiramisu/mesh
-import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
 import vec/vec2
@@ -92,33 +91,34 @@ fn update(m: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 fn view(m: Model) {
   html.div([class("container")], [
     // 3D Scene
-    renderer.renderer(
+    tiramisu.scene(
+      "main",
       [
-        renderer.scene_id("main"),
-        renderer.width(600),
-        renderer.height(500),
-        renderer.background("#1a1a2e"),
+        attribute.width(600),
+        attribute.height(500),
+        scene.background_color(0x1a1a2e),
       ],
       [
         // Camera
-        camera.camera(
+        tiramisu.camera(
           "main",
           [
             camera.fov(45.0),
-            camera.transform(transform.at(vec3.Vec3(0.0, 1.5, 5.0))),
+            transform.transform(transform.at(vec3.Vec3(0.0, 1.5, 5.0))),
             camera.active(True),
           ],
           [],
         ),
         // Ground plane
-        mesh.mesh(
+        tiramisu.mesh(
           "ground",
           [
-            mesh.geometry_plane(vec2.Vec2(10.0, 10.0)),
+            material.metalness(0.1),
+            material.roughness(0.9),
+            mesh.plane(vec2.Vec2(10.0, 10.0)),
             mesh.color(0x2d3436),
-            mesh.metalness(0.1),
-            mesh.roughness(0.9),
-            mesh.transform(
+            material.receive_shadow(True),
+            transform.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -127,44 +127,31 @@ fn view(m: Model) {
           ],
           [],
         ),
-        // Loaded GLTF model using mesh.src()
-        mesh.mesh(
+        // Loaded GLTF model using attribute.src()
+        tiramisu.mesh(
           "soldier",
           [
-            mesh.src(model_url),
-            mesh.transform(
+            attribute.src(model_url),
+            transform.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(0.0, m.rotation, 0.0)),
               ),
             ),
-            event.on("tiramisu:model-loaded", {
-              use mesh_id <- decode.then(decode.at(
-                ["detail", "id"],
-                decode.string,
-              ))
-              decode.success(ModelLoaded(mesh_id))
-            }),
+            material.cast_shadow(True),
+            mesh.on_model_loaded(ModelLoaded),
           ],
           [],
         ),
         // Lights
-        light.light(
+        tiramisu.light(
           "ambient",
           [
-            light.light_type("ambient"),
+            light.kind(light.Directional),
             light.color(0xffffff),
-            light.intensity(0.6),
-          ],
-          [],
-        ),
-        light.light(
-          "sun",
-          [
-            light.light_type("directional"),
-            light.color(0xffffff),
-            light.intensity(1.2),
-            light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+            light.intensity(1.0),
+            light.cast_shadow(True),
+            transform.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
           ],
           [],
         ),
@@ -174,7 +161,7 @@ fn view(m: Model) {
     html.div([class("info")], [
       html.h3([], [html.text("Model Loading")]),
       html.div([class("status loaded")], [
-        html.text("Using mesh.src() attribute"),
+        html.text("Using attribute.src() attribute"),
       ]),
       html.h3([attribute.style("margin-top", "15px")], [
         html.text("Model Info"),

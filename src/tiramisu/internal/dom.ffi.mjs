@@ -2,7 +2,6 @@
 //
 // All DOM primitives live here. Higher-level DOM logic lives in dom.gleam.
 
-import { Option$Some, Option$None } from "../../../gleam_stdlib/gleam/option.mjs";
 import { Result$Ok, Result$Error } from "../../../prelude.mjs";
 import { toList } from "../../../prelude.mjs";
 
@@ -101,18 +100,6 @@ export function parentElement(element) {
 }
 
 // ============================================================================
-// INLINE STYLE
-// ============================================================================
-
-/**
- * Set an inline style property on an element.
- * e.g. setStyle(el, "position", "absolute")
- */
-export function setStyle(element, property, value) {
-  element.style[property] = value;
-}
-
-// ============================================================================
 // CUSTOM EVENTS
 // ============================================================================
 
@@ -148,23 +135,6 @@ export function deleteProperty(element, name) {
   delete element[name];
 }
 
-// ============================================================================
-// SCENE-READY LISTENER
-// ============================================================================
-
-/**
- * Set up a one-shot listener for the scene-ready event.
- * The callback is called with the scene ID when the event fires,
- * then the listener is automatically removed.
- */
-export function listenForSceneReady(host, dispatch) {
-  const handler = (event) => {
-    dispatch(event.detail.sceneId);
-    host.removeEventListener("tiramisu:scene-ready", handler);
-  };
-
-  host.addEventListener("tiramisu:scene-ready", handler);
-}
 
 // ============================================================================
 // MUTATION OBSERVER
@@ -210,7 +180,7 @@ export function setupMutationObserver(hostElement, callback) {
       // Texture map URLs
       "color-map",
       "normal-map",
-      "ao-map",
+      "ambient-occlusion-map",
       "roughness-map",
       "metalness-map",
       "displacement-map",
@@ -221,12 +191,13 @@ export function setupMutationObserver(hostElement, callback) {
       "transparent",
       "receive-shadow",
       // Camera
-      "type",
+      "camera-type",
       "fov",
       "near",
       "far",
       "active",
       // Light
+      "light-type",
       "intensity",
       "cast-shadow",
       // Audio
@@ -253,13 +224,6 @@ export function setupMutationObserver(hostElement, callback) {
 // EVENT DETAIL CONSTRUCTORS
 // ============================================================================
 
-/**
- * Create a scene-ready event detail object with the JS-idiomatic camelCase key.
- * The event decoder in renderer.gleam expects { sceneId: "..." }.
- */
-export function createSceneReadyDetail(sceneId) {
-  return { sceneId };
-}
 
 /**
  * Create a mesh event detail object with the JS-idiomatic key.
@@ -314,23 +278,24 @@ export function findParentObjectId(host) {
     "TIRAMISU-CAMERA",
     "TIRAMISU-LIGHT",
     "TIRAMISU-AUDIO-POSITIONAL",
+    "TIRAMISU-AUDIO-GLOBAL",
   ];
 
   let element = host.parentElement;
   while (element) {
     // Stop at the renderer — it's the scene root
     if (element.tagName === "TIRAMISU-RENDERER") {
-      return Option$None();
+      return Result$Error();
     }
 
     // Check if this is a valid parent element
     if (parentTypes.includes(element.tagName)) {
       const id = element.getAttribute("id");
-      return id ? Option$Some(id) : Option$None();
+      return id ? Result$Ok(id) : Result$Error();
     }
 
     element = element.parentElement;
   }
 
-  return Option$None();
+  return Result$Error();
 }

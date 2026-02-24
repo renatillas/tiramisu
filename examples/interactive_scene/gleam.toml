@@ -12,10 +12,7 @@ quaterni = ">= 1.0.1 and < 2.0.0"
 
 [tools.lustre.html]
 scripts = [
-  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
-]
-stylesheets = [
-  { content = "body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; background: #111; color: #fff; } .container { display: flex; gap: 20px; } .controls { display: flex; flex-direction: column; gap: 10px; padding: 15px; background: #222; border-radius: 8px; min-width: 250px; max-height: 90vh; overflow-y: auto; } .controls button { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: transform 0.1s; } .controls button:hover { transform: scale(1.02); } .controls button:active { transform: scale(0.98); } .color-btn { color: white; } .btn-row { display: flex; flex-wrap: wrap; gap: 5px; } .type-btn { font-size: 11px; padding: 6px 8px; } .controls label { display: flex; flex-direction: column; gap: 5px; } .controls input[type=range] { width: 100%; } h3 { margin: 0 0 10px 0; font-size: 14px; color: #888; text-transform: uppercase; } canvas { display: block; border-radius: 8px; }" }
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" },
 ]
 
 [dev-dependencies]

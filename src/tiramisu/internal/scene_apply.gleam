@@ -1,15 +1,3 @@
-//// Pure Gleam patch applier for the scene graph.
-////
-//// Pattern-matches on ScenePatch variants and calls registry + savoiardi
-//// functions. No global state — everything goes through the instance-scoped
-//// Registry, updated as a functional fold over the patch list.
-////
-//// Per-frame mutable state (active camera) is owned by the RenderLoop
-//// and updated via targeted setter calls.
-////
-//// Async operations (model loading) dispatch transforms through on_async,
-//// which maps to Lustre's RegistryTransform message dispatch.
-
 import gleam/float
 import gleam/int
 import gleam/javascript/promise
@@ -17,11 +5,14 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
+
 import savoiardi
+
 import tiramisu/internal/registry.{type Registry}
 import tiramisu/internal/render_loop.{type RenderLoop}
 import tiramisu/internal/scene_patch.{type ScenePatch}
 import tiramisu/transform.{type Transform}
+
 import vec/vec3
 
 /// Apply a list of patches to the Three.js scene graph.
@@ -36,13 +27,12 @@ pub fn apply_patches(
   patches: List(ScenePatch),
   on_async: fn(fn(Registry) -> Registry) -> Nil,
 ) -> Registry {
-  list.fold(patches, registry, fn(reg, patch) {
-    apply_patch(reg, loop, patch, on_async)
-  })
+  use registry, patch <- list.fold(patches, registry)
+  apply_patch(registry, loop, patch, on_async)
 }
 
 fn apply_patch(
-  reg: Registry,
+  registry: Registry,
   loop: RenderLoop,
   patch: ScenePatch,
   on_async: fn(fn(Registry) -> Registry) -> Nil,
@@ -51,7 +41,7 @@ fn apply_patch(
     scene_patch.CreateMesh(
       id:,
       parent_id:,
-      geometry: geo_spec,
+      geometry:,
       src:,
       material_type:,
       color:,
@@ -77,40 +67,43 @@ fn apply_patch(
       visible:,
       cast_shadow:,
       receive_shadow:,
-      distance:,
     ) -> {
       case src {
         // External model — load asynchronously (fire-and-forget)
-        src if src != "" -> {
+        option.Some(url) -> {
           load_model(
             on_async,
             id,
             parent_id,
-            src,
+            url,
             transform,
-            visible,
-            cast_shadow,
-            receive_shadow,
+            option.unwrap(visible, True),
+            option.unwrap(cast_shadow, False),
+            option.unwrap(receive_shadow, False),
           )
-          // Return registry unchanged — model will be added via on_async
-          reg
+          registry
         }
-        // Primitive geometry — synchronous
-        _ ->
-          case
-            parse_geometry(geo_spec),
-            parse_color(color),
-            parse_color(emissive)
-          {
-            Ok(geometry), Ok(color_int), Ok(emissive_int) -> {
+        option.None -> {
+          let color_int =
+            color
+            |> option.to_result(Nil)
+            |> result.try(parse_color)
+            |> result.unwrap(0xffffff)
+          let emissive_int =
+            emissive
+            |> option.to_result(Nil)
+            |> result.try(parse_color)
+            |> result.unwrap(0x000000)
+          case geometry |> option.to_result(Nil) |> result.try(parse_geometry) {
+            Ok(geometry) -> {
               let material =
                 create_material_by_type(
                   material_type,
                   color_int,
+                  emissive_int,
                   metalness,
                   roughness,
                   opacity,
-                  emissive_int,
                   emissive_intensity,
                   displacement_scale,
                   displacement_bias,
@@ -118,26 +111,32 @@ fn apply_patch(
                   alpha_test,
                   transparent,
                 )
-              savoiardi.update_material_wireframe(material, wireframe)
+              savoiardi.update_material_wireframe(
+                material,
+                option.unwrap(wireframe, False),
+              )
               savoiardi.update_material_side(
                 material,
-                parse_material_side(side),
+                parse_material_side(option.unwrap(side, "front")),
               )
               let mesh = savoiardi.create_mesh(geometry, material)
-              // If parent is a LOD object, register this mesh as a LOD level
-              maybe_add_lod_level(reg, parent_id, mesh, distance)
               // Register FIRST so set_transform/set_visible can find the object
               let reg =
                 registry.register_and_add_object(
-                  reg,
+                  registry,
                   id,
                   mesh,
                   parent_id,
                   registry.MeshObject,
                 )
               registry.set_transform(reg, id, transform)
-              registry.set_visible(reg, id, visible)
-              registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
+              registry.set_visible(reg, id, option.unwrap(visible, True))
+              registry.set_mesh_shadow(
+                reg,
+                id,
+                option.unwrap(cast_shadow, False),
+                option.unwrap(receive_shadow, False),
+              )
               // Load texture maps asynchronously (fire-and-forget)
               let _ =
                 load_material_textures(
@@ -151,8 +150,9 @@ fn apply_patch(
                 )
               reg
             }
-            _, _, _ -> reg
+            Error(Nil) -> registry
           }
+        }
       }
     }
 
@@ -166,27 +166,36 @@ fn apply_patch(
       transform:,
       active:,
     ) -> {
-      let camera = case camera_type {
+      let near_val = option.unwrap(near, 0.1)
+      let far_val = option.unwrap(far, 1000.0)
+      let camera = case option.unwrap(camera_type, "perspective") {
         "orthographic" ->
           savoiardi.create_orthographic_camera(
             -10.0,
             10.0,
             10.0,
             -10.0,
-            near,
-            far,
+            near_val,
+            far_val,
           )
         // Default to perspective
         _ ->
           savoiardi.create_perspective_camera(
-            fov,
-            registry.get_renderer_aspect_ratio(reg),
-            near,
-            far,
+            option.unwrap(fov, 75.0),
+            registry.get_renderer_aspect_ratio(registry),
+            near_val,
+            far_val,
           )
       }
       // Register FIRST so set_transform can find the object
-      let reg = registry.register_camera(reg, id, camera, parent_id, active)
+      let reg =
+        registry.register_camera(
+          registry,
+          id,
+          camera,
+          parent_id,
+          option.unwrap(active, False),
+        )
       registry.set_transform(reg, id, transform)
       // Sync active camera to render loop
       sync_active_camera(reg, loop)
@@ -202,13 +211,15 @@ fn apply_patch(
       transform:,
       cast_shadow:,
     ) -> {
-      case parse_color(color) {
+      case parse_color(option.unwrap(color, "#ffffff")) {
         Ok(color_int) -> {
-          let light = case light_type {
+          let intensity_val = option.unwrap(intensity, 1.0)
+          let casts_shadow = option.unwrap(cast_shadow, False)
+          let light = case option.unwrap(light_type, "point") {
             "directional" -> {
               let light =
-                savoiardi.create_directional_light(color_int, intensity)
-              case cast_shadow {
+                savoiardi.create_directional_light(color_int, intensity_val)
+              case casts_shadow {
                 True -> {
                   savoiardi.set_light_cast_shadow(light, True)
                   savoiardi.configure_shadow(
@@ -237,8 +248,8 @@ fn apply_patch(
             }
             "point" -> {
               let light =
-                savoiardi.create_point_light(color_int, intensity, 0.0)
-              case cast_shadow {
+                savoiardi.create_point_light(color_int, intensity_val, 0.0)
+              case casts_shadow {
                 True -> {
                   savoiardi.set_light_cast_shadow(light, True)
                   savoiardi.configure_shadow(
@@ -256,14 +267,14 @@ fn apply_patch(
             }
             // Default to ambient
             _ -> {
-              savoiardi.create_ambient_light(color_int, intensity)
+              savoiardi.create_ambient_light(color_int, intensity_val)
               |> savoiardi.light_to_object3d
             }
           }
           // Register FIRST so set_transform can find the object
           let reg =
             registry.register_and_add_object(
-              reg,
+              registry,
               id,
               light,
               parent_id,
@@ -272,7 +283,7 @@ fn apply_patch(
           registry.set_transform(reg, id, transform)
           reg
         }
-        Error(Nil) -> reg
+        Error(Nil) -> registry
       }
     }
 
@@ -281,19 +292,20 @@ fn apply_patch(
       // Register FIRST so set_transform/set_visible can find the object
       let reg =
         registry.register_and_add_object(
-          reg,
+          registry,
           id,
           group,
           parent_id,
           registry.GroupObject,
         )
       registry.set_transform(reg, id, transform)
-      registry.set_visible(reg, id, visible)
+      registry.set_visible(reg, id, option.unwrap(visible, True))
       reg
     }
 
     scene_patch.CreateAudio(
       id:,
+      parent_id:,
       src:,
       volume:,
       loop: audio_loop,
@@ -301,14 +313,17 @@ fn apply_patch(
       playback_rate:,
       detune:,
     ) -> {
-      let #(reg, listener) = get_or_create_listener(reg)
+      let #(reg, listener) = get_or_create_listener(registry)
       let audio = savoiardi.create_audio(listener)
-      savoiardi.set_audio_volume(audio, volume)
-      savoiardi.set_audio_loop(audio, audio_loop)
-      savoiardi.set_audio_playback_rate(audio, playback_rate)
-      savoiardi.set_audio_detune(audio, detune)
-      load_and_play(audio, src, playing)
-      let reg = registry.register_audio(reg, reg.scene_id, id, audio)
+      savoiardi.set_audio_volume(audio, option.unwrap(volume, 1.0))
+      savoiardi.set_audio_loop(audio, option.unwrap(audio_loop, False))
+      savoiardi.set_audio_playback_rate(
+        audio,
+        option.unwrap(playback_rate, 1.0),
+      )
+      savoiardi.set_audio_detune(audio, option.unwrap(detune, 0.0))
+      load_and_play(audio, src, option.unwrap(playing, False))
+      let reg = registry.register_audio(reg, parent_id, id, audio)
       reg
     }
 
@@ -326,16 +341,31 @@ fn apply_patch(
       max_distance:,
       rolloff_factor:,
     ) -> {
-      let #(reg, listener) = get_or_create_listener(reg)
+      let #(reg, listener) = get_or_create_listener(registry)
       let pos_audio = savoiardi.create_positional_audio(listener)
-      savoiardi.set_positional_audio_volume(pos_audio, volume)
-      savoiardi.set_positional_audio_loop(pos_audio, audio_loop)
-      savoiardi.set_positional_audio_playback_rate(pos_audio, playback_rate)
-      savoiardi.set_positional_audio_detune(pos_audio, detune)
-      savoiardi.set_ref_distance(pos_audio, ref_distance)
-      savoiardi.set_max_distance(pos_audio, max_distance)
-      savoiardi.set_rolloff_factor(pos_audio, rolloff_factor)
-      load_and_play_positional(pos_audio, src, playing)
+      savoiardi.set_positional_audio_volume(
+        pos_audio,
+        option.unwrap(volume, 1.0),
+      )
+      savoiardi.set_positional_audio_loop(
+        pos_audio,
+        option.unwrap(audio_loop, False),
+      )
+      savoiardi.set_positional_audio_playback_rate(
+        pos_audio,
+        option.unwrap(playback_rate, 1.0),
+      )
+      savoiardi.set_positional_audio_detune(
+        pos_audio,
+        option.unwrap(detune, 0.0),
+      )
+      savoiardi.set_ref_distance(pos_audio, option.unwrap(ref_distance, 1.0))
+      savoiardi.set_max_distance(pos_audio, option.unwrap(max_distance, 100.0))
+      savoiardi.set_rolloff_factor(
+        pos_audio,
+        option.unwrap(rolloff_factor, 1.0),
+      )
+      load_and_play_positional(pos_audio, src, option.unwrap(playing, False))
       // Register FIRST so set_transform can find the object
       let reg =
         registry.register_positional_audio(reg, parent_id, id, pos_audio)
@@ -352,18 +382,21 @@ fn apply_patch(
       color:,
       transform:,
     ) -> {
-      case parse_color(color) {
+      case parse_color(option.unwrap(color, "#888888")) {
         Ok(color_int) -> {
-          let object = case debug_type {
-            "axes" -> savoiardi.create_axes_helper(size)
-            "grid" -> savoiardi.create_grid_helper(size, divisions, color_int)
+          let size_val = option.unwrap(size, 5.0)
+          let divisions_val = option.unwrap(divisions, 10)
+          let object = case option.unwrap(debug_type, "axes") {
+            "axes" -> savoiardi.create_axes_helper(size_val)
+            "grid" ->
+              savoiardi.create_grid_helper(size_val, divisions_val, color_int)
             // Default to axes
-            _ -> savoiardi.create_axes_helper(size)
+            _ -> savoiardi.create_axes_helper(size_val)
           }
           // Register FIRST so set_transform can find the object
           let reg =
             registry.register_and_add_object(
-              reg,
+              registry,
               id,
               object,
               parent_id,
@@ -372,34 +405,43 @@ fn apply_patch(
           registry.set_transform(reg, id, transform)
           reg
         }
-        Error(Nil) -> reg
+        Error(Nil) -> registry
       }
     }
 
     // -- Updates ----------------------------------------------------------------
     scene_patch.UpdateTransform(id:, transform:) -> {
-      registry.set_transform(reg, id, transform)
-      reg
+      registry.set_transform(registry, id, transform)
+      registry
     }
 
-    scene_patch.UpdateMeshGeometry(id:, geometry: geo_spec) -> {
-      case registry.get_object(reg, id) {
-        Ok(object) -> {
+    scene_patch.UpdateMeshGeometry(id:, geometry:) -> {
+      let _ =
+        registry.get_object(registry, id)
+        |> result.map(fn(object) {
           savoiardi.get_object_geometry(object)
           |> savoiardi.dispose_geometry
-          case parse_geometry(geo_spec) {
-            Ok(geometry) -> savoiardi.set_object_geometry(object, geometry)
-            Error(Nil) -> Nil
-          }
-        }
-        Error(Nil) -> Nil
-      }
-      reg
+
+          geometry
+          |> option.to_result(Nil)
+          |> result.try(parse_geometry)
+          |> result.map(savoiardi.set_object_geometry(object, _))
+        })
+      registry
     }
 
     scene_patch.UpdateMeshSrc(id:, src:) -> {
-      update_model(on_async, id, src)
-      reg
+      case src {
+        option.Some(url) -> set_model(on_async, id, url)
+        option.None -> {
+          let _ =
+            registry.get_object(registry, id)
+            |> result.map(savoiardi.get_object_geometry)
+            |> result.map(savoiardi.dispose_geometry)
+          Nil
+        }
+      }
+      registry
     }
 
     scene_patch.UpdateMeshMaterial(
@@ -425,127 +467,144 @@ fn apply_patch(
       alpha_test:,
       transparent:,
     ) -> {
-      case registry.get_object(reg, id) {
-        Ok(object) ->
-          case parse_color(color), parse_color(emissive) {
-            Ok(color_int), Ok(emissive_int) -> {
-              let new_material =
-                create_material_by_type(
-                  material_type,
-                  color_int,
-                  metalness,
-                  roughness,
-                  opacity,
-                  emissive_int,
-                  emissive_intensity,
-                  displacement_scale,
-                  displacement_bias,
-                  shininess,
-                  alpha_test,
-                  transparent,
-                )
-              savoiardi.update_material_wireframe(new_material, wireframe)
-              savoiardi.update_material_side(
-                new_material,
-                parse_material_side(side),
-              )
-              // Dispose old material and replace
-              let old_material = savoiardi.get_object_material(object)
-              savoiardi.dispose_material(old_material)
-              savoiardi.set_object_material(object, new_material)
-              // Load texture maps asynchronously (fire-and-forget)
-              let _ =
-                load_material_textures(
-                  new_material,
-                  color_map,
-                  normal_map,
-                  ao_map,
-                  roughness_map,
-                  metalness_map,
-                  displacement_map,
-                )
-              Nil
-            }
-            _, _ -> Nil
-          }
-        Error(Nil) -> Nil
-      }
-      reg
+      let _ =
+        registry.get_object(registry, id)
+        |> result.map(fn(object) {
+          let color_int =
+            color
+            |> option.to_result(Nil)
+            |> result.try(parse_color)
+            |> result.unwrap(0xffffff)
+          let emissive_int =
+            emissive
+            |> option.to_result(Nil)
+            |> result.try(parse_color)
+            |> result.unwrap(0x000000)
+          let new_material =
+            create_material_by_type(
+              material_type,
+              color_int,
+              emissive_int,
+              metalness,
+              roughness,
+              opacity,
+              emissive_intensity,
+              displacement_scale,
+              displacement_bias,
+              shininess,
+              alpha_test,
+              transparent,
+            )
+          savoiardi.update_material_wireframe(
+            new_material,
+            option.unwrap(wireframe, False),
+          )
+          savoiardi.update_material_side(
+            new_material,
+            parse_material_side(option.unwrap(side, "front")),
+          )
+          // Dispose old material and replace
+          let old_material = savoiardi.get_object_material(object)
+          savoiardi.dispose_material(old_material)
+          savoiardi.set_object_material(object, new_material)
+          // Load texture maps asynchronously (fire-and-forget)
+          let _ =
+            load_material_textures(
+              new_material,
+              color_map,
+              normal_map,
+              ao_map,
+              roughness_map,
+              metalness_map,
+              displacement_map,
+            )
+          Nil
+        })
+
+      registry
     }
 
     scene_patch.UpdateMeshShadow(id:, cast_shadow:, receive_shadow:) -> {
-      registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-      reg
+      registry.set_mesh_shadow(
+        registry,
+        id,
+        option.unwrap(cast_shadow, False),
+        option.unwrap(receive_shadow, False),
+      )
+      registry
     }
 
     scene_patch.UpdateMeshVisibility(id:, visible:) -> {
-      registry.set_visible(reg, id, visible)
-      reg
+      registry.set_visible(registry, id, option.unwrap(visible, True))
+      registry
     }
 
     scene_patch.UpdateCameraProps(id:, fov:, near:, far:, ..) -> {
-      case registry.get_camera(reg, id) {
-        Ok(camera) -> {
+      let _ =
+        registry.get_camera(registry, id)
+        |> result.map(fn(camera) {
           savoiardi.set_perspective_camera_params(
             camera,
-            fov,
-            registry.get_renderer_aspect_ratio(reg),
-            near,
-            far,
+            option.unwrap(fov, 75.0),
+            registry.get_renderer_aspect_ratio(registry),
+            option.unwrap(near, 0.1),
+            option.unwrap(far, 1000.0),
           )
           savoiardi.update_camera_projection_matrix(camera)
-        }
-        Error(Nil) -> Nil
-      }
-      reg
+        })
+      registry
     }
 
     scene_patch.UpdateCameraActive(id:, active:) -> {
-      let reg = registry.set_camera_active(reg, id, active)
+      let reg =
+        registry.set_camera_active(registry, id, option.unwrap(active, False))
       // Sync active camera to render loop
       sync_active_camera(reg, loop)
       reg
     }
 
     scene_patch.UpdateLightProps(id:, color:, intensity:, ..) -> {
-      case registry.get_light(reg, id) {
-        option.Some(light) ->
-          case parse_color(color) {
-            Ok(color_int) -> {
-              savoiardi.update_light_color(light, color_int)
-              savoiardi.update_light_intensity(light, intensity)
-            }
-            Error(Nil) -> Nil
-          }
-        option.None -> Nil
+      let _ = {
+        use light <- result.try(
+          registry.get_light(registry, id) |> option.to_result(Nil),
+        )
+        use color_int <- result.try(
+          parse_color(option.unwrap(color, "#ffffff")),
+        )
+        savoiardi.update_light_color(light, color_int)
+        savoiardi.update_light_intensity(light, option.unwrap(intensity, 1.0))
+        Ok(Nil)
       }
-      reg
+      registry
     }
 
     scene_patch.UpdateAudioProps(
       id:,
+      src: _,
       volume:,
       loop: audio_loop,
       playing:,
       playback_rate:,
       detune:,
-      ..,
     ) -> {
-      case registry.get_audio(reg, id) {
-        Ok(audio) -> {
-          savoiardi.set_audio_volume(audio, volume)
-          savoiardi.set_audio_loop(audio, audio_loop)
-          savoiardi.set_audio_playback_rate(audio, playback_rate)
-          savoiardi.set_audio_detune(audio, detune)
-          update_audio_playback(audio, playing)
-        }
-        Error(Nil) -> Nil
-      }
-      reg
+      let _ =
+        registry.get_audio(registry, id)
+        |> result.map(fn(audio) {
+          savoiardi.set_audio_volume(audio, option.unwrap(volume, 1.0))
+          savoiardi.set_audio_loop(audio, option.unwrap(audio_loop, False))
+          savoiardi.set_audio_playback_rate(
+            audio,
+            option.unwrap(playback_rate, 1.0),
+          )
+          savoiardi.set_audio_detune(audio, option.unwrap(detune, 0.0))
+          update_audio_playback(audio, option.unwrap(playing, False))
+        })
+      registry
     }
 
     scene_patch.UpdatePositionalAudio(
       id:,
+      src: _,
       volume:,
       loop: audio_loop,
       playing:,
@@ -555,52 +614,57 @@ fn apply_patch(
       ref_distance:,
       max_distance:,
       rolloff_factor:,
-      ..,
     ) -> {
-      registry.set_transform(reg, id, transform)
-      case registry.get_positional_audio(reg, id) {
-        Ok(pos_audio) -> {
-          savoiardi.set_positional_audio_volume(pos_audio, volume)
-          savoiardi.set_positional_audio_loop(pos_audio, audio_loop)
-          savoiardi.set_positional_audio_playback_rate(pos_audio, playback_rate)
-          savoiardi.set_positional_audio_detune(pos_audio, detune)
-          savoiardi.set_ref_distance(pos_audio, ref_distance)
-          savoiardi.set_max_distance(pos_audio, max_distance)
-          savoiardi.set_rolloff_factor(pos_audio, rolloff_factor)
-          update_positional_audio_playback(pos_audio, playing)
-        }
-        Error(Nil) -> Nil
-      }
-      reg
+      registry.set_transform(registry, id, transform)
+      let _ =
+        registry.get_positional_audio(registry, id)
+        |> result.map(fn(pos_audio) {
+          savoiardi.set_positional_audio_volume(
+            pos_audio,
+            option.unwrap(volume, 1.0),
+          )
+          savoiardi.set_positional_audio_loop(
+            pos_audio,
+            option.unwrap(audio_loop, False),
+          )
+          savoiardi.set_positional_audio_playback_rate(
+            pos_audio,
+            option.unwrap(playback_rate, 1.0),
+          )
+          savoiardi.set_positional_audio_detune(
+            pos_audio,
+            option.unwrap(detune, 0.0),
+          )
+          savoiardi.set_ref_distance(
+            pos_audio,
+            option.unwrap(ref_distance, 1.0),
+          )
+          savoiardi.set_max_distance(
+            pos_audio,
+            option.unwrap(max_distance, 100.0),
+          )
+          savoiardi.set_rolloff_factor(
+            pos_audio,
+            option.unwrap(rolloff_factor, 1.0),
+          )
+          update_positional_audio_playback(
+            pos_audio,
+            option.unwrap(playing, False),
+          )
+        })
+      registry
     }
 
     scene_patch.UpdateGroupVisibility(id:, visible:) -> {
-      registry.set_visible(reg, id, visible)
-      reg
-    }
-
-    // -- LOD creation -----------------------------------------------------------
-    scene_patch.CreateLod(id:, parent_id:, transform:) -> {
-      let lod = savoiardi.create_lod()
-      let object = savoiardi.lod_to_object3d(lod)
-      // Register FIRST so set_transform can find the object
-      let reg =
-        registry.register_and_add_object(
-          reg,
-          id,
-          object,
-          parent_id,
-          registry.LodObject,
-        )
-      registry.set_transform(reg, id, transform)
-      reg
+      registry.set_visible(registry, id, option.unwrap(visible, True))
+      registry
     }
 
     // -- InstancedMesh creation -------------------------------------------------
     scene_patch.CreateInstancedMesh(
       id:,
       parent_id:,
-      geometry: geo_spec,
+      geometry:,
       material_type:,
       color:,
       metalness:,
@@ -614,65 +678,76 @@ fn apply_patch(
       cast_shadow:,
       receive_shadow:,
     ) -> {
-      case parse_geometry(geo_spec), parse_color(color) {
-        Ok(geometry), Ok(color_int) -> {
-          let is_transparent = transparent || opacity <. 1.0
+      let instances_str = option.unwrap(instances, "")
+      case
+        geometry |> option.to_result(Nil) |> result.try(parse_geometry),
+        color |> option.to_result(Nil) |> result.try(parse_color)
+      {
+        Ok(geom), Ok(color_int) -> {
           let material =
             create_material_by_type(
               material_type,
               color_int,
+              0,
               metalness,
               roughness,
               opacity,
-              0,
-              0.0,
-              1.0,
-              0.0,
-              30.0,
-              0.0,
-              is_transparent,
+              option.Some(0.0),
+              option.Some(1.0),
+              option.Some(0.0),
+              option.Some(30.0),
+              option.Some(0.0),
+              transparent,
             )
-          savoiardi.update_material_wireframe(material, wireframe)
-          let count = parse_instance_count(instances)
+          savoiardi.update_material_wireframe(
+            material,
+            option.unwrap(wireframe, False),
+          )
+          let count = parse_instance_count(instances_str)
           // Create with generous capacity so count changes don't require recreation.
           let capacity = int.max(count * 4, 64)
           let instanced =
-            savoiardi.create_instanced_mesh(geometry, material, capacity)
+            savoiardi.create_instanced_mesh(geom, material, capacity)
           // Set the actual rendered count (capacity > count).
           registry.set_instanced_mesh_count(instanced, count)
-          let transforms = parse_instance_transforms(instances)
+          let transforms = parse_instance_transforms(instances_str)
           savoiardi.update_instanced_mesh_transforms(instanced, transforms)
           let object = savoiardi.instanced_mesh_to_object3d(instanced)
           // Register FIRST so set_transform/set_visible/set_mesh_shadow can find it
           let reg =
             registry.register_and_add_object(
-              reg,
+              registry,
               id,
               object,
               parent_id,
               registry.InstancedMeshObject,
             )
           registry.set_transform(reg, id, transform)
-          registry.set_visible(reg, id, visible)
-          registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
+          registry.set_visible(reg, id, option.unwrap(visible, True))
+          registry.set_mesh_shadow(
+            reg,
+            id,
+            option.unwrap(cast_shadow, False),
+            option.unwrap(receive_shadow, False),
+          )
           reg
         }
-        _, _ -> reg
+        _, _ -> registry
       }
     }
 
     scene_patch.UpdateInstancedMeshInstances(id:, instances:) -> {
-      case registry.get_instanced_mesh(reg, id) {
-        Ok(instanced) -> {
-          let count = parse_instance_count(instances)
-          let transforms = parse_instance_transforms(instances)
+      let _ =
+        registry.get_instanced_mesh(registry, id)
+        |> result.map(fn(instanced) {
+          let instances_str = option.unwrap(instances, "")
+          let count = parse_instance_count(instances_str)
+          let transforms = parse_instance_transforms(instances_str)
           savoiardi.update_instanced_mesh_transforms(instanced, transforms)
           // Update the rendered count — Three.js only renders .count instances
           registry.set_instanced_mesh_count(instanced, count)
-        }
-        Error(Nil) -> Nil
-      }
-      reg
+        })
+      registry
     }
 
     scene_patch.UpdateInstancedMeshMaterial(
@@ -685,58 +760,63 @@ fn apply_patch(
       wireframe:,
       transparent:,
     ) -> {
-      case registry.get_object(reg, id) {
-        Ok(object) ->
-          case parse_color(color) {
-            Ok(color_int) -> {
-              let is_transparent = transparent || opacity <. 1.0
-              let new_material =
-                create_material_by_type(
-                  material_type,
-                  color_int,
-                  metalness,
-                  roughness,
-                  opacity,
-                  0,
-                  0.0,
-                  1.0,
-                  0.0,
-                  30.0,
-                  0.0,
-                  is_transparent,
-                )
-              savoiardi.update_material_wireframe(new_material, wireframe)
-              savoiardi.get_object_material(object)
-              |> savoiardi.dispose_material
-              savoiardi.set_object_material(object, new_material)
-            }
-            Error(Nil) -> Nil
-          }
-        Error(Nil) -> Nil
+      let _ = {
+        use object <- result.try(registry.get_object(registry, id))
+        use color_int <- result.try(
+          color |> option.to_result(Nil) |> result.try(parse_color),
+        )
+        let new_material =
+          create_material_by_type(
+            material_type,
+            color_int,
+            0,
+            metalness,
+            roughness,
+            opacity,
+            option.Some(0.0),
+            option.Some(1.0),
+            option.Some(0.0),
+            option.Some(30.0),
+            option.Some(0.0),
+            transparent,
+          )
+        savoiardi.update_material_wireframe(
+          new_material,
+          option.unwrap(wireframe, False),
+        )
+        savoiardi.get_object_material(object)
+        |> savoiardi.dispose_material
+        savoiardi.set_object_material(object, new_material)
+        Ok(Nil)
       }
-      reg
+      registry
     }
 
     scene_patch.UpdateInstancedMeshVisibility(id:, visible:) -> {
-      registry.set_visible(reg, id, visible)
-      reg
+      registry.set_visible(registry, id, option.unwrap(visible, True))
+      registry
     }
 
     scene_patch.UpdateInstancedMeshShadow(id:, cast_shadow:, receive_shadow:) -> {
-      registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-      reg
+      registry.set_mesh_shadow(
+        registry,
+        id,
+        option.unwrap(cast_shadow, False),
+        option.unwrap(receive_shadow, False),
+      )
+      registry
     }
 
     // -- Structure --------------------------------------------------------------
     scene_patch.Remove(id:) -> {
-      let reg = registry.remove_object(reg, id)
+      let reg = registry.remove_object(registry, id)
       // If a camera was removed, sync the active camera
       sync_active_camera(reg, loop)
       reg
     }
 
     scene_patch.Reparent(id:, new_parent_id:) -> {
-      let reg = registry.reparent_object(reg, id, new_parent_id)
+      let reg = registry.reparent_object(registry, id, new_parent_id)
       reg
     }
   }
@@ -754,8 +834,8 @@ fn sync_active_camera(reg: Registry, loop: RenderLoop) -> Nil {
 
 // GEOMETRY PARSING ------------------------------------------------------------
 
-fn parse_geometry(spec: String) -> Result(savoiardi.Geometry, Nil) {
-  case string.split(spec, ":") {
+fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
+  case string.split(geometry, ":") {
     [type_str, params_str] -> {
       let params =
         string.split(params_str, ",")
@@ -832,9 +912,7 @@ fn parse_color(hex: String) -> Result(Int, Nil) {
 /// The listener is stored in the registry and attached to the
 /// active camera so positional audio panning works correctly.
 /// Returns the updated registry and the listener.
-fn get_or_create_listener(
-  reg: Registry,
-) -> #(Registry, savoiardi.AudioListener) {
+fn get_or_create_listener(reg: Registry) -> #(Registry, savoiardi.AudioListener) {
   case registry.get_audio_listener(reg) {
     Ok(listener) -> #(reg, listener)
     Error(Nil) -> {
@@ -847,51 +925,59 @@ fn get_or_create_listener(
 }
 
 /// Load an audio buffer from a URL and play the global Audio when ready.
-fn load_and_play(audio: savoiardi.Audio, src: String, should_play: Bool) -> Nil {
+fn load_and_play(
+  audio: savoiardi.Audio,
+  src: option.Option(String),
+  should_play: Bool,
+) -> Nil {
   case src {
-    "" -> promise.resolve(Error(Nil))
-    _ -> {
-      use result <- promise.map(savoiardi.load_audio(src))
-      use buffer <- result.map(result)
+    option.None -> Nil
+    option.Some(url) -> {
+      let _ = {
+        use result <- promise.map(savoiardi.load_audio(url))
+        use buffer <- result.map(result)
 
-      savoiardi.set_audio_buffer(audio, buffer)
+        savoiardi.set_audio_buffer(audio, buffer)
 
-      case should_play {
-        True -> {
-          savoiardi.resume_audio_context()
-          savoiardi.play_audio(audio)
+        case should_play {
+          True -> {
+            savoiardi.resume_audio_context()
+            savoiardi.play_audio(audio)
+          }
+          False -> Nil
         }
-        False -> Nil
       }
+      Nil
     }
   }
-  Nil
 }
 
 /// Load an audio buffer and play a PositionalAudio when ready.
 fn load_and_play_positional(
   audio: savoiardi.PositionalAudio,
-  src: String,
+  src: option.Option(String),
   should_play: Bool,
 ) -> Nil {
   case src {
-    "" -> promise.resolve(Error(Nil))
-    _ -> {
-      use result <- promise.map(savoiardi.load_audio(src))
-      use buffer <- result.map(result)
+    option.None -> Nil
+    option.Some(url) -> {
+      let _ = {
+        use result <- promise.map(savoiardi.load_audio(url))
+        use buffer <- result.map(result)
 
-      savoiardi.set_positional_audio_buffer(audio, buffer)
+        savoiardi.set_positional_audio_buffer(audio, buffer)
 
-      case should_play {
-        True -> {
-          savoiardi.resume_audio_context()
-          savoiardi.play_positional_audio(audio)
+        case should_play {
+          True -> {
+            savoiardi.resume_audio_context()
+            savoiardi.play_positional_audio(audio)
+          }
+          False -> Nil
         }
-        False -> Nil
       }
+      Nil
     }
   }
-  Nil
 }
 
 /// Update playback state for a global Audio object.
@@ -940,30 +1026,23 @@ fn load_model(
   cast_shadow: Bool,
   receive_shadow: Bool,
 ) -> Nil {
+  let register_loaded =
+    register_loaded_model(
+      on_async,
+      id,
+      parent_id,
+      transform,
+      visible,
+      cast_shadow,
+      receive_shadow,
+    )
   let extension = get_file_extension(src)
   case extension {
     "gltf" | "glb" -> {
       let _ = {
         use result <- promise.map(savoiardi.load_gltf(src))
         case result {
-          Ok(data) -> {
-            let object = savoiardi.get_gltf_scene(data)
-            on_async(fn(reg) {
-              let reg =
-                registry.register_and_add_object(
-                  reg,
-                  id,
-                  object,
-                  parent_id,
-                  registry.MeshObject,
-                )
-              registry.set_transform(reg, id, transform)
-              registry.set_visible(reg, id, visible)
-              registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-              reg
-            })
-            registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
-          }
+          Ok(data) -> register_loaded(savoiardi.get_gltf_scene(data))
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
         }
       }
@@ -973,24 +1052,7 @@ fn load_model(
       let _ = {
         use result <- promise.map(savoiardi.load_fbx(src))
         case result {
-          Ok(data) -> {
-            let object = savoiardi.get_fbx_scene(data)
-            on_async(fn(reg) {
-              let reg =
-                registry.register_and_add_object(
-                  reg,
-                  id,
-                  object,
-                  parent_id,
-                  registry.MeshObject,
-                )
-              registry.set_transform(reg, id, transform)
-              registry.set_visible(reg, id, visible)
-              registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-              reg
-            })
-            registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
-          }
+          Ok(data) -> register_loaded(savoiardi.get_fbx_scene(data))
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
         }
       }
@@ -1000,23 +1062,7 @@ fn load_model(
       let _ = {
         use result <- promise.map(savoiardi.load_obj(src))
         case result {
-          Ok(data) -> {
-            on_async(fn(reg) {
-              let reg =
-                registry.register_and_add_object(
-                  reg,
-                  id,
-                  data,
-                  parent_id,
-                  registry.MeshObject,
-                )
-              registry.set_transform(reg, id, transform)
-              registry.set_visible(reg, id, visible)
-              registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-              reg
-            })
-            registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
-          }
+          Ok(data) -> register_loaded(data)
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
         }
       }
@@ -1048,21 +1094,7 @@ fn load_model(
                 0.0,
               )
             let mesh = savoiardi.create_mesh(centered, material)
-            on_async(fn(reg) {
-              let reg =
-                registry.register_and_add_object(
-                  reg,
-                  id,
-                  mesh,
-                  parent_id,
-                  registry.MeshObject,
-                )
-              registry.set_transform(reg, id, transform)
-              registry.set_visible(reg, id, visible)
-              registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
-              reg
-            })
-            registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
+            register_loaded(mesh)
           }
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
         }
@@ -1073,10 +1105,40 @@ fn load_model(
   }
 }
 
+/// Shared callback for all model loaders: registers the loaded object in the
+/// scene and dispatches the model-loaded event.
+fn register_loaded_model(
+  on_async: fn(fn(Registry) -> Registry) -> Nil,
+  id: String,
+  parent_id: String,
+  transform: Transform,
+  visible: Bool,
+  cast_shadow: Bool,
+  receive_shadow: Bool,
+) -> fn(savoiardi.Object3D) -> Nil {
+  fn(object) {
+    on_async(fn(registry) {
+      let reg =
+        registry.register_and_add_object(
+          registry,
+          id,
+          object,
+          parent_id,
+          registry.MeshObject,
+        )
+      registry.set_transform(reg, id, transform)
+      registry.set_visible(reg, id, visible)
+      registry.set_mesh_shadow(reg, id, cast_shadow, receive_shadow)
+      reg
+    })
+    registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
+  }
+}
+
 /// Replace an existing object's model when the src attribute changes.
 /// Fire-and-forget — dispatches a RegistryTransform via on_async when the
 /// new model loads.
-fn update_model(
+fn set_model(
   on_async: fn(fn(Registry) -> Registry) -> Nil,
   id: String,
   src: String,
@@ -1089,10 +1151,7 @@ fn update_model(
         case result {
           Ok(data) -> {
             let object = savoiardi.get_gltf_scene(data)
-            on_async(fn(reg) {
-              let reg = registry.replace_object_model(reg, id, object)
-              reg
-            })
+            on_async(fn(reg) { registry.replace_object_model(reg, id, object) })
             registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
           }
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
@@ -1106,10 +1165,7 @@ fn update_model(
         case result {
           Ok(data) -> {
             let object = savoiardi.get_fbx_scene(data)
-            on_async(fn(reg) {
-              let reg = registry.replace_object_model(reg, id, object)
-              reg
-            })
+            on_async(fn(reg) { registry.replace_object_model(reg, id, object) })
             registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
           }
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
@@ -1122,10 +1178,7 @@ fn update_model(
         use result <- promise.map(savoiardi.load_obj(src))
         case result {
           Ok(data) -> {
-            on_async(fn(reg) {
-              let reg = registry.replace_object_model(reg, id, data)
-              reg
-            })
+            on_async(fn(reg) { registry.replace_object_model(reg, id, data) })
             registry.dispatch_mesh_event(id, "tiramisu:model-loaded")
           }
           Error(_) -> registry.dispatch_mesh_event(id, "tiramisu:model-error")
@@ -1152,83 +1205,85 @@ fn get_file_extension(url: String) -> String {
 // MATERIAL HELPERS ------------------------------------------------------------
 
 /// Create a Three.js material based on the material type string.
+/// Colors must be pre-resolved to Int by the caller.
 fn create_material_by_type(
-  material_type: String,
-  color_int: Int,
-  metalness: Float,
-  roughness: Float,
-  opacity: Float,
-  emissive_int: Int,
-  emissive_intensity: Float,
-  displacement_scale: Float,
-  displacement_bias: Float,
-  shininess: Float,
-  alpha_test: Float,
-  transparent: Bool,
+  material_type: option.Option(String),
+  color: Int,
+  emissive: Int,
+  metalness: option.Option(Float),
+  roughness: option.Option(Float),
+  opacity: option.Option(Float),
+  emissive_intensity: option.Option(Float),
+  displacement_scale: option.Option(Float),
+  displacement_bias: option.Option(Float),
+  shininess: option.Option(Float),
+  alpha_test: option.Option(Float),
+  transparent: option.Option(Bool),
 ) -> savoiardi.Material {
-  let is_transparent = transparent || opacity <. 1.0
-  case material_type {
+  let opacity_val = option.unwrap(opacity, 1.0)
+  let is_transparent = option.unwrap(transparent, False) || opacity_val <. 1.0
+  case option.unwrap(material_type, "standard") {
     "basic" ->
       savoiardi.create_basic_material(
-        color_int,
+        color,
         is_transparent,
-        opacity,
+        opacity_val,
         option.None,
         savoiardi.FrontSide,
-        alpha_test,
+        option.unwrap(alpha_test, 0.0),
         True,
       )
     "phong" ->
       savoiardi.create_phong_material(
-        color_int,
-        shininess,
+        color,
+        option.unwrap(shininess, 30.0),
         option.None,
         option.None,
         option.None,
         is_transparent,
-        opacity,
-        alpha_test,
+        opacity_val,
+        option.unwrap(alpha_test, 0.0),
       )
     "lambert" ->
       savoiardi.create_lambert_material(
-        color_int,
+        color,
         option.None,
         option.None,
         option.None,
         is_transparent,
-        opacity,
-        alpha_test,
+        opacity_val,
+        option.unwrap(alpha_test, 0.0),
         savoiardi.FrontSide,
       )
     "toon" ->
       savoiardi.create_toon_material(
-        color_int,
+        color,
         option.None,
         option.None,
         option.None,
         is_transparent,
-        opacity,
-        alpha_test,
+        opacity_val,
+        option.unwrap(alpha_test, 0.0),
       )
     // Default to standard (PBR)
     _ ->
       savoiardi.create_standard_material(
-        color_int,
-        metalness,
-        roughness,
+        color,
+        option.unwrap(metalness, 0.5),
+        option.unwrap(roughness, 0.5),
         is_transparent,
-        opacity,
+        opacity_val,
         option.None,
         option.None,
         option.None,
         option.None,
-        displacement_scale,
-        displacement_bias,
+        option.unwrap(displacement_scale, 1.0),
+        option.unwrap(displacement_bias, 0.0),
         option.None,
         option.None,
-        emissive_int,
-        emissive_intensity,
-        alpha_test,
+        emissive,
+        option.unwrap(emissive_intensity, 1.0),
+        option.unwrap(alpha_test, 0.0),
       )
   }
 }
@@ -1236,12 +1291,12 @@ fn create_material_by_type(
 /// Load texture maps from URLs and apply them to a material asynchronously.
 fn load_material_textures(
   material: savoiardi.Material,
-  color_map: String,
-  normal_map: String,
-  ao_map: String,
-  roughness_map: String,
-  metalness_map: String,
-  displacement_map: String,
+  color_map: option.Option(String),
+  normal_map: option.Option(String),
+  ao_map: option.Option(String),
+  roughness_map: option.Option(String),
+  metalness_map: option.Option(String),
+  displacement_map: option.Option(String),
 ) -> promise.Promise(Result(Nil, Nil)) {
   [
     load_texture_to_material(material, color_map, "map"),
@@ -1263,13 +1318,13 @@ fn load_material_textures(
 /// Load a single texture from a URL and set it on a material property.
 fn load_texture_to_material(
   material: savoiardi.Material,
-  url: String,
+  url: option.Option(String),
   property_name: String,
 ) -> promise.Promise(Result(Nil, Nil)) {
   case url {
-    "" -> promise.resolve(Error(Nil))
-    _ -> {
-      use result <- promise.map(savoiardi.load_texture(url))
+    option.None -> promise.resolve(Error(Nil))
+    option.Some(u) -> {
+      use result <- promise.map(savoiardi.load_texture(u))
       use texture <- result.map(result)
       savoiardi.set_material_texture(material, property_name, texture)
     }
@@ -1283,20 +1338,6 @@ fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
     "back" -> savoiardi.BackSide
     "double" -> savoiardi.DoubleSide
     _ -> savoiardi.FrontSide
-  }
-}
-
-/// If the parent of this mesh is a LOD object, register the mesh as a LOD level
-/// at the given distance instead of relying on the default parent-child add.
-fn maybe_add_lod_level(
-  reg: Registry,
-  parent_id: String,
-  mesh: savoiardi.Object3D,
-  distance: Float,
-) -> Nil {
-  case registry.get_lod(reg, parent_id) {
-    Ok(lod) -> savoiardi.add_lod_level(lod:, object: mesh, distance:)
-    Error(Nil) -> Nil
   }
 }
 

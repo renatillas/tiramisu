@@ -8,6 +8,7 @@
 //// their own DOM FFI.
 
 import gleam/dynamic.{type Dynamic}
+import gleam/int
 import gleam/option.{type Option}
 import gleam/result
 
@@ -66,25 +67,13 @@ pub fn inner_html(el: Element) -> String
 pub fn parent_element(el: Element) -> Result(Element, Nil)
 
 // ============================================================================
-// INLINE STYLE
-// ============================================================================
-
-/// Set an inline style property on an element.
-@external(javascript, "./dom.ffi.mjs", "setStyle")
-pub fn set_style(el: Element, property: String, value: String) -> Nil
-
-// ============================================================================
 // CUSTOM EVENTS
 // ============================================================================
 
 /// Dispatch a custom event from an element.
 /// The event bubbles and is composed (crosses shadow DOM boundaries).
 @external(javascript, "./dom.ffi.mjs", "dispatchCustomEvent")
-pub fn dispatch_custom_event(
-  el: Element,
-  event_name: String,
-  detail: a,
-) -> Nil
+pub fn dispatch_custom_event(el: Element, event_name: String, detail: a) -> Nil
 
 // ============================================================================
 // JS PROPERTY ACCESS (for Three.js object storage on DOM elements)
@@ -111,28 +100,13 @@ pub fn get_element_by_id(id: String) -> Result(Element, Nil)
 pub fn append_child(parent: Element, child: Element) -> Nil
 
 // ============================================================================
-// SCENE-READY LISTENER (one-shot event with detail access)
-// ============================================================================
-
-/// Set up a one-shot listener for the tiramisu:scene-ready custom event.
-/// The callback is called with the scene ID when the renderer initializes.
-@external(javascript, "./dom.ffi.mjs", "listenForSceneReady")
-pub fn listen_for_scene_ready(
-  host: Element,
-  callback: fn(String) -> Nil,
-) -> Nil
-
-// ============================================================================
 // MUTATION OBSERVER
 // ============================================================================
 
 /// Set up a MutationObserver on the host element's light DOM children.
 /// Uses queueMicrotask to batch rapid DOM mutations into a single callback.
 @external(javascript, "./dom.ffi.mjs", "setupMutationObserver")
-pub fn setup_mutation_observer(
-  host: Element,
-  callback: fn() -> Nil,
-) -> Nil
+pub fn setup_mutation_observer(host: Element, callback: fn() -> Nil) -> Nil
 
 // ============================================================================
 // DOM TREE WALKING
@@ -142,21 +116,21 @@ pub fn setup_mutation_observer(
 /// and return its ID. Returns None if no parent object is found before
 /// reaching the renderer. This enables proper hierarchical transforms.
 @external(javascript, "./dom.ffi.mjs", "findParentObjectId")
-pub fn find_parent_object_id(host: Element) -> Option(String)
+pub fn find_parent_object_id(host: Element) -> Result(String, Nil)
 
 // ============================================================================
 // COMPOSITE OPERATIONS (pure Gleam, composing primitives)
 // ============================================================================
 
 /// Find the parent tiramisu-renderer element and get its scene ID.
-pub fn find_parent_scene_id(host: Element) -> Option(String) {
+pub fn find_parent_scene_id(host: Element) -> Result(String, Nil) {
   case closest(host, "tiramisu-renderer") {
     Ok(renderer) ->
       case get_attribute(renderer, "data-scene-id") {
-        Ok(scene_id) -> option.Some(scene_id)
-        Error(Nil) -> option.None
+        Ok(scene_id) -> Ok(scene_id)
+        Error(Nil) -> Error(Nil)
       }
-    Error(Nil) -> option.None
+    Error(Nil) -> Error(Nil)
   }
 }
 
@@ -165,25 +139,11 @@ pub fn get_scene_id_from_host(host: Element) -> Result(String, Nil) {
   get_attribute(host, "scene-id")
 }
 
-/// Set the data-scene-id attribute and dispatch the scene-ready event.
-pub fn set_scene_id_on_host(host: Element, scene_id: String) -> Nil {
-  set_attribute(host, "data-scene-id", scene_id)
-  dispatch_custom_event(
-    host,
-    "tiramisu:scene-ready",
-    create_scene_ready_detail(scene_id),
-  )
-}
-
-/// Create a scene-ready event detail with camelCase key for JS compatibility.
-@external(javascript, "./dom.ffi.mjs", "createSceneReadyDetail")
-fn create_scene_ready_detail(scene_id: String) -> Dynamic
-
 /// Get the renderer configuration from a host element's attributes.
 pub fn get_renderer_config(host: Element) -> RendererConfig {
   let width = case get_attribute(host, "width") {
     Ok(w) ->
-      case parse_int(w) {
+      case int.parse(w) {
         Ok(n) -> option.Some(n)
         Error(Nil) -> option.None
       }
@@ -191,7 +151,7 @@ pub fn get_renderer_config(host: Element) -> RendererConfig {
   }
   let height = case get_attribute(host, "height") {
     Ok(h) ->
-      case parse_int(h) {
+      case int.parse(h) {
         Ok(n) -> option.Some(n)
         Error(Nil) -> option.None
       }
@@ -260,10 +220,3 @@ fn create_mesh_event_detail(id: String) -> Dynamic
 /// (savoiardi.Canvas) are opaque types that are DOM elements at runtime.
 @external(javascript, "./dom.ffi.mjs", "appendCanvasToContainer")
 pub fn append_canvas_to_container(container: a, canvas: b) -> Nil
-
-// ============================================================================
-// INTERNAL HELPERS
-// ============================================================================
-
-@external(javascript, "./dom.ffi.mjs", "parseInt10")
-fn parse_int(value: String) -> Result(Int, Nil)

@@ -1,45 +1,6 @@
-//// Material attributes for tiramisu-mesh elements.
-////
-//// Materials define how surfaces are rendered and interact with light.
-//// These attribute functions set material properties on mesh elements
-//// via DOM attributes.
-////
-//// ## Material Types
-////
-//// - **standard** (default): Physically-based (PBR) with metalness/roughness
-//// - **basic**: Unlit, no lighting calculations (fastest)
-//// - **phong**: Shiny surfaces with specular highlights
-//// - **lambert**: Matte surfaces, diffuse-only (fast)
-//// - **toon**: Cel-shaded cartoon style
-////
-//// ## Example
-////
-//// ```gleam
-//// import tiramisu/mesh
-//// import tiramisu/material
-////
-//// mesh.mesh("shiny-cube", [
-////   mesh.geometry_box(vec3.Vec3(2.0, 2.0, 2.0)),
-////   mesh.color(0xff6b6b),
-////   material.standard(),
-////   material.emissive(0xff0000),
-////   material.emissive_intensity(0.5),
-////   material.side(material.DoubleSide),
-//// ], [])
-//// ```
-////
-//// ## Texture Maps
-////
-//// ```gleam
-//// mesh.mesh("textured", [
-////   mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
-////   material.color_map("/textures/brick_color.jpg"),
-////   material.normal_map("/textures/brick_normal.jpg"),
-//// ], [])
-//// ```
-
 import gleam/float
 import gleam/int
+import gleam/json
 
 import lustre/attribute.{type Attribute}
 
@@ -107,7 +68,7 @@ pub fn shininess(value: Float) -> Attribute(msg) {
 /// ## Example
 ///
 /// ```gleam
-/// mesh.mesh("tree", [
+/// tiramisu.mesh("tree", [
 ///   material.color_map("/textures/leaves.png"),
 ///   material.alpha_test(0.5),
 /// ], [])
@@ -122,8 +83,11 @@ pub fn alpha_test(value: Float) -> Attribute(msg) {
 /// Use this attribute when you need transparency with opacity=1.0,
 /// such as for alpha-tested textures or materials with transparent regions
 /// in their color map.
-pub fn transparent() -> Attribute(msg) {
-  attribute.attribute("transparent", "")
+pub fn transparent(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("transparent", "")
+    False -> attribute.property("transparent", json.bool(False))
+  }
 }
 
 // MATERIAL PROPERTIES ---------------------------------------------------------
@@ -140,11 +104,6 @@ pub fn transparent() -> Attribute(msg) {
 /// ```
 pub fn emissive(hex: Int) -> Attribute(msg) {
   attribute.attribute("emissive", "#" <> int.to_base16(hex))
-}
-
-/// Set the emissive (glow) color as a hex string.
-pub fn emissive_string(hex: String) -> Attribute(msg) {
-  attribute.attribute("emissive", hex)
 }
 
 /// Set the emissive intensity (glow brightness).
@@ -179,8 +138,8 @@ pub fn side(s: MaterialSide) -> Attribute(msg) {
 /// ## Example
 ///
 /// ```gleam
-/// mesh.mesh("textured", [
-///   mesh.color(0xffffff),
+/// tiramisu.mesh("textured", [
+///   tiramisu.color(0xffffff),
 ///   material.color_map("/textures/brick.jpg"),
 /// ], [])
 /// ```
@@ -200,8 +159,8 @@ pub fn normal_map(url: String) -> Attribute(msg) {
 ///
 /// AO maps darken areas where ambient light would be occluded,
 /// adding depth to crevices and corners.
-pub fn ao_map(url: String) -> Attribute(msg) {
-  attribute.attribute("ao-map", url)
+pub fn ambient_occlusion_map(url: String) -> Attribute(msg) {
+  attribute.attribute("ambient-occlusion-map", url)
 }
 
 /// Set the roughness map URL for per-pixel roughness variation.
@@ -229,8 +188,8 @@ pub fn metalness_map(url: String) -> Attribute(msg) {
 /// ## Example
 ///
 /// ```gleam
-/// mesh.mesh("terrain", [
-///   mesh.geometry_sphere(2.0),
+/// tiramisu.mesh("terrain", [
+///   mesh.geometry_sphere_simple(2.0),
 ///   material.displacement_map("/textures/heightmap.jpg"),
 ///   material.displacement_scale(0.5),
 /// ], [])
@@ -251,4 +210,59 @@ pub fn displacement_scale(scale: Float) -> Attribute(msg) {
 /// Shifts the displacement up or down. Default is 0.0.
 pub fn displacement_bias(bias: Float) -> Attribute(msg) {
   attribute.attribute("displacement-bias", float.to_string(bias))
+}
+
+/// Set the metalness of the material (0.0 = dielectric, 1.0 = metal).
+///
+/// Works with meshes and instanced meshes.
+///
+pub fn metalness(m: Float) -> Attribute(msg) {
+  attribute.attribute("metalness", float.to_string(m))
+}
+
+/// Set the roughness of the material (0.0 = smooth, 1.0 = rough).
+///
+/// Works with meshes and instanced meshes.
+///
+pub fn roughness(r: Float) -> Attribute(msg) {
+  attribute.attribute("roughness", float.to_string(r))
+}
+
+/// Set the opacity of the material (0.0 = transparent, 1.0 = opaque).
+///
+/// Works with meshes and instanced meshes.
+///
+pub fn opacity(o: Float) -> Attribute(msg) {
+  attribute.attribute("opacity", float.to_string(o))
+}
+
+pub fn wireframe(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("wireframe", "")
+    False -> attribute.property("wireframe", json.bool(False))
+  }
+}
+
+/// Enable shadow casting on the element.
+///
+/// For meshes and instanced meshes: the element will cast shadows.
+/// Requires a light with shadow casting enabled.
+///
+pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("cast-shadow", "")
+    False -> attribute.property("cast-shadow", json.bool(False))
+  }
+}
+
+/// Enable shadow receiving on the mesh.
+///
+/// The mesh will show shadows cast by other meshes. Requires a light
+/// with shadow casting enabled.
+///
+pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("receive-shadow", "")
+    False -> attribute.property("receive-shadow", json.bool(False))
+  }
 }

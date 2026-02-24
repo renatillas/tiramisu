@@ -17,10 +17,11 @@
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/option.{type Option}
+import quaternion
 import savoiardi.{
-  type Audio, type AudioListener,
-  type Camera, type InstancedMesh, type LOD, type Light, type Material,
-  type Object3D, type PositionalAudio, type Renderer, type Scene,
+  type Audio, type AudioListener, type Camera, type InstancedMesh,
+  type Light, type Material, type Object3D, type PositionalAudio, type Renderer,
+  type Scene,
 }
 import tiramisu/internal/dom
 import tiramisu/transform
@@ -43,7 +44,6 @@ pub type ObjectKind {
   AudioObject
   DebugObject
   InstancedMeshObject
-  LodObject
 }
 
 /// Metadata about a registered camera.
@@ -244,11 +244,7 @@ pub fn set_camera_active(
   case dict.get(registry.cameras, id) {
     Ok(entry) -> {
       let cameras =
-        dict.insert(
-          registry.cameras,
-          id,
-          CameraEntry(..entry, active: active),
-        )
+        dict.insert(registry.cameras, id, CameraEntry(..entry, active: active))
       Registry(..registry, cameras: cameras)
     }
     Error(Nil) -> registry
@@ -438,9 +434,9 @@ pub fn set_scale(
 
 /// Apply a full transform (position, rotation, scale) to an object.
 pub fn set_transform(reg: Registry, id: String, t: transform.Transform) -> Nil {
-  let vec3.Vec3(px, py, pz) = transform.position(t)
-  let #(qx, qy, qz, qw) = transform.to_quaternion_xyzw(t)
-  let vec3.Vec3(sx, sy, sz) = transform.scale(t)
+  let vec3.Vec3(px, py, pz) = t.position
+  let quaternion.Quaternion(qx, qy, qz, qw) = t.rotation
+  let vec3.Vec3(sx, sy, sz) = t.scale
 
   set_position(reg, id, px, py, pz)
   set_quaternion(reg, id, qx, qy, qz, qw)
@@ -484,19 +480,9 @@ pub fn get_instanced_mesh_max_count(mesh: InstancedMesh) -> Int {
   savoiardi.get_instanced_mesh_max_count(mesh)
 }
 
-/// Get a LOD from the registry by ID.
-pub fn get_lod(registry: Registry, id: String) -> Result(LOD, Nil) {
-  case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, kind: LodObject, ..)) ->
-      Ok(savoiardi.object3d_to_lod(object))
-    _ -> Error(Nil)
-  }
-}
-
 // RESIZE ----------------------------------------------------------------------
 
 /// Resize the renderer and update all perspective cameras.
-/// CSS renderers are resized separately via render_loop.resize.
 pub fn resize(registry: Registry, width: Int, height: Int) -> Nil {
   savoiardi.set_renderer_size(registry.renderer, width, height)
   // Update all perspective cameras' aspect ratio
@@ -571,8 +557,3 @@ fn resolve_parent(registry: Registry, parent_id: String) -> Object3D {
       }
   }
 }
-
-// FFI DECLARATIONS ------------------------------------------------------------
-
-@external(javascript, "./registry.ffi.mjs", "getDevicePixelRatio")
-pub fn get_device_pixel_ratio() -> Float
