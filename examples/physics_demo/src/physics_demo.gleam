@@ -60,20 +60,20 @@ pub type Msg {
   KeyUp(Key)
   // Raycast callback
   GotGroundRay(Result(cacao.RayHit, Nil))
-  // Body query callbacks
-  GotPlayerPosition(vec3.Vec3(Float))
-  GotPlayerVelocity(vec3.Vec3(Float))
 }
 
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  let world = cacao.world()
+  let cacao_app = cacao.app()
   let assert Ok(_) =
-    tiramisu.register([cacao.extension(world), ..tiramisu.builtin_extensions()])
+    tiramisu.register([
+      cacao.extension(cacao_app),
+      ..tiramisu.builtin_extensions()
+    ])
 
   let app = lustre.application(init, update, view)
-  let assert Ok(_) = lustre.start(app, "#app", world)
+  let assert Ok(_) = lustre.start(app, "#app", cacao_app)
   Nil
 }
 
@@ -128,28 +128,34 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
           // Step physics simulation
           let world = cacao.step(world)
 
-          // Process collision events synchronously (they're on the world)
-          let in_trigger = process_trigger_events(model.in_trigger, world)
+          // Read current player position synchronously (avoids one-frame lag)
+          let player_position = case cacao.resolve_body(world, "player") {
+            Ok(body) -> cacao.get_translation(body)
+            Error(_) -> model.player_position
+          }
 
-          // Build effects: movement, raycast, body queries
+          // Process collision events synchronously (they're on the world)
+          let in_trigger = process_trigger_events(world, model.in_trigger)
+
+          // Cast ray from player center downward. With solid=false the
+          // player's own collider is skipped (ray origin is inside it).
+          // Distance to ground ≈ player half-height (0.5) when standing.
           let effects = [
             apply_movement(world, model, ctx),
-            cacao.get_position(world, "player", GotPlayerPosition),
             cacao.cast_ray(
               world,
               GotGroundRay,
-              origin: model.player_position
-                |> vec3f.add(vec3.Vec3(0.0, -0.6, 0.0)),
+              origin: player_position,
               direction: vec3.Vec3(0.0, -1.0, 0.0),
               max_distance: 200.0,
             ),
-            cacao.get_linear_velocity(world, "player", GotPlayerVelocity),
           ]
 
           #(
             Model(
               ..model,
               physics: Some(world),
+              player_position:,
               in_trigger:,
               input: input.end_frame(model.input),
             ),
@@ -159,27 +165,19 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       }
     }
 
-    GotPlayerPosition(pos) -> {
-      #(Model(..model, player_position: pos), effect.none())
-    }
-
     GotGroundRay(hit) -> {
-      let distance = case hit {
+      let distance = case echo hit {
         Ok(ray_hit) -> ray_hit.distance
         Error(Nil) -> 99.0
       }
       #(Model(..model, ground_distance: distance), effect.none())
-    }
-
-    GotPlayerVelocity(_velocity) -> {
-      #(model, effect.none())
     }
   }
 }
 
 /// Process trigger zone collision events for the player.
 /// Returns the new in_trigger state.
-fn process_trigger_events(current: Bool, world: cacao.PhysicsWorld) -> Bool {
+fn process_trigger_events(world: cacao.PhysicsWorld, current: Bool) -> Bool {
   let player_triggers =
     cacao.get_collisions_for(world, "player")
     |> list.filter(fn(info) { info.is_sensor })
@@ -259,7 +257,9 @@ fn apply_movement(
   }
 
   // Apply jump impulse
-  let effects = case jump, model.ground_distance <. 0.1 {
+  // Ray starts from player center, so ground distance ≈ 0.5 (half-height)
+  // when standing on the ground
+  let effects = case jump, model.ground_distance <. 0.6 {
     True, True -> [
       cacao.apply_impulse(world, "player", vec3.Vec3(0.0, jump_impulse, 0.0)),
       ..effects
@@ -317,7 +317,8 @@ fn view(_model: Model) {
           cacao.friction(0.2),
           cacao.linear_damping(1.5),
           cacao.angular_damping(1.0),
-          cacao.lock_rotations(x: True, y: False, z: True),
+          cacao.lock_x(True),
+          cacao.lock_y(True),
           cacao.collision_group(membership: 0b0100, filter: 0b0111),
         ],
         [],
