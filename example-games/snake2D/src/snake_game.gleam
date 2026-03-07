@@ -12,9 +12,11 @@ import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import tiramisu
 import tiramisu/camera
+import tiramisu/empty
 import tiramisu/light
 import tiramisu/material
 import tiramisu/mesh
+import tiramisu/primitive
 import tiramisu/scene
 import tiramisu/tick
 import tiramisu/transform
@@ -406,7 +408,7 @@ pub fn view(model: Model) -> Element(Msg) {
           camera.near(0.1),
           camera.far(100.0),
           camera.active(True),
-          transform.transform(transform.at(vec3.Vec3(0.0, 0.0, 20.0))),
+          camera.transform(transform.at(vec3.Vec3(0.0, 0.0, 20.0))),
         ],
         [],
       ),
@@ -419,7 +421,7 @@ pub fn view(model: Model) -> Element(Msg) {
         ],
         [],
       ),
-      tiramisu.empty("rootNode", [transform.transform(transform.identity)], {
+      tiramisu.empty("root-node", [empty.transform(transform.identity)], {
         list.flatten([
           create_static_view(),
           case model.game_state {
@@ -449,56 +451,55 @@ fn create_static_view() -> List(Element(Msg)) {
   let v_height = canvas_height -. 2.0 *. horz_border_dist()
   // Horizontal border: full canvas width, thin depth
   let h_border_geom =
-    mesh.geometry_box(vec3.Vec3(canvas_width, box_width /. 5.0, 1.0))
+    primitive.box(vec3.Vec3(canvas_width, box_width /. 5.0, 1.0))
   // Vertical border: narrow width, spans the play area height
-  let v_border_geom =
-    mesh.geometry_box(vec3.Vec3(box_width /. 5.0, v_height, 1.0))
-  let border_color = mesh.color(color_hex(BorderColor))
+  let v_border_geom = primitive.box(vec3.Vec3(box_width /. 5.0, v_height, 1.0))
+  let border_color = material.color(color_hex(BorderColor))
   let border_metalness = material.metalness(0.2)
   let border_roughness = material.roughness(0.9)
 
   [
-    tiramisu.mesh(
-      "upperLine",
+    tiramisu.primitive(
+      "upper-line",
       [
         h_border_geom,
         border_color,
         border_metalness,
         border_roughness,
-        transform.transform(transform.at(vec3.Vec3(0.0, upper_border(), 0.0))),
+        primitive.transform(transform.at(vec3.Vec3(0.0, upper_border(), 0.0))),
       ],
       [],
     ),
-    tiramisu.mesh(
-      "downLine",
+    tiramisu.primitive(
+      "down-line",
       [
         h_border_geom,
         border_color,
         border_metalness,
         border_roughness,
-        transform.transform(transform.at(vec3.Vec3(0.0, down_border(), 0.0))),
+        primitive.transform(transform.at(vec3.Vec3(0.0, down_border(), 0.0))),
       ],
       [],
     ),
-    tiramisu.mesh(
-      "leftLine",
+    tiramisu.primitive(
+      "left-line",
       [
         v_border_geom,
         border_color,
         border_metalness,
         border_roughness,
-        transform.transform(transform.at(vec3.Vec3(left_border(), 0.0, 0.0))),
+        primitive.transform(transform.at(vec3.Vec3(left_border(), 0.0, 0.0))),
       ],
       [],
     ),
-    tiramisu.mesh(
-      "rightLine",
+    tiramisu.primitive(
+      "right-line",
       [
         v_border_geom,
         border_color,
         border_metalness,
         border_roughness,
-        transform.transform(transform.at(vec3.Vec3(right_border(), 0.0, 0.0))),
+        primitive.transform(transform.at(vec3.Vec3(right_border(), 0.0, 0.0))),
       ],
       [],
     ),
@@ -506,28 +507,24 @@ fn create_static_view() -> List(Element(Msg)) {
 }
 
 fn create_running_game_view(model: Model) -> List(Element(Msg)) {
-  let cube_geom = mesh.geometry_box(vec3.Vec3(box_width, box_width, 1.0))
+  let cube_geom = primitive.box(vec3.Vec3(box_width, box_width, 1.0))
   let head_position = vec3.Vec3(model.head.x, model.head.y, 0.0)
   [
-    tiramisu.mesh(
+    tiramisu.primitive(
       "snakeHead",
       [
         cube_geom,
-        mesh.color(color_hex(SnakeHeadColor)),
-        material.metalness(0.2),
-        material.roughness(0.9),
-        transform.transform(transform.at(head_position)),
+        material.color(color_hex(SnakeHeadColor)),
+        primitive.transform(transform.at(head_position)),
       ],
       [],
     ),
-    tiramisu.mesh(
+    tiramisu.primitive(
       "beute",
       [
         cube_geom,
-        mesh.color(color_hex(BeuteColor)),
-        material.metalness(0.2),
-        material.roughness(0.9),
-        transform.transform(
+        material.color(color_hex(BeuteColor)),
+        primitive.transform(
           transform.at(vec3.Vec3(model.beute_pos.0, model.beute_pos.1, 0.0)),
         ),
       ],
@@ -546,12 +543,12 @@ fn tail_elements(model: Model) -> List(Element(Msg)) {
 }
 
 fn create_tail_element(x: Float, y: Float, index: Int) -> Element(Msg) {
-  tiramisu.mesh(
-    string.append("TailElement", int.to_string(index)),
+  tiramisu.primitive(
+    "TailElement" <> int.to_string(index),
     [
-      mesh.geometry_box(vec3.Vec3(box_width, box_width, 1.0)),
-      mesh.color(color_hex(SnakeTailColor)),
-      transform.transform(transform.at(vec3.Vec3(x, y, 0.0))),
+      primitive.box(vec3.Vec3(box_width, box_width, 1.0)),
+      material.color(color_hex(SnakeTailColor)),
+      primitive.transform(transform.at(vec3.Vec3(x, y, 0.0))),
     ],
     [],
   )
