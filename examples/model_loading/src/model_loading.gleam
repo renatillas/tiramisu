@@ -5,6 +5,7 @@
 //// - The mesh component handles loading automatically
 //// - Rotation animation via tick updates
 
+import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/time/duration
@@ -12,12 +13,14 @@ import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
 import lustre/element/html
+import lustre/event
 import quaternion
 import tiramisu
 import tiramisu/camera
 import tiramisu/light
 import tiramisu/material
 import tiramisu/mesh
+import tiramisu/primitive
 import tiramisu/scene
 import tiramisu/tick.{type TickContext}
 import tiramisu/transform
@@ -77,15 +80,8 @@ fn update(m: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     Tick(ctx) -> {
       let dt = duration.to_seconds(ctx.delta_time)
       let new_rotation = m.rotation +. dt *. 0.5
-      let current_fps = case dt >. 0.0 {
-        True -> 1.0 /. dt
-        False -> m.fps
-      }
-      let smooth_fps = case m.fps == 0.0 {
-        True -> current_fps
-        False -> m.fps *. 0.9 +. current_fps *. 0.1
-      }
-      #(Model(rotation: new_rotation, fps: smooth_fps), effect.none())
+      let current_fps = 1.0 /. dt
+      #(Model(rotation: new_rotation, fps: current_fps), effect.none())
     }
     ModelLoaded(mesh_id) -> {
       echo "Model loaded with id: " <> mesh_id
@@ -112,21 +108,22 @@ fn view(m: Model) {
           "main",
           [
             camera.fov(45.0),
-            transform.transform(transform.at(vec3.Vec3(0.0, 1.5, 5.0))),
+            camera.transform(transform.at(vec3.Vec3(0.0, 1.5, 5.0))),
             camera.active(True),
           ],
           [],
         ),
         // Ground plane
-        tiramisu.mesh(
+        tiramisu.primitive(
           "ground",
           [
             material.metalness(0.1),
             material.roughness(0.9),
-            mesh.plane(vec2.Vec2(10.0, 10.0)),
-            mesh.color(0x2d3436),
-            material.receive_shadow(True),
-            transform.transform(
+            material.color(0x2d3436),
+
+            primitive.plane(vec2.Vec2(10.0, 10.0)),
+            primitive.receive_shadow(True),
+            primitive.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
                 quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
@@ -140,14 +137,17 @@ fn view(m: Model) {
           "soldier",
           [
             attribute.src(model_url),
-            transform.transform(
+            mesh.transform(
               transform.at(vec3.Vec3(0.0, 0.0, 0.0))
               |> transform.with_rotation(
-                quaternion.from_euler(vec3.Vec3(0.0, 0.0, 0.0)),
+                quaternion.from_euler(vec3.Vec3(0.0, m.rotation, 0.0)),
               ),
             ),
             material.cast_shadow(True),
-            mesh.on_model_loaded(ModelLoaded),
+            event.on("tiramisu:model-loaded", {
+              use id <- decode.subfield(["detail", "id"], decode.string)
+              decode.success(ModelLoaded(id))
+            }),
           ],
           [],
         ),
@@ -159,7 +159,7 @@ fn view(m: Model) {
             light.color(0xffffff),
             light.intensity(1.0),
             light.cast_shadow(True),
-            transform.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+            light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
           ],
           [],
         ),

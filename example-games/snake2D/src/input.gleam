@@ -1,91 +1,9 @@
-//// Input handling for game-style keyboard and mouse polling.
-////
-//// `InputState` is pure Gleam data stored in your Model. Input is captured via
-//// Lustre event attributes on the renderer element. The browser's focus system
-//// naturally scopes input — clicking a renderer focuses it, and only that
-//// renderer receives keyboard events. Multiple games on one page work
-//// independently.
-////
-//// ## Usage
-////
-//// ```gleam
-//// import tiramisu/input
-////
-//// type Model { Model(input: input.InputState, ...) }
-//// type Msg {
-////   Tick(tick.TickContext)
-////   KeyDown(input.Key) KeyUp(input.Key)
-////   MouseMove(Float, Float) MouseDown(input.MouseButton) MouseUp(input.MouseButton)
-////   Wheel(Float)
-//// }
-////
-//// fn init(_) {
-////   #(Model(input: input.new()), tick.subscribe("", Tick))
-//// }
-////
-//// fn update(model, msg) {
-////   case msg {
-////     KeyDown(key) -> #(
-////       Model(..model, input: input.key_down(model.input, key)),
-////       effect.none(),
-////     )
-////     KeyUp(key) -> #(
-////       Model(..model, input: input.key_up(model.input, key)),
-////       effect.none(),
-////     )
-////     MouseMove(x, y) -> #(
-////       Model(..model, input: input.mouse_move(model.input, x, y)),
-////       effect.none(),
-////     )
-////     MouseDown(btn) -> #(
-////       Model(..model, input: input.mouse_down(model.input, btn)),
-////       effect.none(),
-////     )
-////     MouseUp(btn) -> #(
-////       Model(..model, input: input.mouse_up(model.input, btn)),
-////       effect.none(),
-////     )
-////     Wheel(delta) -> #(
-////       Model(..model, input: input.mouse_wheel_input(model.input, delta)),
-////       effect.none(),
-////     )
-////     Tick(ctx) -> {
-////       let moving = input.is_pressed(model.input, input.W)
-////       let #(mx, my) = input.mouse_position(model.input)
-////       // ... game logic ...
-////       #(Model(..model, input: input.end_frame(model.input)), effects)
-////     }
-////   }
-//// }
-////
-//// fn view(model) {
-////   renderer.renderer([
-////     renderer.width(800),
-////     renderer.height(600),
-////     attribute.attribute("tabindex", "0"),
-////     input.on_keydown(KeyDown),
-////     input.on_keyup(KeyUp),
-////     input.on_mousemove(MouseMove),
-////     input.on_mousedown(MouseDown),
-////     input.on_mouseup(MouseUp),
-////     input.on_wheel(Wheel),
-////   ], [ ... ])
-//// }
-//// ```
-
 import gleam/dynamic/decode
 import gleam/set.{type Set}
 import lustre/attribute.{type Attribute}
 import lustre/event
 
-// TYPES -----------------------------------------------------------------------
-
-/// A keyboard key identified by its physical position (KeyboardEvent.key).
-///
-/// Uses `key` so that letter keys, arrows, function keys, and modifiers all
-/// have distinct human-readable identifiers.
 pub type Key {
-  // Letters
   A
   B
   C

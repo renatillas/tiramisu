@@ -10,9 +10,10 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/int
-import gleam/list
+import gleam/javascript/array
 import gleam/option.{type Option}
 import gleam/result
+import savoiardi
 
 // ============================================================================
 // ELEMENT TYPE
@@ -116,27 +117,17 @@ pub fn setup_mutation_observer(
 ) -> Nil
 
 // ============================================================================
-// DOM TREE WALKING
-// ============================================================================
-
-/// Find the immediate parent tiramisu element (mesh, empty, camera, light, audio)
-/// and return its ID. Returns None if no parent object is found before
-/// reaching the renderer. This enables proper hierarchical transforms.
-@external(javascript, "./dom.ffi.mjs", "findParentObjectId")
-pub fn find_parent_object_id(host: Element) -> Result(String, Nil)
-
-// ============================================================================
 // ATTRIBUTE INTROSPECTION
 // ============================================================================
 
 /// Get all attributes on an element as a Dict(String, String).
 pub fn get_all_attributes(el: Element) -> Dict(String, String) {
   get_all_attributes_list(el)
-  |> list.fold(dict.new(), fn(acc, pair) { dict.insert(acc, pair.0, pair.1) })
+  |> array.fold(dict.new(), fn(acc, pair) { dict.insert(acc, pair.0, pair.1) })
 }
 
 @external(javascript, "./dom.ffi.mjs", "getAllAttributesList")
-fn get_all_attributes_list(el: Element) -> List(#(String, String))
+fn get_all_attributes_list(el: Element) -> array.Array(#(String, String))
 
 // ============================================================================
 // COMPOSITE OPERATIONS (pure Gleam, composing primitives)
@@ -205,7 +196,7 @@ pub type RendererConfig {
 /// Store a Three.js object reference on its corresponding DOM element.
 /// This enables external integrations (cacao physics, etc.) to find
 /// the Three.js object via document.getElementById(id)._object3d.
-pub fn store_object_on_dom(id: String, object: a) -> Nil {
+pub fn store_object_on_dom(id: String, object: savoiardi.Object3D) -> Nil {
   case get_element_by_id(id) {
     Ok(el) -> set_property(el, "_object3d", object)
     Error(Nil) -> Nil
@@ -221,18 +212,12 @@ pub fn clear_object_from_dom(id: String) -> Nil {
 }
 
 /// Dispatch a custom event on a DOM element found by ID.
-/// Used to notify Lustre apps about model load status.
-pub fn dispatch_mesh_event(mesh_id: String, event_name: String) -> Nil {
+pub fn dispatch_event(mesh_id: String, event_name: String, contents) -> Nil {
   case get_element_by_id(mesh_id) {
-    Ok(el) ->
-      dispatch_custom_event(el, event_name, create_mesh_event_detail(mesh_id))
+    Ok(el) -> dispatch_custom_event(el, event_name, contents)
     Error(Nil) -> Nil
   }
 }
-
-/// Create a mesh event detail with the right JS key format.
-@external(javascript, "./dom.ffi.mjs", "createMeshEventDetail")
-fn create_mesh_event_detail(id: String) -> Dynamic
 
 /// Append a canvas to a container (shadow root div).
 /// Also sets display:block on the canvas.

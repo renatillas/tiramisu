@@ -81,7 +81,16 @@ fn remove(
   parent_id: String,
   object: Object3D,
 ) -> Context {
-  let reg = registry.remove_object(ctx.registry, id, parent_id, object)
+  // Remove from Three.js scene graph
+  let parent = registry.resolve_parent(registry, parent_id)
+  savoiardi.remove_child(parent, object)
+  // Dispose resources
+  savoiardi.dispose_object(object)
+  // Remove from maps
+  let objects = dict.delete(registry.objects, id)
+  // Clear DOM reference
+  dom.clear_object_from_dom(id)
+  Registry(..registry, objects:)
   Context(..ctx, registry: reg)
 }
 
@@ -148,13 +157,9 @@ fn update(
     False, "orthographic" ->
       update_orthographic(context, object, attributes, changed_attributes)
     True, "perspective" | True, "orthographic" ->
-      case object {
-        option.Some(object) ->
-          remove(context, id, parent_id, object)
-          |> create(id, parent_id, attributes)
-          |> Ok
-        option.None -> Error(Nil)
-      }
+      remove(context, id)
+      |> create(id, parent_id, attributes)
+      |> Ok
     _, _ -> Error(Nil)
   }
 

@@ -28,28 +28,21 @@ pub type TickContext {
 ///
 /// ## Parameters
 ///
-/// - `scene_id`: The scene to subscribe to. Options:
-///   - `""` (empty string): Receive ticks from ALL scenes (global handler)
-///   - User-defined ID: Set via `renderer.scene_id("my-id")` attribute
-///   - Dynamic ID: Received from `renderer.on_scene_ready` event
+/// - `scene_id`: The scene to subscribe to.
 /// - `handler`: A function that receives a `TickContext` and returns your message type.
 ///
 /// ## Examples
 ///
 /// ```gleam
-/// // Global subscription (all scenes)
-/// tick.subscribe("", Tick)
-///
-/// // Specific scene (using user-defined ID)
 /// tick.subscribe("my-scene", Tick)
 /// ```
 ///
 pub fn subscribe(
   scene_id: String,
-  handler: fn(TickContext) -> msg,
+  to_msg: fn(TickContext) -> msg,
 ) -> Effect(msg) {
   effect.from(fn(dispatch) {
-    let _key = subscribe_to_ticks(scene_id, fn(ctx) { dispatch(handler(ctx)) })
+    let _key = subscribe_to_ticks(scene_id, fn(ctx) { dispatch(to_msg(ctx)) })
     Nil
   })
 }

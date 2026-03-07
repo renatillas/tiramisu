@@ -7,23 +7,28 @@
 
 import gleam/time/duration
 import gleam_community/maths
+
 import lustre
 import lustre/attribute
 import lustre/effect
 import lustre/element.{type Element}
 import lustre/element/html
+
 import quaternion
-import tiramisu
-import tiramisu/camera
-import tiramisu/light
-import tiramisu/material
-import tiramisu/mesh
-import tiramisu/scene
-import tiramisu/tick
-import tiramisu/transform
+
 import vec/vec2
 import vec/vec3
 import vec/vec3f
+
+import tiramisu
+import tiramisu/camera
+import tiramisu/empty
+import tiramisu/light
+import tiramisu/material
+import tiramisu/primitive
+import tiramisu/scene
+import tiramisu/tick
+import tiramisu/transform
 
 // MODEL -----------------------------------------------------------------------
 
@@ -125,7 +130,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-cam",
         [
           camera.fov(60.0),
-          transform.transform(
+          camera.transform(
             transform.at(vec3.Vec3(cx, 3.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -134,53 +139,50 @@ fn warm_scene(model: Model) -> Element(Msg) {
         [],
       ),
       // Red cube
-      tiramisu.mesh(
+      tiramisu.primitive(
         "warm-cube",
         [
-          mesh.geometry_box(vec3.Vec3(1.5, 1.5, 1.5)),
-          mesh.color(0xff4444),
-          material.metalness(0.3),
-          material.roughness(0.7),
-          transform.transform(transform.at(vec3.Vec3(-2.0, 0.75, 0.0))),
+          primitive.box(vec3.Vec3(1.5, 1.5, 1.5)),
+          primitive.transform(transform.at(vec3.Vec3(-2.0, 0.75, 0.0))),
+
+          material.color(0xff4444),
         ],
         [],
       ),
       // Orange sphere
-      tiramisu.mesh(
+      tiramisu.primitive(
         "warm-sphere",
         [
-          mesh.sphere(1.0, segments: vec2.Vec2(32, 16)),
-          mesh.color(0xff8800),
-          material.metalness(0.6),
-          material.roughness(0.3),
-          transform.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+          primitive.sphere(1.0, segments: vec2.Vec2(32, 16)),
+          primitive.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+
+          material.color(0xff8800),
         ],
         [],
       ),
       // Yellow cone
-      tiramisu.mesh(
+      tiramisu.primitive(
         "warm-cone",
         [
-          mesh.cone(radius: 0.8, height: 2.0, segments: 32),
-          mesh.color(0xffcc00),
-          material.metalness(0.4),
-          material.roughness(0.5),
-          transform.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
+          primitive.cone(radius: 0.8, height: 2.0, segments: 32),
+          primitive.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
+
+          material.color(0xffcc00),
         ],
         [],
       ),
       // Ground
-      tiramisu.mesh(
+      tiramisu.primitive(
         "warm-ground",
         [
-          mesh.plane(vec2.Vec2(12.0, 12.0)),
-          mesh.color(0x3d2b1f),
-          transform.transform(
+          primitive.plane(vec2.Vec2(12.0, 12.0)),
+          primitive.transform(
             transform.at(vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
             ),
           ),
+          material.color(0x3d2b1f),
           material.receive_shadow(True),
         ],
         [],
@@ -200,7 +202,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
           light.kind(light.Directional),
           light.color(0xffaa44),
           light.intensity(1.2),
-          transform.transform(transform.at(vec3.Vec3(3.0, 8.0, 5.0))),
+          primitive.transform(transform.at(vec3.Vec3(3.0, 8.0, 5.0))),
           light.cast_shadow(True),
         ],
         [],
@@ -227,7 +229,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
         "cool-cam",
         [
           camera.fov(50.0),
-          transform.transform(
+          camera.transform(
             transform.at(vec3.Vec3(cx, 4.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -236,53 +238,49 @@ fn cool_scene(model: Model) -> Element(Msg) {
         [],
       ),
       // Blue torus
-      tiramisu.mesh(
+      tiramisu.primitive(
         "cool-torus",
         [
-          mesh.torus(
+          primitive.torus(
             radius: 1.2,
             tube: 0.4,
             radial_segments: 32,
             tubular_segments: 16,
           ),
-          mesh.color(0x4488ff),
-          material.metalness(0.8),
-          material.roughness(0.1),
-          transform.transform(transform.at(vec3.Vec3(-2.0, 1.5, 0.0))),
+          primitive.transform(transform.at(vec3.Vec3(-2.0, 1.5, 0.0))),
+
+          material.color(0x4488ff),
         ],
         [],
       ),
       // Cyan cylinder
-      tiramisu.mesh(
+      tiramisu.primitive(
         "cool-cyl",
         [
-          mesh.cylinder(
+          primitive.cylinder(
             radius_top: 0.6,
             radius_bottom: 2.5,
             height: 0.5,
             segments: 32,
           ),
-          mesh.color(0x00cccc),
-          material.metalness(0.5),
-          material.roughness(0.4),
-          transform.transform(transform.at(vec3.Vec3(2.0, 1.25, 0.0))),
+          primitive.transform(transform.at(vec3.Vec3(2.0, 1.25, 0.0))),
+
+          material.color(0x00cccc),
         ],
         [],
       ),
       // Purple box
-      tiramisu.mesh(
+      tiramisu.primitive(
         "cool-box",
         [
-          mesh.geometry_box(vec3.Vec3(1.0, 1.0, 1.0)),
-          mesh.color(0x8844ff),
-          material.metalness(0.7),
-          material.roughness(0.2),
-          transform.transform(
+          primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
+          primitive.transform(
             transform.at(vec3.Vec3(0.0, 0.8, 1.5))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(0.3, 0.7, 0.0)),
             ),
           ),
+          material.color(0x8844ff),
         ],
         [],
       ),
@@ -290,14 +288,15 @@ fn cool_scene(model: Model) -> Element(Msg) {
       tiramisu.mesh(
         "cool-ground",
         [
-          mesh.plane(vec2.Vec2(16.0, 16.0)),
-          mesh.color(0x112233),
-          transform.transform(
+          primitive.plane(vec2.Vec2(16.0, 16.0)),
+          primitive.transform(
             transform.at(vec3.Vec3(0.0, 0.0, 0.0))
             |> transform.with_rotation(
               quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
             ),
           ),
+
+          material.color(0x112233),
           material.receive_shadow(True),
         ],
         [],
@@ -317,7 +316,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
           light.kind(light.Directional),
           light.color(0xaaccff),
           light.intensity(1.0),
-          transform.transform(transform.at(vec3.Vec3(-4.0, 10.0, 6.0))),
+          light.transform(transform.at(vec3.Vec3(-4.0, 10.0, 6.0))),
           light.cast_shadow(True),
         ],
         [],
@@ -344,7 +343,7 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
         "wire-cam",
         [
           camera.fov(70.0),
-          transform.transform(
+          camera.transform(
             transform.at(vec3.Vec3(cx, 4.0, cz))
             |> transform.with_look_at(vec3f.zero),
           ),
@@ -356,25 +355,27 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
       tiramisu.empty(
         "wire-group",
         [
-          transform.transform(transform.at(vec3.Vec3(0.0, 0.0, 0.0))),
+          empty.transform(transform.at(vec3.Vec3(0.0, 0.0, 0.0))),
         ],
         [
-          tiramisu.mesh(
+          tiramisu.primitive(
             "wire-box",
             [
-              mesh.geometry_box(vec3.Vec3(1.5, 1.5, 1.5)),
-              mesh.color(0x00ff88),
-              transform.transform(transform.at(vec3.Vec3(-2.0, 1.0, 0.0))),
+              primitive.box(vec3.Vec3(1.5, 1.5, 1.5)),
+              primitive.transform(transform.at(vec3.Vec3(-2.0, 1.0, 0.0))),
+
+              material.color(0x00ff88),
               material.wireframe(True),
             ],
             [],
           ),
-          tiramisu.mesh(
+          tiramisu.primitive(
             "wire-sphere",
             [
-              mesh.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
-              mesh.color(0xff0088),
-              transform.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+              primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
+              primitive.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+
+              material.color(0xff0088),
               material.wireframe(True),
             ],
             [],

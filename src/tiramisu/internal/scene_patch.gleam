@@ -4,7 +4,7 @@
 //// Handlers in scene_apply.gleam interpret the attrs dict for each tag.
 
 import gleam/dict.{type Dict}
-import tiramisu/transform.{type Transform}
+import gleam/set.{type Set}
 
 /// A single patch operation on the scene graph.
 pub type ScenePatch {
@@ -13,18 +13,15 @@ pub type ScenePatch {
     id: String,
     parent_id: String,
     tag: String,
-    attrs: Dict(String, String),
-    transform: Transform,
+    attributes: Dict(String, String),
   )
   /// Update an existing Three.js object.
-  /// Both old_attrs and new_attrs are supplied so handlers can diff at the
-  /// property level if they choose to avoid unnecessary Three.js work.
   UpdateNode(
     id: String,
+    parent_id: String,
     tag: String,
-    old_attrs: Dict(String, String),
-    new_attrs: Dict(String, String),
-    transform: Transform,
+    attributes: Dict(String, String),
+    changed_attributes: Set(String),
   )
   /// Remove an existing Three.js object from the scene.
   Remove(id: String)

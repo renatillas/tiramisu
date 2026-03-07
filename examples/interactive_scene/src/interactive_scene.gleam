@@ -20,6 +20,7 @@ import gleam/int
 import gleam/list
 import gleam/string
 import gleam/time/duration
+import tiramisu/primitive
 import tiramisu/scene
 
 import lustre
@@ -36,7 +37,6 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/light
 import tiramisu/material
-import tiramisu/mesh
 import tiramisu/tick
 import tiramisu/transform
 
@@ -65,13 +65,13 @@ pub type Model {
     /// Whether animation is running
     animating: Bool,
     /// Material type (standard, basic, phong, lambert, toon)
-    material_type: String,
+    material_type: MaterialType,
     /// Emissive color (hex integer)
     emissive_color: Int,
     /// Emissive intensity
     emissive_intensity: Float,
     /// Material side (front, back, double)
-    side: String,
+    side: material.Side,
     /// Color map texture URL
     color_map_url: String,
     /// Normal map texture URL
@@ -105,6 +105,14 @@ pub type Model {
   )
 }
 
+pub type MaterialType {
+  Standard
+  Basic
+  Phong
+  Lambert
+  Toon
+}
+
 /// Messages for state updates
 pub type Msg {
   /// Animation tick with timing context
@@ -130,13 +138,13 @@ pub type Msg {
   /// Set roughness
   SetRoughness(Float)
   /// Set material type
-  SetMaterialType(String)
+  SetMaterialType(MaterialType)
   /// Set emissive glow color
   SetEmissiveColor(Int)
   /// Set emissive glow intensity
   SetEmissiveIntensity(Float)
   /// Set material side
-  SetSide(String)
+  SetSide(material.Side)
   /// Set color map texture URL
   SetColorMapUrl(String)
   /// Set normal map texture URL
@@ -170,12 +178,7 @@ pub type Msg {
 // MAIN ------------------------------------------------------------------------
 
 pub fn main() -> Nil {
-  let assert Ok(_) =
-    tiramisu.register([
-      camera.extension(),
-      light.extension(),
-      mesh.extension(),
-    ])
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
 
   // Start a Lustre app with effects support
   let app = lustre.application(init, update, view)
@@ -197,10 +200,10 @@ fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
       metalness: 0.3,
       roughness: 0.7,
       animating: True,
-      material_type: "standard",
+      material_type: Standard,
       emissive_color: 0x000000,
       emissive_intensity: 0.0,
-      side: "front",
+      side: material.Front,
       color_map_url: "",
       normal_map_url: "",
       ao_map_url: "",
@@ -426,26 +429,38 @@ fn view(model: Model) -> Element(Msg) {
             [
               camera.fov(75.0),
               camera.active(True),
-              transform.transform(transform.at(vec3.Vec3(0.0, 3.0, 6.0))),
+              camera.transform(transform.at(vec3.Vec3(0.0, 3.0, 6.0))),
             ],
             [],
           ),
           // Rotating sphere with dynamic material properties
           // (sphere has enough vertices for displacement maps to work)
-          tiramisu.mesh(
+          tiramisu.primitive(
             "sphere",
             [
-              mesh.sphere(1.5, vec2.Vec2(64, 64)),
-              mesh.color(model.cube_color),
+              case model.material_type {
+                Standard -> material.standard()
+                Basic -> material.basic()
+                Phong -> material.phong()
+                Lambert -> material.lambert()
+                Toon -> material.toon()
+              },
+              primitive.sphere(1.5, vec2.Vec2(64, 64)),
+              primitive.transform(
+                transform.at(vec3.Vec3(0.0, 2.0, 0.0))
+                |> transform.with_rotation(
+                  quaternion.from_euler(vec3.Vec3(0.0, model.rotation, 0.0)),
+                ),
+              ),
+
+              material.color(model.cube_color),
               material.metalness(model.metalness),
               material.roughness(model.roughness),
-              // Material type
-              attribute.attribute("material-type", model.material_type),
               // Emissive glow
               material.emissive(model.emissive_color),
               material.emissive_intensity(model.emissive_intensity),
               // Material side
-              attribute.attribute("side", model.side),
+              material.side(model.side),
               // Displacement
               material.displacement_scale(model.displacement_scale),
               material.displacement_bias(model.displacement_bias),
@@ -454,12 +469,6 @@ fn view(model: Model) -> Element(Msg) {
               // Alpha test, transparency & opacity
               material.alpha_test(model.alpha_test),
               material.opacity(model.opacity),
-              transform.transform(
-                transform.at(vec3.Vec3(0.0, 2.0, 0.0))
-                |> transform.with_rotation(
-                  quaternion.from_euler(vec3.Vec3(0.0, model.rotation, 0.0)),
-                ),
-              ),
               material.wireframe(model.wireframe),
               material.cast_shadow(model.cast_shadow),
               material.transparent(model.transparent),
@@ -491,20 +500,19 @@ fn view(model: Model) -> Element(Msg) {
             [],
           ),
           // Ground plane — receives shadows from the sphere
-          tiramisu.mesh(
+          tiramisu.primitive(
             "ground",
             [
-              mesh.plane(vec2.Vec2(15.0, 15.0)),
-              mesh.color(0x2d3436),
-              material.metalness(0.1),
-              material.roughness(0.9),
-              transform.transform(
+              primitive.plane(vec2.Vec2(15.0, 15.0)),
+              primitive.transform(
                 transform.at(vec3.Vec3(0.0, 0.0, 0.0))
                 |> transform.with_rotation(
                   quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
                 ),
               ),
+
               material.receive_shadow(model.receive_shadow),
+              material.color(0x2d3436),
             ],
             [],
           ),
@@ -525,7 +533,7 @@ fn view(model: Model) -> Element(Msg) {
               light.color(0xffffff),
               light.intensity(1.0),
               light.cast_shadow(True),
-              transform.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+              light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
             ],
             [],
           ),
@@ -562,11 +570,11 @@ fn view(model: Model) -> Element(Msg) {
           html.div([class("flex flex-col gap-2")], [
             section_title("Material Type"),
             html.div([class("flex flex-wrap gap-1")], [
-              material_type_button("Standard", "standard", model.material_type),
-              material_type_button("Basic", "basic", model.material_type),
-              material_type_button("Phong", "phong", model.material_type),
-              material_type_button("Lambert", "lambert", model.material_type),
-              material_type_button("Toon", "toon", model.material_type),
+              material_type_button("Standard", Standard, model.material_type),
+              material_type_button("Basic", Basic, model.material_type),
+              material_type_button("Phong", Phong, model.material_type),
+              material_type_button("Lambert", Lambert, model.material_type),
+              material_type_button("Toon", Toon, model.material_type),
             ]),
           ]),
           // Color
@@ -617,9 +625,9 @@ fn view(model: Model) -> Element(Msg) {
           html.div([class("flex flex-col gap-2")], [
             section_title("Material Side"),
             html.div([class("flex gap-1")], [
-              side_button("Front", "front", model.side),
-              side_button("Back", "back", model.side),
-              side_button("Double", "double", model.side),
+              side_button("Front", material.Front, model.side),
+              side_button("Back", material.Back, model.side),
+              side_button("Double", material.Double, model.side),
             ]),
           ]),
           // Texture maps
@@ -781,8 +789,8 @@ fn section_title(text: String) -> Element(Msg) {
 
 fn material_type_button(
   label: String,
-  mt: String,
-  current: String,
+  mt: MaterialType,
+  current: MaterialType,
 ) -> Element(Msg) {
   html.button(
     [
@@ -838,13 +846,17 @@ fn emissive_button(label: String, color: Int, current: Int) -> Element(Msg) {
   )
 }
 
-fn side_button(label: String, s: String, current: String) -> Element(Msg) {
+fn side_button(
+  label: String,
+  side: material.Side,
+  current: material.Side,
+) -> Element(Msg) {
   html.button(
     [
-      event.on_click(SetSide(s)),
+      event.on_click(SetSide(side)),
       class(
         "px-3 py-1.5 rounded text-white text-xs font-medium cursor-pointer "
-        <> case s == current {
+        <> case side == current {
           True -> "bg-indigo-600"
           False -> "bg-gray-700 hover:bg-gray-600"
         },

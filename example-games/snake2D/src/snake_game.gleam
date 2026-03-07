@@ -1,12 +1,8 @@
 //// Snake Game - A classic snake game built with Tiramisu
 
-import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/option
-import gleam/result
 import gleam/string
 import gleam/time/duration
 import input
@@ -36,8 +32,6 @@ const canvas_width = 1920.0
 /// Canvas height in world units.
 const canvas_height = 1080.0
 
-const highscore_key = "Highscore"
-
 // =============================================================================
 // Types
 // =============================================================================
@@ -49,7 +43,7 @@ pub type Model {
     tail: List(BoxData),
     beute_pos: #(Float, Float),
     game_state: GameState,
-    score_info: ScoreInfo,
+    score_info: Int,
     input: input.InputState,
   )
 }
@@ -58,14 +52,6 @@ pub type GameState {
   Running
   NotStarted
   GameOver
-}
-
-pub type ScoreInfo {
-  ScoreInfo(
-    current_score: Int,
-    highscore: option.Option(Int),
-    new_high_score: Bool,
-  )
 }
 
 pub type BoxData {
@@ -101,10 +87,9 @@ type Color {
 // =============================================================================
 
 pub fn main() -> Nil {
-  let assert Ok(_) = tiramisu.register([])
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
   let assert Ok(_) =
-    lustre.application(init, update, view)
-    |> lustre.start("#app", Nil)
+    lustre.application(init:, update:, view:) |> lustre.start("#app", Nil)
   Nil
 }
 
@@ -113,28 +98,17 @@ pub fn main() -> Nil {
 // =============================================================================
 
 pub fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
-  let pot_highscore =
-    get_localstorage(highscore_key)
-    |> result.try(fn(x) {
-      let assert Ok(val) = decode.run(x, decode.int)
-      Ok(val)
-    })
-  let highscore = option.from_result(pot_highscore)
-  #(init_model(highscore), tick.subscribe("snake", Tick))
+  #(init_model(), tick.subscribe("snake", Tick))
 }
 
-fn init_model(highscore: option.Option(Int)) -> Model {
+fn init_model() -> Model {
   Model(
     time: 0.0,
     head: BoxData(x: 0.0, y: 0.0, direction: Right),
     tail: [],
     beute_pos: random_pos(),
     game_state: Running,
-    score_info: ScoreInfo(
-      current_score: 0,
-      highscore: highscore,
-      new_high_score: False,
-    ),
+    score_info: 0,
     input: input.new(),
   )
 }
@@ -153,7 +127,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
             input.is_mouse_just_pressed(model.input, input.LeftButton)
             || input.is_just_pressed(model.input, input.Enter)
           {
-            True -> init_model(model.score_info.highscore)
+            True -> init_model()
             False -> model
           }
         }
@@ -184,28 +158,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
 fn update_running_model(model: Model, ctx: tick.TickContext) -> Model {
   case check_game_over(model) {
     True -> {
-      let score = model.score_info.current_score
-      let pot_new_highscore = case model.score_info.highscore {
-        option.Some(highscore_val) ->
-          case score > highscore_val {
-            True -> {
-              set_localstorage(highscore_key, int.to_string(score))
-              ScoreInfo(
-                ..model.score_info,
-                highscore: option.Some(score),
-                new_high_score: True,
-              )
-            }
-            _ -> model.score_info
-          }
-        _ ->
-          ScoreInfo(
-            ..model.score_info,
-            highscore: option.Some(score),
-            new_high_score: True,
-          )
-      }
-      Model(..model, game_state: GameOver, score_info: pot_new_highscore)
+      Model(..model, game_state: GameOver, score_info: 0)
     }
     False -> update_snake_beute(model, ctx)
   }
@@ -263,8 +216,8 @@ fn update_snake_beute(model: Model, ctx: tick.TickContext) -> Model {
     True -> {
       let is_grefressen = is_gefressen_cal(model)
       let new_score = case is_grefressen {
-        True -> model.score_info.current_score + 1
-        False -> model.score_info.current_score
+        True -> model.score_info + 1
+        False -> model.score_info
       }
 
       let new_beute_pos = case is_grefressen {
@@ -302,7 +255,7 @@ fn update_snake_beute(model: Model, ctx: tick.TickContext) -> Model {
         tail: new_tail,
         beute_pos: new_beute_pos,
         game_state: Running,
-        score_info: ScoreInfo(..model.score_info, current_score: new_score),
+        score_info: new_score,
       )
     }
     False -> {
@@ -598,8 +551,6 @@ fn create_tail_element(x: Float, y: Float, index: Int) -> Element(Msg) {
     [
       mesh.geometry_box(vec3.Vec3(box_width, box_width, 1.0)),
       mesh.color(color_hex(SnakeTailColor)),
-      material.metalness(0.2),
-      material.roughness(0.9),
       transform.transform(transform.at(vec3.Vec3(x, y, 0.0))),
     ],
     [],
@@ -628,18 +579,4 @@ fn down_border() -> Float {
 
 fn horz_border_dist() -> Float {
   3.0 *. box_width
-}
-
-// =============================================================================
-// FFI - Local Storage
-// =============================================================================
-
-@external(javascript, "./local_storage.ffi.mjs", "set_localstorage")
-fn set_localstorage(_key: String, _value: String) -> Nil {
-  Nil
-}
-
-@external(javascript, "./local_storage.ffi.mjs", "get_localstorage")
-fn get_localstorage(_key: String) -> Result(Dynamic, Nil) {
-  Error(Nil)
 }

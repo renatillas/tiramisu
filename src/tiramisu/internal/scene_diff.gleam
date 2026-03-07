@@ -5,7 +5,7 @@
 ////
 //// 1. Flatten the old tree into a Dict(id -> #(SceneNode, parent_id))
 //// 2. Walk the new tree recursively, tracking parent_id:
-////    - If the node exists in the old map: compare tag/attrs/transform,
+////    - If the node exists in the old map: compare tag/attrs,
 ////      emit UpdateNode if anything changed, delete from old map
 ////    - If the node is new: emit a CreateNode patch
 //// 3. Remaining entries in the old map (not visited) -> emit Remove patches
@@ -15,6 +15,7 @@
 import gleam/bool
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/set
 
 import tiramisu/internal/scene.{type Node}
 import tiramisu/internal/scene_patch.{type ScenePatch}
@@ -96,7 +97,7 @@ fn walk(
             }
 
             // Compare and emit update if anything changed
-            let patches = diff_node(old_node, node, id, patches)
+            let patches = diff_node(old_node, node, id, parent_id, patches)
 
             // Recurse into children
             walk(node.children, id, old_map, patches)
@@ -108,8 +109,7 @@ fn walk(
                 id:,
                 parent_id:,
                 tag: node.tag,
-                attrs: node.attrs,
-                transform: node.transform,
+                attributes: node.attributes,
               ),
               ..patches
             ]
@@ -130,24 +130,35 @@ fn diff_node(
   old: Node,
   new: Node,
   id: String,
+  parent_id: String,
   patches: List(ScenePatch),
 ) -> List(ScenePatch) {
   // Tag changed — remove old. The new node will be recreated on the next diff
   // cycle (when previous_scene no longer contains the old entry).
   use <- bool.guard(old.tag != new.tag, [scene_patch.Remove(id:), ..patches])
   // Nothing changed
-  use <- bool.guard(
-    old.transform == new.transform && old.attrs == new.attrs,
-    patches,
-  )
+  use <- bool.guard(old.attributes == new.attributes, patches)
+  let changed_attributes =
+    difference_of_attributes(old.attributes, new.attributes)
   [
     scene_patch.UpdateNode(
       id:,
+      parent_id:,
       tag: new.tag,
-      old_attrs: old.attrs,
-      new_attrs: new.attrs,
-      transform: new.transform,
+      attributes: new.attributes,
+      changed_attributes:,
     ),
     ..patches
   ]
+}
+
+fn difference_of_attributes(
+  old_attributes: Dict(String, String),
+  new_attributes: Dict(String, String),
+) -> set.Set(String) {
+  use accumulator, key, value <- dict.fold(new_attributes, set.new())
+  case dict.get(old_attributes, key) {
+    Ok(old_value) if old_value == value -> accumulator
+    _ -> set.insert(accumulator, key)
+  }
 }

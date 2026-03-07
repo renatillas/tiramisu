@@ -1,88 +1,72 @@
+import gleam/dict.{type Dict}
 import gleam/float
+import gleam/function
 import gleam/int
+import gleam/javascript/promise
 import gleam/json
+import gleam/list
+import gleam/option
+import gleam/result
+import gleam/set
 
 import lustre/attribute.{type Attribute}
+
+import savoiardi
+import tiramisu/dev/extension
+import tiramisu/internal/dom
+import tiramisu/internal/node
+
+@internal
+pub fn observed_attributes() {
+  set.from_list([
+    "type", "color", "metalness", "roughness", "opacity", "wireframe",
+    "emissive", "emissive-intensity", "side", "color-map", "normal-map",
+    "ambient-occlusion-map", "roughness-map", "metalness-map",
+    "displacement-map", "displacement-scale", "displacement-bias", "shininess",
+    "alpha-test", "transparent", "hidden", "cast-shadow", "receive-shadow",
+  ])
+}
 
 // TYPES -----------------------------------------------------------------------
 
 /// Which sides of geometry faces to render.
-pub type MaterialSide {
+pub type Side {
   /// Render front faces only (default).
-  FrontSide
+  Front
   /// Render back faces only.
-  BackSide
+  Back
   /// Render both front and back faces.
-  DoubleSide
+  Double
 }
 
-// MATERIAL TYPE ATTRIBUTES ----------------------------------------------------
-
-/// Use the standard (PBR) material with metalness/roughness workflow.
-/// This is the default material type.
 pub fn standard() -> Attribute(msg) {
-  attribute.attribute("material-type", "standard")
+  attribute.attribute("type", "standard")
 }
 
-/// Use the basic (unlit) material. No lighting calculations.
-/// Fastest material, useful for UI elements, flat colors, and debugging.
 pub fn basic() -> Attribute(msg) {
-  attribute.attribute("material-type", "basic")
+  attribute.attribute("type", "basic")
 }
 
-/// Use the phong material with specular highlights.
-/// Good for shiny surfaces like plastic or ceramic.
 pub fn phong() -> Attribute(msg) {
-  attribute.attribute("material-type", "phong")
+  attribute.attribute("type", "phong")
 }
 
-/// Use the lambert material for matte surfaces.
-/// Diffuse-only lighting, good for cloth, wood, or concrete.
 pub fn lambert() -> Attribute(msg) {
-  attribute.attribute("material-type", "lambert")
+  attribute.attribute("type", "lambert")
 }
 
-/// Use the toon (cel-shaded) material for cartoon-style rendering.
 pub fn toon() -> Attribute(msg) {
-  attribute.attribute("material-type", "toon")
+  attribute.attribute("type", "toon")
 }
 
-// ADDITIONAL MATERIAL PROPERTIES ----------------------------------------------
-
-/// Set the shininess of a phong material.
-///
-/// Controls the size and sharpness of specular highlights.
-/// Higher values create smaller, sharper highlights. Default is 30.0.
-/// Only applies to phong materials.
 pub fn shininess(value: Float) -> Attribute(msg) {
   attribute.attribute("shininess", float.to_string(value))
 }
 
-/// Set the alpha test threshold.
-///
-/// Pixels with alpha below this value are discarded (not rendered).
-/// Useful for materials with alpha-tested textures like foliage or fences
-/// where you want hard-edged transparency without sorting artifacts.
-/// Default is 0.0 (disabled).
-///
-/// ## Example
-///
-/// ```gleam
-/// tiramisu.mesh("tree", [
-///   material.color_map("/textures/leaves.png"),
-///   material.alpha_test(0.5),
-/// ], [])
-/// ```
 pub fn alpha_test(value: Float) -> Attribute(msg) {
   attribute.attribute("alpha-test", float.to_string(value))
 }
 
-/// Enable transparency on the material.
-///
-/// Normally transparency is derived from opacity being less than 1.0.
-/// Use this attribute when you need transparency with opacity=1.0,
-/// such as for alpha-tested textures or materials with transparent regions
-/// in their color map.
 pub fn transparent(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("transparent", "")
@@ -90,148 +74,66 @@ pub fn transparent(bool: Bool) -> Attribute(msg) {
   }
 }
 
-// MATERIAL PROPERTIES ---------------------------------------------------------
-
-/// Set the emissive (glow) color as a hex integer.
-///
-/// Objects with emissive colors appear to emit light. Works best with
-/// `emissive_intensity` and bloom post-processing.
-///
-/// ## Example
-///
-/// ```gleam
-/// material.emissive(0xff0000)  // Red glow
-/// ```
 pub fn emissive(hex: Int) -> Attribute(msg) {
   attribute.attribute("emissive", "#" <> int.to_base16(hex))
 }
 
-/// Set the emissive intensity (glow brightness).
-///
-/// 0.0 = no emission, higher values = brighter glow.
 pub fn emissive_intensity(intensity: Float) -> Attribute(msg) {
   attribute.attribute("emissive-intensity", float.to_string(intensity))
 }
 
-/// Set which sides of geometry faces to render.
-///
-/// ## Example
-///
-/// ```gleam
-/// material.side(material.DoubleSide)  // Render both sides
-/// ```
-pub fn side(s: MaterialSide) -> Attribute(msg) {
+pub fn side(s: Side) -> Attribute(msg) {
   attribute.attribute("side", case s {
-    FrontSide -> "front"
-    BackSide -> "back"
-    DoubleSide -> "double"
+    Front -> "front"
+    Back -> "back"
+    Double -> "double"
   })
 }
 
-// TEXTURE MAP ATTRIBUTES ------------------------------------------------------
+pub fn color(hex hex: Int) -> Attribute(msg) {
+  attribute.attribute("color", "#" <> int.to_base16(hex))
+}
 
-/// Set the color/albedo texture map URL.
-///
-/// The texture modulates the base color. Set base color to white (0xffffff)
-/// when using a color map to let the texture define the color entirely.
-///
-/// ## Example
-///
-/// ```gleam
-/// tiramisu.mesh("textured", [
-///   tiramisu.color(0xffffff),
-///   material.color_map("/textures/brick.jpg"),
-/// ], [])
-/// ```
 pub fn color_map(url: String) -> Attribute(msg) {
   attribute.attribute("color-map", url)
 }
 
-/// Set the normal map URL for surface detail.
-///
-/// Normal maps add surface details like bumps and grooves without
-/// adding geometry.
 pub fn normal_map(url: String) -> Attribute(msg) {
   attribute.attribute("normal-map", url)
 }
 
-/// Set the ambient occlusion map URL.
-///
-/// AO maps darken areas where ambient light would be occluded,
-/// adding depth to crevices and corners.
 pub fn ambient_occlusion_map(url: String) -> Attribute(msg) {
   attribute.attribute("ambient-occlusion-map", url)
 }
 
-/// Set the roughness map URL for per-pixel roughness variation.
-///
-/// Allows different parts of the surface to have different roughness,
-/// like scratches on polished metal.
 pub fn roughness_map(url: String) -> Attribute(msg) {
   attribute.attribute("roughness-map", url)
 }
 
-/// Set the metalness map URL for per-pixel metalness variation.
-///
-/// Useful for surfaces that are partially metallic, like painted metal
-/// with scratches revealing bare metal.
 pub fn metalness_map(url: String) -> Attribute(msg) {
   attribute.attribute("metalness-map", url)
 }
 
-/// Set the displacement map URL for vertex displacement.
-///
-/// Unlike normal maps which only affect shading, displacement maps
-/// actually move the geometry vertices, creating real bumps and dents.
-/// Requires geometry with enough subdivisions (segments) to displace.
-///
-/// ## Example
-///
-/// ```gleam
-/// tiramisu.mesh("terrain", [
-///   mesh.geometry_sphere_simple(2.0),
-///   material.displacement_map("/textures/heightmap.jpg"),
-///   material.displacement_scale(0.5),
-/// ], [])
-/// ```
 pub fn displacement_map(url: String) -> Attribute(msg) {
   attribute.attribute("displacement-map", url)
 }
 
-/// Set the displacement scale (strength of vertex displacement).
-///
-/// Higher values create more pronounced displacement. Default is 1.0.
 pub fn displacement_scale(scale: Float) -> Attribute(msg) {
   attribute.attribute("displacement-scale", float.to_string(scale))
 }
 
-/// Set the displacement bias (offset for vertex displacement).
-///
-/// Shifts the displacement up or down. Default is 0.0.
 pub fn displacement_bias(bias: Float) -> Attribute(msg) {
   attribute.attribute("displacement-bias", float.to_string(bias))
 }
 
-/// Set the metalness of the material (0.0 = dielectric, 1.0 = metal).
-///
-/// Works with meshes and instanced meshes.
-///
 pub fn metalness(m: Float) -> Attribute(msg) {
   attribute.attribute("metalness", float.to_string(m))
 }
 
-/// Set the roughness of the material (0.0 = smooth, 1.0 = rough).
-///
-/// Works with meshes and instanced meshes.
-///
 pub fn roughness(r: Float) -> Attribute(msg) {
   attribute.attribute("roughness", float.to_string(r))
 }
 
-/// Set the opacity of the material (0.0 = transparent, 1.0 = opaque).
-///
-/// Works with meshes and instanced meshes.
-///
 pub fn opacity(o: Float) -> Attribute(msg) {
   attribute.attribute("opacity", float.to_string(o))
 }
@@ -243,11 +145,6 @@ pub fn wireframe(bool: Bool) -> Attribute(msg) {
   }
 }
 
-/// Enable shadow casting on the element.
-///
-/// For meshes and instanced meshes: the element will cast shadows.
-/// Requires a light with shadow casting enabled.
-///
 pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("cast-shadow", "")
@@ -255,14 +152,225 @@ pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   }
 }
 
-/// Enable shadow receiving on the mesh.
-///
-/// The mesh will show shadows cast by other meshes. Requires a light
-/// with shadow casting enabled.
-///
 pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("receive-shadow", "")
     False -> attribute.property("receive-shadow", json.bool(False))
+  }
+}
+
+// MATERIAL EXTENSION ----------------------------------------------------------
+
+/// Attribute extension that handles material updates for all tiramisu mesh nodes.
+///
+/// Centralises material parsing and disposal logic that would otherwise be
+/// duplicated across primitive and mesh node handlers.
+pub fn extension() -> extension.Extension {
+  extension.AttributeExtension(extension.Attribute(
+    observed_attributes: observed_attributes(),
+    on_create: fn(context, _tag, id, object, attributes) {
+      case object {
+        option.None -> Nil
+        option.Some(object) -> {
+          let material = parse_material(attributes)
+          savoiardi.set_object_material(object, material)
+          context.on_async(
+            promise.await(
+              promise.await_list(parse_apply_textures_async(
+                id,
+                material,
+                attributes,
+              )),
+              fn(_) { promise.resolve(function.identity) },
+            ),
+          )
+        }
+      }
+    },
+    on_update: fn(context, _tag, id, object, attrs, changed_attributes) {
+      case object {
+        option.None -> Nil
+        option.Some(obj) ->
+          // Only act when at least one material attribute changed.
+          case
+            set.intersection(changed_attributes, observed_attributes())
+            |> set.is_empty
+          {
+            True -> Nil
+            False -> {
+              let old = savoiardi.get_object_material(obj)
+              savoiardi.dispose_material(old)
+              let mat = parse_material(attrs)
+              savoiardi.set_object_material(obj, mat)
+              context.on_async(
+                promise.await(
+                  promise.await_list(parse_apply_textures_async(id, mat, attrs)),
+                  fn(_) { promise.resolve(function.identity) },
+                ),
+              )
+            }
+          }
+      }
+    },
+    on_remove: fn(_context, _id, _parent_id, object) {
+      object
+      |> savoiardi.get_object_material
+      |> savoiardi.dispose_material
+    },
+    on_object_resolved: fn(context, _tag, id, object, attributes) {
+      let material = parse_material(attributes)
+      savoiardi.set_object_material(object, material)
+      context.on_async(
+        promise.await(
+          promise.await_list(parse_apply_textures_async(
+            id,
+            material,
+            attributes,
+          )),
+          fn(_) { promise.resolve(function.identity) },
+        ),
+      )
+    },
+  ))
+}
+
+// INTERNAL MATERIAL PARSING ---------------------------------------------------
+
+@internal
+pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
+  let color = node.get_color(attrs, "color", 0xffffff)
+  let emissive = node.get_color(attrs, "emissive", 0x000000)
+  let opacity = node.get_float(attrs, "opacity", 1.0)
+  let transparent = node.get_bool(attrs, "transparent") || opacity <. 1.0
+  let material_type = dict.get(attrs, "type") |> result.unwrap("standard")
+
+  let mat = case material_type {
+    "basic" -> {
+      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      savoiardi.create_basic_material(
+        color:,
+        transparent:,
+        opacity:,
+        color_map: option.None,
+        side: savoiardi.FrontSide,
+        alpha_test:,
+        depth_write: True,
+      )
+    }
+    "phong" -> {
+      let shininess = node.get_float(attrs, "shininess", 30.0)
+      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      savoiardi.create_phong_material(
+        color:,
+        shininess:,
+        color_map: option.None,
+        normal_map: option.None,
+        ambient_occlusion_map: option.None,
+        transparent:,
+        opacity:,
+        alpha_test:,
+      )
+    }
+    "lambert" -> {
+      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      savoiardi.create_lambert_material(
+        color:,
+        color_map: option.None,
+        normal_map: option.None,
+        ambient_occlusion_map: option.None,
+        transparent:,
+        opacity:,
+        alpha_test:,
+      )
+    }
+    "toon" -> {
+      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      savoiardi.create_toon_material(
+        color:,
+        color_map: option.None,
+        normal_map: option.None,
+        ambient_occlusion_map: option.None,
+        transparent:,
+        opacity:,
+        alpha_test:,
+      )
+    }
+    _ -> {
+      let metalness = node.get_float(attrs, "metalness", 0.5)
+      let roughness = node.get_float(attrs, "roughness", 0.5)
+      let displacement_scale = node.get_float(attrs, "displacement-scale", 1.0)
+      let displacement_bias = node.get_float(attrs, "displacement-bias", 0.0)
+      let emissive_intensity = node.get_float(attrs, "emissive-intensity", 1.0)
+      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+
+      savoiardi.create_standard_material(
+        color:,
+        metalness:,
+        roughness:,
+        transparent:,
+        opacity:,
+        color_map: option.None,
+        normal_map: option.None,
+        ambient_occlusion_map: option.None,
+        displacement_map: option.None,
+        displacement_scale:,
+        displacement_bias:,
+        roughness_map: option.None,
+        metalness_map: option.None,
+        emissive:,
+        emissive_intensity:,
+        alpha_test:,
+      )
+    }
+  }
+  savoiardi.update_material_wireframe(mat, node.get_bool(attrs, "wireframe"))
+  savoiardi.update_material_side(
+    mat,
+    parse_material_side(dict.get(attrs, "side") |> result.unwrap("front")),
+  )
+  mat
+}
+
+@internal
+pub fn parse_apply_textures_async(
+  id: String,
+  mat: savoiardi.Material,
+  attrs: Dict(String, String),
+) -> List(promise.Promise(Result(Nil, Nil))) {
+  use #(texture_name, texture_src) <- list.map([
+    #("map", dict.get(attrs, "color-map")),
+    #("normalMap", dict.get(attrs, "normal-map")),
+    #("aoMap", dict.get(attrs, "ambient-occlusion-map")),
+    #("roughnessMap", dict.get(attrs, "roughness-map")),
+    #("metalnessMap", dict.get(attrs, "metalness-map")),
+    #("displacementMap", dict.get(attrs, "displacement-map")),
+  ])
+  case texture_src {
+    Error(Nil) -> {
+      promise.resolve(Ok(Nil))
+    }
+    Ok(url) -> {
+      use result <- promise.map(savoiardi.load_texture(url))
+      case result {
+        Ok(texture) ->
+          Ok(savoiardi.set_material_texture(mat, texture_name, texture))
+        Error(_) -> {
+          dom.dispatch_event(
+            id,
+            "tiramisu:load-texture-error",
+            json.object([#("id", json.string(id))]),
+          )
+          Error(Nil)
+        }
+      }
+    }
+  }
+}
+
+fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
+  case side_str {
+    "back" -> savoiardi.BackSide
+    "double" -> savoiardi.DoubleSide
+    _ -> savoiardi.FrontSide
   }
 }

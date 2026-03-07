@@ -12,15 +12,18 @@
 //// so that external libraries (e.g. physics) can react to the scene lifecycle
 //// without scanning the DOM every frame.
 
-import gleam/dict
+import gleam/dict.{type Dict}
+import gleam/javascript/promise
 import gleam/list
 import gleam/option
+import gleam/pair
+import gleam/result
+import gleam/set
 import savoiardi.{type Object3D}
-import tiramisu/internal/node_utils
 
-import tiramisu/extension.{type Context, type Extensions}
+import tiramisu/dev/extension.{type Context, type Extensions}
 
-import tiramisu/internal/registry.{type Registry}
+import tiramisu/dev/registry.{type Registry}
 import tiramisu/internal/render_loop.{type RenderLoop}
 import tiramisu/internal/scene_patch.{type ScenePatch}
 
@@ -33,14 +36,16 @@ pub fn apply_patches(
   loop: RenderLoop,
   patches: List(ScenePatch),
   exts: Extensions,
-  on_async: fn(fn(Registry) -> Registry) -> Nil,
+  on_async: fn(promise.Promise(fn(Registry) -> Registry)) -> Nil,
 ) -> Registry {
   // Build the on_object_resolved callback that notifies all attribute hooks.
-  // Receives the tag from the node handler so the correct tag is reported.
-  let on_object_resolved = fn(tag: String, id: String, object: Object3D) {
-    notify_resolved(exts, tag, id, object)
-  }
-  let ctx = extension.Context(registry:, loop:, on_async:, on_object_resolved:)
+  let ctx =
+    extension.Context(
+      registry:,
+      loop:,
+      on_async:,
+      on_object_resolved: fn(_, _, _) { Nil },
+    )
   let ctx =
     list.fold(patches, ctx, fn(ctx, patch) { apply_patch(ctx, patch, exts) })
   ctx.registry
@@ -52,27 +57,53 @@ fn apply_patch(
   extensions: Extensions,
 ) -> Context {
   case patch {
-    scene_patch.CreateNode(id:, parent_id:, tag:, attrs:, transform:) -> {
+    scene_patch.CreateNode(id:, parent_id:, tag:, attributes:) -> {
       case extension.get_node(extensions, tag) {
         Ok(handler) -> {
-          let new_ctx = handler.create(ctx, id, parent_id, attrs, transform)
+          let new_ctx = handler.create(ctx, id, parent_id, attributes)
           // Notify attribute hooks — object is None for async src= meshes
           let obj =
-            registry.get_object(new_ctx.registry, id) |> option.from_result
-          notify_create(extensions, tag, id, obj, attrs)
+            registry.get_object(new_ctx.registry, id)
+            |> result.map(pair.first)
+            |> option.from_result
+          notify_create(extensions, ctx, tag, id, obj, attributes)
           new_ctx
         }
         Error(Nil) -> ctx
       }
     }
 
-    scene_patch.UpdateNode(id:, tag:, old_attrs:, new_attrs:, transform:) -> {
+    scene_patch.UpdateNode(
+      id:,
+      parent_id:,
+      tag:,
+      attributes:,
+      changed_attributes:,
+    ) -> {
       case extension.get_node(extensions, tag) {
         Ok(handler) -> {
-          let new_ctx = handler.update(ctx, id, old_attrs, new_attrs, transform)
           let obj =
-            registry.get_object(new_ctx.registry, id) |> option.from_result
-          notify_update(extensions, tag, id, obj, new_attrs)
+            registry.get_object(ctx.registry, id)
+            |> result.map(pair.first)
+            |> option.from_result
+          let new_ctx =
+            handler.update(
+              ctx,
+              id,
+              parent_id,
+              obj,
+              attributes,
+              changed_attributes,
+            )
+          notify_update(
+            extensions,
+            ctx,
+            tag,
+            id,
+            obj,
+            attributes,
+            changed_attributes,
+          )
           new_ctx
         }
         Error(Nil) -> ctx
@@ -81,12 +112,12 @@ fn apply_patch(
 
     scene_patch.Remove(id:) -> {
       case dict.get(ctx.registry.objects, id) {
-        Ok(registry.ObjectEntry(kind: registry.ObjectKind(tag:), ..)) -> {
+        Ok(registry.ObjectEntry(parent_id:, tag:, object:)) -> {
           // Notify attribute hooks BEFORE removal so they can read the object
-          notify_remove(extensions, tag, id)
+          notify_remove(extensions, ctx, id, parent_id, object)
           case extension.get_node(extensions, tag) {
-            Ok(handler) -> handler.remove(ctx, id)
-            Error(Nil) -> node_utils.default_remove(ctx, id)
+            Ok(handler) -> handler.remove(ctx, id, parent_id, object)
+            Error(Nil) -> ctx
           }
         }
         Error(Nil) -> ctx
@@ -104,41 +135,39 @@ fn apply_patch(
 
 fn notify_create(
   exts: Extensions,
+  context,
   tag: String,
   id: String,
   object: option.Option(Object3D),
-  attrs: dict.Dict(String, String),
+  attrs: Dict(String, String),
 ) -> Nil {
   list.each(extension.attribute_hooks(exts), fn(hook) {
-    hook.on_create(tag, id, object, attrs)
+    hook.on_create(context, tag, id, object, attrs)
   })
 }
 
 fn notify_update(
   exts: Extensions,
+  context,
   tag: String,
   id: String,
   object: option.Option(Object3D),
-  attrs: dict.Dict(String, String),
+  attrs: Dict(String, String),
+  changed_attributes: set.Set(String),
 ) -> Nil {
   list.each(extension.attribute_hooks(exts), fn(hook) {
-    hook.on_update(tag, id, object, attrs)
+    hook.on_update(context, tag, id, object, attrs, changed_attributes)
   })
 }
 
-fn notify_remove(exts: Extensions, tag: String, id: String) -> Nil {
-  list.each(extension.attribute_hooks(exts), fn(hook) {
-    hook.on_remove(tag, id)
-  })
-}
-
-fn notify_resolved(
+fn notify_remove(
   exts: Extensions,
-  tag: String,
+  context: Context,
   id: String,
+  parent_id: String,
   object: Object3D,
 ) -> Nil {
   list.each(extension.attribute_hooks(exts), fn(hook) {
-    hook.on_object_resolved(tag, id, object)
+    hook.on_remove(context, id, parent_id, object)
   })
 }

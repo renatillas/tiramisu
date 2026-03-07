@@ -18,7 +18,6 @@ import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
-import lustre/attribute
 import quaternion.{type Quaternion}
 import vec/vec3.{type Vec3}
 import vec/vec3f
@@ -84,49 +83,47 @@ pub fn with_look_at(transform: Transform, target: Vec3(Float)) -> Transform {
 /// Parse a transform string in the format "pos:x,y,z quat:x,y,z,w scale:x,y,z".
 /// Parts can be omitted to use defaults.
 @internal
-pub fn parse(input: String) -> Transform {
+pub fn parse(input: String) -> Result(Transform, Nil) {
   let parts = string.split(input, ";") |> list.map(string.trim)
 
-  let pos = find_and_parse_vec3(parts, "position:", vec3.Vec3(0.0, 0.0, 0.0))
-  let rot = find_and_parse_rotation(parts, "rotation:", quaternion.identity)
-  let scl = find_and_parse_vec3(parts, "scale:", vec3.Vec3(1.0, 1.0, 1.0))
+  use pos <- result.try(find_and_parse_vec3(parts, "position:"))
+  use rot <- result.try(find_and_parse_rotation(parts, "rotation:"))
+  use scl <- result.try(find_and_parse_vec3(parts, "scale:"))
 
-  Transform(position: pos, rotation: rot, scale: scl)
+  Ok(Transform(position: pos, rotation: rot, scale: scl))
 }
 
 fn find_and_parse_vec3(
   parts: List(String),
   prefix: String,
-  default: Vec3(Float),
-) -> Vec3(Float) {
+) -> Result(Vec3(Float), Nil) {
   case list.find(parts, string.starts_with(_, prefix)) {
     Ok(part) ->
       prefix
       |> string.length
       |> string.drop_start(part, _)
-      |> parse_vec3(default)
+      |> parse_vec3
 
-    Error(_) -> default
+    Error(_) -> Error(Nil)
   }
 }
 
 fn find_and_parse_rotation(
   parts: List(String),
   prefix: String,
-  default: Quaternion,
-) -> Quaternion {
+) -> Result(Quaternion, Nil) {
   case list.find(parts, string.starts_with(_, prefix)) {
     Ok(part) ->
       prefix
       |> string.length
       |> string.drop_start(part, _)
-      |> parse_rotation(default)
+      |> parse_rotation
 
-    Error(_) -> default
+    Error(_) -> Error(Nil)
   }
 }
 
-fn parse_vec3(input: String, default: Vec3(Float)) -> Vec3(Float) {
+fn parse_vec3(input: String) -> Result(Vec3(Float), Nil) {
   case string.split(input, ",") |> list.map(string.trim) {
     [x_str, y_str, z_str] -> {
       use x <- result.try(parse_number(x_str))
@@ -136,10 +133,9 @@ fn parse_vec3(input: String, default: Vec3(Float)) -> Vec3(Float) {
     }
     _ -> Error(Nil)
   }
-  |> result.unwrap(default)
 }
 
-fn parse_rotation(input: String, default: Quaternion) -> Quaternion {
+fn parse_rotation(input: String) -> Result(Quaternion, Nil) {
   case string.split(input, ",") |> list.map(string.trim) {
     [x_str, y_str, z_str, w_str] -> {
       use x <- result.try(parse_number(x_str))
@@ -157,7 +153,6 @@ fn parse_rotation(input: String, default: Quaternion) -> Quaternion {
     }
     _ -> Error(Nil)
   }
-  |> result.unwrap(default)
 }
 
 fn parse_number(input: String) -> Result(Float, Nil) {
@@ -170,15 +165,6 @@ fn parse_number(input: String) -> Result(Float, Nil) {
       }
     }
   }
-}
-
-/// Set the full transform of an element.
-///
-/// Works with cameras, lights, meshes, empties, LODs, instanced meshes,
-/// positional audio, and debug helpers.
-///
-pub fn transform(transform: Transform) -> attribute.Attribute(msg) {
-  attribute.attribute("transform", to_string(transform))
 }
 
 @internal

@@ -1,10 +1,12 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/int
+import gleam/javascript/promise
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/set
 import gleam/string
 import vec/vec2
 
@@ -15,21 +17,20 @@ import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import lustre/element/html
 
-import tiramisu/extension
+import tiramisu/dev/extension
+import tiramisu/dev/registry.{type Registry}
 import tiramisu/internal/dom
-import tiramisu/internal/registry.{type Registry}
 import tiramisu/internal/render_loop.{type RenderLoop}
 import tiramisu/internal/scene
 import tiramisu/internal/scene_apply
 import tiramisu/internal/scene_diff
-import tiramisu/transform
 
 import savoiardi
 
 // TYPES -----------------------------------------------------------------------
 
 /// The model for the renderer component.
-pub type Model {
+type Model {
   Model(
     /// Instance-scoped registry (purely functional)
     registry: Option(Registry),
@@ -57,7 +58,7 @@ pub type Model {
 }
 
 /// Messages for the renderer component.
-pub type Msg {
+type Msg {
   /// Scene and renderer have been initialized
   Initialized(
     registry: Registry,
@@ -92,11 +93,10 @@ pub const tag = "tiramisu-scene"
 pub fn register(
   extensions: List(extension.Extension),
 ) -> Result(Nil, lustre.Error) {
-  // Merge built-ins first so built-in tags always take precedence
   let extensions = extension.from_list(extensions)
 
   let app =
-    lustre.component(fn(_) { init(extensions) }, update, view, [
+    lustre.component(init: fn(_) { init(extensions) }, update:, view:, options: [
       component.on_attribute_change("width", fn(v) {
         case int.parse(v) {
           Ok(n) -> Ok(WidthChanged(n))
@@ -167,7 +167,9 @@ fn init(exts: extension.Extensions) -> #(Model, Effect(Msg)) {
   #(model, effect.after_paint(do_init(exts)))
 }
 
-fn do_init(exts: extension.Extensions) -> fn(fn(Msg) -> Nil, Dynamic) -> Nil {
+fn do_init(
+  extensions: extension.Extensions,
+) -> fn(fn(Msg) -> Nil, Dynamic) -> Nil {
   fn(dispatch, root) {
     let host = dom.shadow_root_host(root)
     let scene_id = dom.get_scene_id_from_host(host) |> result.unwrap("")
@@ -188,24 +190,26 @@ fn do_init(exts: extension.Extensions) -> fn(fn(Msg) -> Nil, Dynamic) -> Nil {
     let canvas = savoiardi.get_renderer_dom_element(renderer)
     dom.append_canvas_to_container(root, canvas)
 
-    let reg = registry.new(gleam_scene, scene_id, renderer)
+    let registry = registry.new(gleam_scene, scene_id, renderer)
     let render_loop = render_loop.start(gleam_scene, renderer, scene_id)
 
     // Set up MutationObserver with all extension-observed attributes
-    let observed_attrs = extension.all_observed_attributes(exts)
-    dom.setup_mutation_observer(host, observed_attrs, fn() {
+    let observed_attrs = extension.all_observed_attributes(extensions)
+    dom.setup_mutation_observer(host, observed_attrs |> set.to_list, fn() {
       dispatch(DomMutated)
     })
 
-    let on_async = fn(registry_transform) {
-      dispatch(PatcherModifiedRegistry(registry_transform))
-    }
-
-    let initial_scene = parse_children(host, exts)
+    let initial_scene = parse_children(host, extensions)
     let patches = scene_diff.diff([], initial_scene, scene_id)
-    let registry =
-      scene_apply.apply_patches(reg, render_loop, patches, exts, on_async)
 
+    let registry =
+      scene_apply.apply_patches(
+        registry,
+        render_loop,
+        patches,
+        extensions,
+        on_async(_, dispatch),
+      )
     dispatch(Initialized(
       registry:,
       render_loop:,
@@ -255,7 +259,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
                   loop,
                   patches,
                   model.extensions,
-                  fn(transform) { dispatch(PatcherModifiedRegistry(transform)) },
+                  on_async(_, dispatch),
                 )
               dispatch(PatcherModifiedRegistry(fn(_) { registry }))
             }),
@@ -318,6 +322,16 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
+fn on_async(
+  transform: promise.Promise(fn(Registry) -> Registry),
+  dispatch: fn(Msg) -> Nil,
+) -> Nil {
+  promise.map(transform, fn(transform) {
+    dispatch(PatcherModifiedRegistry(transform))
+  })
+  Nil
+}
+
 // VIEW ------------------------------------------------------------------------
 
 fn view(_model: Model) -> Element(Msg) {
@@ -327,20 +341,15 @@ fn view(_model: Model) -> Element(Msg) {
 // DOM PARSING -----------------------------------------------------------------
 
 /// Parse a single DOM element into a SceneNode.
-/// All attrs except `id` and `transform` are captured into the attrs dict.
+/// All attrs except `id` are captured into the attrs dict.
 fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
   let tag = dom.tag_name(el) |> string.lowercase
   let attrs = dom.get_all_attributes(el)
   let key = dict.get(attrs, "id") |> result.unwrap("")
-  let transform =
-    dict.get(attrs, "transform")
-    |> result.map(transform.parse)
-    |> result.unwrap(transform.identity)
-  // Strip id and transform — they're stored separately on the node
+
   let node_attrs =
     attrs
     |> dict.delete("id")
-    |> dict.delete("transform")
 
   // Only produce a scene node for known/registered tags — skip everything else
   case extension.get_node(exts, tag) {
@@ -348,9 +357,8 @@ fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
       scene.SceneNode(
         key:,
         tag:,
-        transform:,
         children: parse_children(el, exts),
-        attrs: node_attrs,
+        attributes: node_attrs,
       )
     Error(Nil) ->
       // Unknown tag — pass through as a transparent structural node
@@ -358,9 +366,8 @@ fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
       scene.SceneNode(
         key:,
         tag:,
-        transform:,
         children: parse_children(el, exts),
-        attrs: dict.new(),
+        attributes: dict.new(),
       )
   }
 }
@@ -369,7 +376,8 @@ fn parse_children(
   el: dom.Element,
   exts: extension.Extensions,
 ) -> List(scene.Node) {
-  list.map(dom.children(el), fn(child) { parse_element(child, exts) })
+  use element <- list.map(dom.children(el))
+  parse_element(element, exts)
 }
 
 // HELPERS ---------------------------------------------------------------------
@@ -389,7 +397,6 @@ fn set_renderer_background(renderer: savoiardi.Renderer, color: String) -> Nil {
 fn parse_bool(value: String) -> Result(Bool, Nil) {
   case value {
     "" | "true" -> Ok(True)
-    "false" -> Ok(False)
     _ -> Error(Nil)
   }
 }

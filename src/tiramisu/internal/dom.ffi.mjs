@@ -147,14 +147,6 @@ export function deleteProperty(element, name) {
  * collected from all registered extension handlers (built-in + user-defined).
  */
 export function setupMutationObserver(hostElement, observedAttrs, callback) {
-  // Convert Gleam linked list to JS array
-  const filter = [];
-  let node = observedAttrs;
-  while (node.tail) {
-    filter.push(node.head);
-    node = node.tail;
-  }
-
   let scheduled = false;
   const observer = new MutationObserver(() => {
     if (!scheduled) {
@@ -170,21 +162,11 @@ export function setupMutationObserver(hostElement, observedAttrs, callback) {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: filter,
+    attributeFilter: observedAttrs.toArray(),
   });
 }
 
-// ============================================================================
-// EVENT DETAIL CONSTRUCTORS
-// ============================================================================
 
-
-/**
- * Create a mesh event detail object with the JS-idiomatic key.
- */
-export function createMeshEventDetail(id) {
-  return { id };
-}
 
 // ============================================================================
 // CONTAINER OPERATIONS
@@ -211,61 +193,6 @@ export function getAllAttributesList(element) {
   for (const attr of element.attributes) {
     pairs.push([attr.name, attr.value]);
   }
-  return toList(pairs);
+  return pairs;
 }
 
-// ============================================================================
-// INTERNAL HELPERS
-// ============================================================================
-
-/**
- * Parse a string as a base-10 integer. Returns Result(Int, Nil).
- */
-export function parseInt10(value) {
-  const n = parseInt(value, 10);
-  if (isNaN(n)) return Result$Error(undefined);
-  return Result$Ok(n);
-}
-
-// ============================================================================
-// DOM TREE WALKING
-// ============================================================================
-
-/**
- * Find the immediate parent tiramisu element (mesh, empty, camera, light, audio)
- * and return its ID. If no parent is found before the renderer, returns None.
- * This enables proper hierarchical transforms in the Three.js scene graph.
- *
- * This must stay in FFI because it needs to walk up the DOM tree checking
- * multiple tag names with stop-at-renderer logic that's awkward with just
- * `closest` (which can't stop at a boundary element).
- */
-export function findParentObjectId(host) {
-  // Tiramisu element types that can be parents in the scene hierarchy
-  const parentTypes = [
-    "TIRAMISU-MESH",
-    "TIRAMISU-EMPTY",
-    "TIRAMISU-CAMERA",
-    "TIRAMISU-LIGHT",
-    "TIRAMISU-AUDIO-POSITIONAL",
-    "TIRAMISU-AUDIO-GLOBAL",
-  ];
-
-  let element = host.parentElement;
-  while (element) {
-    // Stop at the renderer — it's the scene root
-    if (element.tagName === "TIRAMISU-RENDERER") {
-      return Result$Error();
-    }
-
-    // Check if this is a valid parent element
-    if (parentTypes.includes(element.tagName)) {
-      const id = element.getAttribute("id");
-      return id ? Result$Ok(id) : Result$Error();
-    }
-
-    element = element.parentElement;
-  }
-
-  return Result$Error();
-}

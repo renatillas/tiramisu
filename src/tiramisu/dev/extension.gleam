@@ -7,12 +7,13 @@
 //// `Node` handles a custom HTML element tag with full lifecycle.
 
 import gleam/dict.{type Dict}
+import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option}
+import gleam/set.{type Set}
 import savoiardi.{type Object3D}
-import tiramisu/internal/registry.{type Registry}
+import tiramisu/dev/registry.{type Registry}
 import tiramisu/internal/render_loop.{type RenderLoop}
-import tiramisu/transform.{type Transform}
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
 
@@ -22,7 +23,7 @@ pub type Context {
   Context(
     registry: Registry,
     loop: RenderLoop,
-    on_async: fn(fn(Registry) -> Registry) -> Nil,
+    on_async: fn(promise.Promise(fn(Registry) -> Registry)) -> Nil,
     /// Called by async model loaders (mesh src=) after the model registers in
     /// the registry, so attribute extensions can react to the resolved object.
     /// Arguments: `(tag, id, object)`.
@@ -41,24 +42,34 @@ pub type Node {
   Node(
     tag: String,
     /// Attribute names this node type observes (added to MutationObserver filter).
-    observed_attributes: List(String),
+    observed_attributes: set.Set(String),
     /// Called when a new element with this tag appears in the scene.
-    /// `id` is the element id; `parent_id` is the Three.js parent id.
-    create: fn(Context, String, String, Dict(String, String), Transform) ->
-      Context,
+    /// The order of arguments is as follows: 
+    /// - `context: Context
+    /// - `element_id: String`
+    /// - `parent_id: String`
+    /// - `attributes: Dict(String, String)`
+    create: fn(Context, String, String, Dict(String, String)) -> Context,
     /// Called when an existing element's attrs or transform change.
-    /// `old_attrs` is the previous snapshot; `new_attrs` is the current one.
+    /// The order of arguments is as follows:
+    /// - `context: Context`
+    /// - `element_id: String`
+    /// - `parent_id: String`
+    /// - `object: Option(Object3D)`
+    /// - `attributes: Dict(String, String)`
+    /// - `changed_attributes: Set(String)`
     update: fn(
       Context,
       String,
+      String,
+      Option(Object3D),
       Dict(String, String),
-      Dict(String, String),
-      Transform,
+      Set(String),
     ) ->
       Context,
     /// Called when an element is removed from the scene.
     /// The handler is responsible for calling `registry.remove_object`.
-    remove: fn(Context, String) -> Context,
+    remove: fn(Context, String, String, Object3D) -> Context,
   )
 }
 
@@ -74,21 +85,46 @@ pub type Attribute {
     /// Attribute names to observe on tiramisu elements.
     /// Merged into the MutationObserver filter so DOM changes to these
     /// attributes trigger a scene re-parse.
-    observed_attributes: List(String),
+    observed_attributes: set.Set(String),
     /// Fires when any tiramisu node is created.
     ///
     /// - `tag`: the element HTML tag (e.g. `"tiramisu-mesh"`)
     /// - `id`: the element's id attribute
     /// - `object`: `None` for async `src=` meshes until the model loads
     /// - `attrs`: all element attributes except id and transform
-    on_create: fn(String, String, Option(Object3D), Dict(String, String)) -> Nil,
+    on_create: fn(
+      Context,
+      String,
+      String,
+      Option(Object3D),
+      Dict(String, String),
+    ) ->
+      Nil,
     /// Fires when any tiramisu node's attributes or transform change.
-    on_update: fn(String, String, Option(Object3D), Dict(String, String)) -> Nil,
-    /// Fires when any tiramisu node is removed from the scene.
-    on_remove: fn(String, String) -> Nil,
-    /// Fires specifically when an async GLB / GLTF / FBX model finishes loading.
-    /// Use this to refine physics collider shapes from the loaded geometry.
-    on_object_resolved: fn(String, String, Object3D) -> Nil,
+    ///
+    /// - `tag`: the element HTML tag
+    /// - `id`: the element's id attribute
+    /// - `object`: `None` for async `src=` meshes until the model loads
+    /// - `attrs`: all element attributes except id and transform
+    /// - `changed_attributes`: the set of attribute names that changed in this update
+    on_update: fn(
+      Context,
+      String,
+      String,
+      Option(Object3D),
+      Dict(String, String),
+      Set(String),
+    ) ->
+      Nil,
+    on_remove: fn(Context, String, String, Object3D) -> Nil,
+    on_object_resolved: fn(
+      Context,
+      String,
+      String,
+      Object3D,
+      Dict(String, String),
+    ) ->
+      Nil,
   )
 }
 
@@ -132,14 +168,14 @@ pub fn attribute_hooks(exts: Extensions) -> List(Attribute) {
 }
 
 /// Collect all `observed_attributes` from all extensions for the MutationObserver.
-pub fn all_observed_attributes(exts: Extensions) -> List(String) {
+pub fn all_observed_attributes(exts: Extensions) -> set.Set(String) {
   let node_attrs =
-    dict.fold(exts.0, [], fn(acc, _, handler) {
-      list.append(acc, handler.observed_attributes)
+    dict.fold(exts.0, set.new(), fn(acc, _, handler) {
+      set.union(acc, handler.observed_attributes)
     })
   let attr_attrs =
-    list.fold(exts.1, [], fn(acc, handler) {
-      list.append(acc, handler.observed_attributes)
+    list.fold(exts.1, set.new(), fn(acc, handler) {
+      set.union(acc, handler.observed_attributes)
     })
-  list.append(node_attrs, attr_attrs)
+  set.union(node_attrs, attr_attrs)
 }
