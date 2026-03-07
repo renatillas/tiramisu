@@ -1,9 +1,8 @@
 import gleam/dict.{type Dict}
-import gleam/json
 import gleam/option
 import gleam/result
 import gleam/set.{type Set}
-import lustre/attribute.{type Attribute}
+import lustre/attribute
 import savoiardi.{type Object3D}
 import tiramisu/transform
 
@@ -16,20 +15,13 @@ import tiramisu/internal/node
 pub const tag = "tiramisu-empty"
 
 pub fn extension() {
-  let observed_attributes = set.from_list(["transform", "hide"])
+  let observed_attributes = set.from_list(["transform", "hidden"])
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
 
 pub fn transform(transform: transform.Transform) -> attribute.Attribute(msg) {
   attribute.attribute("transform", transform.to_string(transform))
-}
-
-pub fn hide(visible: Bool) -> Attribute(msg) {
-  case visible {
-    True -> attribute.attribute("hide", "")
-    False -> attribute.property("hide", json.bool(False))
-  }
 }
 
 fn create(
@@ -43,14 +35,14 @@ fn create(
     Ok(transform) -> node.set_transform(group, transform)
     Error(Nil) -> Nil
   }
-  set_hide(group, attributes)
+  set_hidden(group, attributes)
   let registry =
     registry.register_and_add_object(ctx.registry, id, group, parent_id, tag)
   extension.Context(..ctx, registry:)
 }
 
-fn set_hide(group: Object3D, attributes: Dict(String, String)) -> Nil {
-  let hide = node.get_bool(attributes, "hide")
+fn set_hidden(group: Object3D, attributes: Dict(String, String)) -> Nil {
+  let hide = node.get_bool(attributes, "hidden")
   savoiardi.set_object_visible(group, !hide)
 }
 
@@ -64,7 +56,7 @@ fn update(
 ) -> Context {
   let result = {
     use group <- result.map(object |> option.to_result(Nil))
-    case node.contains(["transform"], in: changed_attributes) {
+    case set.contains("transform", in: changed_attributes) {
       True ->
         case node.get_transform(attributes) {
           Ok(transform) -> node.set_transform(group, transform)
@@ -73,8 +65,8 @@ fn update(
 
       False -> Nil
     }
-    case node.contains(["hide"], in: changed_attributes) {
-      True -> set_hide(group, attributes)
+    case set.contains("hidden", in: changed_attributes) {
+      True -> set_hidden(group, attributes)
       False -> Nil
     }
     Nil

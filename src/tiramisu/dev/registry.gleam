@@ -6,10 +6,8 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/dict.{type Dict}
-import gleam/int
-import savoiardi.{type Material, type Object3D, type Renderer, type Scene}
+import savoiardi.{type Object3D, type Renderer, type Scene}
 import tiramisu/internal/dom
-import vec/vec2
 
 // TYPES -----------------------------------------------------------------------
 
@@ -34,15 +32,6 @@ pub type Registry {
 /// Create a new empty registry for a renderer instance.
 pub fn new(scene: Scene, scene_id: String, renderer: Renderer) -> Registry {
   Registry(scene:, scene_id:, renderer:, objects: dict.new(), id_counter: 0)
-}
-
-// ID GENERATION ---------------------------------------------------------------
-
-/// Generate a unique ID within this registry using scene_id as prefix.
-pub fn generate_id(registry: Registry, prefix: String) -> #(Registry, String) {
-  let next = registry.id_counter + 1
-  let id = registry.scene_id <> "_" <> prefix <> "_" <> int.to_string(next)
-  #(Registry(..registry, id_counter: next), id)
 }
 
 // OBJECT CRUD -----------------------------------------------------------------
@@ -96,8 +85,7 @@ pub fn remove_object(
   Registry(..registry, objects:)
 }
 
-/// Reparent an object to a new parent.
-/// Three.js add() automatically removes from the old parent.
+@internal
 pub fn reparent_object(
   registry: Registry,
   id: String,
@@ -114,50 +102,6 @@ pub fn reparent_object(
     }
     Error(Nil) -> registry
   }
-}
-
-/// Set castShadow/receiveShadow on a mesh via the registry.
-pub fn set_mesh_shadow(
-  registry: Registry,
-  id: String,
-  cast_shadow: Bool,
-  receive_shadow: Bool,
-) -> Nil {
-  case get_object(registry, id) {
-    Ok(#(object, _)) ->
-      savoiardi.enable_shadows(object, cast_shadow, receive_shadow)
-    Error(Nil) -> Nil
-  }
-}
-
-// MATERIAL HELPERS ------------------------------------------------------------
-
-/// Get a material from a registered object.
-pub fn get_material(registry: Registry, id: String) -> Result(Material, Nil) {
-  case get_object(registry, id) {
-    Ok(#(object, _)) -> Ok(savoiardi.get_object_material(object))
-    Error(Nil) -> Error(Nil)
-  }
-}
-
-// ASPECT RATIO ----------------------------------------------------------------
-
-/// Get the aspect ratio of this registry's renderer canvas.
-/// Falls back to 16:9 if canvas dimensions are invalid.
-pub fn get_renderer_aspect_ratio(registry: Registry) -> Float {
-  let vec2.Vec2(x: width, y: height) =
-    savoiardi.get_canvas_dimensions(registry.renderer)
-  case height {
-    0.0 -> 16.0 /. 9.0
-    h -> width /. h
-  }
-}
-
-// RESIZE ----------------------------------------------------------------------
-
-/// Resize the renderer
-pub fn resize(registry: Registry, width: Int, height: Int) -> Nil {
-  savoiardi.set_renderer_size(registry.renderer, width, height)
 }
 
 // MODEL LOADING ---------------------------------------------------------------

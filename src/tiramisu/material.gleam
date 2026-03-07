@@ -170,6 +170,7 @@ pub fn extension() -> extension.Extension {
     observed_attributes: observed_attributes(),
     on_create: fn(context, _tag, id, object, attributes) {
       case object {
+        // On objects that dont register themselves upon creation, we do nothing (yet)
         option.None -> Nil
         option.Some(object) -> {
           let material = parse_material(attributes)
@@ -217,6 +218,7 @@ pub fn extension() -> extension.Extension {
       |> savoiardi.get_object_material
       |> savoiardi.dispose_material
     },
+    // Once the object has been resolved we can set the material
     on_object_resolved: fn(context, _tag, id, object, attributes) {
       let material = parse_material(attributes)
       savoiardi.set_object_material(object, material)
@@ -238,15 +240,15 @@ pub fn extension() -> extension.Extension {
 
 @internal
 pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
-  let color = node.get_color(attrs, "color", 0xffffff)
-  let emissive = node.get_color(attrs, "emissive", 0x000000)
-  let opacity = node.get_float(attrs, "opacity", 1.0)
+  let color = node.get(attrs, "color", 0xffffff, node.parse_color)
+  let emissive = node.get(attrs, "emissive", 0x000000, node.parse_color)
+  let opacity = node.get(attrs, "opacity", 1.0, node.parse_number)
   let transparent = node.get_bool(attrs, "transparent") || opacity <. 1.0
   let material_type = dict.get(attrs, "type") |> result.unwrap("standard")
 
   let mat = case material_type {
     "basic" -> {
-      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
       savoiardi.create_basic_material(
         color:,
         transparent:,
@@ -258,8 +260,8 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "phong" -> {
-      let shininess = node.get_float(attrs, "shininess", 30.0)
-      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      let shininess = node.get(attrs, "shininess", 30.0, node.parse_number)
+      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
       savoiardi.create_phong_material(
         color:,
         shininess:,
@@ -272,7 +274,7 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "lambert" -> {
-      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
       savoiardi.create_lambert_material(
         color:,
         color_map: option.None,
@@ -284,7 +286,7 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "toon" -> {
-      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
       savoiardi.create_toon_material(
         color:,
         color_map: option.None,
@@ -296,12 +298,15 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     _ -> {
-      let metalness = node.get_float(attrs, "metalness", 0.5)
-      let roughness = node.get_float(attrs, "roughness", 0.5)
-      let displacement_scale = node.get_float(attrs, "displacement-scale", 1.0)
-      let displacement_bias = node.get_float(attrs, "displacement-bias", 0.0)
-      let emissive_intensity = node.get_float(attrs, "emissive-intensity", 1.0)
-      let alpha_test = node.get_float(attrs, "alpha-test", 0.0)
+      let metalness = node.get(attrs, "metalness", 0.5, node.parse_number)
+      let roughness = node.get(attrs, "roughness", 0.5, node.parse_number)
+      let displacement_scale =
+        node.get(attrs, "displacement-scale", 1.0, node.parse_number)
+      let displacement_bias =
+        node.get(attrs, "displacement-bias", 0.0, node.parse_number)
+      let emissive_intensity =
+        node.get(attrs, "emissive-intensity", 1.0, node.parse_number)
+      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
 
       savoiardi.create_standard_material(
         color:,

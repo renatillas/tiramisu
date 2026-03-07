@@ -128,37 +128,38 @@ fn create(
 }
 
 fn create_directional(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let color = node.get_color(attributes, "color", 0xffffff)
-  let intensity = node.get_float(attributes, "intensity", 1.0)
+  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
+  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
   savoiardi.create_directional_light(color:, intensity:)
 }
 
 fn create_point(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let distance = node.get_float(attributes, "distance", 0.0)
-  let color = node.get_color(attributes, "color", 0xffffff)
-  let intensity = node.get_float(attributes, "intensity", 1.0)
+  let distance = node.get(attributes, "distance", 0.0, node.parse_number)
+  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
+  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
   savoiardi.create_point_light(color:, intensity:, distance:)
 }
 
 fn create_hemisphere(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let sky_color = node.get_int(attributes, "sky", 0x000000)
-  let ground_color = node.get_int(attributes, "ground", 0x000000)
-  let intensity = node.get_float(attributes, "intensity", 1.0)
+  let sky_color = node.get(attributes, "sky", 0x000000, node.parse_color)
+  let ground_color = node.get(attributes, "ground", 0x000000, node.parse_color)
+  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
   savoiardi.create_hemisphere_light(sky_color:, ground_color:, intensity:)
 }
 
 fn create_spot(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let distance = node.get_float(attributes, "distance", 0.0)
-  let angle = node.get_float(attributes, "angle", maths.pi() /. 4.0)
-  let penumbra = node.get_float(attributes, "penumbra", 0.5)
-  let color = node.get_color(attributes, "color", 0xffffff)
-  let intensity = node.get_float(attributes, "intensity", 1.0)
+  let distance = node.get(attributes, "distance", 0.0, node.parse_number)
+  let angle =
+    node.get(attributes, "angle", maths.pi() /. 4.0, node.parse_number)
+  let penumbra = node.get(attributes, "penumbra", 0.5, node.parse_number)
+  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
+  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
   savoiardi.create_spot_light(color:, intensity:, distance:, angle:, penumbra:)
 }
 
 fn create_ambient(attributes: dict.Dict(String, String)) {
-  let color = node.get_color(attributes, "color", 0xffffff)
-  let intensity = node.get_float(attributes, "intensity", 1.0)
+  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
+  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
   savoiardi.create_ambient_light(color:, intensity:)
 }
 
@@ -172,7 +173,7 @@ fn update(
 ) -> extension.Context {
   let result = {
     use object <- result.try(object |> option.to_result(Nil))
-    let #(light, registry) = case node.contains(["kind"], changed_attributes) {
+    let #(light, registry) = case set.contains("kind", in: changed_attributes) {
       True -> {
         let kind = dict.get(attributes, "type") |> result.unwrap("point")
         let light = case kind {
@@ -194,7 +195,7 @@ fn update(
 
     let light = savoiardi.object3d_to_light(object)
 
-    case node.contains(["cast-shadow"], changed_attributes) {
+    case set.contains("cast-shadow", in: changed_attributes) {
       True ->
         savoiardi.set_light_cast_shadow(
           light,
@@ -202,20 +203,20 @@ fn update(
         )
       False -> Nil
     }
-    case node.contains(["color"], changed_attributes) {
+    case set.contains("color", in: changed_attributes) {
       True -> {
         savoiardi.update_light_color(
           light,
-          node.get_color(attributes, "color", 0xffffff),
+          node.get(attributes, "color", 0xffffff, node.parse_color),
         )
       }
       False -> Nil
     }
-    case node.contains(["intensity"], changed_attributes) {
+    case set.contains("intensity", in: changed_attributes) {
       True ->
         savoiardi.update_light_intensity(
           light,
-          node.get_float(attributes, "intensity", 1.0),
+          node.get(attributes, "intensity", 1.0, node.parse_number),
         )
       False -> Nil
     }

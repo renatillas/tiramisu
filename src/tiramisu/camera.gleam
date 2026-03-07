@@ -1,16 +1,19 @@
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/json
+import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 import gleam/set.{type Set}
 import lustre/attribute.{type Attribute}
 import savoiardi.{type Object3D}
+
 import tiramisu/dev/extension.{type Context, Context}
 import tiramisu/dev/registry
+import tiramisu/dev/render_loop
 import tiramisu/internal/node
-import tiramisu/internal/render_loop
 import tiramisu/transform
+import vec/vec2
 
 pub const tag = "tiramisu-camera"
 
@@ -91,14 +94,14 @@ fn create(
   parent_id: String,
   attributes: Dict(String, String),
 ) -> Context {
-  let near = node.get_float(attributes, "near", 0.1)
-  let far = node.get_float(attributes, "far", 1000.0)
+  let near = node.get(attributes, "near", 0.1, node.parse_number)
+  let far = node.get(attributes, "far", 1000.0, node.parse_number)
   let camera = case dict.get(attributes, "type") {
     Ok("orthographic") -> {
-      let left = node.get_float(attributes, "left", -10.0)
-      let right = node.get_float(attributes, "right", 10.0)
-      let top = node.get_float(attributes, "top", 10.0)
-      let bottom = node.get_float(attributes, "bottom", -10.0)
+      let left = node.get(attributes, "left", -10.0, node.parse_number)
+      let right = node.get(attributes, "right", 10.0, node.parse_number)
+      let top = node.get(attributes, "top", 10.0, node.parse_number)
+      let bottom = node.get(attributes, "bottom", -10.0, node.parse_number)
       savoiardi.create_orthographic_camera(
         left:,
         right:,
@@ -109,8 +112,8 @@ fn create(
       )
     }
     _ -> {
-      let fov = node.get_float(attributes, "fov", 75.0)
-      let aspect = registry.get_renderer_aspect_ratio(ctx.registry)
+      let fov = node.get(attributes, "fov", 75.0, node.parse_number)
+      let aspect = get_canvas_ratio(ctx.registry)
       savoiardi.create_perspective_camera(fov:, aspect:, near:, far:)
     }
   }
@@ -138,7 +141,7 @@ fn update(
   attributes: Dict(String, String),
   changed_attributes: Set(String),
 ) -> Context {
-  let has_changed = node.contains(["type"], changed_attributes)
+  let has_changed = set.contains("type", in: changed_attributes)
   let new_camera_type =
     dict.get(attributes, "type")
     |> result.unwrap("perspective")
@@ -194,7 +197,7 @@ fn conditionally_set_orthographic_camera_params(
   camera: savoiardi.Camera,
 ) {
   case
-    node.contains(
+    list.any(
       [
         "near",
         "far",
@@ -203,7 +206,7 @@ fn conditionally_set_orthographic_camera_params(
         "top",
         "bottom",
       ],
-      in: changed_attributes,
+      set.contains(changed_attributes, _),
     )
   {
     True -> {
@@ -256,7 +259,7 @@ fn conditionally_set_active(
   new_attributes: Dict(String, String),
   changed_attributes: Set(String),
 ) -> Nil {
-  let has_changed = node.contains(["active"], changed_attributes)
+  let has_changed = set.contains("active", in: changed_attributes)
   let active = node.get_bool(new_attributes, "active")
   case has_changed, active {
     False, _ -> Nil
@@ -264,9 +267,7 @@ fn conditionally_set_active(
       render_loop.clear_active_camera(context.loop)
       render_loop.set_active_camera(context.loop, camera)
     }
-    _, False -> {
-      render_loop.clear_active_camera(context.loop)
-    }
+    _, False -> render_loop.clear_active_camera(context.loop)
   }
 }
 
@@ -277,21 +278,21 @@ fn conditionally_set_perspective_camera_params(
   attributes: Dict(String, String),
 ) -> Nil {
   case
-    node.contains(
+    list.any(
       [
         "fov",
         "near",
         "far",
         "aspect",
       ],
-      changed_attributes,
+      set.contains(changed_attributes, _),
     )
   {
     True -> {
       let fov = get_fov(attributes)
       let near = get_near(attributes)
       let far = get_far(attributes)
-      let aspect = registry.get_renderer_aspect_ratio(context.registry)
+      let aspect = get_canvas_ratio(context.registry)
       savoiardi.set_perspective_camera_params(
         camera,
         fov:,
@@ -346,4 +347,13 @@ fn get_bottom(attributes: Dict(String, String)) -> Float {
     default: -10.0,
     parse_fn: node.parse_number,
   )
+}
+
+fn get_canvas_ratio(registry: registry.Registry) {
+  let vec2.Vec2(x: width, y: height) =
+    savoiardi.get_canvas_dimensions(registry.renderer)
+  case height {
+    0.0 -> 16.0 /. 9.0
+    h -> width /. h
+  }
 }

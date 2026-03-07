@@ -1,28 +1,15 @@
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
-import gleam/list
 import gleam/result
-import gleam/set.{type Set}
 import gleam/string
 import savoiardi
 import tiramisu/transform
 
-pub fn get_color(attrs: Dict(String, String), key: String, default: Int) -> Int {
-  dict.get(attrs, key)
-  |> result.map(string.replace(_, "#", ""))
-  |> result.try(int.base_parse(_, 16))
-  |> result.unwrap(default)
-}
-
-pub fn get_float(
-  attrs: Dict(String, String),
-  key: String,
-  default: Float,
-) -> Float {
-  dict.get(attrs, key)
-  |> result.try(float.parse)
-  |> result.unwrap(default)
+pub fn parse_color(string: String) -> Result(Int, Nil) {
+  string
+  |> string.replace("#", "")
+  |> int.base_parse(16)
 }
 
 pub fn get_bool(attrs: Dict(String, String), key: String) -> Bool {
@@ -30,12 +17,6 @@ pub fn get_bool(attrs: Dict(String, String), key: String) -> Bool {
     Ok("true") | Ok("") -> True
     _ -> False
   }
-}
-
-pub fn get_int(attrs: Dict(String, String), key: String, default: Int) -> Int {
-  dict.get(attrs, key)
-  |> result.try(int.parse)
-  |> result.unwrap(default)
 }
 
 pub fn get(
@@ -70,11 +51,4 @@ pub fn set_transform(
   savoiardi.set_object_position(object, transform.position)
   savoiardi.set_object_quaternion(object, transform.rotation)
   savoiardi.set_object_scale(object, transform.scale)
-}
-
-pub fn contains(
-  attributes: List(String),
-  in changed_attributes: Set(String),
-) -> Bool {
-  list.any(attributes, set.contains(changed_attributes, _))
 }

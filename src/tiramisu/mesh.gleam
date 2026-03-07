@@ -77,7 +77,7 @@ fn update(
   let _ = {
     use object <- result.map(object |> option.to_result(Nil))
     case
-      node.contains(["src"], changed_attributes),
+      set.contains("src", in: changed_attributes),
       dict.get(attributes, "src")
     {
       True, Ok(src) ->
@@ -90,7 +90,7 @@ fn update(
         ))
       _, _ -> Nil
     }
-    case node.contains(["transform"], changed_attributes) {
+    case set.contains("transform", in: changed_attributes) {
       True -> {
         node.get_transform(attributes)
         |> result.unwrap(transform.identity)

@@ -19,8 +19,8 @@ import lustre/element/html
 
 import tiramisu/dev/extension
 import tiramisu/dev/registry.{type Registry}
+import tiramisu/dev/render_loop.{type RenderLoop}
 import tiramisu/internal/dom
-import tiramisu/internal/render_loop.{type RenderLoop}
 import tiramisu/internal/scene
 import tiramisu/internal/scene_apply
 import tiramisu/internal/scene_diff
@@ -279,23 +279,27 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    WidthChanged(w) -> {
-      let new_model = Model(..model, width: w)
+    WidthChanged(width) -> {
+      let new_model = Model(..model, width: width)
       case model.registry {
-        Some(reg) -> #(
+        Some(registry) -> #(
           new_model,
-          effect.from(fn(_) { registry.resize(reg, w, model.height) }),
+          effect.from(fn(_) {
+            savoiardi.set_renderer_size(registry.renderer, width, model.height)
+          }),
         )
         _ -> #(new_model, effect.none())
       }
     }
 
-    HeightChanged(h) -> {
-      let new_model = Model(..model, height: h)
+    HeightChanged(height) -> {
+      let new_model = Model(..model, height:)
       case model.registry {
-        Some(reg) -> #(
+        Some(registry) -> #(
           new_model,
-          effect.from(fn(_) { registry.resize(reg, model.width, h) }),
+          effect.from(fn(_) {
+            savoiardi.set_renderer_size(registry.renderer, model.width, height)
+          }),
         )
         _ -> #(new_model, effect.none())
       }
