@@ -14,96 +14,13 @@ Tiramisu brings the power of functional programming and static type safety to ga
 
 ## ✨ Features
 
-- **🔒 Type-Safe**: Catch bugs at compile time with Gleam's expressive type system
-- **🎮 3D & 2D**: Full 3D capabilities powered by Three.js, with excellent 2D support
-- **⚡ Immutable**: Predictable game state management through functional updates
-- **🎬 Effect System**: MVU architecture inspired by Lustre for clean game loops
-- **📦 Rich API**: Scene graphs, materials, lighting, animations, physics, and more
-- **🚀 Production Ready**: Built on battle-tested Three.js with WebGL acceleration
-- **🎯 Zero Runtime Overhead**: Compiles directly to readable JavaScript
+TODO
 
 ---
 
 ## 🚀 Quick Start
 
-```gleam
-import gleam/option
-import gleam/time/duration
-import tiramisu
-import tiramisu/camera
-import tiramisu/effect
-import tiramisu/geometry
-import tiramisu/light
-import tiramisu/material
-import tiramisu/scene
-import tiramisu/transform
-import vec/vec3
-
-type Model {
-  Model(rotation: Float)
-}
-
-type Msg {
-  Tick
-}
-
-pub fn main() {
-  tiramisu.application(init, update, view)
-  |> tiramisu.start("#app", tiramisu.FullScreen, option.None)
-}
-
-fn init(_ctx: tiramisu.Context) {
-  #(Model(rotation: 0.0), effect.dispatch(Tick), option.None)
-}
-
-fn update(model: Model, msg: Msg, ctx: tiramisu.Context) {
-  case msg {
-    Tick -> {
-      // ctx.delta_time is a Duration type for type-safe time handling
-      let delta_seconds = duration.to_seconds(ctx.delta_time)
-      let new_rotation = model.rotation +. delta_seconds
-      #(Model(rotation: new_rotation), effect.dispatch(Tick), option.None)
-    }
-  }
-}
-
-fn view(model: Model, _ctx: tiramisu.Context) {
-  let assert Ok(cam) = camera.perspective(field_of_view: 75.0, near: 0.1, far: 1000.0)
-  let assert Ok(cube_geo) = geometry.box(width: 1.0, height: 1.0, depth: 1.0)
-  let assert Ok(cube_mat) =
-    material.new()
-    |> material.with_color(0x00ff00)
-    |> material.with_metalness(1.0)
-    |> material.with_roughness(0.3)
-    |> material.build()
-  let assert Ok(sun) = light.directional(intensity: 1.0, color: 0xffffff)
-
-  scene.empty(id: "scene", transform: transform.identity, children: [
-    scene.camera(
-      id: "main-camera",
-      camera: cam,
-      transform: transform.at(position: vec3.Vec3(0.0, 2.0, 5.0)),
-      look_at: option.Some(vec3.Vec3(0.0, 0.0, 0.0)),
-      active: True,
-      viewport: option.None,
-      postprocessing: option.None,
-    ),
-    scene.mesh(
-      id: "cube",
-      geometry: cube_geo,
-      material: cube_mat,
-      transform: transform.identity
-        |> transform.rotate_y(model.rotation),
-      physics: option.None,
-    ),
-    scene.light(
-      id: "sun",
-      light: sun,
-      transform: transform.at(position: vec3.Vec3(5.0, 5.0, 5.0)),
-    ),
-  ])
-}
-```
+TODO
 
 ---
 
@@ -147,55 +64,17 @@ gleam add tiramisu
 Add Three.js, Rapier, and styling configuration:
 
 ```toml
-name = "my_game"
-version = "0.1.0"
-
-# ...
-
 [tools.lustre.html]
 scripts = [
   { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
 ]
-stylesheets = [
-  { content = "body { margin: 0; padding: 0; overflow: hidden; }" }
-]
 ```
-
-**Note**: The `stylesheets` configuration removes default body margins and prevents scrollbars, which is essential for fullscreen games.
 
 ---
 
 ## 🏗️ Core Concepts
 
-### MVU Architecture
-
-Tiramisu follows the Model-View-Update pattern:
-
-- **Model**: Your immutable game state
-- **Update**: Pure function that transforms state based on messages
-- **View**: Declarative scene description from current state
-
-### Effect System
-
-Side effects (network, timers, audio) are handled through a composable effect system, keeping your update logic pure and testable.
-
-### Scene Graph
-
-Hierarchical node system powered by Three.js, with functional updates and transforms. Support for meshes, lights, cameras, groups, and more.
-
----
-
-## 🎮 What Can You Build?
-
-- 3D games and simulations
-- 2D platformers and top-down games
-- Interactive visualizations
-- Architectural walkthroughs
-- Educational simulations
-- Physics-based experiences
-- Anything that runs in a browser!
-
----
+TODO
 
 ## 🛠️ Built With
 
@@ -214,14 +93,6 @@ Contributions are welcome! Whether it's bug reports, feature requests, or code c
 ## 📄 License
 
 MIT License - see [LICENSE.md](./LICENSE.md) for details.
-
----
-
-## 🌟 Why Tiramisu?
-
-> "Like the dessert, Tiramisu is made of layers - each one adding richness and depth. From the functional purity of Gleam to the rendering power of Three.js, every layer works together to create something delightful."
-
-**Start building type-safe games today.** ✨
 
 ---
 
