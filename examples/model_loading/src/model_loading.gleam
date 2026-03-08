@@ -14,12 +14,10 @@ import lustre/attribute.{class}
 import lustre/effect.{type Effect}
 import lustre/element/html
 import lustre/event
-import quaternion
 import tiramisu
 import tiramisu/camera
 import tiramisu/light
 import tiramisu/material
-import tiramisu/mesh
 import tiramisu/primitive
 import tiramisu/scene
 import tiramisu/tick.{type TickContext}
@@ -108,7 +106,7 @@ fn view(m: Model) {
           "main",
           [
             camera.fov(45.0),
-            camera.transform(transform.at(vec3.Vec3(0.0, 1.5, 5.0))),
+            transform.position(vec3.Vec3(0.0, 1.5, 5.0)),
             camera.active(True),
           ],
           [],
@@ -123,12 +121,7 @@ fn view(m: Model) {
 
             primitive.plane(vec2.Vec2(10.0, 10.0)),
             primitive.receive_shadow(True),
-            primitive.transform(
-              transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-              |> transform.with_rotation(
-                quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
-              ),
-            ),
+            transform.rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
           ],
           [],
         ),
@@ -137,12 +130,7 @@ fn view(m: Model) {
           "soldier",
           [
             attribute.src(model_url),
-            mesh.transform(
-              transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-              |> transform.with_rotation(
-                quaternion.from_euler(vec3.Vec3(0.0, m.rotation, 0.0)),
-              ),
-            ),
+            transform.rotation(vec3.Vec3(0.0, m.rotation, 0.0)),
             material.cast_shadow(True),
             event.on("tiramisu:model-loaded", {
               use id <- decode.subfield(["detail", "id"], decode.string)
@@ -159,7 +147,7 @@ fn view(m: Model) {
             light.color(0xffffff),
             light.intensity(1.0),
             light.cast_shadow(True),
-            light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+            transform.position(vec3.Vec3(5.0, 10.0, 7.0)),
           ],
           [],
         ),

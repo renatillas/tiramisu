@@ -1,192 +1,183 @@
-//// Transform type for representing position, rotation, and scale.
-////
-//// This module provides the Transform type and parsing for web components.
-////
-//// ## Attribute Format
-////
-//// ```
-//// transform="pos:0,1,0 quat:0,0,0,1 scale:2,2,2"
-//// ```
-////
-//// Parts can be omitted to use defaults:
-//// - `pos:x,y,z` - Position (default: 0,0,0)
-//// - `quat:x,y,z,w` - Rotation as quaternion (default: 0,0,0,1 identity)
-//// - `scale:x,y,z` - Scale (default: 1,1,1)
-
+import gleam/dict
 import gleam/float
-import gleam/int
 import gleam/list
+import gleam/option
 import gleam/result
+import gleam/set
 import gleam/string
-import quaternion.{type Quaternion}
-import vec/vec3.{type Vec3}
-import vec/vec3f
+import lustre/attribute
+import quaternion
+import savoiardi
+import tiramisu/dev/extension
+import tiramisu/internal/node
+import vec/vec3
 
-// TYPES -----------------------------------------------------------------------
-
-/// A transform represents position, rotation, and scale in 3D space.
-pub type Transform {
-  Transform(position: Vec3(Float), rotation: Quaternion, scale: Vec3(Float))
+pub fn position(position: vec3.Vec3(Float)) -> attribute.Attribute(a) {
+  attribute.attribute("position", vec_to_string(position))
 }
 
-// CONSTRUCTORS ----------------------------------------------------------------
-
-/// Create an identity transform (position at origin, no rotation, scale of 1).
-pub const identity = Transform(
-  position: vec3.Vec3(0.0, 0.0, 0.0),
-  rotation: quaternion.identity,
-  scale: vec3.Vec3(1.0, 1.0, 1.0),
-)
-
-/// Create a transform at a specific position.
-pub fn at(position pos: Vec3(Float)) -> Transform {
-  Transform(
-    position: pos,
-    rotation: quaternion.identity,
-    scale: vec3.Vec3(1.0, 1.0, 1.0),
-  )
+pub fn scale(scale: vec3.Vec3(Float)) -> attribute.Attribute(a) {
+  attribute.attribute("scale", vec_to_string(scale))
 }
 
-// BUILDERS --------------------------------------------------------------------
-
-/// Set the position of a transform.
-pub fn with_position(transform: Transform, position: Vec3(Float)) -> Transform {
-  Transform(..transform, position: position)
+pub fn rotation(rotation: vec3.Vec3(Float)) -> attribute.Attribute(a) {
+  attribute.attribute("rotation", vec_to_string(rotation))
 }
 
-/// Set the rotation of a transform using a quaternion.
-pub fn with_rotation(transform: Transform, rotation: Quaternion) -> Transform {
-  Transform(..transform, rotation: rotation)
+pub fn rotation_quaternion(
+  rotation: quaternion.Quaternion,
+) -> attribute.Attribute(a) {
+  attribute.attribute("rotation", quaternion_to_string(rotation))
 }
 
-/// Set the scale of a transform.
-pub fn with_scale(transform: Transform, scale: Vec3(Float)) -> Transform {
-  Transform(..transform, scale: scale)
+fn vec_to_string(vec: vec3.Vec3(Float)) -> String {
+  float.to_string(vec.x)
+  <> " "
+  <> float.to_string(vec.y)
+  <> " "
+  <> float.to_string(vec.z)
 }
 
-/// Set a uniform scale on all axes.
-pub fn with_uniform_scale(transform: Transform, scale: Float) -> Transform {
-  Transform(..transform, scale: vec3.splat(scale))
+fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
+  float.to_string(rotation.x)
+  <> " "
+  <> float.to_string(rotation.y)
+  <> " "
+  <> float.to_string(rotation.z)
+  <> " "
+  <> float.to_string(rotation.w)
 }
 
-/// Set the rotation to look at a target point from the current position.
-pub fn with_look_at(transform: Transform, target: Vec3(Float)) -> Transform {
-  let target = vec3f.subtract(target, transform.position) |> vec3f.normalize
-  let forward = vec3.Vec3(0.0, 0.0, -1.0)
-  let up = vec3.Vec3(0.0, 1.0, 0.0)
-  let rotation = quaternion.look_at(forward:, target:, up:)
-  Transform(..transform, rotation:)
-}
-
-// PARSING ---------------------------------------------------------------------
-
-/// Parse a transform string in the format "pos:x,y,z quat:x,y,z,w scale:x,y,z".
-/// Parts can be omitted to use defaults.
-@internal
-pub fn parse(input: String) -> Result(Transform, Nil) {
-  let parts = string.split(input, ";") |> list.map(string.trim)
-
-  use pos <- result.try(find_and_parse_vec3(parts, "position:"))
-  use rot <- result.try(find_and_parse_rotation(parts, "rotation:"))
-  use scl <- result.try(find_and_parse_vec3(parts, "scale:"))
-
-  Ok(Transform(position: pos, rotation: rot, scale: scl))
-}
-
-fn find_and_parse_vec3(
-  parts: List(String),
-  prefix: String,
-) -> Result(Vec3(Float), Nil) {
-  case list.find(parts, string.starts_with(_, prefix)) {
-    Ok(part) ->
-      prefix
-      |> string.length
-      |> string.drop_start(part, _)
-      |> parse_vec3
-
-    Error(_) -> Error(Nil)
-  }
-}
-
-fn find_and_parse_rotation(
-  parts: List(String),
-  prefix: String,
-) -> Result(Quaternion, Nil) {
-  case list.find(parts, string.starts_with(_, prefix)) {
-    Ok(part) ->
-      prefix
-      |> string.length
-      |> string.drop_start(part, _)
-      |> parse_rotation
-
-    Error(_) -> Error(Nil)
-  }
-}
-
-fn parse_vec3(input: String) -> Result(Vec3(Float), Nil) {
-  case string.split(input, ",") |> list.map(string.trim) {
-    [x_str, y_str, z_str] -> {
-      use x <- result.try(parse_number(x_str))
-      use y <- result.try(parse_number(y_str))
-      use z <- result.map(parse_number(z_str))
-      vec3.Vec3(x, y, z)
-    }
-    _ -> Error(Nil)
-  }
-}
-
-fn parse_rotation(input: String) -> Result(Quaternion, Nil) {
-  case string.split(input, ",") |> list.map(string.trim) {
-    [x_str, y_str, z_str, w_str] -> {
-      use x <- result.try(parse_number(x_str))
-      use y <- result.try(parse_number(y_str))
-      use z <- result.try(parse_number(z_str))
-      use w <- result.map(parse_number(w_str))
-      quaternion.Quaternion(x:, y:, z:, w:)
-    }
-    [x_str, y_str, z_str] -> {
-      use x <- result.try(parse_number(x_str))
-      use y <- result.try(parse_number(y_str))
-      use z <- result.map(parse_number(z_str))
-      vec3.Vec3(x:, y:, z:)
-      |> quaternion.from_euler
-    }
-    _ -> Error(Nil)
-  }
-}
-
-fn parse_number(input: String) -> Result(Float, Nil) {
-  case float.parse(input) {
-    Ok(f) -> Ok(f)
-    Error(_) -> {
-      case int.parse(input) {
-        Ok(i) -> Ok(int.to_float(i))
-        Error(_) -> Error(Nil)
+/// Attribute extension that handles material updates for all tiramisu mesh nodes.
+///
+/// Centralises material parsing and disposal logic that would otherwise be
+/// duplicated across primitive and mesh node handlers.
+pub fn extension() -> extension.Extension {
+  extension.AttributeExtension(extension.Attribute(
+    observed_attributes: set.from_list(["position", "rotation", "scale"]),
+    on_create: fn(_context, _tag, _id, object, attributes) {
+      case object {
+        // On objects that dont register themselves upon creation, we do nothing (yet)
+        option.None -> Nil
+        option.Some(object) -> {
+          let _ =
+            dict.get(attributes, "position")
+            |> result.try(vector_to_numbers)
+            |> result.try(parse_vector)
+            |> result.map(savoiardi.set_object_position(object, _))
+          let _ =
+            dict.get(attributes, "scale")
+            |> result.try(vector_to_numbers)
+            |> result.try(parse_vector)
+            |> result.map(savoiardi.set_object_scale(object, _))
+          let rotation =
+            dict.get(attributes, "rotation")
+            |> result.try(vector_to_numbers)
+          let _ =
+            rotation
+            |> result.try(parse_quaternion)
+            |> result.lazy_or(fn() {
+              result.try(rotation, parse_vector)
+              |> result.map(quaternion.from_euler)
+            })
+            |> result.map(savoiardi.set_object_quaternion(object, _))
+          Nil
+        }
       }
-    }
+    },
+    on_update: fn(_context, _tag, _id, object, attributes, changed_attributes) {
+      case object {
+        option.None -> Nil
+        option.Some(object) -> {
+          case set.contains(changed_attributes, this: "position") {
+            False -> Nil
+            True -> {
+              let _ =
+                dict.get(attributes, "position")
+                |> result.try(vector_to_numbers)
+                |> result.try(parse_vector)
+                |> result.map(savoiardi.set_object_position(object, _))
+              Nil
+            }
+          }
+          case set.contains(changed_attributes, this: "rotation") {
+            False -> Nil
+            True -> {
+              let rotation =
+                dict.get(attributes, "rotation")
+                |> result.try(vector_to_numbers)
+              let _ =
+                rotation
+                |> result.try(parse_quaternion)
+                |> result.lazy_or(fn() {
+                  result.try(rotation, parse_vector)
+                  |> result.map(quaternion.from_euler)
+                })
+                |> result.map(savoiardi.set_object_quaternion(object, _))
+              Nil
+            }
+          }
+          case set.contains(changed_attributes, this: "scale") {
+            False -> Nil
+            True -> {
+              let _ =
+                dict.get(attributes, "scale")
+                |> result.try(vector_to_numbers)
+                |> result.try(parse_vector)
+                |> result.map(savoiardi.set_object_scale(object, _))
+              Nil
+            }
+          }
+        }
+      }
+    },
+    on_remove: fn(_context, _id, _parent_id, _object) { Nil },
+    // Once the object has been resolved we can set the material
+    on_object_resolved: fn(_context, _tag, _id, object, attributes) {
+      let _ =
+        dict.get(attributes, "position")
+        |> result.try(vector_to_numbers)
+        |> result.try(parse_vector)
+        |> result.map(savoiardi.set_object_position(object, _))
+      let _ =
+        dict.get(attributes, "scale")
+        |> result.try(vector_to_numbers)
+        |> result.try(parse_vector)
+        |> result.map(savoiardi.set_object_scale(object, _))
+      let rotation =
+        dict.get(attributes, "rotation")
+        |> result.try(vector_to_numbers)
+      let _ =
+        rotation
+        |> result.try(parse_quaternion)
+        |> result.lazy_or(fn() {
+          result.try(rotation, parse_vector)
+          |> result.map(quaternion.from_euler)
+        })
+        |> result.map(savoiardi.set_object_quaternion(object, _))
+      Nil
+    },
+  ))
+}
+
+fn parse_vector(list) -> Result(vec3.Vec3(Float), Nil) {
+  case list {
+    [x, y, z] -> Ok(vec3.Vec3(x, y, z))
+    _ -> Error(Nil)
   }
 }
 
-@internal
-pub fn to_string(transform: Transform) -> String {
-  "position:"
-  <> float.to_string(transform.position.x)
-  <> ", "
-  <> float.to_string(transform.position.y)
-  <> ", "
-  <> float.to_string(transform.position.z)
-  <> "; rotation:"
-  <> float.to_string(transform.rotation.x)
-  <> ", "
-  <> float.to_string(transform.rotation.y)
-  <> ", "
-  <> float.to_string(transform.rotation.z)
-  <> ", "
-  <> float.to_string(transform.rotation.w)
-  <> "; scale:"
-  <> float.to_string(transform.scale.x)
-  <> ", "
-  <> float.to_string(transform.scale.y)
-  <> ", "
-  <> float.to_string(transform.scale.z)
+fn parse_quaternion(list) -> Result(quaternion.Quaternion, Nil) {
+  case list {
+    [x, y, z, w] -> Ok(quaternion.Quaternion(x, y, z, w))
+    _ -> Error(Nil)
+  }
+}
+
+fn vector_to_numbers(vector: String) -> Result(List(Float), Nil) {
+  vector
+  |> string.split(on: " ")
+  |> list.map(string.trim)
+  |> list.map(node.parse_number)
+  |> result.all
 }

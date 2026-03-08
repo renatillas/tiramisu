@@ -16,17 +16,6 @@ import tiramisu/dev/extension
 import tiramisu/internal/dom
 import tiramisu/internal/node
 
-@internal
-pub fn observed_attributes() {
-  set.from_list([
-    "type", "color", "metalness", "roughness", "opacity", "wireframe",
-    "emissive", "emissive-intensity", "side", "color-map", "normal-map",
-    "ambient-occlusion-map", "roughness-map", "metalness-map",
-    "displacement-map", "displacement-scale", "displacement-bias", "shininess",
-    "alpha-test", "transparent", "hidden", "cast-shadow", "receive-shadow",
-  ])
-}
-
 // TYPES -----------------------------------------------------------------------
 
 /// Which sides of geometry faces to render.
@@ -159,7 +148,15 @@ pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
   }
 }
 
-// MATERIAL EXTENSION ----------------------------------------------------------
+fn observed_attributes() {
+  set.from_list([
+    "type", "color", "metalness", "roughness", "opacity", "wireframe",
+    "emissive", "emissive-intensity", "side", "color-map", "normal-map",
+    "ambient-occlusion-map", "roughness-map", "metalness-map",
+    "displacement-map", "displacement-scale", "displacement-bias", "shininess",
+    "alpha-test", "transparent", "hidden", "cast-shadow", "receive-shadow",
+  ])
+}
 
 /// Attribute extension that handles material updates for all tiramisu mesh nodes.
 ///
@@ -363,7 +360,10 @@ pub fn parse_apply_textures_async(
           dom.dispatch_event(
             id,
             "tiramisu:load-texture-error",
-            json.object([#("id", json.string(id))]),
+            json.object([
+              #("id", json.string(id)),
+              #("src", json.string(url)),
+            ]),
           )
           Error(Nil)
         }

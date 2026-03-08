@@ -7,6 +7,8 @@
 
 import gleam/time/duration
 import gleam_community/maths
+import quaternion
+import vec/vec3f
 
 import lustre
 import lustre/attribute
@@ -14,15 +16,11 @@ import lustre/effect
 import lustre/element.{type Element}
 import lustre/element/html
 
-import quaternion
-
 import vec/vec2
 import vec/vec3
-import vec/vec3f
 
 import tiramisu
 import tiramisu/camera
-import tiramisu/empty
 import tiramisu/light
 import tiramisu/material
 import tiramisu/primitive
@@ -40,7 +38,6 @@ type Msg {
   Tick1(tick.TickContext)
   Tick2(tick.TickContext)
   Tick3(tick.TickContext)
-  Tick4(tick.TickContext)
 }
 
 // MAIN ------------------------------------------------------------------------
@@ -61,7 +58,6 @@ fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
       tick.subscribe("warm", Tick1),
       tick.subscribe("cool", Tick2),
       tick.subscribe("wire", Tick3),
-      tick.subscribe("mini", Tick4),
     ]),
   )
 }
@@ -80,11 +76,15 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       let dt = duration.to_seconds(ctx.delta_time)
       #(Model(time: model.time +. dt), effect.none())
     }
-    Tick4(ctx) -> {
-      let dt = duration.to_seconds(ctx.delta_time)
-      #(Model(time: model.time +. dt), effect.none())
-    }
   }
+}
+
+fn look_at(position, target) {
+  let target = vec3f.subtract(target, position) |> vec3f.normalize
+  let forward = vec3.Vec3(0.0, 0.0, -1.0)
+  let up = vec3.Vec3(0.0, 1.0, 0.0)
+  let rotation = quaternion.look_at(forward:, target:, up:)
+  rotation
 }
 
 // VIEW ------------------------------------------------------------------------
@@ -130,10 +130,11 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-cam",
         [
           camera.fov(60.0),
-          camera.transform(
-            transform.at(vec3.Vec3(cx, 3.0, cz))
-            |> transform.with_look_at(vec3f.zero),
-          ),
+          transform.position(vec3.Vec3(cx, 3.0, cz)),
+          transform.rotation_quaternion(look_at(
+            vec3.Vec3(cx, 3.0, cz),
+            vec3f.zero,
+          )),
           camera.active(True),
         ],
         [],
@@ -143,7 +144,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-cube",
         [
           primitive.box(vec3.Vec3(1.5, 1.5, 1.5)),
-          primitive.transform(transform.at(vec3.Vec3(-2.0, 0.75, 0.0))),
+          transform.position(vec3.Vec3(-2.0, 0.75, 0.0)),
 
           material.color(0xff4444),
         ],
@@ -154,7 +155,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-sphere",
         [
           primitive.sphere(1.0, segments: vec2.Vec2(32, 16)),
-          primitive.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+          transform.position(vec3.Vec3(0.0, 1.0, 0.0)),
 
           material.color(0xff8800),
         ],
@@ -165,7 +166,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-cone",
         [
           primitive.cone(radius: 0.8, height: 2.0, segments: 32),
-          primitive.transform(transform.at(vec3.Vec3(2.0, 1.0, 0.0))),
+          transform.position(vec3.Vec3(2.0, 1.0, 0.0)),
 
           material.color(0xffcc00),
         ],
@@ -176,12 +177,8 @@ fn warm_scene(model: Model) -> Element(Msg) {
         "warm-ground",
         [
           primitive.plane(vec2.Vec2(12.0, 12.0)),
-          primitive.transform(
-            transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-            |> transform.with_rotation(
-              quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
-            ),
-          ),
+          transform.position(vec3.Vec3(0.0, 0.0, 0.0)),
+          transform.rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
           material.color(0x3d2b1f),
           material.receive_shadow(True),
         ],
@@ -202,7 +199,7 @@ fn warm_scene(model: Model) -> Element(Msg) {
           light.kind(light.Directional),
           light.color(0xffaa44),
           light.intensity(1.2),
-          primitive.transform(transform.at(vec3.Vec3(3.0, 8.0, 5.0))),
+          transform.position(vec3.Vec3(3.0, 8.0, 5.0)),
           light.cast_shadow(True),
         ],
         [],
@@ -229,10 +226,11 @@ fn cool_scene(model: Model) -> Element(Msg) {
         "cool-cam",
         [
           camera.fov(50.0),
-          camera.transform(
-            transform.at(vec3.Vec3(cx, 4.0, cz))
-            |> transform.with_look_at(vec3f.zero),
-          ),
+          transform.position(vec3.Vec3(cx, 4.0, cz)),
+          transform.rotation_quaternion(look_at(
+            vec3.Vec3(cx, 4.0, cz),
+            vec3f.zero,
+          )),
           camera.active(True),
         ],
         [],
@@ -247,7 +245,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
             radial_segments: 32,
             tubular_segments: 16,
           ),
-          primitive.transform(transform.at(vec3.Vec3(-2.0, 1.5, 0.0))),
+          transform.position(vec3.Vec3(-2.0, 1.5, 0.0)),
 
           material.color(0x4488ff),
         ],
@@ -263,7 +261,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
             height: 0.5,
             segments: 32,
           ),
-          primitive.transform(transform.at(vec3.Vec3(2.0, 1.25, 0.0))),
+          transform.position(vec3.Vec3(2.0, 1.25, 0.0)),
 
           material.color(0x00cccc),
         ],
@@ -274,12 +272,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
         "cool-box",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(
-            transform.at(vec3.Vec3(0.0, 0.8, 1.5))
-            |> transform.with_rotation(
-              quaternion.from_euler(vec3.Vec3(0.3, 0.7, 0.0)),
-            ),
-          ),
+          transform.position(vec3.Vec3(0.0, 0.8, 1.5)),
           material.color(0x8844ff),
         ],
         [],
@@ -289,12 +282,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
         "cool-ground",
         [
           primitive.plane(vec2.Vec2(16.0, 16.0)),
-          primitive.transform(
-            transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-            |> transform.with_rotation(
-              quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
-            ),
-          ),
+          transform.rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
 
           material.color(0x112233),
           material.receive_shadow(True),
@@ -316,7 +304,7 @@ fn cool_scene(model: Model) -> Element(Msg) {
           light.kind(light.Directional),
           light.color(0xaaccff),
           light.intensity(1.0),
-          light.transform(transform.at(vec3.Vec3(-4.0, 10.0, 6.0))),
+          transform.position(vec3.Vec3(-4.0, 10.0, 6.0)),
           light.cast_shadow(True),
         ],
         [],
@@ -343,45 +331,40 @@ fn wireframe_scene(model: Model) -> Element(Msg) {
         "wire-cam",
         [
           camera.fov(70.0),
-          camera.transform(
-            transform.at(vec3.Vec3(cx, 4.0, cz))
-            |> transform.with_look_at(vec3f.zero),
-          ),
+          transform.position(vec3.Vec3(cx, 4.0, cz)),
+          transform.rotation_quaternion(look_at(
+            vec3.Vec3(cx, 4.0, cz),
+            vec3f.zero,
+          )),
           camera.active(True),
         ],
         [],
       ),
       // Group of wireframe objects
-      tiramisu.empty(
-        "wire-group",
-        [
-          empty.transform(transform.at(vec3.Vec3(0.0, 0.0, 0.0))),
-        ],
-        [
-          tiramisu.primitive(
-            "wire-box",
-            [
-              primitive.box(vec3.Vec3(1.5, 1.5, 1.5)),
-              primitive.transform(transform.at(vec3.Vec3(-2.0, 1.0, 0.0))),
+      tiramisu.empty("wire-group", [], [
+        tiramisu.primitive(
+          "wire-box",
+          [
+            primitive.box(vec3.Vec3(1.5, 1.5, 1.5)),
+            transform.position(vec3.Vec3(-2.0, 1.0, 0.0)),
 
-              material.color(0x00ff88),
-              material.wireframe(True),
-            ],
-            [],
-          ),
-          tiramisu.primitive(
-            "wire-sphere",
-            [
-              primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
-              primitive.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+            material.color(0x00ff88),
+            material.wireframe(True),
+          ],
+          [],
+        ),
+        tiramisu.primitive(
+          "wire-sphere",
+          [
+            primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
+            transform.position(vec3.Vec3(0.0, 1.0, 0.0)),
 
-              material.color(0xff0088),
-              material.wireframe(True),
-            ],
-            [],
-          ),
-        ],
-      ),
+            material.color(0xff0088),
+            material.wireframe(True),
+          ],
+          [],
+        ),
+      ]),
       tiramisu.light(
         "wire-ambient",
         [

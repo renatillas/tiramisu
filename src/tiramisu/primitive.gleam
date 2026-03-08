@@ -14,9 +14,6 @@ import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension.{type Context}
 import tiramisu/dev/registry
-import tiramisu/internal/node
-import tiramisu/material
-import tiramisu/transform
 
 import vec/vec2
 import vec/vec3
@@ -25,16 +22,9 @@ import vec/vec3
 pub const tag: String = "tiramisu-primitive"
 
 pub fn extension() {
-  let observed_attributes =
-    ["transform", "geometry"]
-    |> set.from_list
-    |> set.union(material.observed_attributes())
+  let observed_attributes = set.from_list(["geometry"])
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
-}
-
-pub fn transform(transform: transform.Transform) -> attribute.Attribute(msg) {
-  attribute.attribute("transform", transform.to_string(transform))
 }
 
 pub fn box(shape: vec3.Vec3(Float)) -> Attribute(msg) {
@@ -143,11 +133,6 @@ fn create(
     Ok(geometry) -> {
       let object = savoiardi.create_mesh(geometry)
 
-      case node.get_transform(attributes) {
-        Ok(transform) -> node.set_transform(object, transform)
-        Error(Nil) -> node.set_transform(object, transform.identity)
-      }
-
       let registry =
         registry.register_and_add_object(
           context.registry,
@@ -184,14 +169,6 @@ fn update(
           |> result.try(parse_geometry)
           |> result.map(savoiardi.set_object_geometry(object, _))
         Nil
-      }
-      False -> Nil
-    }
-    case set.contains(changed_attributes, "transform") {
-      True -> {
-        node.get_transform(attributes)
-        |> result.unwrap(transform.identity)
-        |> node.set_transform(object, _)
       }
       False -> Nil
     }

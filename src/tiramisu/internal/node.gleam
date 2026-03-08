@@ -3,8 +3,6 @@ import gleam/float
 import gleam/int
 import gleam/result
 import gleam/string
-import savoiardi
-import tiramisu/transform
 
 pub fn parse_color(string: String) -> Result(Int, Nil) {
   string
@@ -35,20 +33,4 @@ pub fn parse_number(number) {
     Ok(float) -> Ok(float)
     Error(Nil) -> result.map(int.parse(number), int.to_float)
   }
-}
-
-pub fn get_transform(
-  attributes: Dict(String, String),
-) -> Result(transform.Transform, Nil) {
-  dict.get(attributes, "transform")
-  |> result.try(transform.parse)
-}
-
-pub fn set_transform(
-  object: savoiardi.Object3D,
-  transform: transform.Transform,
-) -> Nil {
-  savoiardi.set_object_position(object, transform.position)
-  savoiardi.set_object_quaternion(object, transform.rotation)
-  savoiardi.set_object_scale(object, transform.scale)
 }

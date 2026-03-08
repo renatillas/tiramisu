@@ -30,8 +30,6 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 
-import quaternion
-
 import input
 import tiramisu
 import tiramisu/camera
@@ -429,7 +427,7 @@ fn view(model: Model) -> Element(Msg) {
             [
               camera.fov(75.0),
               camera.active(True),
-              camera.transform(transform.at(vec3.Vec3(0.0, 3.0, 6.0))),
+              transform.position(vec3.Vec3(0.0, 3.0, 6.0)),
             ],
             [],
           ),
@@ -446,12 +444,8 @@ fn view(model: Model) -> Element(Msg) {
                 Toon -> material.toon()
               },
               primitive.sphere(1.5, vec2.Vec2(64, 64)),
-              primitive.transform(
-                transform.at(vec3.Vec3(0.0, 2.0, 0.0))
-                |> transform.with_rotation(
-                  quaternion.from_euler(vec3.Vec3(0.0, model.rotation, 0.0)),
-                ),
-              ),
+              transform.position(vec3.Vec3(0.0, 2.0, 0.0)),
+              transform.rotation(vec3.Vec3(0.0, model.rotation, 0.0)),
 
               material.color(model.cube_color),
               material.metalness(model.metalness),
@@ -504,12 +498,8 @@ fn view(model: Model) -> Element(Msg) {
             "ground",
             [
               primitive.plane(vec2.Vec2(15.0, 15.0)),
-              primitive.transform(
-                transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-                |> transform.with_rotation(
-                  quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
-                ),
-              ),
+              transform.position(vec3.Vec3(0.0, 0.0, 0.0)),
+              transform.rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
 
               material.receive_shadow(model.receive_shadow),
               material.color(0x2d3436),
@@ -533,7 +523,7 @@ fn view(model: Model) -> Element(Msg) {
               light.color(0xffffff),
               light.intensity(1.0),
               light.cast_shadow(True),
-              light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+              transform.position(vec3.Vec3(5.0, 10.0, 7.0)),
             ],
             [],
           ),

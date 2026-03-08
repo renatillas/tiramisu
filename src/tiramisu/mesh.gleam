@@ -10,28 +10,18 @@ import gleam/string
 
 import savoiardi.{type Object3D}
 
-import lustre/attribute
-
 import tiramisu/dev/extension.{type Context}
 import tiramisu/dev/registry
 import tiramisu/internal/dom
 import tiramisu/internal/node
-import tiramisu/material
-import tiramisu/transform
 
 @internal
 pub const tag: String = "tiramisu-mesh"
 
 pub fn extension() {
-  let observed_attributes =
-    set.from_list(["transform", "src", "hidden"])
-    |> set.union(material.observed_attributes())
+  let observed_attributes = set.from_list(["src", "hidden"])
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
-}
-
-pub fn transform(transform: transform.Transform) -> attribute.Attribute(msg) {
-  attribute.attribute("transform", transform.to_string(transform))
 }
 
 fn create(
@@ -90,14 +80,7 @@ fn update(
         ))
       _, _ -> Nil
     }
-    case set.contains("transform", in: changed_attributes) {
-      True -> {
-        node.get_transform(attributes)
-        |> result.unwrap(transform.identity)
-        |> node.set_transform(object, _)
-      }
-      False -> Nil
-    }
+    savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
   }
   ctx
 }
@@ -226,10 +209,6 @@ fn create_gltf(
 }
 
 fn set_object_attributes(object: Object3D, attributes: Dict(String, String)) {
-  node.get_transform(attributes)
-  |> result.unwrap(transform.identity)
-  |> node.set_transform(object, _)
-
   savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
 }
 

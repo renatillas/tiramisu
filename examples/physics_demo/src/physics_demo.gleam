@@ -292,10 +292,8 @@ fn view(_model: Model) {
         [
           camera.active(True),
           camera.fov(75.0),
-          camera.transform(
-            transform.at(vec3.Vec3(0.0, 8.0, 14.0))
-            |> transform.with_look_at(vec3.Vec3(0.0, 0.0, 0.0)),
-          ),
+          transform.position(vec3.Vec3(0.0, 8.0, 14.0)),
+          transform.rotation(vec3.Vec3(-0.3, 0.0, 0.0)),
         ],
         [],
       ),
@@ -306,7 +304,7 @@ fn view(_model: Model) {
         "player",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(0.0, 2.0, 0.0))),
+          transform.position(vec3.Vec3(0.0, 2.0, 0.0)),
 
           material.color(0x00ff88),
           material.cast_shadow(True),
@@ -332,7 +330,7 @@ fn view(_model: Model) {
         "red1",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(3.0, 2.0, -2.0))),
+          transform.position(vec3.Vec3(3.0, 2.0, -2.0)),
 
           material.color(0xff6b6b),
 
@@ -347,7 +345,7 @@ fn view(_model: Model) {
         "red2",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(4.0, 2.0, -2.0))),
+          transform.position(vec3.Vec3(4.0, 2.0, -2.0)),
           material.color(0xe05050),
 
           cacao.body_type(cacao.Dynamic),
@@ -362,7 +360,7 @@ fn view(_model: Model) {
         "blue1",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(3.5, 2.0, -2.0))),
+          transform.position(vec3.Vec3(3.5, 2.0, -2.0)),
 
           material.color(0x4ecdc4),
 
@@ -377,7 +375,7 @@ fn view(_model: Model) {
         "blue2",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(4.5, 2.0, -2.0))),
+          transform.position(vec3.Vec3(4.5, 2.0, -2.0)),
 
           material.color(0x3498db),
 
@@ -395,7 +393,7 @@ fn view(_model: Model) {
         "trigger_zone",
         [
           primitive.box(vec3.Vec3(3.0, 2.0, 3.0)),
-          primitive.transform(transform.at(vec3.Vec3(-3.0, 1.0, 3.0))),
+          transform.position(vec3.Vec3(-3.0, 1.0, 3.0)),
           material.color(0xffaa00),
 
           material.opacity(0.2),
@@ -413,7 +411,7 @@ fn view(_model: Model) {
         "sphere",
         [
           primitive.sphere(radius: 0.5, segments: vec2.Vec2(16, 16)),
-          primitive.transform(transform.at(vec3.Vec3(1.0, 2.0, 2.0))),
+          transform.position(vec3.Vec3(1.0, 2.0, 2.0)),
 
           material.color(0xfeca57),
 
@@ -430,7 +428,7 @@ fn view(_model: Model) {
         "stack1",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(-6.0, 1.0, -1.0))),
+          transform.position(vec3.Vec3(-6.0, 1.0, -1.0)),
 
           material.color(0xe056a0),
 
@@ -444,7 +442,7 @@ fn view(_model: Model) {
         "stack2",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(-6.0, 2.0, -1.0))),
+          transform.position(vec3.Vec3(-6.0, 2.0, -1.0)),
 
           material.color(0x9b59b6),
 
@@ -458,7 +456,7 @@ fn view(_model: Model) {
         "stack3",
         [
           primitive.box(vec3.Vec3(1.0, 1.0, 1.0)),
-          primitive.transform(transform.at(vec3.Vec3(-6.0, 3.0, -1.0))),
+          transform.position(vec3.Vec3(-6.0, 3.0, -1.0)),
 
           material.color(0x3498db),
 
@@ -475,7 +473,7 @@ fn view(_model: Model) {
         "ground",
         [
           primitive.box(vec3.Vec3(30.0, 1.0, 30.0)),
-          primitive.transform(transform.at(vec3.Vec3(0.0, -0.5, 0.0))),
+          transform.position(vec3.Vec3(0.0, -0.5, 0.0)),
 
           material.color(0x2d3436),
           material.receive_shadow(True),
@@ -503,7 +501,7 @@ fn view(_model: Model) {
           light.kind(light.Directional),
           light.color(0xffffff),
           light.intensity(5.0),
-          light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+          transform.position(vec3.Vec3(5.0, 10.0, 7.0)),
           light.cast_shadow(True),
         ],
         [],

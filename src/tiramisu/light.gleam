@@ -13,14 +13,12 @@ import lustre/attribute.{type Attribute}
 import tiramisu/dev/extension
 import tiramisu/dev/registry
 import tiramisu/internal/node
-import tiramisu/transform
 
 pub const tag = "tiramisu-light"
 
 pub fn extension() {
   let observed_attributes =
     set.from_list([
-      "transform",
       "type",
       "color",
       "intensity",
@@ -41,10 +39,6 @@ pub type Light {
   Point
   Spot
   Hemisphere
-}
-
-pub fn transform(transform: transform.Transform) -> attribute.Attribute(msg) {
-  attribute.attribute("transform", transform.to_string(transform))
 }
 
 pub fn kind(kind: Light) -> Attribute(msg) {
@@ -110,11 +104,6 @@ fn create(
   savoiardi.set_light_cast_shadow(light, casts_shadow)
 
   let light = savoiardi.light_to_object3d(light)
-
-  case node.get_transform(attributes) {
-    Ok(transform) -> node.set_transform(light, transform)
-    Error(Nil) -> node.set_transform(light, transform.identity)
-  }
 
   let registry =
     registry.register_and_add_object(
@@ -188,12 +177,8 @@ fn update(
       }
       False -> #(object, context.registry)
     }
-    case node.get_transform(attributes) {
-      Ok(transform) -> node.set_transform(light, transform)
-      Error(Nil) -> node.set_transform(light, transform.identity)
-    }
 
-    let light = savoiardi.object3d_to_light(object)
+    let light = savoiardi.object3d_to_light(light)
 
     case set.contains("cast-shadow", in: changed_attributes) {
       True ->

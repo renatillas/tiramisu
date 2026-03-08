@@ -47,7 +47,7 @@ fn view() {
         [
           camera.fov(75.0),
           camera.active(True),
-          camera.transform(transform.at(vec3.Vec3(0.0, 2.0, 5.0))),
+          transform.position(vec3.Vec3(0.0, 2.0, 5.0)),
         ],
         [],
       ),
@@ -56,7 +56,7 @@ fn view() {
         "cube",
         [
           primitive.box(vec3.Vec3(2.0, 2.0, 2.0)),
-          primitive.transform(transform.at(vec3.Vec3(0.0, 1.0, 0.0))),
+          transform.position(vec3.Vec3(0.0, 1.0, 0.0)),
           material.color(0xff6b6b),
         ],
         [],
@@ -66,7 +66,7 @@ fn view() {
         "sphere",
         [
           primitive.sphere(radius: 0.8, segments: vec2.Vec2(32, 16)),
-          primitive.transform(transform.at(vec3.Vec3(-3.0, 0.8, 0.0))),
+          transform.position(vec3.Vec3(-3.0, 0.8, 0.0)),
           material.color(0x4ecdc4),
           material.metalness(0.8),
           material.roughness(0.2),
@@ -86,7 +86,7 @@ fn view() {
           material.color(0x45b7d1),
           material.metalness(0.5),
           material.roughness(0.5),
-          primitive.transform(transform.at(vec3.Vec3(3.0, 1.0, 0.0))),
+          transform.position(vec3.Vec3(3.0, 1.0, 0.0)),
         ],
         [],
       ),
@@ -96,12 +96,8 @@ fn view() {
         [
           primitive.plane(vec2.Vec2(20.0, 20.0)),
           material.color(0x2d3436),
-          primitive.transform(
-            transform.at(vec3.Vec3(0.0, 0.0, 0.0))
-            |> transform.with_rotation(
-              quaternion.from_euler(vec3.Vec3(-1.5708, 0.0, 0.0)),
-            ),
-          ),
+          transform.position(vec3.Vec3(0.0, 0.0, 0.0)),
+          transform.rotation(vec3.Vec3(-1.5708, 0.0, 0.0)),
         ],
         [],
       ),
@@ -122,7 +118,7 @@ fn view() {
           light.kind(light.Directional),
           light.color(0xffffff),
           light.intensity(1.0),
-          light.transform(transform.at(vec3.Vec3(5.0, 10.0, 7.0))),
+          transform.position(vec3.Vec3(5.0, 10.0, 7.0)),
           light.cast_shadow(True),
         ],
         [],

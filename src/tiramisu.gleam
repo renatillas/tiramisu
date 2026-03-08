@@ -1,6 +1,7 @@
 import lustre
 import lustre/attribute.{type Attribute}
 import lustre/element.{type Element}
+import tiramisu/transform
 
 import tiramisu/camera
 import tiramisu/dev/extension
@@ -71,6 +72,7 @@ pub fn empty(
 
 pub fn builtin_extensions() -> List(extension.Extension) {
   [
+    transform.extension(),
     mesh.extension(),
     primitive.extension(),
     camera.extension(),

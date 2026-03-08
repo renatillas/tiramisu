@@ -12,7 +12,6 @@ import tiramisu/dev/extension.{type Context, Context}
 import tiramisu/dev/registry
 import tiramisu/dev/render_loop
 import tiramisu/internal/node
-import tiramisu/transform
 import vec/vec2
 
 pub const tag = "tiramisu-camera"
@@ -20,8 +19,15 @@ pub const tag = "tiramisu-camera"
 pub fn extension() {
   let observed_attributes =
     set.from_list([
-      "transform", "active", "type", "fov", "near", "far", "left", "right",
-      "top", "bottom",
+      "active",
+      "type",
+      "fov",
+      "near",
+      "far",
+      "left",
+      "right",
+      "top",
+      "bottom",
     ])
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
@@ -30,10 +36,6 @@ pub fn extension() {
 pub type Camera {
   Perspective
   Orthographic
-}
-
-pub fn transform(transform: transform.Transform) -> attribute.Attribute(msg) {
-  attribute.attribute("transform", transform.to_string(transform))
 }
 
 pub fn kind(kind: Camera) -> Attribute(msg) {
@@ -126,10 +128,6 @@ fn create(
   let registry =
     registry.register_and_add_object(ctx.registry, id, object, parent_id:, tag:)
 
-  case node.get_transform(attributes) {
-    Ok(transform) -> node.set_transform(object, transform)
-    Error(Nil) -> Nil
-  }
   Context(..ctx, registry: registry)
 }
 
@@ -174,10 +172,6 @@ fn update_orthographic(
   changed_attributes: Set(String),
 ) -> Result(Context, Nil) {
   use camera <- result.map(object |> option.to_result(Nil))
-  case node.get_transform(new_attributes) {
-    Ok(transform) -> node.set_transform(camera, transform)
-    Error(Nil) -> Nil
-  }
   let camera = savoiardi.object3d_to_camera(camera)
 
   conditionally_set_orthographic_camera_params(
@@ -238,10 +232,6 @@ fn update_perspective(
   changed_attributes: Set(String),
 ) -> Result(Context, Nil) {
   use object <- result.map(object |> option.to_result(Nil))
-  case node.get_transform(new_attributes) {
-    Ok(transform) -> node.set_transform(object, transform)
-    Error(Nil) -> Nil
-  }
   let camera = savoiardi.object3d_to_camera(object)
   conditionally_set_perspective_camera_params(
     context,
