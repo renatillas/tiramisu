@@ -70,7 +70,7 @@ type Msg {
   /// Light DOM children changed — re-parse, diff, and apply
   DomMutated
   /// Async registry mutation (model loading, etc.) — always applied to latest registry
-  PatcherModifiedRegistry(fn(Registry) -> Registry)
+  PatchModifiedRegistry(fn(Registry) -> Registry)
   /// Width attribute changed
   WidthChanged(Int)
   /// Height attribute changed
@@ -261,7 +261,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
                   model.extensions,
                   on_async(_, dispatch),
                 )
-              dispatch(PatcherModifiedRegistry(fn(_) { registry }))
+              dispatch(PatchModifiedRegistry(fn(_) { registry }))
             }),
           )
         }
@@ -269,7 +269,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    PatcherModifiedRegistry(transform) -> {
+    PatchModifiedRegistry(transform) -> {
       case model.registry {
         Some(reg) -> {
           let new_reg = transform(reg)
@@ -280,7 +280,7 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     }
 
     WidthChanged(width) -> {
-      let new_model = Model(..model, width: width)
+      let new_model = Model(..model, width:)
       case model.registry {
         Some(registry) -> #(
           new_model,
@@ -331,7 +331,7 @@ fn on_async(
   dispatch: fn(Msg) -> Nil,
 ) -> Nil {
   promise.map(transform, fn(transform) {
-    dispatch(PatcherModifiedRegistry(transform))
+    dispatch(PatchModifiedRegistry(transform))
   })
   Nil
 }
@@ -358,7 +358,7 @@ fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
   // Only produce a scene node for known/registered tags — skip everything else
   case extension.get_node(exts, tag) {
     Ok(_) ->
-      scene.SceneNode(
+      scene.Node(
         key:,
         tag:,
         children: parse_children(el, exts),
@@ -367,7 +367,7 @@ fn parse_element(el: dom.Element, exts: extension.Extensions) -> scene.Node {
     Error(Nil) ->
       // Unknown tag — pass through as a transparent structural node
       // (no Three.js object, but children are still parsed)
-      scene.SceneNode(
+      scene.Node(
         key:,
         tag:,
         children: parse_children(el, exts),

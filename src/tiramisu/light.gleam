@@ -103,16 +103,8 @@ fn create(
   let casts_shadow = node.get_bool(attributes, "cast-shadow")
   savoiardi.set_light_cast_shadow(light, casts_shadow)
 
-  let light = savoiardi.light_to_object3d(light)
-
-  let registry =
-    registry.register_and_add_object(
-      context.registry,
-      id,
-      light,
-      parent_id,
-      tag,
-    )
+  let object = savoiardi.light_to_object3d(light)
+  let registry = registry.add(context.registry, id, object:, parent_id:, tag:)
   extension.Context(..context, registry: registry)
 }
 
@@ -173,7 +165,7 @@ fn update(
           _ -> create_ambient(attributes)
         }
         let light = savoiardi.light_to_object3d(light)
-        #(light, registry.replace_object_model(context.registry, id, light))
+        #(light, registry.replace(context.registry, id, light))
       }
       False -> #(object, context.registry)
     }
@@ -220,6 +212,6 @@ fn remove(
   parent_id: String,
   object: Object3D,
 ) -> extension.Context {
-  let reg = registry.remove_object(context.registry, id, parent_id, object)
+  let reg = registry.remove(context.registry, id, parent_id, object)
   extension.Context(..context, registry: reg)
 }

@@ -7,6 +7,7 @@ import gleam/option.{type Option}
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import lustre/attribute.{type Attribute}
 
 import savoiardi.{type Object3D}
 
@@ -24,6 +25,27 @@ pub fn extension() {
   |> extension.NodeExtension
 }
 
+pub fn center(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("center", "")
+    False -> attribute.property("center", json.bool(False))
+  }
+}
+
+pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("cast-shadow", "")
+    False -> attribute.property("cast-shadow", json.bool(False))
+  }
+}
+
+pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("receive-shadow", "")
+    False -> attribute.property("receive-shadow", json.bool(False))
+  }
+}
+
 fn create(
   context: Context,
   id: String,
@@ -39,13 +61,7 @@ fn create(
           src:,
           attributes:,
           transformation: fn(registry, id, object) {
-            registry.register_and_add_object(
-              registry,
-              id,
-              object,
-              parent_id:,
-              tag:,
-            )
+            registry.add(registry, id, object:, parent_id:, tag:)
           },
         ),
       )
@@ -76,7 +92,7 @@ fn update(
           id:,
           src:,
           attributes:,
-          transformation: registry.replace_object_model,
+          transformation: registry.replace,
         ))
       _, _ -> Nil
     }
@@ -91,7 +107,7 @@ fn remove(
   parent_id: String,
   object: Object3D,
 ) -> Context {
-  let registry = registry.remove_object(context.registry, id, parent_id, object)
+  let registry = registry.remove(context.registry, id, parent_id, object)
   extension.Context(..context, registry:)
 }
 
@@ -123,7 +139,11 @@ fn create_stl(
   use result <- promise.await(savoiardi.load_stl(src))
   case result {
     Error(Nil) -> {
-      dom.dispatch_event(id, "tiramisu:model-error", id)
+      dom.dispatch_event(
+        id,
+        "tiramisu:model-error",
+        json.object([#("id", json.string(id))]),
+      )
       promise.resolve(function.identity)
     }
     Ok(geometry) -> {
@@ -171,7 +191,11 @@ fn create_fbx(
   use result <- promise.map(savoiardi.load_fbx(src))
   case result {
     Error(_) -> {
-      dom.dispatch_event(id, "tiramisu:model-error", id)
+      dom.dispatch_event(
+        id,
+        "tiramisu:model-error",
+        json.object([#("id", json.string(id))]),
+      )
       function.identity
     }
     Ok(data) -> {
@@ -210,6 +234,11 @@ fn create_gltf(
 
 fn set_object_attributes(object: Object3D, attributes: Dict(String, String)) {
   savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+  savoiardi.enable_shadows(
+    object,
+    cast_shadow: node.get_bool(attributes, "cast-shadow"),
+    receive_shadow: node.get_bool(attributes, "receive-shadow"),
+  )
 }
 
 fn update_registry(

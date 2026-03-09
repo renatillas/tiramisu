@@ -48,10 +48,6 @@ fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
   <> float.to_string(rotation.w)
 }
 
-/// Attribute extension that handles material updates for all tiramisu mesh nodes.
-///
-/// Centralises material parsing and disposal logic that would otherwise be
-/// duplicated across primitive and mesh node handlers.
 pub fn extension() -> extension.Extension {
   extension.AttributeExtension(extension.Attribute(
     observed_attributes: set.from_list(["position", "rotation", "scale"]),

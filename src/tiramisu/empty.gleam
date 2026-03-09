@@ -6,7 +6,6 @@ import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension.{type Context}
 import tiramisu/dev/registry
-import tiramisu/internal/console
 import tiramisu/internal/node
 
 @internal
@@ -24,10 +23,9 @@ fn create(
   parent_id: String,
   attributes: Dict(String, String),
 ) -> Context {
-  let group = savoiardi.create_group()
-  set_hidden(group, attributes)
-  let registry =
-    registry.register_and_add_object(ctx.registry, id, group, parent_id, tag)
+  let object = savoiardi.create_group()
+  set_hidden(object, attributes)
+  let registry = registry.add(ctx.registry, id, object:, parent_id:, tag:)
   extension.Context(..ctx, registry:)
 }
 
@@ -44,18 +42,13 @@ fn update(
   attributes: Dict(String, String),
   changed_attributes: Set(String),
 ) -> Context {
-  let result = {
+  let _ = {
     use group <- result.map(object |> option.to_result(Nil))
     case set.contains("hidden", in: changed_attributes) {
       True -> set_hidden(group, attributes)
       False -> Nil
     }
     Nil
-  }
-  case result {
-    Ok(Nil) -> Nil
-    Error(Nil) ->
-      console.error("Error updating empty mesh - Please open an issue!")
   }
   ctx
 }
@@ -66,6 +59,6 @@ fn remove(
   parent_id: String,
   object: Object3D,
 ) -> Context {
-  let registry = registry.remove_object(context.registry, id, parent_id, object)
+  let registry = registry.remove(context.registry, id, parent_id, object)
   extension.Context(..context, registry:)
 }

@@ -23,7 +23,6 @@ pub type Registry {
     scene_id: String,
     renderer: Renderer,
     objects: Dict(String, Entry),
-    id_counter: Int,
   )
 }
 
@@ -31,28 +30,25 @@ pub type Registry {
 
 /// Create a new empty registry for a renderer instance.
 pub fn new(scene: Scene, scene_id: String, renderer: Renderer) -> Registry {
-  Registry(scene:, scene_id:, renderer:, objects: dict.new(), id_counter: 0)
+  Registry(scene:, scene_id:, renderer:, objects: dict.new())
 }
 
 // OBJECT CRUD -----------------------------------------------------------------
 
 /// Get an Object3D by its ID.
-pub fn get_object(
-  registry: Registry,
-  id: String,
-) -> Result(#(Object3D, String), Nil) {
+pub fn get(registry: Registry, id: String) -> Result(Entry, Nil) {
   case dict.get(registry.objects, id) {
-    Ok(ObjectEntry(object:, parent_id:, ..)) -> Ok(#(object, parent_id))
+    Ok(entry) -> Ok(entry)
     Error(Nil) -> Error(Nil)
   }
 }
 
 /// Register an object and add it to the scene graph under its parent.
 /// Sets the object's name via savoiardi for debugging in Three.js inspector.
-pub fn register_and_add_object(
+pub fn add(
   registry: Registry,
   id: String,
-  object: Object3D,
+  object object: Object3D,
   parent_id parent_id: String,
   tag tag: String,
 ) -> Registry {
@@ -67,7 +63,7 @@ pub fn register_and_add_object(
 }
 
 /// Remove an object from the scene graph and dispose its resources.
-pub fn remove_object(
+pub fn remove(
   registry: Registry,
   id: String,
   parent_id: String,
@@ -109,11 +105,7 @@ pub fn reparent_object(
 /// Replace an existing object's 3D model with a newly loaded one.
 /// Preserves position, rotation, scale, and visibility from the old object.
 /// Updates the registry entry to point to the new object.
-pub fn replace_object_model(
-  registry: Registry,
-  id: String,
-  new_object: Object3D,
-) -> Registry {
+pub fn replace(registry: Registry, id: String, new_object: Object3D) -> Registry {
   case dict.get(registry.objects, id) {
     Ok(ObjectEntry(object:, ..) as entry) -> {
       let replaced = savoiardi.replace_object_model(object, new_object, id)
@@ -140,8 +132,8 @@ fn resolve_parent(registry: Registry, parent_id parent_id: String) -> Object3D {
   case parent_id == registry.scene_id {
     True -> savoiardi.scene_to_object3d(registry.scene)
     False ->
-      case get_object(registry, parent_id) {
-        Ok(#(object, _)) -> object
+      case get(registry, parent_id) {
+        Ok(entry) -> entry.object
         // Fallback to scene root
         Error(Nil) -> savoiardi.scene_to_object3d(registry.scene)
       }

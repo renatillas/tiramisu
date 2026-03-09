@@ -134,27 +134,13 @@ pub fn wireframe(bool: Bool) -> Attribute(msg) {
   }
 }
 
-pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
-  case bool {
-    True -> attribute.attribute("cast-shadow", "")
-    False -> attribute.property("cast-shadow", json.bool(False))
-  }
-}
-
-pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
-  case bool {
-    True -> attribute.attribute("receive-shadow", "")
-    False -> attribute.property("receive-shadow", json.bool(False))
-  }
-}
-
 fn observed_attributes() {
   set.from_list([
     "type", "color", "metalness", "roughness", "opacity", "wireframe",
     "emissive", "emissive-intensity", "side", "color-map", "normal-map",
     "ambient-occlusion-map", "roughness-map", "metalness-map",
     "displacement-map", "displacement-scale", "displacement-bias", "shininess",
-    "alpha-test", "transparent", "hidden", "cast-shadow", "receive-shadow",
+    "alpha-test", "transparent",
   ])
 }
 
@@ -172,6 +158,7 @@ pub fn extension() -> extension.Extension {
         option.Some(object) -> {
           let material = parse_material(attributes)
           savoiardi.set_object_material(object, material)
+
           context.on_async(
             promise.await(
               promise.await_list(parse_apply_textures_async(

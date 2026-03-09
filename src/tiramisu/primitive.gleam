@@ -1,12 +1,12 @@
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 import gleam/set
 import gleam/string
+import tiramisu/internal/node
 
 import lustre/attribute.{type Attribute}
 
@@ -22,7 +22,7 @@ import vec/vec3
 pub const tag: String = "tiramisu-primitive"
 
 pub fn extension() {
-  let observed_attributes = set.from_list(["geometry"])
+  let observed_attributes = set.from_list(["geometry", "hidden"])
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
@@ -115,13 +115,6 @@ pub fn torus(
   )
 }
 
-pub fn hide(hide: Bool) -> Attribute(msg) {
-  case hide {
-    True -> attribute.attribute("hide", "")
-    False -> attribute.property("hide", json.bool(False))
-  }
-}
-
 fn create(
   context: Context,
   id: String,
@@ -132,15 +125,9 @@ fn create(
   let result = case geometry {
     Ok(geometry) -> {
       let object = savoiardi.create_mesh(geometry)
-
+      savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
       let registry =
-        registry.register_and_add_object(
-          context.registry,
-          id,
-          object,
-          parent_id:,
-          tag:,
-        )
+        registry.add(context.registry, id, object:, parent_id:, tag:)
       Ok(extension.Context(..context, registry:))
     }
     Error(Nil) -> Error(Nil)
@@ -162,7 +149,7 @@ fn update(
   // If loading models, registry.get_object fails a few frames until load completes
   let _ = {
     use object <- result.map(object |> option.to_result(Nil))
-    case set.contains(changed_attributes, this: "geometry") {
+    case set.contains("geometry", in: changed_attributes) {
       True -> {
         let _ =
           dict.get(attributes, "geometry")
@@ -170,6 +157,14 @@ fn update(
           |> result.map(savoiardi.set_object_geometry(object, _))
         Nil
       }
+      False -> Nil
+    }
+    case set.contains("hidden", in: changed_attributes) {
+      True ->
+        savoiardi.set_object_visible(
+          object,
+          !node.get_bool(attributes, "hidden"),
+        )
       False -> Nil
     }
   }
@@ -241,26 +236,12 @@ fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
   }
 }
 
-pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
-  case bool {
-    True -> attribute.attribute("cast-shadow", "")
-    False -> attribute.property("cast-shadow", json.bool(False))
-  }
-}
-
-pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
-  case bool {
-    True -> attribute.attribute("receive-shadow", "")
-    False -> attribute.property("receive-shadow", json.bool(False))
-  }
-}
-
 fn remove(
   context: Context,
   id: String,
   parent_id: String,
   object: Object3D,
 ) -> Context {
-  let registry = registry.remove_object(context.registry, id, parent_id, object)
+  let registry = registry.remove(context.registry, id, parent_id, object)
   extension.Context(..context, registry:)
 }

@@ -16,7 +16,6 @@ import gleam/dict.{type Dict}
 import gleam/javascript/promise
 import gleam/list
 import gleam/option
-import gleam/pair
 import gleam/result
 import gleam/set
 import savoiardi.{type Object3D}
@@ -63,8 +62,8 @@ fn apply_patch(
           let new_ctx = handler.create(ctx, id, parent_id, attributes)
           // Notify attribute hooks — object is None for async src= meshes
           let obj =
-            registry.get_object(new_ctx.registry, id)
-            |> result.map(pair.first)
+            registry.get(new_ctx.registry, id)
+            |> result.map(fn(entry) { entry.object })
             |> option.from_result
           notify_create(extensions, ctx, tag, id, obj, attributes)
           new_ctx
@@ -83,8 +82,8 @@ fn apply_patch(
       case extension.get_node(extensions, tag) {
         Ok(handler) -> {
           let obj =
-            registry.get_object(ctx.registry, id)
-            |> result.map(pair.first)
+            registry.get(ctx.registry, id)
+            |> result.map(fn(entry) { entry.object })
             |> option.from_result
           let new_ctx =
             handler.update(

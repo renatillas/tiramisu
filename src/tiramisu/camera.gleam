@@ -86,7 +86,7 @@ fn remove(
   parent_id: String,
   object: Object3D,
 ) -> Context {
-  let reg = registry.remove_object(ctx.registry, id, parent_id, object)
+  let reg = registry.remove(ctx.registry, id, parent_id, object)
   Context(..ctx, registry: reg)
 }
 
@@ -125,9 +125,7 @@ fn create(
     True -> render_loop.set_active_camera(ctx.loop, camera)
     False -> Nil
   }
-  let registry =
-    registry.register_and_add_object(ctx.registry, id, object, parent_id:, tag:)
-
+  let registry = registry.add(ctx.registry, id, object:, parent_id:, tag:)
   Context(..ctx, registry: registry)
 }
 

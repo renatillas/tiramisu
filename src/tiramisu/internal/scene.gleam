@@ -12,7 +12,7 @@ import gleam/dict.{type Dict}
 
 /// A node in the scene description tree.
 pub type Node {
-  SceneNode(
+  Node(
     key: String,
     tag: String,
     children: List(Node),
