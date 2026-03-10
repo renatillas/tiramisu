@@ -22,8 +22,8 @@ import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension.{type Context, type Extensions}
 
+import tiramisu/dev/loop.{type RenderLoop}
 import tiramisu/dev/registry.{type Registry}
-import tiramisu/dev/render_loop.{type RenderLoop}
 import tiramisu/internal/scene_patch.{type ScenePatch}
 
 // APPLY -----------------------------------------------------------------------

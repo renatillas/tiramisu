@@ -12,8 +12,8 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/set.{type Set}
 import savoiardi.{type Object3D}
+import tiramisu/dev/loop.{type RenderLoop}
 import tiramisu/dev/registry.{type Registry}
-import tiramisu/dev/render_loop.{type RenderLoop}
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
 
@@ -23,6 +23,7 @@ pub type Context {
   Context(
     registry: Registry,
     loop: RenderLoop,
+    /// TODO: DOCS
     on_async: fn(promise.Promise(fn(Registry) -> Registry)) -> Nil,
     /// Called by async model loaders (mesh src=) after the model registers in
     /// the registry, so attribute extensions can react to the resolved object.
@@ -42,10 +43,10 @@ pub type Node {
   Node(
     tag: String,
     /// Attribute names this node type observes (added to MutationObserver filter).
-    observed_attributes: set.Set(String),
+    observed_attributes: List(String),
     /// Called when a new element with this tag appears in the scene.
     /// The order of arguments is as follows: 
-    /// - `context: Context
+    /// - `context: Context`
     /// - `element_id: String`
     /// - `parent_id: String`
     /// - `attributes: Dict(String, String)`
@@ -69,6 +70,10 @@ pub type Node {
       Context,
     /// Called when an element is removed from the scene.
     /// The handler is responsible for calling `registry.remove_object`.
+    /// - `context: Context`
+    /// - `id: String`
+    /// - `parent_id: String`
+    /// - `object: Object3D`
     remove: fn(Context, String, String, Object3D) -> Context,
   )
 }
@@ -85,7 +90,7 @@ pub type Attribute {
     /// Attribute names to observe on tiramisu elements.
     /// Merged into the MutationObserver filter so DOM changes to these
     /// attributes trigger a scene re-parse.
-    observed_attributes: set.Set(String),
+    observed_attributes: List(String),
     /// Fires when any tiramisu node is created.
     ///
     /// - `tag`: the element HTML tag (e.g. `"tiramisu-mesh"`)
@@ -142,40 +147,42 @@ pub type Extension {
 
 /// Compiled lookup structure. One per renderer instance, threaded through
 /// the apply pipeline as a pure immutable value. No global state.
-pub type Extensions =
-  #(Dict(String, Node), List(Attribute))
+pub type Extensions {
+  Extensions(
+    nodes: Dict(String, Node),
+    attributes: List(Attribute),
+    observed_attributes: List(String),
+  )
+}
 
 /// Compile a list of extensions into fast lookup structures.
 pub fn from_list(extensions: List(Extension)) -> Extensions {
-  use #(nodes, attributes), ext <- list.fold(extensions, #(dict.new(), []))
+  use Extensions(nodes, attributes, observed_attributes), ext <- list.fold(
+    extensions,
+    Extensions(dict.new(), [], []),
+  )
   case ext {
-    NodeExtension(handler) -> #(
-      dict.insert(nodes, handler.tag, handler),
-      attributes,
-    )
-    AttributeExtension(handler) -> #(nodes, [handler, ..attributes])
+    NodeExtension(handler) ->
+      Extensions(
+        dict.insert(nodes, handler.tag, handler),
+        attributes,
+        list.append(handler.observed_attributes, observed_attributes),
+      )
+    AttributeExtension(handler) ->
+      Extensions(
+        nodes,
+        [handler, ..attributes],
+        list.append(handler.observed_attributes, observed_attributes),
+      )
   }
 }
 
 /// Get the `Node` handler for a given tag, if one is registered.
 pub fn get_node(exts: Extensions, tag: String) -> Result(Node, Nil) {
-  dict.get(exts.0, tag)
+  dict.get(exts.nodes, tag)
 }
 
 /// Get all registered attribute extension hooks.
 pub fn attribute_hooks(exts: Extensions) -> List(Attribute) {
-  exts.1
-}
-
-/// Collect all `observed_attributes` from all extensions for the MutationObserver.
-pub fn all_observed_attributes(exts: Extensions) -> set.Set(String) {
-  let node_attrs =
-    dict.fold(exts.0, set.new(), fn(acc, _, handler) {
-      set.union(acc, handler.observed_attributes)
-    })
-  let attr_attrs =
-    list.fold(exts.1, set.new(), fn(acc, handler) {
-      set.union(acc, handler.observed_attributes)
-    })
-  set.union(node_attrs, attr_attrs)
+  exts.attributes
 }

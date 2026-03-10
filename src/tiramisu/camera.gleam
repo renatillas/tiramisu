@@ -9,26 +9,25 @@ import lustre/attribute.{type Attribute}
 import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension.{type Context, Context}
+import tiramisu/dev/loop
 import tiramisu/dev/registry
-import tiramisu/dev/render_loop
 import tiramisu/internal/node
 import vec/vec2
 
 pub const tag = "tiramisu-camera"
 
 pub fn extension() {
-  let observed_attributes =
-    set.from_list([
-      "active",
-      "type",
-      "fov",
-      "near",
-      "far",
-      "left",
-      "right",
-      "top",
-      "bottom",
-    ])
+  let observed_attributes = [
+    "active",
+    "type",
+    "fov",
+    "near",
+    "far",
+    "left",
+    "right",
+    "top",
+    "bottom",
+  ]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
@@ -122,7 +121,7 @@ fn create(
   let object = savoiardi.camera_to_object3d(camera)
   let active = node.get_bool(attributes, "active")
   case active {
-    True -> render_loop.set_active_camera(ctx.loop, camera)
+    True -> loop.set_active_camera(ctx.loop, camera)
     False -> Nil
   }
   let registry = registry.add(ctx.registry, id, object:, parent_id:, tag:)
@@ -252,10 +251,10 @@ fn conditionally_set_active(
   case has_changed, active {
     False, _ -> Nil
     _, True -> {
-      render_loop.clear_active_camera(context.loop)
-      render_loop.set_active_camera(context.loop, camera)
+      loop.clear_active_camera(context.loop)
+      loop.set_active_camera(context.loop, camera)
     }
-    _, False -> render_loop.clear_active_camera(context.loop)
+    _, False -> loop.clear_active_camera(context.loop)
   }
 }
 

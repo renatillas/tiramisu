@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
@@ -17,15 +18,6 @@ import tiramisu/dev/registry
 
 import vec/vec2
 import vec/vec3
-
-@internal
-pub const tag: String = "tiramisu-primitive"
-
-pub fn extension() {
-  let observed_attributes = set.from_list(["geometry", "hidden"])
-  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
-  |> extension.NodeExtension
-}
 
 pub fn box(shape: vec3.Vec3(Float)) -> Attribute(msg) {
   attribute.attribute(
@@ -113,6 +105,29 @@ pub fn torus(
       <> ","
       <> int.to_string(tubular_segments),
   )
+}
+
+pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("cast-shadow", "")
+    False -> attribute.property("cast-shadow", json.bool(False))
+  }
+}
+
+pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
+  case bool {
+    True -> attribute.attribute("receive-shadow", "")
+    False -> attribute.property("receive-shadow", json.bool(False))
+  }
+}
+
+@internal
+pub const tag: String = "tiramisu-primitive"
+
+pub fn extension() {
+  let observed_attributes = ["geometry", "hidden"]
+  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
+  |> extension.NodeExtension
 }
 
 fn create(

@@ -9,6 +9,7 @@ import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/time/duration
+import gleam/time/timestamp
 import lustre
 import lustre/attribute.{class}
 import lustre/effect.{type Effect}
@@ -18,6 +19,7 @@ import tiramisu
 import tiramisu/camera
 import tiramisu/light
 import tiramisu/material
+import tiramisu/mesh
 import tiramisu/primitive
 import tiramisu/scene
 import tiramisu/tick.{type TickContext}
@@ -129,9 +131,9 @@ fn view(m: Model) {
         tiramisu.mesh(
           "soldier",
           [
+            mesh.cast_shadow(True),
             attribute.src(model_url),
             transform.rotation(vec3.Vec3(0.0, m.rotation, 0.0)),
-            material.cast_shadow(True),
             event.on("tiramisu:model-loaded", {
               use id <- decode.subfield(["detail", "id"], decode.string)
               decode.success(ModelLoaded(id))

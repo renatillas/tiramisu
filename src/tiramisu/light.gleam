@@ -17,18 +17,17 @@ import tiramisu/internal/node
 pub const tag = "tiramisu-light"
 
 pub fn extension() {
-  let observed_attributes =
-    set.from_list([
-      "type",
-      "color",
-      "intensity",
-      "cast-shadow",
-      "distance",
-      "angle",
-      "penumbra",
-      "sky",
-      "ground",
-    ])
+  let observed_attributes = [
+    "type",
+    "color",
+    "intensity",
+    "cast-shadow",
+    "distance",
+    "angle",
+    "penumbra",
+    "sky",
+    "ground",
+  ]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }

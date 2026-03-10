@@ -20,7 +20,7 @@ import tiramisu/internal/node
 pub const tag: String = "tiramisu-mesh"
 
 pub fn extension() {
-  let observed_attributes = set.from_list(["src", "hidden"])
+  let observed_attributes = ["src", "hidden"]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }

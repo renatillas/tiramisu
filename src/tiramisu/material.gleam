@@ -135,13 +135,13 @@ pub fn wireframe(bool: Bool) -> Attribute(msg) {
 }
 
 fn observed_attributes() {
-  set.from_list([
+  [
     "type", "color", "metalness", "roughness", "opacity", "wireframe",
     "emissive", "emissive-intensity", "side", "color-map", "normal-map",
     "ambient-occlusion-map", "roughness-map", "metalness-map",
     "displacement-map", "displacement-scale", "displacement-bias", "shininess",
     "alpha-test", "transparent",
-  ])
+  ]
 }
 
 /// Attribute extension that handles material updates for all tiramisu mesh nodes.
@@ -178,7 +178,10 @@ pub fn extension() -> extension.Extension {
         option.Some(obj) ->
           // Only act when at least one material attribute changed.
           case
-            set.intersection(changed_attributes, observed_attributes())
+            set.intersection(
+              changed_attributes,
+              set.from_list(observed_attributes()),
+            )
             |> set.is_empty
           {
             True -> Nil

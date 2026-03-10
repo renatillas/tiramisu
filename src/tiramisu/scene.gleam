@@ -6,8 +6,8 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/set
 import gleam/string
+import gleam/time/timestamp
 import vec/vec2
 
 import lustre
@@ -18,8 +18,8 @@ import lustre/element.{type Element}
 import lustre/element/html
 
 import tiramisu/dev/extension
+import tiramisu/dev/loop.{type RenderLoop}
 import tiramisu/dev/registry.{type Registry}
-import tiramisu/dev/render_loop.{type RenderLoop}
 import tiramisu/internal/dom
 import tiramisu/internal/scene
 import tiramisu/internal/scene_apply
@@ -71,16 +71,13 @@ type Msg {
   DomMutated
   /// Async registry mutation (model loading, etc.) — always applied to latest registry
   PatchModifiedRegistry(fn(Registry) -> Registry)
-  /// Width attribute changed
   WidthChanged(Int)
-  /// Height attribute changed
   HeightChanged(Int)
-  /// Background attribute changed
   BackgroundChanged(String)
-  /// Antialias attribute changed
-  AntialiasChanged(Bool)
-  /// Alpha attribute changed
-  AlphaChanged(Bool)
+  AntialiasSet(Bool)
+  AntialiasToggled
+  AlphaSet(Bool)
+  AlphaToggled
 }
 
 // COMPONENT -------------------------------------------------------------------
@@ -96,27 +93,27 @@ pub fn register(
   let extensions = extension.from_list(extensions)
 
   let app =
-    lustre.component(init: fn(_) { init(extensions) }, update:, view:, options: [
+    lustre.component(init: init(extensions, _), update:, view:, options: [
       component.on_attribute_change("width", fn(v) {
-        case int.parse(v) {
-          Ok(n) -> Ok(WidthChanged(n))
-          Error(_) -> Error(Nil)
-        }
+        v |> int.parse |> result.map(WidthChanged)
       }),
       component.on_attribute_change("height", fn(v) {
-        case int.parse(v) {
-          Ok(n) -> Ok(HeightChanged(n))
-          Error(_) -> Error(Nil)
-        }
+        v |> int.parse |> result.map(HeightChanged)
       }),
       component.on_attribute_change("background", fn(v) {
         Ok(BackgroundChanged(v))
       }),
-      component.on_attribute_change("antialias", fn(v) {
-        v |> parse_bool |> result.map(AntialiasChanged)
+      component.on_attribute_change("antialias", fn(value) {
+        case value {
+          "" -> Ok(AntialiasToggled)
+          _ -> Ok(AntialiasSet(True))
+        }
       }),
-      component.on_attribute_change("alpha", fn(v) {
-        v |> parse_bool |> result.map(AlphaChanged)
+      component.on_attribute_change("alpha", fn(value) {
+        case value {
+          "" -> Ok(AlphaToggled)
+          _ -> Ok(AlphaSet(True))
+        }
       }),
     ])
 
@@ -148,7 +145,7 @@ pub fn alpha(enabled: Bool) -> Attribute(msg) {
 
 // INIT ------------------------------------------------------------------------
 
-fn init(exts: extension.Extensions) -> #(Model, Effect(Msg)) {
+fn init(exts: extension.Extensions, _flags: Nil) -> #(Model, Effect(Msg)) {
   let model =
     Model(
       registry: None,
@@ -191,11 +188,11 @@ fn do_init(
     dom.append_canvas_to_container(root, canvas)
 
     let registry = registry.new(gleam_scene, scene_id, renderer)
-    let render_loop = render_loop.start(gleam_scene, renderer, scene_id)
+    let render_loop = loop.start(gleam_scene, renderer, scene_id)
 
     // Set up MutationObserver with all extension-observed attributes
-    let observed_attrs = extension.all_observed_attributes(extensions)
-    dom.setup_mutation_observer(host, observed_attrs |> set.to_list, fn() {
+    let observed_attrs = extensions.observed_attributes
+    dom.setup_mutation_observer(host, observed_attrs, fn() {
       dispatch(DomMutated)
     })
 
@@ -316,12 +313,20 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       }
     }
 
-    AntialiasChanged(aa) -> {
+    AntialiasSet(aa) -> {
+      // We do nothing after initialization with the antialias, :(
       #(Model(..model, antialias: aa), effect.none())
     }
+    AntialiasToggled -> {
+      // We do nothing after initialization with the antialias, :(
+      #(Model(..model, antialias: !model.antialias), effect.none())
+    }
 
-    AlphaChanged(a) -> {
+    AlphaSet(a) -> {
       #(Model(..model, alpha: a), effect.none())
+    }
+    AlphaToggled -> {
+      #(Model(..model, alpha: !model.alpha), effect.none())
     }
   }
 }
@@ -395,12 +400,5 @@ fn set_renderer_background(renderer: savoiardi.Renderer, color: String) -> Nil {
   case color {
     Ok(n) -> savoiardi.set_renderer_clear_color(renderer, n)
     Error(Nil) -> Nil
-  }
-}
-
-fn parse_bool(value: String) -> Result(Bool, Nil) {
-  case value {
-    "" | "true" -> Ok(True)
-    _ -> Error(Nil)
   }
 }

@@ -12,7 +12,7 @@ import tiramisu/internal/node
 pub const tag = "tiramisu-empty"
 
 pub fn extension() {
-  let observed_attributes = set.from_list(["hidden"])
+  let observed_attributes = ["hidden"]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
@@ -48,7 +48,6 @@ fn update(
       True -> set_hidden(group, attributes)
       False -> Nil
     }
-    Nil
   }
   ctx
 }

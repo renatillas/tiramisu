@@ -50,7 +50,7 @@ fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
 
 pub fn extension() -> extension.Extension {
   extension.AttributeExtension(extension.Attribute(
-    observed_attributes: set.from_list(["position", "rotation", "scale"]),
+    observed_attributes: ["position", "rotation", "scale"],
     on_create: fn(_context, _tag, _id, object, attributes) {
       case object {
         // On objects that dont register themselves upon creation, we do nothing (yet)
