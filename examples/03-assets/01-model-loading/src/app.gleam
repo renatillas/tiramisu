@@ -13,7 +13,7 @@ import tiramisu/renderer
 import tiramisu/transform
 import vec/vec3
 
-const model_url = "Lucy.stl"
+const model_url = "https://raw.githubusercontent.com/ginkogruen/lucy-openscad/main/lucy.stl"
 
 pub fn main() -> Nil {
   let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
