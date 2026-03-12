@@ -1,0 +1,17 @@
+name = "app"
+version = "1.0.0"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.64.0 and < 2.0.0"
+lustre = ">= 5.3.5 and < 6.0.0"
+tiramisu = { path = "../../.." }
+vec = ">= 3.2.1 and < 4.0.0"
+
+[tools.lustre.html]
+scripts = [
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
+]
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.3.4 and < 3.0.0"

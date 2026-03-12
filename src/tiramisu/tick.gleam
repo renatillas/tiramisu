@@ -1,6 +1,15 @@
-import gleam/time/duration.{type Duration}
-import gleam/time/timestamp.{type Timestamp}
-import lustre/effect.{type Effect}
+//// Frame tick events for Tiramisu scenes.
+////
+//// Ticks are emitted by the renderer loop and dispatched on the scene element.
+//// This keeps frame timing inside the normal Lustre attribute/event model rather
+//// than requiring a separate subscription API.
+
+import gleam/dynamic/decode
+import gleam/float
+import gleam/time/duration
+import gleam/time/timestamp
+import lustre/attribute.{type Attribute}
+import lustre/event
 
 // TYPES -----------------------------------------------------------------------
 
@@ -12,56 +21,36 @@ pub type TickContext {
   TickContext(
     /// Time elapsed since the last frame (typically ~16ms at 60fps).
     /// Use `duration.to_seconds()` to convert to a Float for animation math.
-    delta_time: Duration,
+    delta_time: duration.Duration,
     /// The timestamp when this frame was rendered.
     /// Useful for time-based effects or synchronized animations.
-    timestamp: Timestamp,
+    timestamp: timestamp.Timestamp,
   )
 }
 
-// SUBSCRIPTIONS ---------------------------------------------------------------
+// EVENTS ----------------------------------------------------------------------
 
-/// Subscribe to animation frame ticks.
-///
-/// The handler function will be called on each animation frame with timing
-/// information. Use the delta_time for smooth, frame-rate independent animation.
-///
-/// ## Parameters
-///
-/// - `scene_id`: The scene to subscribe to.
-/// - `handler`: A function that receives a `TickContext` and returns your message type.
-///
-/// ## Examples
-///
-/// ```gleam
-/// tick.subscribe("my-scene", Tick)
-/// ```
-///
-pub fn subscribe(
-  scene_id: String,
+/// Attach a per-frame tick handler to the current scene element.
+pub fn on_tick(
   to_msg: fn(TickContext) -> msg,
-) -> Effect(msg) {
-  effect.from(fn(dispatch) {
-    let _key = subscribe_to_ticks(scene_id, fn(ctx) { dispatch(to_msg(ctx)) })
-    Nil
+) -> Attribute(msg) {
+  event.on("tiramisu:tick", {
+    use tick_context <- decode.field("detail", tick_context_decoder())
+    decode.success(to_msg(tick_context))
   })
 }
 
-/// Unsubscribe from animation frame ticks.
-///
-/// Call this when your component unmounts or no longer needs tick updates.
-///
-pub fn unsubscribe(scene_id: String) -> Effect(msg) {
-  effect.from(fn(_dispatch) { unsubscribe_from_ticks(scene_id) })
+fn tick_context_decoder() -> decode.Decoder(TickContext) {
+  use delta_ms <- decode.field("delta_ms", decode.float)
+  use timestamp_ms <- decode.field("timestamp_ms", decode.int)
+
+  let seconds = timestamp_ms / 1000
+  let milliseconds = timestamp_ms - seconds * 1000
+  let nanoseconds = milliseconds * 1000000
+
+  TickContext(
+    delta_time: duration.milliseconds(float.round(delta_ms)),
+    timestamp: timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
+  )
+  |> decode.success
 }
-
-// FFI -------------------------------------------------------------------------
-
-@external(javascript, "./tick.ffi.mjs", "subscribeToTicks")
-fn subscribe_to_ticks(
-  scene_id: String,
-  handler: fn(TickContext) -> Nil,
-) -> String
-
-@external(javascript, "./tick.ffi.mjs", "unsubscribeFromTicks")
-fn unsubscribe_from_ticks(scene_id: String) -> Nil

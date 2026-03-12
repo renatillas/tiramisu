@@ -1,0 +1,39 @@
+# TODO
+
+- [x] Introduce internal `element` and `web_component` modules to separate low-level DOM primitives from web-component lifecycle helpers
+- [x] Introduce internal renderer-host module so renderer creation, resizing, background handling, and host bootstrapping are not owned directly by `scene.gleam`
+- [x] Move scene graph parsing/diffing/patching into internal scene graph code instead of keeping it embedded inside `scene.gleam`
+- [x] Split the current `tiramisu/scene.gleam` into clearer internal responsibilities:
+  - renderer host runtime
+  - scene graph runtime
+  - DOM observation / reconciliation
+- [x] Make the public API explicit:
+  - `tiramisu.renderer(...)` is the renderer host
+  - `tiramisu.scene(...)` is the structural scene root
+- [x] Move renderer host bootstrapping out of the scene runtime into `internal/renderer_host`
+- [x] Replace the global tick subscription API with `tiramisu.on_tick(...)` on the scene element
+- [x] Remove temporary renderer attribute compatibility from `tiramisu/scene.gleam`
+- [x] Move DOM FFI responsibilities into `internal/element.gleam` and `internal/element.ffi.mjs`
+- [x] Remove `internal/dom.gleam` and `internal/dom.ffi.mjs`
+- [x] Slim `render_loop.ffi.mjs` so tick event dispatch happens in Gleam/runtime code rather than inside the FFI loop
+- [ ] Finish migrating example apps to the explicit `renderer -> scene` shape
+  - [x] `examples/basic_scene`
+  - [x] `examples/model_loading`
+  - [x] `examples/interactive_scene`
+  - [x] `examples/multi_renderer`
+  - [x] `examples/physics_demo`
+  - [x] `example-games/snake2D`
+- [x] Make the internal naming consistent with responsibilities:
+  - scene graph
+  - scene runtime
+  - renderer host
+  - DOM element helpers
+  - web component helpers
+- [x] Reduce direct dependence on the old raw DOM module by routing code through `internal/element`
+- [x] Move registry ownership into `internal/registry` now that it is runtime state rather than developer-facing API
+- [x] Re-evaluate whether mutation observation belongs to `scene_runtime` or a separate reconciliation module
+  - Decision: keep it in `scene_runtime`, because it is part of scene subtree orchestration rather than a reusable pure reconciliation domain
+- [x] Add architecture notes explaining:
+  - current public API
+  - internal runtime flow
+  - separation between renderer concerns and scene concerns

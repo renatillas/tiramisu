@@ -1,30 +1,71 @@
+//// Asset-backed mesh node attributes.
+////
+//// Mesh nodes represent externally loaded assets such as GLTF, GLB, OBJ, FBX,
+//// and STL files. Loading is asynchronous and integrated into the scene
+//// runtime, so the node can appear in the view immediately and resolve later.
+
 import gleam/dict.{type Dict}
+import gleam/dynamic/decode
 import gleam/function
 import gleam/javascript/promise
 import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
-import gleam/set.{type Set}
 import gleam/string
 import lustre/attribute.{type Attribute}
+import lustre/event
 
 import savoiardi.{type Object3D}
 
-import tiramisu/dev/extension.{type Context}
-import tiramisu/dev/registry
-import tiramisu/internal/dom
+import tiramisu/dev/extension
+import tiramisu/dev/runtime
+import tiramisu/internal/element
 import tiramisu/internal/node
 
+/// The custom element tag used for asset-backed meshes.
 @internal
 pub const tag: String = "tiramisu-mesh"
 
-pub fn extension() {
+/// Hide or show the mesh object.
+///
+/// This controls Three.js visibility for the node rather than DOM layout.
+pub const hidden = attribute.hidden
+
+/// Set the asset URL to load for this mesh.
+///
+/// Tiramisu resolves supported formats such as GLTF, GLB, OBJ, FBX, and STL
+/// through this attribute.
+pub const src = attribute.src
+
+/// Internal node extension for mesh elements.
+pub fn extension() -> extension.Extension {
   let observed_attributes = ["src", "hidden"]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
 
+/// Listen for successful model loading on this mesh.
+///
+/// The handler receives the mesh node id from the event detail.
+pub fn on_model_load(to_msg) {
+  event.on("tiramisu:model-loaded", {
+    use id <- decode.subfield(["detail", "id"], decode.string)
+    decode.success(to_msg(id))
+  })
+}
+
+/// Listen for model loading failures on this mesh.
+///
+/// The handler receives the mesh node id from the event detail.
+pub fn on_model_error(to_msg) {
+  event.on("tiramisu:model-error", {
+    use id <- decode.subfield(["detail", "id"], decode.string)
+    decode.success(to_msg(id))
+  })
+}
+
+/// Center the loaded geometry around the origin when supported.
 pub fn center(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("center", "")
@@ -32,6 +73,7 @@ pub fn center(bool: Bool) -> Attribute(msg) {
   }
 }
 
+/// Enable or disable shadow casting for the mesh.
 pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("cast-shadow", "")
@@ -39,6 +81,7 @@ pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   }
 }
 
+/// Enable or disable shadow receiving for the mesh.
 pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("receive-shadow", "")
@@ -47,11 +90,11 @@ pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
 }
 
 fn create(
-  context: Context,
+  context: extension.Context,
   id: String,
   parent_id: String,
   attributes: Dict(String, String),
-) -> Context {
+) -> extension.Context {
   case dict.get(attributes, "src") {
     Ok(src) -> {
       context.on_async(
@@ -60,8 +103,8 @@ fn create(
           id:,
           src:,
           attributes:,
-          transformation: fn(registry, id, object) {
-            registry.add(registry, id, object:, parent_id:, tag:)
+          transformation: fn(scene_runtime, id, object) {
+            runtime.add_object(scene_runtime, id, object:, parent_id:, tag:)
           },
         ),
       )
@@ -72,53 +115,56 @@ fn create(
 }
 
 fn update(
-  ctx: Context,
+  ctx: extension.Context,
   id: String,
-  _parent_id: String,
+  parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
-  changed_attributes: Set(String),
-) -> Context {
-  // If loading models, registry.get_object fails a few frames until load completes
-  let _ = {
-    use object <- result.map(object |> option.to_result(Nil))
-    case
-      set.contains("src", in: changed_attributes),
-      dict.get(attributes, "src")
-    {
-      True, Ok(src) ->
-        ctx.on_async(register_model(
+  changed_attributes: extension.AttributeChanges,
+) -> extension.Context {
+  case object {
+    option.Some(object) -> {
+      case
+        reload_model_if_needed(
           ctx,
-          id:,
-          src:,
-          attributes:,
-          transformation: registry.replace,
-        ))
-      _, _ -> Nil
+          id,
+          parent_id,
+          object,
+          attributes,
+          changed_attributes,
+        )
+      {
+        Ok(next_context) -> next_context
+        Error(Nil) -> {
+          set_object_attributes(object, attributes)
+          ctx
+        }
+      }
     }
-    savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+
+    option.None -> ctx
   }
-  ctx
 }
 
 fn remove(
-  context: Context,
+  context: extension.Context,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> Context {
-  let registry = registry.remove(context.registry, id, parent_id, object)
-  extension.Context(..context, registry:)
+) -> extension.Context {
+  let next_runtime =
+    runtime.remove_object(context.runtime, id, parent_id, object)
+  extension.Context(..context, runtime: next_runtime)
 }
 
 fn register_model(
-  context: Context,
+  context: extension.Context,
   id id: String,
   src src: String,
   attributes attributes,
-  transformation transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> promise.Promise(fn(registry.Registry) -> registry.Registry) {
+  transformation transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
   case get_file_extension(src) {
     "gltf" | "glb" -> create_gltf(src, id, context, attributes, transformation)
     "fbx" -> create_fbx(src, id, context, attributes, transformation)
@@ -131,15 +177,15 @@ fn register_model(
 fn create_stl(
   src: String,
   id: String,
-  context: Context,
+  context: extension.Context,
   attributes,
-  registry_transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> promise.Promise(fn(registry.Registry) -> registry.Registry) {
+  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
   use result <- promise.await(savoiardi.load_stl(src))
   case result {
     Error(Nil) -> {
-      dom.dispatch_event(
+      element.dispatch_event(
         id,
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
@@ -153,7 +199,7 @@ fn create_stl(
       }
       let object = savoiardi.create_mesh(geometry)
       set_object_attributes(object, attributes)
-      update_registry(_, object, context, id, registry_transformation)
+      update_runtime(_, object, context, id, runtime_transformation)
       |> promise.resolve
     }
   }
@@ -162,20 +208,24 @@ fn create_stl(
 fn create_obj(
   src: String,
   id: String,
-  context: Context,
+  context: extension.Context,
   attributes,
-  registry_transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> promise.Promise(fn(registry.Registry) -> registry.Registry) {
+  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
   use result <- promise.map(savoiardi.load_obj(src))
   case result {
     Error(_) -> {
-      dom.dispatch_event(id, "tiramisu:model-error", id)
+      element.dispatch_event(
+        id,
+        "tiramisu:model-error",
+        json.object([#("id", json.string(id))]),
+      )
       function.identity
     }
     Ok(object) -> {
       set_object_attributes(object, attributes)
-      update_registry(_, object, context, id, registry_transformation)
+      update_runtime(_, object, context, id, runtime_transformation)
     }
   }
 }
@@ -183,15 +233,15 @@ fn create_obj(
 fn create_fbx(
   src: String,
   id: String,
-  context: Context,
+  context: extension.Context,
   attributes,
-  registry_transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> promise.Promise(fn(registry.Registry) -> registry.Registry) {
+  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
   use result <- promise.map(savoiardi.load_fbx(src))
   case result {
     Error(_) -> {
-      dom.dispatch_event(
+      element.dispatch_event(
         id,
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
@@ -201,7 +251,7 @@ fn create_fbx(
     Ok(data) -> {
       let object = savoiardi.get_fbx_scene(data)
       set_object_attributes(object, attributes)
-      update_registry(_, object, context, id, registry_transformation)
+      update_runtime(_, object, context, id, runtime_transformation)
     }
   }
 }
@@ -209,15 +259,15 @@ fn create_fbx(
 fn create_gltf(
   src: String,
   id: String,
-  context: Context,
+  context: extension.Context,
   attributes,
-  registry_transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> promise.Promise(fn(registry.Registry) -> registry.Registry) {
+  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
   use result <- promise.map(savoiardi.load_gltf(src))
   case result {
     Error(_) -> {
-      dom.dispatch_event(
+      element.dispatch_event(
         id,
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
@@ -227,7 +277,7 @@ fn create_gltf(
     Ok(data) -> {
       let object = savoiardi.get_gltf_scene(data)
       set_object_attributes(object, attributes)
-      update_registry(_, object, context, id, registry_transformation)
+      update_runtime(_, object, context, id, runtime_transformation)
     }
   }
 }
@@ -241,21 +291,57 @@ fn set_object_attributes(object: Object3D, attributes: Dict(String, String)) {
   )
 }
 
-fn update_registry(
-  registry: registry.Registry,
+fn update_runtime(
+  scene_runtime: runtime.Runtime,
   object: Object3D,
-  context: Context,
+  context: extension.Context,
   id: String,
-  registry_transformation: fn(registry.Registry, String, Object3D) ->
-    registry.Registry,
-) -> registry.Registry {
-  dom.dispatch_event(
+  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
+    runtime.Runtime,
+) -> runtime.Runtime {
+  element.dispatch_event(
     id,
     "tiramisu:model-loaded",
     json.object([#("id", json.string(id))]),
   )
   context.on_object_resolved(tag, id, object)
-  registry_transformation(registry, id, object)
+  runtime_transformation(scene_runtime, id, object)
+}
+
+fn reload_model_if_needed(
+  context: extension.Context,
+  id: String,
+  parent_id: String,
+  object: Object3D,
+  attributes: Dict(String, String),
+  changed_attributes: extension.AttributeChanges,
+) -> Result(extension.Context, Nil) {
+  case extension.change(changed_attributes, "src") {
+    Ok(extension.Removed) ->
+      extension.Context(
+        ..context,
+        runtime: runtime.remove_object(context.runtime, id, parent_id, object),
+      )
+      |> Ok
+
+    Ok(extension.Added(_)) | Ok(extension.Updated(_)) ->
+      case dict.get(attributes, "src") {
+        Ok(src) -> {
+          context.on_async(register_model(
+            context,
+            id:,
+            src:,
+            attributes:,
+            transformation: runtime.replace_object,
+          ))
+          Error(Nil)
+        }
+
+        Error(Nil) -> Error(Nil)
+      }
+
+    Error(Nil) -> Error(Nil)
+  }
 }
 
 fn get_file_extension(url: String) -> String {

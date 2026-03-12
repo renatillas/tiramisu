@@ -1,104 +1,82 @@
-# 🍰 Tiramisu
+# Tiramisu
 
-<img alt="Tiramisu-logo-03" src="https://github.com/user-attachments/assets/e4dff9c1-e132-4caa-82fc-37220990857b" />
+Tiramisu is a 3D renderer for Gleam built on top of Lustre web components and Three.js.
 
+## What it gives you
 
-**A type-safe 3D game engine for Gleam**
+- Declarative scene construction with `tiramisu.renderer` and `tiramisu.scene`
+- Scene nodes as web components: camera, primitive, mesh, light, and empty
+- A Lustre-friendly render loop through `tiramisu.on_tick`
+- Asset loading through `tiramisu.mesh` and `attribute.src`
+- Renderer backgrounds with solid colors, textures, panoramas, and cubemaps
 
-Tiramisu brings the power of functional programming and static type safety to game development, leveraging Three.js for professional-grade 3D rendering while maintaining Gleam's elegant, immutable design principles.
-
-[![Package Version](https://img.shields.io/hexpm/v/tiramisu)](https://hex.pm/packages/tiramisu)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/tiramisu/)
-
----
-
-## ✨ Features
-
-TODO
-
----
-
-## 🚀 Quick Start
-
-TODO
-
----
-
-## 🧀 Quick Project Setup with Mascarpone
-
-**The fastest way to start a new Tiramisu project:**
-
-```sh
-gleam add --dev mascarpone
-gleam run -m mascarpone
-```
-
-[Mascarpone](https://hexdocs.pm/mascarpone/) is an interactive CLI tool that scaffolds complete Tiramisu projects with:
-
-- 🎨 **Beautiful TUI** - Interactive project configuration
-- 🎮 **Multiple Templates** - Choose from 2D games, 3D games, or physics demos
-- 📦 **Automatic Setup** - Configured `gleam.toml`, dependencies, and CDN imports
-- 🖥️ **Lustre Integration** - Optional UI overlays for menus and HUDs
-- ⚡ **Working Examples** - Start with a functional game, not an empty file
-
-After creating your project, just run:
-
-```sh
-gleam run -m lustre/dev start
-```
-
-Then open http://localhost:1234 to see your game!
-
----
-
-## 📦 Manual Installation
-
-Alternatively, add Tiramisu to an existing Gleam project:
+## Install
 
 ```sh
 gleam add tiramisu
 ```
 
-### Configure your gleam.toml
-
-Add Three.js, Rapier, and styling configuration:
+Add a Three.js import map to `gleam.toml`:
 
 ```toml
 [tools.lustre.html]
 scripts = [
-  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\", \"@dimforge/rapier3d-compat\": \"https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/+esm\" } }" }
+  { type = "importmap", content = "{ \"imports\": { \"three\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js\", \"three/addons/\": \"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/\" } }" }
 ]
 ```
 
----
+## Minimal example
 
-## 🏗️ Core Concepts
+```gleam
+import lustre
+import lustre/attribute
+import tiramisu
+import tiramisu/camera
+import tiramisu/renderer
+import tiramisu/transform
+import vec/vec3
 
-TODO
+pub fn main() -> Nil {
+  let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
+  let assert Ok(_) = lustre.start(lustre.element(view()), "#app", Nil)
+  Nil
+}
 
-## 🛠️ Built With
+fn view() {
+  tiramisu.renderer(
+    "renderer",
+    [renderer.width(800), renderer.height(480), renderer.background_color(0x111827)],
+    [
+      tiramisu.scene("scene", [], [
+        tiramisu.camera(
+          "camera",
+          [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 6.0))],
+          [],
+        ),
+      ]),
+    ],
+  )
+}
+```
 
-- **[Gleam](https://gleam.run)** - Type-safe functional language
-- **[Three.js](https://threejs.org)** - 3D graphics library
-- **[Lustre](https://lustre.build)** - Elm-inspired web framework
+## Guide
 
----
+The best place to learn the API now is the incremental examples in `examples/`.
+Start with:
 
-## 🤝 Contributing
+1. `examples/01-basics/01-renderer-and-scene`
+2. `examples/01-basics/02-camera-primitive-transform`
+3. `examples/01-basics/03-lights-materials-hierarchy`
+4. `examples/02-effects/01-on-tick-animation`
+5. `examples/03-assets/01-model-loading`
+6. `examples/04-layout/01-multiple-renderers`
+7. `examples/05-server-components/01-basic-setup`
 
-Contributions are welcome! Whether it's bug reports, feature requests, or code contributions, please feel free to open an issue or pull request.
+See `examples/README.md` for the full walkthrough.
 
----
-
-## 📄 License
-
-MIT License - see [LICENSE.md](./LICENSE.md) for details.
-
----
 
 ## Development
 
 ```sh
-gleam run   # Run the project
-gleam test  # Run the tests
+gleam build --target javascript
 ```

@@ -5,15 +5,16 @@
 ////
 //// `Attribute` hooks into the lifecycle of any tiramisu-managed node.
 //// `Node` handles a custom HTML element tag with full lifecycle.
+////
+//// Most users do not need this module. It exists for extension authors that
+//// want to define custom nodes or cross-cutting attribute behaviour.
 
 import gleam/dict.{type Dict}
 import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option}
-import gleam/set.{type Set}
 import savoiardi.{type Object3D}
-import tiramisu/dev/loop.{type RenderLoop}
-import tiramisu/dev/registry.{type Registry}
+import tiramisu/dev/runtime.{type Runtime}
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
 
@@ -21,16 +22,25 @@ import tiramisu/dev/registry.{type Registry}
 /// Handlers receive the context, perform their work, and return an updated one.
 pub type Context {
   Context(
-    registry: Registry,
-    loop: RenderLoop,
+    runtime: Runtime,
     /// TODO: DOCS
-    on_async: fn(promise.Promise(fn(Registry) -> Registry)) -> Nil,
+    on_async: fn(promise.Promise(fn(Runtime) -> Runtime)) -> Nil,
     /// Called by async model loaders (mesh src=) after the model registers in
     /// the registry, so attribute extensions can react to the resolved object.
     /// Arguments: `(tag, id, object)`.
     on_object_resolved: fn(String, String, Object3D) -> Nil,
   )
 }
+
+pub type AttributeChange {
+  Added(String)
+  Removed
+  Updated(String)
+}
+
+/// Semantic attribute changes for one node update.
+pub type AttributeChanges =
+  Dict(String, AttributeChange)
 
 // NODE EXTENSION --------------------------------------------------------------
 
@@ -58,18 +68,18 @@ pub type Node {
     /// - `parent_id: String`
     /// - `object: Option(Object3D)`
     /// - `attributes: Dict(String, String)`
-    /// - `changed_attributes: Set(String)`
+    /// - `changed_attributes: AttributeChanges`
     update: fn(
       Context,
       String,
       String,
       Option(Object3D),
       Dict(String, String),
-      Set(String),
+      AttributeChanges,
     ) ->
       Context,
     /// Called when an element is removed from the scene.
-    /// The handler is responsible for calling `registry.remove_object`.
+    /// The handler is responsible for calling `runtime.remove_object`.
     /// - `context: Context`
     /// - `id: String`
     /// - `parent_id: String`
@@ -111,14 +121,14 @@ pub type Attribute {
     /// - `id`: the element's id attribute
     /// - `object`: `None` for async `src=` meshes until the model loads
     /// - `attrs`: all element attributes except id and transform
-    /// - `changed_attributes`: the set of attribute names that changed in this update
+    /// - `changed_attributes`: semantic attribute changes for this update
     on_update: fn(
       Context,
       String,
       String,
       Option(Object3D),
       Dict(String, String),
-      Set(String),
+      AttributeChanges,
     ) ->
       Nil,
     on_remove: fn(Context, String, String, Object3D) -> Nil,
@@ -147,6 +157,7 @@ pub type Extension {
 
 /// Compiled lookup structure. One per renderer instance, threaded through
 /// the apply pipeline as a pure immutable value. No global state.
+@internal
 pub type Extensions {
   Extensions(
     nodes: Dict(String, Node),
@@ -156,6 +167,7 @@ pub type Extensions {
 }
 
 /// Compile a list of extensions into fast lookup structures.
+@internal
 pub fn from_list(extensions: List(Extension)) -> Extensions {
   use Extensions(nodes, attributes, observed_attributes), ext <- list.fold(
     extensions,
@@ -178,11 +190,45 @@ pub fn from_list(extensions: List(Extension)) -> Extensions {
 }
 
 /// Get the `Node` handler for a given tag, if one is registered.
+@internal
 pub fn get_node(exts: Extensions, tag: String) -> Result(Node, Nil) {
   dict.get(exts.nodes, tag)
 }
 
 /// Get all registered attribute extension hooks.
+@internal
 pub fn attribute_hooks(exts: Extensions) -> List(Attribute) {
   exts.attributes
+}
+
+/// Check whether a given attribute changed in any way.
+pub fn has_change(changes: AttributeChanges, key: String) -> Bool {
+  case dict.get(changes, key) {
+    Ok(_) -> True
+    Error(Nil) -> False
+  }
+}
+
+/// Get the semantic change for a specific attribute.
+pub fn change(
+  changes: AttributeChanges,
+  key: String,
+) -> Result(AttributeChange, Nil) {
+  dict.get(changes, key)
+}
+
+/// Check whether an attribute was removed.
+pub fn was_removed(changes: AttributeChanges, key: String) -> Bool {
+  case dict.get(changes, key) {
+    Ok(Removed) -> True
+    _ -> False
+  }
+}
+
+/// Check whether any of the given attributes changed.
+pub fn has_any_change(
+  changes: AttributeChanges,
+  keys: List(String),
+) -> Bool {
+  list.any(keys, has_change(changes, _))
 }

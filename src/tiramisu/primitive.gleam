@@ -1,3 +1,8 @@
+//// Primitive mesh attributes.
+////
+//// Primitive nodes are the fastest way to put visible geometry in a scene
+//// without relying on external assets.
+
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
@@ -5,20 +10,25 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option}
 import gleam/result
-import gleam/set
 import gleam/string
+import tiramisu/dev/extension
 import tiramisu/internal/node
 
 import lustre/attribute.{type Attribute}
 
 import savoiardi.{type Object3D}
 
-import tiramisu/dev/extension.{type Context}
-import tiramisu/dev/registry
+import tiramisu/dev/runtime
 
 import vec/vec2
 import vec/vec3
 
+/// Hide or show the primitive object.
+///
+/// This controls Three.js visibility for the node rather than DOM layout.
+pub const hidden = attribute.hidden
+
+/// Create a box geometry.
 pub fn box(shape: vec3.Vec3(Float)) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
@@ -31,6 +41,7 @@ pub fn box(shape: vec3.Vec3(Float)) -> Attribute(msg) {
   )
 }
 
+/// Create a sphere geometry.
 pub fn sphere(
   radius radius: Float,
   segments segments: vec2.Vec2(Int),
@@ -46,6 +57,7 @@ pub fn sphere(
   )
 }
 
+/// Create a plane geometry.
 pub fn plane(size: vec2.Vec2(Float)) -> Attribute(msg) {
   attribute.attribute(
     "geometry",
@@ -53,6 +65,7 @@ pub fn plane(size: vec2.Vec2(Float)) -> Attribute(msg) {
   )
 }
 
+/// Create a cylinder geometry.
 pub fn cylinder(
   radius_top radius_top: Float,
   radius_bottom radius_bottom: Float,
@@ -72,6 +85,7 @@ pub fn cylinder(
   )
 }
 
+/// Create a cone geometry.
 pub fn cone(
   radius radius: Float,
   height height: Float,
@@ -88,6 +102,7 @@ pub fn cone(
   )
 }
 
+/// Create a torus geometry.
 pub fn torus(
   radius radius: Float,
   tube tube: Float,
@@ -107,6 +122,7 @@ pub fn torus(
   )
 }
 
+/// Enable or disable shadow casting for the primitive.
 pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("cast-shadow", "")
@@ -114,6 +130,7 @@ pub fn cast_shadow(bool: Bool) -> Attribute(msg) {
   }
 }
 
+/// Enable or disable shadow receiving for the primitive.
 pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
   case bool {
     True -> attribute.attribute("receive-shadow", "")
@@ -121,69 +138,113 @@ pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
   }
 }
 
+/// The custom element tag used for primitive nodes.
 @internal
 pub const tag: String = "tiramisu-primitive"
 
-pub fn extension() {
+/// Internal node extension for primitive elements.
+pub fn extension() -> extension.Extension {
   let observed_attributes = ["geometry", "hidden"]
   extension.Node(tag:, observed_attributes:, create:, update:, remove:)
   |> extension.NodeExtension
 }
 
 fn create(
-  context: Context,
+  context: extension.Context,
   id: String,
   parent_id: String,
   attributes: Dict(String, String),
-) -> Context {
-  let geometry = dict.get(attributes, "geometry") |> result.try(parse_geometry)
-  let result = case geometry {
+) -> extension.Context {
+  case dict.get(attributes, "geometry") |> result.try(parse_geometry) {
     Ok(geometry) -> {
       let object = savoiardi.create_mesh(geometry)
-      savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
-      let registry =
-        registry.add(context.registry, id, object:, parent_id:, tag:)
-      Ok(extension.Context(..context, registry:))
+      apply_attributes(object, attributes)
+      let next_runtime =
+        runtime.add_object(context.runtime, id, object:, parent_id:, tag:)
+      extension.Context(..context, runtime: next_runtime)
     }
-    Error(Nil) -> Error(Nil)
-  }
-  case result {
-    Ok(context) -> context
+
     Error(Nil) -> context
   }
 }
 
 fn update(
-  ctx: Context,
+  ctx: extension.Context,
   _id: String,
   _parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
-  changed_attributes: set.Set(String),
-) -> Context {
-  // If loading models, registry.get_object fails a few frames until load completes
-  let _ = {
-    use object <- result.map(object |> option.to_result(Nil))
-    case set.contains("geometry", in: changed_attributes) {
-      True -> {
-        let _ =
-          dict.get(attributes, "geometry")
-          |> result.try(parse_geometry)
-          |> result.map(savoiardi.set_object_geometry(object, _))
-        Nil
-      }
-      False -> Nil
+  changed_attributes: extension.AttributeChanges,
+) -> extension.Context {
+  case object {
+    option.Some(object) -> {
+      let _ = apply_geometry(object, attributes, changed_attributes)
+      let _ = apply_visibility(object, attributes, changed_attributes)
+      let _ = apply_shadows(object, attributes, changed_attributes)
+      ctx
     }
-    case set.contains("hidden", in: changed_attributes) {
-      True ->
-        savoiardi.set_object_visible(
-          object,
-          !node.get_bool(attributes, "hidden"),
-        )
-      False -> Nil
-    }
+
+    option.None -> ctx
   }
-  ctx
+}
+
+fn apply_attributes(object: Object3D, attributes: Dict(String, String)) -> Nil {
+  savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+  savoiardi.enable_shadows(
+    object,
+    cast_shadow: node.get_bool(attributes, "cast-shadow"),
+    receive_shadow: node.get_bool(attributes, "receive-shadow"),
+  )
+}
+
+fn apply_geometry(
+  object: Object3D,
+  attributes: Dict(String, String),
+  changed_attributes: extension.AttributeChanges,
+) -> Nil {
+  case extension.has_change(changed_attributes, "geometry") {
+    True -> {
+      let _ =
+        dict.get(attributes, "geometry")
+        |> result.try(parse_geometry)
+        |> result.map(savoiardi.set_object_geometry(object, _))
+      Nil
+    }
+
+    False -> Nil
+  }
+}
+
+fn apply_visibility(
+  object: Object3D,
+  attributes: Dict(String, String),
+  changed_attributes: extension.AttributeChanges,
+) -> Nil {
+  case extension.has_change(changed_attributes, "hidden") {
+    True ->
+      savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+    False -> Nil
+  }
+}
+
+fn apply_shadows(
+  object: Object3D,
+  attributes: Dict(String, String),
+  changed_attributes: extension.AttributeChanges,
+) -> Nil {
+  case
+    extension.has_change(changed_attributes, "cast-shadow")
+    || extension.has_change(changed_attributes, "receive-shadow")
+  {
+    True ->
+      savoiardi.enable_shadows(
+        object,
+        cast_shadow: node.get_bool(attributes, "cast-shadow"),
+        receive_shadow: node.get_bool(attributes, "receive-shadow"),
+      )
+
+    False -> Nil
+  }
 }
 
 fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
@@ -252,11 +313,12 @@ fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
 }
 
 fn remove(
-  context: Context,
+  context: extension.Context,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> Context {
-  let registry = registry.remove(context.registry, id, parent_id, object)
-  extension.Context(..context, registry:)
+) -> extension.Context {
+  let next_runtime =
+    runtime.remove_object(context.runtime, id, parent_id, object)
+  extension.Context(..context, runtime: next_runtime)
 }

@@ -3,7 +3,6 @@
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/string
 import gleam/time/duration
 import input
 import lustre
@@ -12,12 +11,10 @@ import lustre/effect.{type Effect}
 import lustre/element.{type Element}
 import tiramisu
 import tiramisu/camera
-import tiramisu/empty
 import tiramisu/light
 import tiramisu/material
-import tiramisu/mesh
 import tiramisu/primitive
-import tiramisu/scene
+import tiramisu/renderer
 import tiramisu/tick
 import tiramisu/transform
 import vec/vec3
@@ -100,7 +97,7 @@ pub fn main() -> Nil {
 // =============================================================================
 
 pub fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
-  #(init_model(), tick.subscribe("snake", Tick))
+  #(init_model(), effect.none())
 }
 
 fn init_model() -> Model {
@@ -379,59 +376,67 @@ fn update_tail_pos(head_pos: BoxData, tail_pos: List(BoxData)) -> List(BoxData) 
 // =============================================================================
 
 pub fn view(model: Model) -> Element(Msg) {
-  tiramisu.scene(
-    "snake",
+  tiramisu.renderer(
+    "snake-renderer",
     [
       // Canvas dimensions — match the canvas_width/canvas_height constants so
       // 1 world unit == 1 pixel in the orthographic camera below.
       attribute.attribute("width", "1920"),
       attribute.attribute("height", "1080"),
-      scene.background_color(0x000000),
-      // tabindex="0" allows the element to receive keyboard focus on click.
-      attribute.attribute("tabindex", "0"),
-      input.on_keydown(KeyDown),
-      input.on_keyup(KeyUp),
-      input.on_mousedown(MouseDown),
-      input.on_mouseup(MouseUp),
+      renderer.background_color(0x000000),
     ],
     [
-      tiramisu.camera(
-        "camera",
+      tiramisu.scene(
+        "snake",
         [
-          camera.kind(camera.Orthographic),
-          // Map world units 1:1 to pixels — left/right span the full canvas width,
-          // top/bottom span the full canvas height.
-          camera.left(-960.0),
-          camera.right(960.0),
-          camera.top(540.0),
-          camera.bottom(-540.0),
-          camera.near(0.1),
-          camera.far(100.0),
-          camera.active(True),
-          camera.transform(transform.at(vec3.Vec3(0.0, 0.0, 20.0))),
+          tiramisu.on_tick(Tick),
+          // tabindex="0" allows the element to receive keyboard focus on click.
+          attribute.attribute("tabindex", "0"),
+          input.on_keydown(KeyDown),
+          input.on_keyup(KeyUp),
+          input.on_mousedown(MouseDown),
+          input.on_mouseup(MouseUp),
         ],
-        [],
-      ),
-      tiramisu.light(
-        "ambient",
         [
-          light.kind(light.Ambient),
-          light.color(0xffffff),
-          light.intensity(1.0),
+          tiramisu.camera(
+            "camera",
+            [
+              camera.kind(camera.Orthographic),
+              // Map world units 1:1 to pixels — left/right span the full canvas width,
+              // top/bottom span the full canvas height.
+              camera.left(-960.0),
+              camera.right(960.0),
+              camera.top(540.0),
+              camera.bottom(-540.0),
+              camera.near(0.1),
+              camera.far(100.0),
+              camera.active(True),
+              transform.position(vec3.Vec3(0.0, 0.0, 20.0)),
+            ],
+            [],
+          ),
+          tiramisu.light(
+            "ambient",
+            [
+              light.kind(light.Ambient),
+              light.color(0xffffff),
+              light.intensity(1.0),
+            ],
+            [],
+          ),
+          tiramisu.empty("root-node", [], {
+            list.flatten([
+              create_static_view(),
+              case model.game_state {
+                Running -> create_running_game_view(model)
+                // GameOver and NotStarted: only the static borders remain visible.
+                // The player can restart by pressing Enter or clicking.
+                GameOver | NotStarted -> []
+              },
+            ])
+          }),
         ],
-        [],
       ),
-      tiramisu.empty("root-node", [empty.transform(transform.identity)], {
-        list.flatten([
-          create_static_view(),
-          case model.game_state {
-            Running -> create_running_game_view(model)
-            // GameOver and NotStarted: only the static borders remain visible.
-            // The player can restart by pressing Enter or clicking.
-            GameOver | NotStarted -> []
-          },
-        ])
-      }),
     ],
   )
 }
@@ -466,7 +471,7 @@ fn create_static_view() -> List(Element(Msg)) {
         border_color,
         border_metalness,
         border_roughness,
-        primitive.transform(transform.at(vec3.Vec3(0.0, upper_border(), 0.0))),
+        transform.position(vec3.Vec3(0.0, upper_border(), 0.0)),
       ],
       [],
     ),
@@ -477,7 +482,7 @@ fn create_static_view() -> List(Element(Msg)) {
         border_color,
         border_metalness,
         border_roughness,
-        primitive.transform(transform.at(vec3.Vec3(0.0, down_border(), 0.0))),
+        transform.position(vec3.Vec3(0.0, down_border(), 0.0)),
       ],
       [],
     ),
@@ -488,7 +493,7 @@ fn create_static_view() -> List(Element(Msg)) {
         border_color,
         border_metalness,
         border_roughness,
-        primitive.transform(transform.at(vec3.Vec3(left_border(), 0.0, 0.0))),
+        transform.position(vec3.Vec3(left_border(), 0.0, 0.0)),
       ],
       [],
     ),
@@ -499,7 +504,7 @@ fn create_static_view() -> List(Element(Msg)) {
         border_color,
         border_metalness,
         border_roughness,
-        primitive.transform(transform.at(vec3.Vec3(right_border(), 0.0, 0.0))),
+        transform.position(vec3.Vec3(right_border(), 0.0, 0.0)),
       ],
       [],
     ),
@@ -515,7 +520,7 @@ fn create_running_game_view(model: Model) -> List(Element(Msg)) {
       [
         cube_geom,
         material.color(color_hex(SnakeHeadColor)),
-        primitive.transform(transform.at(head_position)),
+        transform.position(head_position),
       ],
       [],
     ),
@@ -524,9 +529,7 @@ fn create_running_game_view(model: Model) -> List(Element(Msg)) {
       [
         cube_geom,
         material.color(color_hex(BeuteColor)),
-        primitive.transform(
-          transform.at(vec3.Vec3(model.beute_pos.0, model.beute_pos.1, 0.0)),
-        ),
+        transform.position(vec3.Vec3(model.beute_pos.0, model.beute_pos.1, 0.0)),
       ],
       [],
     ),
@@ -548,7 +551,7 @@ fn create_tail_element(x: Float, y: Float, index: Int) -> Element(Msg) {
     [
       primitive.box(vec3.Vec3(box_width, box_width, 1.0)),
       material.color(color_hex(SnakeTailColor)),
-      primitive.transform(transform.at(vec3.Vec3(x, y, 0.0))),
+      transform.position(vec3.Vec3(x, y, 0.0)),
     ],
     [],
   )
