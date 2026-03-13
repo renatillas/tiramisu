@@ -4,6 +4,7 @@ import tiramisu/camera
 import tiramisu/material
 import tiramisu/primitive
 import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
@@ -19,10 +20,9 @@ fn view() {
     [
       renderer.width(800),
       renderer.height(480),
-      renderer.background_color(0x0f172a),
     ],
     [
-      tiramisu.scene("scene", [], [
+      tiramisu.scene("scene", [scene.background_color(0x0f172a)], [
         tiramisu.camera(
           "camera",
           [

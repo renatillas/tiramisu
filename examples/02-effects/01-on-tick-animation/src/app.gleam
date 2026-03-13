@@ -7,7 +7,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/primitive
 import tiramisu/renderer
-import tiramisu/tick
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
@@ -23,7 +23,7 @@ type Model {
 }
 
 type Msg {
-  Tick(tick.TickContext)
+  Tick(scene.Tick)
 }
 
 fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
@@ -45,10 +45,12 @@ fn view(model: Model) {
     [
       renderer.width(800),
       renderer.height(500),
-      renderer.background_color(0x020617),
     ],
     [
-      tiramisu.scene("scene", [tiramisu.on_tick(Tick)], [
+      tiramisu.scene(
+        "scene",
+        [scene.on_tick(Tick), scene.background_color(0x020617)],
+        [
         tiramisu.camera(
           "camera",
           [
@@ -74,7 +76,8 @@ fn view(model: Model) {
           ],
           [],
         ),
-      ]),
+        ],
+      ),
     ],
   )
 }

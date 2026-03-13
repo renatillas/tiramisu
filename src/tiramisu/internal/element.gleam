@@ -4,7 +4,6 @@ import gleam/int
 import gleam/javascript/array
 import gleam/json
 import gleam/option
-import gleam/result
 import savoiardi
 
 pub type HtmlElement
@@ -13,7 +12,6 @@ pub type RendererConfig {
   RendererConfig(
     width: option.Option(Int),
     height: option.Option(Int),
-    background: String,
     antialias: Bool,
     alpha: Bool,
   )
@@ -178,13 +176,12 @@ pub fn renderer_config(
       option.Some(_) -> parsed_height
       option.None -> option.Some(fallback_height)
     },
-    background: attribute(host, "background") |> result.unwrap("#000000"),
     antialias: case attribute(host, "antialias") {
-      Ok("false") -> False
-      _ -> True
+      Ok("") -> True
+      _ -> False
     },
     alpha: case attribute(host, "alpha") {
-      Ok("true") -> True
+      Ok("") -> True
       _ -> False
     },
   )

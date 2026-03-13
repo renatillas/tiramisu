@@ -16,7 +16,6 @@ import gleam/javascript/promise
 import gleam/json
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/string
 import lustre
 import lustre/attribute.{type Attribute}
 import lustre/component
@@ -44,8 +43,6 @@ type Model {
     width: Int,
     /// Canvas height
     height: Int,
-    /// Background color
-    background: String,
     /// Antialiasing enabled
     antialias: Bool,
     /// Transparent background
@@ -66,7 +63,6 @@ type Msg {
   RuntimePatched(fn(Runtime) -> Runtime)
   WidthChanged(Int)
   HeightChanged(Int)
-  BackgroundChanged(String)
   AntialiasSet(Bool)
   AntialiasToggled
   AlphaSet(Bool)
@@ -98,9 +94,6 @@ pub fn register(
       component.on_attribute_change("height", fn(v) {
         v |> int.parse |> result.map(HeightChanged)
       }),
-      component.on_attribute_change("background", fn(v) {
-        Ok(BackgroundChanged(v))
-      }),
       component.on_attribute_change("antialias", fn(value) {
         case value {
           "" -> Ok(AntialiasToggled)
@@ -119,47 +112,6 @@ pub fn register(
 }
 
 // ATTRIBUTES ------------------------------------------------------------------
-
-/// Set the background color for the renderer (as hex int).
-pub fn background_color(hex: Int) -> Attribute(msg) {
-  attribute.attribute("background", "#" <> int.to_base16(hex))
-}
-
-/// Clear any scene background.
-///
-/// This leaves the renderer background transparent when `alpha(True)` is set,
-/// or falls back to the renderer clear behaviour otherwise.
-pub fn clear_background() -> Attribute(msg) {
-  attribute.attribute("background", "none")
-}
-
-/// Set the background to a flat 2D texture.
-pub fn background_texture(url: String) -> Attribute(msg) {
-  attribute.attribute("background", "texture:" <> url)
-}
-
-/// Set the background to an equirectangular panorama.
-pub fn background_equirectangular(url: String) -> Attribute(msg) {
-  attribute.attribute("background", "equirectangular:" <> url)
-}
-
-/// Set the background to a cubemap skybox.
-///
-/// URLs must be provided in the Three.js cube texture order:
-/// `+X, -X, +Y, -Y, +Z, -Z`.
-pub fn background_cube(
-  positive_x px: String,
-  negative_x nx: String,
-  positive_y py: String,
-  negative_y ny: String,
-  positive_z pz: String,
-  negative_z nz: String,
-) -> Attribute(msg) {
-  attribute.attribute(
-    "background",
-    "cube:" <> string.join([px, nx, py, ny, pz, nz], with: "|"),
-  )
-}
 
 /// Enable or disable antialiasing on the renderer.
 pub fn antialias(enabled: Bool) -> Attribute(msg) {
@@ -185,7 +137,6 @@ fn init(exts: extension.Extensions, _flags: Nil) -> #(Model, effect.Effect(Msg))
       runtime: None,
       width: 1920,
       height: 1080,
-      background: "#000000",
       antialias: True,
       alpha: False,
       extensions: exts,
@@ -232,8 +183,6 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     WidthChanged(width) -> resize_width(model, width)
 
     HeightChanged(height) -> resize_height(model, height)
-
-    BackgroundChanged(background) -> set_background(model, background)
 
     AntialiasSet(aa) -> {
       #(Model(..model, antialias: aa), effect.none())
@@ -311,30 +260,6 @@ fn resize_effect(
   height: Int,
 ) -> effect.Effect(Msg) {
   effect.from(fn(_) { renderer_runtime.resize(renderer, width, height) })
-}
-
-fn set_background(
-  model: Model,
-  background: String,
-) -> #(Model, effect.Effect(Msg)) {
-  let next_model = Model(..model, background:)
-  case model.runtime {
-    Some(runtime) -> #(
-      next_model,
-      effect.from(fn(dispatch) {
-        let runtime =
-          scene.apply_runtime_transform(runtime, fn(rt) {
-            renderer_runtime.apply_background(rt, background, on_async(
-              _,
-              dispatch,
-            ))
-          })
-        dispatch(RuntimeReconciled(runtime))
-      }),
-    )
-
-    None -> #(next_model, effect.none())
-  }
 }
 
 fn tick(

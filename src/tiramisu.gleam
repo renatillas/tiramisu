@@ -53,7 +53,6 @@ import tiramisu/mesh
 import tiramisu/primitive
 import tiramisu/renderer
 import tiramisu/scene
-import tiramisu/tick
 
 /// Register Tiramisu's custom elements with Lustre.
 ///
@@ -93,7 +92,7 @@ pub fn scene(
   attributes: List(Attribute(msg)),
   children: List(Element(msg)),
 ) -> Element(msg) {
-  scene.scene(id, attributes, children)
+  element.element(scene.tag, [attribute.id(id), ..attributes], children)
 }
 
 /// Create a camera node.
@@ -151,13 +150,6 @@ pub fn empty(
   children: List(Element(msg)),
 ) -> Element(msg) {
   element.element(empty.tag, [attribute.id(id), ..attributes], children)
-}
-
-/// Attach a per-frame tick handler to the current scene.
-///
-/// This is the main way to drive animation from Lustre state.
-pub fn on_tick(handler: fn(tick.TickContext) -> msg) -> Attribute(msg) {
-  tick.on_tick(handler)
 }
 
 /// Get the built-in extensions shipped with Tiramisu.

@@ -6,6 +6,7 @@ import tiramisu/camera
 import tiramisu/material
 import tiramisu/primitive
 import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
@@ -40,10 +41,9 @@ fn scene_card(title: String, background: Int, color: Int, prefix: String) {
       [
         renderer.width(420),
         renderer.height(320),
-        renderer.background_color(background),
       ],
       [
-        tiramisu.scene(prefix <> "-scene", [], [
+        tiramisu.scene(prefix <> "-scene", [scene.background_color(background)], [
           tiramisu.camera(
             prefix <> "-camera",
             [

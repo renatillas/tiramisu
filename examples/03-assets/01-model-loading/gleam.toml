@@ -8,6 +8,7 @@ lustre = ">= 5.3.5 and < 6.0.0"
 tiramisu = { path = "../../.." }
 vec = ">= 3.2.1 and < 4.0.0"
 gleam_community_colour = ">= 2.0.4 and < 3.0.0"
+gleam_time = ">= 1.7.0 and < 2.0.0"
 
 [tools.lustre.html]
 scripts = [

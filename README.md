@@ -33,6 +33,7 @@ import lustre/attribute
 import tiramisu
 import tiramisu/camera
 import tiramisu/renderer
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
@@ -45,9 +46,9 @@ pub fn main() -> Nil {
 fn view() {
   tiramisu.renderer(
     "renderer",
-    [renderer.width(800), renderer.height(480), renderer.background_color(0x111827)],
+    [renderer.width(800), renderer.height(480)],
     [
-      tiramisu.scene("scene", [], [
+      tiramisu.scene("scene", [scene.background_color(0x111827)], [
         tiramisu.camera(
           "camera",
           [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 6.0))],

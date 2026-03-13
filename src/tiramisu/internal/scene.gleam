@@ -1,6 +1,8 @@
 import gleam/bool
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import gleam/float
+import gleam/int
 import gleam/javascript/promise.{type Promise}
 import gleam/list
 import gleam/option
@@ -60,9 +62,19 @@ pub fn initialize(
 ) -> Runtime {
   let #(scene_id, root) = find_root(host)
   let renderer_runtime =
-    renderer.initialize(shadow_root, host, scene_id, on_async, on_tick)
+    renderer.initialize(shadow_root, host, scene_id, on_tick)
 
-  element.observe_mutations(host, extensions.observed_attributes, on_dom_mutated)
+  element.observe_mutations(
+    host,
+    list.append(
+      public_scene.observed_attributes(),
+      extensions.observed_attributes,
+    ),
+    on_dom_mutated,
+  )
+
+  let renderer_runtime =
+    apply_scene_attributes(renderer_runtime, root, on_async)
 
   let initial_nodes = parse(root, extensions)
   let renderer_runtime =
@@ -90,8 +102,10 @@ pub fn reconcile(
 ) -> Runtime {
   let new_nodes = parse(runtime.root, runtime.extensions)
   let renderer_runtime =
+    apply_scene_attributes(runtime.renderer, runtime.root, on_async)
+  let renderer_runtime =
     reconcile_nodes(
-      runtime.renderer,
+      renderer_runtime,
       runtime.previous_nodes,
       new_nodes,
       runtime.scene_id,
@@ -162,8 +176,7 @@ pub fn apply(
   let context = patch_context(runtime, extensions, on_async)
   list.fold(patches, context, fn(context, patch) {
     apply_patch(context, patch, extensions)
-  })
-  .runtime
+  }).runtime
 }
 
 fn reconcile_nodes(
@@ -176,14 +189,241 @@ fn reconcile_nodes(
 ) -> renderer.Runtime {
   let patches = diff(previous_nodes, next_nodes, scene_id)
   let next_runtime =
-    apply(
-      renderer.runtime(renderer_runtime),
-      patches,
-      extensions,
-      on_async,
-    )
+    apply(renderer.runtime(renderer_runtime), patches, extensions, on_async)
 
   renderer.with_runtime(renderer_runtime, next_runtime)
+}
+
+type Background {
+  None
+  Color(Int)
+  Texture(String)
+  Equirectangular(String)
+  Cube(List(String))
+}
+
+type BackgroundColorSpace {
+  SRGB
+  LinearSRGB
+}
+
+type Fog {
+  NoFog
+  LinearFog(Int, Float, Float)
+  Exp2Fog(Int, Float)
+}
+
+fn apply_scene_attributes(
+  renderer_runtime: renderer.Runtime,
+  root: element.HtmlElement,
+  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
+) -> renderer.Runtime {
+  let background_color_space =
+    parse_background_color_space(
+      element.attribute(root, "background-color-space") |> result.unwrap("srgb"),
+    )
+  let runtime =
+    apply_background(
+      renderer.runtime(renderer_runtime),
+      element.attribute(root, "background") |> result.unwrap("000000"),
+      background_color_space,
+      on_async,
+    )
+    |> apply_fog(element.attribute(root, "fog") |> result.unwrap("none"))
+
+  renderer.with_runtime(renderer_runtime, runtime)
+}
+
+fn apply_background(
+  runtime: runtime.Runtime,
+  background: String,
+  background_color_space: BackgroundColorSpace,
+  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
+) -> runtime.Runtime {
+  case parse_background(background) {
+    None -> {
+      let _ = savoiardi.clear_scene_background(runtime.scene(runtime))
+      runtime
+    }
+
+    Color(color) -> {
+      let _ =
+        savoiardi.set_scene_background_color(runtime.scene(runtime), color)
+      runtime
+    }
+
+    Texture(url) -> {
+      on_async(
+        savoiardi.load_texture(url)
+        |> promise.map(
+          apply_loaded_texture(_, fn(scene, texture) {
+            savoiardi.set_texture_color_space(
+              texture,
+              to_savoiardi_color_space(background_color_space),
+            )
+            let _ = savoiardi.set_scene_background_texture(scene, texture)
+            Nil
+          }),
+        ),
+      )
+      runtime
+    }
+
+    Equirectangular(url) -> {
+      on_async(
+        savoiardi.load_equirectangular_texture(url)
+        |> promise.map(
+          apply_loaded_texture(_, fn(scene, texture) {
+            savoiardi.set_texture_color_space(
+              texture,
+              to_savoiardi_color_space(background_color_space),
+            )
+            let _ = savoiardi.set_scene_background_texture(scene, texture)
+            Nil
+          }),
+        ),
+      )
+      runtime
+    }
+
+    Cube(urls) -> {
+      on_async(
+        savoiardi.load_cube_texture(urls)
+        |> promise.map(fn(result) {
+          fn(runtime) {
+            case result {
+              Ok(texture) -> {
+                let _ =
+                  savoiardi.set_scene_background_cube_texture(
+                    runtime.scene(runtime),
+                    texture,
+                  )
+                runtime
+              }
+              Error(Nil) -> runtime
+            }
+          }
+        }),
+      )
+      runtime
+    }
+  }
+}
+
+fn apply_loaded_texture(
+  result: Result(savoiardi.Texture, Nil),
+  apply: fn(savoiardi.Scene, savoiardi.Texture) -> Nil,
+) -> fn(runtime.Runtime) -> runtime.Runtime {
+  fn(runtime) {
+    case result {
+      Ok(texture) -> {
+        apply(runtime.scene(runtime), texture)
+        runtime
+      }
+      Error(Nil) -> runtime
+    }
+  }
+}
+
+fn parse_background(background: String) -> Background {
+  case background {
+    "" | "none" -> None
+    _ ->
+      case string.starts_with(background, "texture:") {
+        True -> Texture(string.drop_start(from: background, up_to: 8))
+        False ->
+          case string.starts_with(background, "equirectangular:") {
+            True ->
+              Equirectangular(string.drop_start(from: background, up_to: 16))
+
+            False ->
+              case string.starts_with(background, "cube:") {
+                True ->
+                  parse_cube_background(string.drop_start(
+                    from: background,
+                    up_to: 5,
+                  ))
+
+                False ->
+                  case
+                    background
+                    |> int.base_parse(16)
+                  {
+                    Ok(color) -> Color(color)
+                    Error(Nil) -> None
+                  }
+              }
+          }
+      }
+  }
+}
+
+fn parse_cube_background(encoded: String) -> Background {
+  let urls = string.split(encoded, "|")
+  case list.length(urls) == 6 {
+    True -> Cube(urls)
+    False -> None
+  }
+}
+
+fn parse_background_color_space(encoded: String) -> BackgroundColorSpace {
+  case string.lowercase(encoded) {
+    "linear-srgb" -> LinearSRGB
+    _ -> SRGB
+  }
+}
+
+fn to_savoiardi_color_space(space: BackgroundColorSpace) -> savoiardi.ColorSpace {
+  case space {
+    SRGB -> savoiardi.SRGBColorSpace
+    LinearSRGB -> savoiardi.LinearSRGBColorSpace
+  }
+}
+
+fn apply_fog(runtime: runtime.Runtime, fog: String) -> runtime.Runtime {
+  case parse_fog(fog) {
+    NoFog -> {
+      let _ = savoiardi.clear_scene_fog(runtime.scene(runtime))
+      runtime
+    }
+
+    LinearFog(color, near, far) -> {
+      let _ = savoiardi.set_scene_fog(runtime.scene(runtime), color, near, far)
+      runtime
+    }
+
+    Exp2Fog(color, density) -> {
+      let _ =
+        savoiardi.set_scene_fog_exp2(runtime.scene(runtime), color, density)
+      runtime
+    }
+  }
+}
+
+fn parse_fog(fog: String) -> Fog {
+  case fog {
+    "" | "none" -> NoFog
+    _ -> {
+      let parts = string.split(fog, "|")
+      case parts {
+        ["linear:" <> color, near, far] -> {
+          case int.base_parse(color, 16), float.parse(near), float.parse(far) {
+            Ok(color), Ok(near), Ok(far) -> LinearFog(color, near, far)
+            _, _, _ -> NoFog
+          }
+        }
+
+        ["exp2:" <> color, density] -> {
+          case int.base_parse(color, 16), float.parse(density) {
+            Ok(color), Ok(density) -> Exp2Fog(color, density)
+            _, _ -> NoFog
+          }
+        }
+
+        _ -> NoFog
+      }
+    }
+  }
 }
 
 fn patch_context(
@@ -192,11 +432,9 @@ fn patch_context(
   on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
 ) -> extension.Context {
   let callback_context =
-    extension.Context(
-      runtime:,
-      on_async:,
-      on_object_resolved: fn(_, _, _) { Nil },
-    )
+    extension.Context(runtime:, on_async:, on_object_resolved: fn(_, _, _) {
+      Nil
+    })
 
   extension.Context(
     runtime:,
@@ -449,7 +687,8 @@ fn apply_patch(
     }
 
     Reparent(id:, new_parent_id:) -> {
-      let next_runtime = runtime.reparent_object(context.runtime, id, new_parent_id)
+      let next_runtime =
+        runtime.reparent_object(context.runtime, id, new_parent_id)
       extension.Context(..context, runtime: next_runtime)
     }
   }
@@ -478,14 +717,7 @@ fn notify_update(
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
   list.each(extension.attribute_hooks(extensions), fn(hook) {
-    hook.on_update(
-      context,
-      tag,
-      id,
-      object,
-      attributes,
-      changed_attributes,
-    )
+    hook.on_update(context, tag, id, object, attributes, changed_attributes)
   })
 }
 
@@ -514,10 +746,7 @@ fn notify_object_resolved(
   })
 }
 
-fn find_object(
-  runtime: runtime.Runtime,
-  id: String,
-) -> option.Option(Object3D) {
+fn find_object(runtime: runtime.Runtime, id: String) -> option.Option(Object3D) {
   runtime.object(runtime, id)
   |> option.from_result
 }
