@@ -13,10 +13,37 @@ import gleam/dict.{type Dict}
 import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option}
-import savoiardi.{type Object3D}
+import savoiardi.{type CubeTexture, type Object3D, type Texture}
 import tiramisu/dev/runtime.{type Runtime}
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
+
+pub type AsyncEffect {
+  NoOp
+  RegisterObject(id: String, parent_id: String, tag: String, object: Object3D)
+  ReplaceObject(id: String, object: Object3D)
+  SetBackgroundTexture(texture: Texture)
+  SetBackgroundCubeTexture(texture: CubeTexture)
+}
+
+pub type AsyncScope {
+  SceneScope
+  NodeScope(String)
+  CustomScope(String)
+}
+
+pub opaque type AsyncKey {
+  AsyncKey(String)
+}
+
+pub fn async_key(value: String) -> AsyncKey {
+  AsyncKey(value)
+}
+
+pub fn async_key_to_string(key: AsyncKey) -> String {
+  let AsyncKey(value) = key
+  value
+}
 
 /// Context passed to all node extension handlers.
 /// Handlers receive the context, perform their work, and return an updated one.
@@ -24,7 +51,8 @@ pub type Context {
   Context(
     runtime: Runtime,
     /// TODO: DOCS
-    on_async: fn(promise.Promise(fn(Runtime) -> Runtime)) -> Nil,
+    spawn: fn(AsyncScope, AsyncKey, promise.Promise(AsyncEffect)) ->
+      promise.Promise(Nil),
     /// Called by async model loaders (mesh src=) after the model registers in
     /// the registry, so attribute extensions can react to the resolved object.
     /// Arguments: `(tag, id, object)`.
@@ -114,7 +142,7 @@ pub type Attribute {
       Option(Object3D),
       Dict(String, String),
     ) ->
-      Nil,
+      promise.Promise(Nil),
     /// Fires when any tiramisu node's attributes or transform change.
     ///
     /// - `tag`: the element HTML tag
@@ -130,16 +158,18 @@ pub type Attribute {
       Dict(String, String),
       AttributeChanges,
     ) ->
-      Nil,
-    on_remove: fn(Context, String, String, Object3D) -> Nil,
+      promise.Promise(Nil),
+    on_remove: fn(Context, String, String, Object3D) -> promise.Promise(Nil),
     on_object_resolved: fn(
-      Context,
+      Runtime,
+      fn(AsyncScope, AsyncKey, promise.Promise(AsyncEffect)) ->
+        promise.Promise(Nil),
       String,
       String,
       Object3D,
       Dict(String, String),
     ) ->
-      Nil,
+      promise.Promise(Nil),
   )
 }
 
@@ -226,9 +256,6 @@ pub fn was_removed(changes: AttributeChanges, key: String) -> Bool {
 }
 
 /// Check whether any of the given attributes changed.
-pub fn has_any_change(
-  changes: AttributeChanges,
-  keys: List(String),
-) -> Bool {
+pub fn has_any_change(changes: AttributeChanges, keys: List(String)) -> Bool {
   list.any(keys, has_change(changes, _))
 }

@@ -18,7 +18,6 @@
 
 import gleam/dict.{type Dict}
 import gleam/float
-import gleam/function
 import gleam/int
 import gleam/javascript/promise
 import gleam/json
@@ -195,18 +194,21 @@ pub fn extension() -> extension.Extension {
     on_create: fn(context, _tag, id, object, attributes) {
       case object {
         // On objects that dont register themselves upon creation, we do nothing (yet)
-        option.None -> Nil
-        option.Some(object) -> apply_material(context, id, object, attributes)
+        option.None -> promise.resolve(Nil)
+        option.Some(object) ->
+          apply_material(context.spawn, id, object, attributes)
       }
     },
     on_update: fn(context, _tag, id, object, attrs, changed_attributes) {
       case object {
-        option.None -> Nil
+        option.None -> promise.resolve(Nil)
         option.Some(obj) ->
           // Only act when at least one material attribute changed.
-          case extension.has_any_change(changed_attributes, observed_attributes()) {
-            True -> replace_material(context, id, obj, attrs)
-            False -> Nil
+          case
+            extension.has_any_change(changed_attributes, observed_attributes())
+          {
+            True -> replace_material(context.spawn, id, obj, attrs)
+            False -> promise.resolve(Nil)
           }
       }
     },
@@ -214,48 +216,51 @@ pub fn extension() -> extension.Extension {
       object
       |> savoiardi.get_object_material
       |> savoiardi.dispose_material
+      |> promise.resolve
     },
     // Once the object has been resolved we can set the material
-    on_object_resolved: fn(context, _tag, id, object, attributes) {
-      apply_material(context, id, object, attributes)
+    on_object_resolved: fn(_runtime, on_async, _tag, id, object, attributes) {
+      apply_material(on_async, id, object, attributes)
     },
   ))
 }
 
 fn apply_material(
-  context: extension.Context,
+  on_async,
   id: String,
   object: savoiardi.Object3D,
   attributes: Dict(String, String),
-) -> Nil {
+) -> promise.Promise(Nil) {
   let material = parse_material(attributes)
   savoiardi.set_object_material(object, material)
-  load_material_textures(context, id, material, attributes)
+  load_material_textures(on_async, id, material, attributes)
 }
 
 fn replace_material(
-  context: extension.Context,
+  on_async,
   id: String,
   object: savoiardi.Object3D,
   attributes: Dict(String, String),
-) -> Nil {
+) -> promise.Promise(Nil) {
   object
   |> savoiardi.get_object_material
   |> savoiardi.dispose_material
 
-  apply_material(context, id, object, attributes)
+  apply_material(on_async, id, object, attributes)
 }
 
 fn load_material_textures(
-  context: extension.Context,
+  spawn,
   id: String,
   material: savoiardi.Material,
   attributes: Dict(String, String),
-) -> Nil {
-  context.on_async(
-    promise.await(
+) -> promise.Promise(Nil) {
+  spawn(
+    extension.NodeScope(id),
+    extension.async_key("material:textures"),
+    promise.map(
       promise.await_list(parse_apply_textures_async(id, material, attributes)),
-      fn(_) { promise.resolve(function.identity) },
+      fn(_) { extension.NoOp },
     ),
   )
 }

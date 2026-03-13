@@ -404,7 +404,7 @@ fn get_bottom(attributes: Dict(String, String)) -> Float {
 
 fn get_canvas_ratio(runtime: runtime.Runtime) -> Float {
   let vec2.Vec2(x: width, y: height) =
-    savoiardi.get_canvas_dimensions(runtime.renderer(runtime))
+    savoiardi.get_canvas_dimensions(runtime.threejs_renderer(runtime))
   case height {
     0.0 -> 16.0 /. 9.0
     _ -> width /. height

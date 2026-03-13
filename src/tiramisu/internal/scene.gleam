@@ -44,7 +44,7 @@ pub type Patch {
 
 pub type Runtime {
   Runtime(
-    renderer: renderer.Runtime,
+    runtime: runtime.Runtime,
     scene_id: String,
     root: element.HtmlElement,
     previous_nodes: List(Node),
@@ -57,9 +57,14 @@ pub fn initialize(
   host: element.HtmlElement,
   extensions: extension.Extensions,
   on_dom_mutated: fn() -> Nil,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
-  on_tick: fn(Float, Int) -> Nil,
-) -> Runtime {
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
+  on_tick: fn(Float) -> Nil,
+) -> promise.Promise(Runtime) {
   let #(scene_id, root) = find_root(host)
   let renderer_runtime =
     renderer.initialize(shadow_root, host, scene_id, on_tick)
@@ -73,22 +78,22 @@ pub fn initialize(
     on_dom_mutated,
   )
 
-  let renderer_runtime =
-    apply_scene_attributes(renderer_runtime, root, on_async)
+  let renderer_runtime = apply_scene_attributes(renderer_runtime, root, spawn)
 
   let initial_nodes = parse(root, extensions)
-  let renderer_runtime =
+  let runtime =
     reconcile_nodes(
       renderer_runtime,
       [],
       initial_nodes,
       scene_id,
       extensions,
-      on_async,
+      spawn,
     )
+  use runtime <- promise.map(runtime)
 
   Runtime(
-    renderer: renderer_runtime,
+    runtime:,
     scene_id:,
     root:,
     previous_nodes: initial_nodes,
@@ -97,47 +102,86 @@ pub fn initialize(
 }
 
 pub fn reconcile(
-  runtime: Runtime,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
-) -> Runtime {
-  let new_nodes = parse(runtime.root, runtime.extensions)
-  let renderer_runtime =
-    apply_scene_attributes(runtime.renderer, runtime.root, on_async)
-  let renderer_runtime =
+  rt: Runtime,
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
+) -> promise.Promise(Runtime) {
+  let new_nodes = parse(rt.root, rt.extensions)
+  let renderer_runtime = apply_scene_attributes(rt.runtime, rt.root, spawn)
+  let runtime =
     reconcile_nodes(
       renderer_runtime,
-      runtime.previous_nodes,
+      rt.previous_nodes,
       new_nodes,
-      runtime.scene_id,
-      runtime.extensions,
-      on_async,
+      rt.scene_id,
+      rt.extensions,
+      spawn,
     )
+  use runtime <- promise.map(runtime)
 
-  Runtime(..runtime, renderer: renderer_runtime, previous_nodes: new_nodes)
+  Runtime(..rt, runtime:, previous_nodes: new_nodes)
 }
 
-pub fn apply_runtime_transform(
-  runtime: Runtime,
-  transform: fn(runtime.Runtime) -> runtime.Runtime,
-) -> Runtime {
-  let renderer_runtime = renderer.apply_transform(runtime.renderer, transform)
-  Runtime(..runtime, renderer: renderer_runtime)
+pub fn apply_async_effect(rt: Runtime, effect: extension.AsyncEffect) -> Runtime {
+  case effect {
+    extension.NoOp -> rt
+
+    extension.RegisterObject(id:, parent_id:, tag:, object:) -> {
+      let runtime = runtime.add_object(rt.runtime, id, object, parent_id, tag)
+      Runtime(..rt, runtime:)
+    }
+
+    extension.ReplaceObject(id:, object:) -> {
+      let runtime = runtime.replace_object(rt.runtime, id, object)
+      Runtime(..rt, runtime:)
+    }
+
+    extension.SetBackgroundTexture(texture:) -> {
+      let _ =
+        savoiardi.set_scene_background_texture(
+          runtime.scene(rt.runtime),
+          texture,
+        )
+      rt
+    }
+
+    extension.SetBackgroundCubeTexture(texture:) -> {
+      let _ =
+        savoiardi.set_scene_background_cube_texture(
+          runtime.scene(rt.runtime),
+          texture,
+        )
+      rt
+    }
+  }
 }
 
-pub fn renderer(runtime: Runtime) -> savoiardi.Renderer {
-  renderer.renderer(runtime.renderer)
+pub fn has_scope(_rt: Runtime, scope: extension.AsyncScope) -> Bool {
+  case scope {
+    extension.SceneScope -> True
+    extension.NodeScope(id) ->
+      case element.find(id) {
+        Ok(_) -> True
+        Error(Nil) -> False
+      }
+    extension.CustomScope(_) -> True
+  }
 }
 
-pub fn root_scene(runtime: Runtime) -> savoiardi.Scene {
-  renderer.scene(runtime.renderer)
+pub fn renderer(rt: Runtime) -> savoiardi.Renderer {
+  rt.runtime |> runtime.threejs_renderer
 }
 
-pub fn active_camera(runtime: Runtime) -> Result(Camera, Nil) {
-  renderer.runtime(runtime.renderer) |> runtime.active_camera
+pub fn root_scene(rt: Runtime) -> savoiardi.Scene {
+  rt.runtime |> runtime.scene
 }
 
-pub fn host(runtime: Runtime) -> element.HtmlElement {
-  renderer.host(runtime.renderer)
+pub fn active_camera(rt: Runtime) -> Result(Camera, Nil) {
+  rt.runtime |> runtime.active_camera
 }
 
 pub fn dispatch_tick(
@@ -168,30 +212,37 @@ pub fn diff(
 }
 
 pub fn apply(
-  runtime: runtime.Runtime,
   patches: List(Patch),
+  starting_context,
   extensions: extension.Extensions,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
-) -> runtime.Runtime {
-  let context = patch_context(runtime, extensions, on_async)
-  list.fold(patches, context, fn(context, patch) {
-    apply_patch(context, patch, extensions)
-  }).runtime
+) -> promise.Promise(extension.Context) {
+  use context, patch <- list.fold(patches, promise.resolve(starting_context))
+  use context <- promise.await(context)
+  apply_patch(context, patch, extensions)
 }
 
 fn reconcile_nodes(
-  renderer_runtime: renderer.Runtime,
+  runtime: runtime.Runtime,
   previous_nodes: List(Node),
   next_nodes: List(Node),
   scene_id: String,
   extensions: extension.Extensions,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
-) -> renderer.Runtime {
-  let patches = diff(previous_nodes, next_nodes, scene_id)
-  let next_runtime =
-    apply(renderer.runtime(renderer_runtime), patches, extensions, on_async)
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
+) -> promise.Promise(runtime.Runtime) {
+  let starting_context = create_context(runtime, extensions, spawn)
 
-  renderer.with_runtime(renderer_runtime, next_runtime)
+  let final_context =
+    diff(previous_nodes, next_nodes, scene_id)
+    |> apply(starting_context, extensions)
+
+  use final_context <- promise.map(final_context)
+
+  final_context.runtime
 }
 
 type Background {
@@ -214,31 +265,41 @@ type Fog {
 }
 
 fn apply_scene_attributes(
-  renderer_runtime: renderer.Runtime,
+  runtime: runtime.Runtime,
   root: element.HtmlElement,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
-) -> renderer.Runtime {
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
+) -> runtime.Runtime {
   let background_color_space =
     parse_background_color_space(
       element.attribute(root, "background-color-space") |> result.unwrap("srgb"),
     )
   let runtime =
-    apply_background(
-      renderer.runtime(renderer_runtime),
+    runtime
+    |> apply_background(
       element.attribute(root, "background") |> result.unwrap("000000"),
       background_color_space,
-      on_async,
+      spawn,
     )
     |> apply_fog(element.attribute(root, "fog") |> result.unwrap("none"))
 
-  renderer.with_runtime(renderer_runtime, runtime)
+  runtime
 }
 
 fn apply_background(
   runtime: runtime.Runtime,
   background: String,
   background_color_space: BackgroundColorSpace,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
 ) -> runtime.Runtime {
   case parse_background(background) {
     None -> {
@@ -253,75 +314,75 @@ fn apply_background(
     }
 
     Texture(url) -> {
-      on_async(
-        savoiardi.load_texture(url)
-        |> promise.map(
-          apply_loaded_texture(_, fn(scene, texture) {
-            savoiardi.set_texture_color_space(
-              texture,
-              to_savoiardi_color_space(background_color_space),
-            )
-            let _ = savoiardi.set_scene_background_texture(scene, texture)
-            Nil
-          }),
-        ),
+      spawn(
+        extension.SceneScope,
+        extension.async_key("background"),
+        load_background_texture(url, background_color_space),
       )
       runtime
     }
 
     Equirectangular(url) -> {
-      on_async(
-        savoiardi.load_equirectangular_texture(url)
-        |> promise.map(
-          apply_loaded_texture(_, fn(scene, texture) {
-            savoiardi.set_texture_color_space(
-              texture,
-              to_savoiardi_color_space(background_color_space),
-            )
-            let _ = savoiardi.set_scene_background_texture(scene, texture)
-            Nil
-          }),
-        ),
+      spawn(
+        extension.SceneScope,
+        extension.async_key("background"),
+        load_equirectangular_background(url, background_color_space),
       )
       runtime
     }
 
     Cube(urls) -> {
-      on_async(
-        savoiardi.load_cube_texture(urls)
-        |> promise.map(fn(result) {
-          fn(runtime) {
-            case result {
-              Ok(texture) -> {
-                let _ =
-                  savoiardi.set_scene_background_cube_texture(
-                    runtime.scene(runtime),
-                    texture,
-                  )
-                runtime
-              }
-              Error(Nil) -> runtime
-            }
-          }
-        }),
+      spawn(
+        extension.SceneScope,
+        extension.async_key("background"),
+        load_cube_background(urls),
       )
       runtime
     }
   }
 }
 
-fn apply_loaded_texture(
-  result: Result(savoiardi.Texture, Nil),
-  apply: fn(savoiardi.Scene, savoiardi.Texture) -> Nil,
-) -> fn(runtime.Runtime) -> runtime.Runtime {
-  fn(runtime) {
-    case result {
-      Ok(texture) -> {
-        apply(runtime.scene(runtime), texture)
-        runtime
-      }
-      Error(Nil) -> runtime
+fn load_background_texture(
+  url: String,
+  background_color_space: BackgroundColorSpace,
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_texture(url))
+  case result {
+    Ok(texture) -> {
+      savoiardi.set_texture_color_space(
+        texture,
+        to_savoiardi_color_space(background_color_space),
+      )
+      promise.resolve(extension.SetBackgroundTexture(texture))
     }
+    Error(Nil) -> promise.resolve(extension.NoOp)
+  }
+}
+
+fn load_equirectangular_background(
+  url: String,
+  background_color_space: BackgroundColorSpace,
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_equirectangular_texture(url))
+  case result {
+    Ok(texture) -> {
+      savoiardi.set_texture_color_space(
+        texture,
+        to_savoiardi_color_space(background_color_space),
+      )
+      promise.resolve(extension.SetBackgroundTexture(texture))
+    }
+    Error(Nil) -> promise.resolve(extension.NoOp)
+  }
+}
+
+fn load_cube_background(
+  urls: List(String),
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_cube_texture(urls))
+  case result {
+    Ok(texture) -> promise.resolve(extension.SetBackgroundCubeTexture(texture))
+    Error(Nil) -> promise.resolve(extension.NoOp)
   }
 }
 
@@ -426,37 +487,42 @@ fn parse_fog(fog: String) -> Fog {
   }
 }
 
-fn patch_context(
+fn create_context(
   runtime: runtime.Runtime,
   extensions: extension.Extensions,
-  on_async: fn(Promise(fn(runtime.Runtime) -> runtime.Runtime)) -> Nil,
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    promise.Promise(Nil),
 ) -> extension.Context {
-  let callback_context =
-    extension.Context(runtime:, on_async:, on_object_resolved: fn(_, _, _) {
-      Nil
-    })
-
-  extension.Context(
-    runtime:,
-    on_async:,
-    on_object_resolved: fn(tag, id, object) {
-      case element.find(id) {
-        Ok(node) -> {
-          let attributes = element.attributes(node) |> dict.delete("id")
-          notify_object_resolved(
-            extensions,
-            callback_context,
-            tag,
-            id,
-            object,
-            attributes,
-          )
-        }
-
-        Error(Nil) -> Nil
+  extension.Context(runtime:, spawn:, on_object_resolved: fn(tag, id, object) {
+    case element.find(id) {
+      Ok(node) -> {
+        let attributes = element.attributes(node)
+        spawn(
+          extension.NodeScope(id),
+          extension.async_key("object-resolved"),
+          promise.map(
+            notify_object_resolved(
+              extensions,
+              runtime,
+              spawn,
+              tag,
+              id,
+              object,
+              attributes,
+            ),
+            fn(_) { extension.NoOp },
+          ),
+        )
+        Nil
       }
-    },
-  )
+
+      Error(Nil) -> Nil
+    }
+  })
 }
 
 fn find_root(host: element.HtmlElement) -> #(String, element.HtmlElement) {
@@ -628,18 +694,20 @@ fn apply_patch(
   context: extension.Context,
   patch: Patch,
   extensions: extension.Extensions,
-) -> extension.Context {
+) -> promise.Promise(extension.Context) {
   case patch {
     CreateNode(id:, parent_id:, tag:, attributes:) -> {
       case extension.get_node(extensions, tag) {
         Ok(handler) -> {
           let new_context = handler.create(context, id, parent_id, attributes)
           let object = find_object(new_context.runtime, id)
-          notify_create(extensions, context, tag, id, object, attributes)
+          let promise =
+            notify_create(extensions, context, tag, id, object, attributes)
+          use _ <- promise.map(promise)
           new_context
         }
 
-        Error(Nil) -> context
+        Error(Nil) -> promise.resolve(context)
       }
     }
 
@@ -656,40 +724,45 @@ fn apply_patch(
               attributes,
               changed_attributes,
             )
-          notify_update(
-            extensions,
-            context,
-            tag,
-            id,
-            object,
-            attributes,
-            changed_attributes,
-          )
-          new_context
+          let promise =
+            notify_update(
+              extensions,
+              context,
+              tag,
+              id,
+              object,
+              attributes,
+              changed_attributes,
+            )
+          use _ <- promise.await(promise)
+          promise.resolve(new_context)
         }
 
-        Error(Nil) -> context
+        Error(Nil) -> promise.resolve(context)
       }
     }
 
     Remove(id:) -> {
       case dict.get(runtime.entries(context.runtime), id) {
         Ok(runtime.ObjectEntry(parent_id:, tag:, object:)) -> {
-          notify_remove(extensions, context, id, parent_id, object)
+          let promise =
+            notify_remove(extensions, context, id, parent_id, object)
+          use _ <- promise.await(promise)
           case extension.get_node(extensions, tag) {
-            Ok(handler) -> handler.remove(context, id, parent_id, object)
-            Error(Nil) -> context
+            Ok(handler) ->
+              promise.resolve(handler.remove(context, id, parent_id, object))
+            Error(Nil) -> promise.resolve(context)
           }
         }
 
-        Error(Nil) -> context
+        Error(Nil) -> promise.resolve(context)
       }
     }
 
     Reparent(id:, new_parent_id:) -> {
       let next_runtime =
         runtime.reparent_object(context.runtime, id, new_parent_id)
-      extension.Context(..context, runtime: next_runtime)
+      promise.resolve(extension.Context(..context, runtime: next_runtime))
     }
   }
 }
@@ -701,10 +774,12 @@ fn notify_create(
   id: String,
   object: option.Option(Object3D),
   attributes: dict.Dict(String, String),
-) -> Nil {
-  list.each(extension.attribute_hooks(extensions), fn(hook) {
+) -> promise.Promise(Nil) {
+  list.map(extension.attribute_hooks(extensions), fn(hook) {
     hook.on_create(context, tag, id, object, attributes)
   })
+  |> promise.await_list
+  |> promise.map(fn(_) { Nil })
 }
 
 fn notify_update(
@@ -715,10 +790,12 @@ fn notify_update(
   object: option.Option(Object3D),
   attributes: dict.Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Nil {
-  list.each(extension.attribute_hooks(extensions), fn(hook) {
+) -> promise.Promise(Nil) {
+  list.map(extension.attribute_hooks(extensions), fn(hook) {
     hook.on_update(context, tag, id, object, attributes, changed_attributes)
   })
+  |> promise.await_list
+  |> promise.map(fn(_) { Nil })
 }
 
 fn notify_remove(
@@ -727,23 +804,33 @@ fn notify_remove(
   id: String,
   parent_id: String,
   object: Object3D,
-) -> Nil {
-  list.each(extension.attribute_hooks(extensions), fn(hook) {
+) -> promise.Promise(Nil) {
+  list.map(extension.attribute_hooks(extensions), fn(hook) {
     hook.on_remove(context, id, parent_id, object)
   })
+  |> promise.await_list
+  |> promise.map(fn(_) { Nil })
 }
 
 fn notify_object_resolved(
   extensions: extension.Extensions,
-  context: extension.Context,
+  runtime: runtime.Runtime,
+  spawn: fn(
+    extension.AsyncScope,
+    extension.AsyncKey,
+    Promise(extension.AsyncEffect),
+  ) ->
+    Promise(Nil),
   tag: String,
   id: String,
   object: Object3D,
   attributes: dict.Dict(String, String),
-) -> Nil {
-  list.each(extension.attribute_hooks(extensions), fn(hook) {
-    hook.on_object_resolved(context, tag, id, object, attributes)
+) -> promise.Promise(Nil) {
+  list.map(extension.attribute_hooks(extensions), fn(hook) {
+    hook.on_object_resolved(runtime, spawn, tag, id, object, attributes)
   })
+  |> promise.await_list
+  |> promise.map(fn(_) { Nil })
 }
 
 fn find_object(runtime: runtime.Runtime, id: String) -> option.Option(Object3D) {

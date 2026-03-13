@@ -5,6 +5,7 @@
 
 import gleam/dict
 import gleam/float
+import gleam/javascript/promise
 import gleam/list
 import gleam/option
 import gleam/result
@@ -12,7 +13,9 @@ import gleam/string
 import lustre/attribute
 import quaternion
 import savoiardi
-import tiramisu/dev/extension
+import tiramisu/dev/extension.{
+  type AttributeChanges, Attribute, AttributeExtension,
+}
 import tiramisu/internal/node
 import vec/vec3
 
@@ -58,7 +61,7 @@ fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
 
 /// Internal attribute extension that applies transforms to registered objects.
 pub fn extension() -> extension.Extension {
-  extension.AttributeExtension(extension.Attribute(
+  AttributeExtension(Attribute(
     observed_attributes: ["position", "rotation", "scale"],
     on_create: fn(_context, _tag, _id, object, attributes) {
       case object {
@@ -66,6 +69,7 @@ pub fn extension() -> extension.Extension {
         option.None -> Nil
         option.Some(object) -> apply_all(object, attributes)
       }
+      promise.resolve(Nil)
     },
     on_update: fn(_context, _tag, _id, object, attributes, changed_attributes) {
       case object {
@@ -74,11 +78,13 @@ pub fn extension() -> extension.Extension {
           apply_changed(object, attributes, changed_attributes)
         }
       }
+      promise.resolve(Nil)
     },
-    on_remove: fn(_context, _id, _parent_id, _object) { Nil },
+    on_remove: fn(_context, _id, _parent_id, _object) { promise.resolve(Nil) },
     // Once the object has been resolved we can set the material
-    on_object_resolved: fn(_context, _tag, _id, object, attributes) {
+    on_object_resolved: fn(_runtime, _on_async, _tag, _id, object, attributes) {
       apply_all(object, attributes)
+      promise.resolve(Nil)
     },
   ))
 }
@@ -95,7 +101,7 @@ fn apply_all(
 fn apply_changed(
   object: savoiardi.Object3D,
   attributes: dict.Dict(String, String),
-  changed_attributes: extension.AttributeChanges,
+  changed_attributes: AttributeChanges,
 ) -> Nil {
   case extension.has_change(changed_attributes, "position") {
     True -> apply_position(object, attributes)

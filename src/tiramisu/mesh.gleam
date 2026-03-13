@@ -6,13 +6,9 @@
 
 import gleam/dict.{type Dict}
 import gleam/dynamic/decode
-import gleam/function
 import gleam/javascript/promise
 import gleam/json
-import gleam/list
 import gleam/option.{type Option}
-import gleam/result
-import gleam/string
 import lustre/attribute.{type Attribute}
 import lustre/event
 
@@ -30,13 +26,13 @@ pub const tag: String = "tiramisu-mesh"
 /// Hide or show the mesh object.
 ///
 /// This controls Three.js visibility for the node rather than DOM layout.
-pub const hidden = attribute.hidden
+pub const hidden: fn(Bool) -> Attribute(a) = attribute.hidden
 
 /// Set the asset URL to load for this mesh.
 ///
 /// Tiramisu resolves supported formats such as GLTF, GLB, OBJ, FBX, and STL
 /// through this attribute.
-pub const src = attribute.src
+pub const src: fn(String) -> Attribute(a) = attribute.src
 
 /// Internal node extension for mesh elements.
 pub fn extension() -> extension.Extension {
@@ -48,7 +44,7 @@ pub fn extension() -> extension.Extension {
 /// Listen for successful model loading on this mesh.
 ///
 /// The handler receives the mesh node id from the event detail.
-pub fn on_model_load(to_msg) {
+pub fn on_model_load(to_msg: fn(String) -> a) -> Attribute(a) {
   event.on("tiramisu:model-loaded", {
     use id <- decode.subfield(["detail", "id"], decode.string)
     decode.success(to_msg(id))
@@ -58,7 +54,7 @@ pub fn on_model_load(to_msg) {
 /// Listen for model loading failures on this mesh.
 ///
 /// The handler receives the mesh node id from the event detail.
-pub fn on_model_error(to_msg) {
+pub fn on_model_error(to_msg: fn(String) -> a) -> Attribute(a) {
   event.on("tiramisu:model-error", {
     use id <- decode.subfield(["detail", "id"], decode.string)
     decode.success(to_msg(id))
@@ -97,16 +93,10 @@ fn create(
 ) -> extension.Context {
   case dict.get(attributes, "src") {
     Ok(src) -> {
-      context.on_async(
-        register_model(
-          context,
-          id:,
-          src:,
-          attributes:,
-          transformation: fn(scene_runtime, id, object) {
-            runtime.add_object(scene_runtime, id, object:, parent_id:, tag:)
-          },
-        ),
+      context.spawn(
+        extension.NodeScope(id),
+        extension.async_key("src"),
+        register_model(context, id, parent_id, src, attributes, Register),
       )
       context
     }
@@ -157,31 +147,36 @@ fn remove(
   extension.Context(..context, runtime: next_runtime)
 }
 
+pub type Mode {
+  Register
+  Replace
+}
+
 fn register_model(
   context: extension.Context,
-  id id: String,
-  src src: String,
-  attributes attributes,
-  transformation transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
-  case get_file_extension(src) {
-    "gltf" | "glb" -> create_gltf(src, id, context, attributes, transformation)
-    "fbx" -> create_fbx(src, id, context, attributes, transformation)
-    "obj" -> create_obj(src, id, context, attributes, transformation)
-    "stl" -> create_stl(src, id, context, attributes, transformation)
-    _ -> promise.resolve(function.identity)
+  id: String,
+  parent_id: String,
+  src: String,
+  attributes: Dict(String, String),
+  mode: Mode,
+) -> promise.Promise(extension.AsyncEffect) {
+  case src {
+    "gltf" | "glb" -> create_gltf(src, id, parent_id, context, attributes, mode)
+    "fbx" -> create_fbx(src, id, parent_id, context, attributes, mode)
+    "obj" -> create_obj(src, id, parent_id, context, attributes, mode)
+    "stl" -> create_stl(src, id, parent_id, context, attributes, mode)
+    _ -> promise.resolve(extension.NoOp)
   }
 }
 
 fn create_stl(
   src: String,
   id: String,
-  context: extension.Context,
-  attributes,
-  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
+  parent_id: String,
+  _context: extension.Context,
+  attributes: Dict(String, String),
+  mode: Mode,
+) -> promise.Promise(extension.AsyncEffect) {
   use result <- promise.await(savoiardi.load_stl(src))
   case result {
     Error(Nil) -> {
@@ -190,7 +185,7 @@ fn create_stl(
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
       )
-      promise.resolve(function.identity)
+      promise.resolve(extension.NoOp)
     }
     Ok(geometry) -> {
       let geometry = case node.get_bool(attributes, "center") {
@@ -199,8 +194,7 @@ fn create_stl(
       }
       let object = savoiardi.create_mesh(geometry)
       set_object_attributes(object, attributes)
-      update_runtime(_, object, context, id, runtime_transformation)
-      |> promise.resolve
+      promise.resolve(build_async_effect(mode, id, parent_id, object))
     }
   }
 }
@@ -208,12 +202,12 @@ fn create_stl(
 fn create_obj(
   src: String,
   id: String,
-  context: extension.Context,
-  attributes,
-  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
-  use result <- promise.map(savoiardi.load_obj(src))
+  parent_id: String,
+  _context: extension.Context,
+  attributes: Dict(String, String),
+  mode: Mode,
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_obj(src))
   case result {
     Error(_) -> {
       element.dispatch_event(
@@ -221,11 +215,11 @@ fn create_obj(
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
       )
-      function.identity
+      promise.resolve(extension.NoOp)
     }
     Ok(object) -> {
       set_object_attributes(object, attributes)
-      update_runtime(_, object, context, id, runtime_transformation)
+      promise.resolve(build_async_effect(mode, id, parent_id, object))
     }
   }
 }
@@ -233,12 +227,12 @@ fn create_obj(
 fn create_fbx(
   src: String,
   id: String,
-  context: extension.Context,
-  attributes,
-  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
-  use result <- promise.map(savoiardi.load_fbx(src))
+  parent_id: String,
+  _context: extension.Context,
+  attributes: Dict(String, String),
+  mode: Mode,
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_fbx(src))
   case result {
     Error(_) -> {
       element.dispatch_event(
@@ -246,12 +240,12 @@ fn create_fbx(
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
       )
-      function.identity
+      promise.resolve(extension.NoOp)
     }
     Ok(data) -> {
       let object = savoiardi.get_fbx_scene(data)
       set_object_attributes(object, attributes)
-      update_runtime(_, object, context, id, runtime_transformation)
+      promise.resolve(build_async_effect(mode, id, parent_id, object))
     }
   }
 }
@@ -259,12 +253,12 @@ fn create_fbx(
 fn create_gltf(
   src: String,
   id: String,
-  context: extension.Context,
-  attributes,
-  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> promise.Promise(fn(runtime.Runtime) -> runtime.Runtime) {
-  use result <- promise.map(savoiardi.load_gltf(src))
+  parent_id: String,
+  _context: extension.Context,
+  attributes: Dict(String, String),
+  mode: Mode,
+) -> promise.Promise(extension.AsyncEffect) {
+  use result <- promise.await(savoiardi.load_gltf(src))
   case result {
     Error(_) -> {
       element.dispatch_event(
@@ -272,17 +266,20 @@ fn create_gltf(
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
       )
-      function.identity
+      promise.resolve(extension.NoOp)
     }
     Ok(data) -> {
       let object = savoiardi.get_gltf_scene(data)
       set_object_attributes(object, attributes)
-      update_runtime(_, object, context, id, runtime_transformation)
+      promise.resolve(build_async_effect(mode, id, parent_id, object))
     }
   }
 }
 
-fn set_object_attributes(object: Object3D, attributes: Dict(String, String)) {
+fn set_object_attributes(
+  object: Object3D,
+  attributes: Dict(String, String),
+) -> Nil {
   savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
   savoiardi.enable_shadows(
     object,
@@ -291,21 +288,21 @@ fn set_object_attributes(object: Object3D, attributes: Dict(String, String)) {
   )
 }
 
-fn update_runtime(
-  scene_runtime: runtime.Runtime,
-  object: Object3D,
-  context: extension.Context,
+fn build_async_effect(
+  mode: Mode,
   id: String,
-  runtime_transformation: fn(runtime.Runtime, String, Object3D) ->
-    runtime.Runtime,
-) -> runtime.Runtime {
+  parent_id: String,
+  object: Object3D,
+) -> extension.AsyncEffect {
   element.dispatch_event(
     id,
     "tiramisu:model-loaded",
     json.object([#("id", json.string(id))]),
   )
-  context.on_object_resolved(tag, id, object)
-  runtime_transformation(scene_runtime, id, object)
+  case mode {
+    Register -> extension.RegisterObject(id:, parent_id:, tag:, object:)
+    Replace -> extension.ReplaceObject(id:, object:)
+  }
 }
 
 fn reload_model_if_needed(
@@ -327,13 +324,11 @@ fn reload_model_if_needed(
     Ok(extension.Added(_)) | Ok(extension.Updated(_)) ->
       case dict.get(attributes, "src") {
         Ok(src) -> {
-          context.on_async(register_model(
-            context,
-            id:,
-            src:,
-            attributes:,
-            transformation: runtime.replace_object,
-          ))
+          context.spawn(
+            extension.NodeScope(id),
+            extension.async_key("src"),
+            register_model(context, id, parent_id, src, attributes, Replace),
+          )
           Error(Nil)
         }
 
@@ -342,15 +337,4 @@ fn reload_model_if_needed(
 
     Error(Nil) -> Error(Nil)
   }
-}
-
-fn get_file_extension(url: String) -> String {
-  url
-  |> string.split("?")
-  |> list.first
-  |> result.unwrap(url)
-  |> string.split(".")
-  |> list.last
-  |> result.unwrap("")
-  |> string.lowercase
 }

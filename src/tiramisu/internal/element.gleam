@@ -122,7 +122,7 @@ pub fn clear_object(id: String) -> Nil {
   }
 }
 
-pub fn dispatch_event(id: String, event_name: String, detail) -> Nil {
+pub fn dispatch_event(id: String, event_name: String, detail: a) -> Nil {
   case find(id) {
     Ok(element) -> dispatch_custom_event(element, event_name, detail)
     Error(Nil) -> Nil
