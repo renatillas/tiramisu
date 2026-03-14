@@ -1,7 +1,7 @@
 # 05-server-components/01-basic-setup
 
-This mirrors Lustre's `06-server-components/01-basic-setup`, but the server
-component renders a Tiramisu scene instead of a counter.
+This mirrors Lustre's basic server-component guide, but the server component
+renders a Tiramisu scene instead of a counter.
 
 It demonstrates:
 

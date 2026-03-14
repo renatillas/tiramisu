@@ -41,12 +41,7 @@ fn view(model: Model) {
   let preset = current_preset(model)
 
   html.div(
-    [
-      attribute.styles([
-        #("display", "grid"),
-        #("gap", "1rem"),
-      ]),
-    ],
+    [attribute.styles([#("display", "grid"), #("gap", "1rem")])],
     [
       html.div(
         [
@@ -59,12 +54,7 @@ fn view(model: Model) {
         ],
         [
           html.p(
-            [
-              attribute.styles([
-                #("margin", "0"),
-                #("font-size", "0.95rem"),
-              ]),
-            ],
+            [attribute.styles([#("margin", "0"), #("font-size", "0.95rem")])],
             [html.text("Server state: " <> preset.name <> " preset")],
           ),
           preset_button("Warm", model == Warm, ChoseWarm),
@@ -83,10 +73,7 @@ fn view(model: Model) {
         [
           tiramisu.renderer(
             "server-renderer",
-            [
-              renderer.width(720),
-              renderer.height(420),
-            ],
+            [renderer.width(720), renderer.height(420)],
             [
               tiramisu.scene("server-scene", [scene.background_color(preset.background)], [
                 tiramisu.camera(

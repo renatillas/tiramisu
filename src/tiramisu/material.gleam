@@ -458,6 +458,10 @@ fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
   }
 }
 
+/// Build the internal extension used to apply material attributes.
+///
+/// Most applications should not call this directly; use
+/// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
   extension.attribute_extension(
     observed_attributes: observed_attributes(),

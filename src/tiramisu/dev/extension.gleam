@@ -22,16 +22,26 @@ import tiramisu/dev/runtime
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
 
+/// A deferred runtime mutation produced by an extension.
+///
+/// Runtime actions are returned from async work such as model or texture
+/// loading, then applied later by the renderer once the owning node still
+/// exists and the request is still current.
 pub opaque type RuntimeAction {
   RuntimeAction(fn(runtime.Runtime) -> #(runtime.Runtime, effect.Effect(Msg)))
 }
 
+/// Wrap a runtime mutation as a `RuntimeAction`.
 pub fn action(
   run: fn(runtime.Runtime) -> #(runtime.Runtime, effect.Effect(Msg)),
 ) -> RuntimeAction {
   RuntimeAction(run)
 }
 
+/// Register a newly created object in the runtime and emit `NotifyResolved`.
+///
+/// Extension authors typically return this from async loaders once an object is
+/// ready to be inserted into the scene graph.
 pub fn register_object(
   id: String,
   parent_id: String,
@@ -47,6 +57,7 @@ pub fn register_object(
   })
 }
 
+/// Replace an existing runtime object and emit `NotifyResolved` for the new one.
 pub fn replace_object(id: String, object: Object3D) -> RuntimeAction {
   RuntimeAction(fn(rt) {
     let runtime = runtime.replace_object(rt, id, object)
@@ -61,6 +72,7 @@ pub fn replace_object(id: String, object: Object3D) -> RuntimeAction {
   })
 }
 
+/// Remove an object from the runtime.
 pub fn remove_object(
   id: String,
   parent_id: String,
@@ -71,6 +83,7 @@ pub fn remove_object(
   })
 }
 
+/// Set the scene background to a 2D texture.
 pub fn set_background_texture(texture: Texture) -> RuntimeAction {
   RuntimeAction(fn(rt) {
     let _ = savoiardi.set_scene_background_texture(runtime.scene(rt), texture)
@@ -78,6 +91,7 @@ pub fn set_background_texture(texture: Texture) -> RuntimeAction {
   })
 }
 
+/// Set the scene background to a cube texture.
 pub fn set_background_cube_texture(texture: CubeTexture) -> RuntimeAction {
   RuntimeAction(fn(rt) {
     let _ =
@@ -95,6 +109,10 @@ pub fn run_action(
   run(runtime)
 }
 
+/// Identifies which part of the scene owns an async request.
+///
+/// Tiramisu uses this to decide whether async results should still be applied
+/// after later reconciliations.
 pub type RequestOwner {
   SceneOwner
   NodeOwner(String)
@@ -105,10 +123,15 @@ pub opaque type RequestKey {
   RequestKey(String)
 }
 
+/// Construct a logical key for an async request.
+///
+/// Owners can have multiple independent in-flight requests as long as they use
+/// different keys.
 pub fn request_key(value: String) -> RequestKey {
   RequestKey(value)
 }
 
+/// Convert a request key back into its raw string representation.
 pub fn request_key_to_string(key: RequestKey) -> String {
   let RequestKey(value) = key
   value
@@ -123,6 +146,10 @@ pub fn request_owner_to_string(owner: RequestOwner) -> String {
   }
 }
 
+/// Messages understood by the renderer's extension runtime.
+///
+/// Extension authors usually interact with this type indirectly through
+/// `request/3` and runtime actions instead of constructing messages manually.
 pub type Msg {
   NotifyResolved(String, String, Object3D)
   Spawn(
@@ -132,6 +159,10 @@ pub type Msg {
   )
 }
 
+/// Schedule async work that will eventually yield runtime actions.
+///
+/// The `owner` and `key` pair lets Tiramisu drop stale results after later
+/// reconciliations or attribute changes.
 pub fn request(
   owner: RequestOwner,
   key: RequestKey,
@@ -140,6 +171,7 @@ pub fn request(
   effect.from(fn(dispatch) { dispatch(Spawn(owner:, key:, task:)) })
 }
 
+/// The semantic change recorded for one attribute between two reconciliations.
 pub type AttributeChange {
   Added(String)
   Removed
@@ -152,6 +184,10 @@ pub type AttributeChanges =
 
 // NODE EXTENSION --------------------------------------------------------------
 
+/// Construct a custom node extension.
+///
+/// Use node extensions when you want to introduce a new scene element tag with
+/// full create, update, and remove lifecycle hooks.
 pub fn node_extension(
   tag tag: String,
   observed_attributes observed_attributes: List(String),
@@ -172,6 +208,10 @@ pub fn node_extension(
   NodeExtension(Node(tag:, observed_attributes:, create:, update:, remove:))
 }
 
+/// Construct a cross-cutting attribute extension.
+///
+/// Attribute extensions observe attributes across existing node types and react
+/// when matching attributes are created, updated, removed, or resolved.
 pub fn attribute_extension(
   observed_attributes observed_attributes: List(String),
   on_create on_create: fn(
@@ -268,6 +308,9 @@ pub type Attribute {
   )
 }
 
+/// A compiled extension definition.
+///
+/// Extensions are either custom nodes or cross-cutting attribute handlers.
 pub opaque type Extension {
   NodeExtension(Node)
   AttributeExtension(Attribute)
@@ -350,24 +393,27 @@ pub fn has_any_change(changes: AttributeChanges, keys: List(String)) -> Bool {
   list.any(keys, has_change(changes, _))
 }
 
+/// Check whether a boolean-style attribute is currently present.
+///
+/// This is useful for attributes encoded using HTML presence semantics such as
+/// `hidden`, `active`, or `cast-shadow`.
 pub fn get_bool(attributes: Dict(String, String), key: String) -> Bool {
-  case dict.get(attributes, key) {
-    Ok(_) -> True
-    Error(Nil) -> False
-  }
+  dict.get(attributes, key) |> result.is_ok
 }
 
-pub fn bool_change(
-  changes: AttributeChanges,
-  key: String,
-) -> Result(Bool, Nil) {
+/// Interpret an attribute change as a boolean toggle.
+///
+/// Removed attributes become `False`, while added or updated attributes become
+/// `True`.
+pub fn bool_change(changes: AttributeChanges, key: String) -> Result(Bool, Nil) {
   case change(changes, key) {
-    Ok(Removed) -> Ok(False)
     Ok(Added(_)) | Ok(Updated(_)) -> Ok(True)
+    Ok(Removed) -> Ok(False)
     Error(Nil) -> Error(Nil)
   }
 }
 
+/// Read and parse an attribute, falling back to a default value on failure.
 pub fn get(
   attributes attributes: Dict(String, String),
   key key: String,
@@ -379,6 +425,7 @@ pub fn get(
   |> result.unwrap(default)
 }
 
+/// Parse a number attribute as either a float literal or an integer literal.
 pub fn parse_number(number: String) -> Result(Float, Nil) {
   case float.parse(number) {
     Ok(float) -> Ok(float)

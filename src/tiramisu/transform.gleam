@@ -61,8 +61,8 @@ fn apply_all(
   object: savoiardi.Object3D,
   attributes: dict.Dict(String, String),
 ) -> Nil {
-  let _ = apply_position(object, attributes)
-  let _ = apply_rotation(object, attributes)
+  apply_position(object, attributes)
+  apply_rotation(object, attributes)
   apply_scale(object, attributes)
 }
 
@@ -71,12 +71,12 @@ fn apply_changed(
   attributes: dict.Dict(String, String),
   changed_attributes: AttributeChanges,
 ) -> Nil {
-  let _ = case extension.has_change(changed_attributes, "position") {
+  case extension.has_change(changed_attributes, "position") {
     True -> apply_position(object, attributes)
     False -> Nil
   }
 
-  let _ = case extension.has_change(changed_attributes, "rotation") {
+  case extension.has_change(changed_attributes, "rotation") {
     True -> apply_rotation(object, attributes)
     False -> Nil
   }
@@ -158,7 +158,7 @@ fn on_create(
   object: option.Option(savoiardi.Object3D),
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
-  let _ = case object {
+  case object {
     // On objects that dont register themselves upon creation, we do nothing (yet)
     option.None -> Nil
     option.Some(object) -> apply_all(object, attributes)
@@ -174,11 +174,9 @@ fn on_update(
   attributes: dict.Dict(String, String),
   changed_attributes: dict.Dict(String, extension.AttributeChange),
 ) -> effect.Effect(extension.Msg) {
-  let _ = case object {
+  case object {
     option.None -> Nil
-    option.Some(object) -> {
-      apply_changed(object, attributes, changed_attributes)
-    }
+    option.Some(object) -> apply_changed(object, attributes, changed_attributes)
   }
   effect.none()
 }
@@ -190,7 +188,7 @@ fn on_resolved(
   object: savoiardi.Object3D,
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
-  let _ = apply_all(object, attributes)
+  apply_all(object, attributes)
   effect.none()
 }
 
@@ -203,6 +201,10 @@ fn on_remove(
   effect.none()
 }
 
+/// Build the internal extension used to apply transform attributes.
+///
+/// Most applications should not call this directly; use
+/// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
   extension.attribute_extension(
     observed_attributes: ["position", "rotation", "scale"],

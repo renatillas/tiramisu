@@ -4,6 +4,7 @@
 //// without relying on external assets.
 
 import gleam/dict.{type Dict}
+import gleam/bool
 import gleam/float
 import gleam/int
 import gleam/json
@@ -198,17 +199,15 @@ fn apply_geometry(
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
-  case extension.has_change(changed_attributes, "geometry") {
-    True -> {
-      let _ =
-        dict.get(attributes, "geometry")
-        |> result.try(parse_geometry)
-        |> result.map(savoiardi.set_object_geometry(object, _))
-      Nil
-    }
-
-    False -> Nil
-  }
+  use <- bool.guard(
+    when: !extension.has_change(changed_attributes, "geometry"),
+    return: Nil,
+  )
+  let _ =
+    dict.get(attributes, "geometry")
+    |> result.try(parse_geometry)
+    |> result.map(savoiardi.set_object_geometry(object, _))
+  Nil
 }
 
 fn apply_visibility(
@@ -216,14 +215,14 @@ fn apply_visibility(
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
-  case extension.has_change(changed_attributes, "hidden") {
-    True ->
-      savoiardi.set_object_visible(
-        object,
-        !extension.get_bool(attributes, "hidden"),
-      )
-    False -> Nil
-  }
+  use <- bool.guard(
+    when: !extension.has_change(changed_attributes, "hidden"),
+    return: Nil,
+  )
+  savoiardi.set_object_visible(
+    object,
+    !extension.get_bool(attributes, "hidden"),
+  )
 }
 
 fn apply_shadows(
@@ -231,19 +230,17 @@ fn apply_shadows(
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
-  case
-    extension.has_change(changed_attributes, "cast-shadow")
-    || extension.has_change(changed_attributes, "receive-shadow")
-  {
-    True ->
-      savoiardi.enable_shadows(
-        object,
-        cast_shadow: extension.get_bool(attributes, "cast-shadow"),
-        receive_shadow: extension.get_bool(attributes, "receive-shadow"),
-      )
-
-    False -> Nil
-  }
+  use <- bool.guard(
+    when:
+      !extension.has_change(changed_attributes, "cast-shadow")
+      && !extension.has_change(changed_attributes, "receive-shadow"),
+    return: Nil,
+  )
+  savoiardi.enable_shadows(
+    object,
+    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
+    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
+  )
 }
 
 fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {

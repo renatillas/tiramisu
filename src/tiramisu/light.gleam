@@ -22,22 +22,39 @@ import tiramisu/dev/runtime.{type Runtime}
 /// The custom element tag used for light nodes.
 pub const tag = "tiramisu-light"
 
+/// Create an ambient light.
+///
+/// Ambient lights contribute uniformly from all directions.
 pub fn ambient() -> Attribute(msg) {
   attribute.attribute("type", "ambient")
 }
 
+/// Create a directional light.
+///
+/// Directional lights behave like sunlight and are affected by node transforms.
 pub fn directional() -> Attribute(msg) {
   attribute.attribute("type", "directional")
 }
 
+/// Create a hemisphere light.
+///
+/// Hemisphere lights blend a sky and ground color for broad environmental
+/// lighting.
 pub fn hemisphere() -> Attribute(msg) {
   attribute.attribute("type", "hemisphere")
 }
 
+/// Create a point light.
+///
+/// Point lights emit in all directions from their position.
 pub fn point() -> Attribute(msg) {
   attribute.attribute("type", "point")
 }
 
+/// Create a spot light.
+///
+/// Spot lights emit a cone of light and can be shaped with `angle` and
+/// `penumbra`.
 pub fn spot() -> Attribute(msg) {
   attribute.attribute("type", "spot")
 }
@@ -250,6 +267,10 @@ fn remove(
   #(runtime, effect.none())
 }
 
+/// Build the internal extension used to reconcile light nodes.
+///
+/// Most applications should not call this directly; use
+/// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
   let observed_attributes = [
     "type",

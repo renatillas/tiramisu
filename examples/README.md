@@ -1,7 +1,8 @@
 # Tiramisu examples
 
-These examples are a small guide to the library.
-They are ordered so each example adds one new capability on top of the previous ones.
+These examples are a guide to the public API.
+The first examples form a learnable path. Later sections are focused capability
+demos and integrations.
 
 Run any example with:
 
@@ -11,35 +12,44 @@ gleam run -m lustre/dev start
 
 Then open `http://localhost:1234`.
 
-## 01-basics
+## Core path
 
-- `01-renderer-and-scene`
-  Minimal setup: register Tiramisu, mount a renderer, mount a scene, and add one active camera.
+- `01-basics/01-first-visible-scene`
+  The smallest useful scene: renderer, scene, active camera, one visible object, and basic lighting.
 
-- `02-camera-primitive-transform`
-  Adds geometry and transforms with a primitive cube and a positioned camera.
+- `01-basics/02-transforms-and-hierarchy`
+  Uses `tiramisu.empty` to show how transforms compose through the scene graph.
 
-- `03-lights-materials-hierarchy`
-  Adds lighting, materials, and `tiramisu.empty` for scene hierarchy.
+- `01-basics/03-cameras`
+  Compares perspective and orthographic cameras on the same subject.
 
-## 02-effects
+- `01-basics/04-lighting-and-materials`
+  Shows the main light types and the most important built-in material families.
 
-- `01-on-tick-animation`
-  Uses `tiramisu.on_tick` to animate a scene from Lustre state.
+- `01-basics/05-primitive-gallery`
+  A visual reference for built-in geometry and visibility/shadow toggles.
 
-## 03-assets
+## Scene and effects
 
-- `01-model-loading`
-  Loads a remote GLB model with `tiramisu.mesh` and listens for model events.
+- `02-scene/01-backgrounds-and-fog`
+  Demonstrates texture and equirectangular backgrounds plus fog.
 
-## 04-layout
+- `02-effects/01-on-tick-animation`
+  Uses `scene.on_tick` to animate transforms from Lustre state.
 
-- `01-multiple-renderers`
-  Demonstrates that multiple renderer instances can live on the same page.
+## Assets and layout
 
-## 05-server-components
+- `03-assets/01-model-loading`
+  Loads an external mesh and handles both success and error events.
 
-- `01-basic-setup`
-  Mirrors Lustre's basic server-component guide, but the server-side component
-  renders a Tiramisu scene. This example is an Erlang app and has its own run
-  steps in `examples/05-server-components/01-basic-setup/README.md`.
+- `04-assets/01-material-textures`
+  Demonstrates texture-driven material attributes.
+
+- `04-layout/01-multiple-renderers`
+  Shows multiple independent renderer instances on the same page.
+
+## Integrations
+
+- `05-server-components/01-basic-setup`
+  Renders a Tiramisu scene from a Lustre server component. See that example's
+  README for run steps.

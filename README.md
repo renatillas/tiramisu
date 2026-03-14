@@ -65,13 +65,17 @@ fn view() {
 The best place to learn the API now is the incremental examples in `examples/`.
 Start with:
 
-1. `examples/01-basics/01-renderer-and-scene`
-2. `examples/01-basics/02-camera-primitive-transform`
-3. `examples/01-basics/03-lights-materials-hierarchy`
-4. `examples/02-effects/01-on-tick-animation`
-5. `examples/03-assets/01-model-loading`
-6. `examples/04-layout/01-multiple-renderers`
-7. `examples/05-server-components/01-basic-setup`
+1. `examples/01-basics/01-first-visible-scene`
+2. `examples/01-basics/02-transforms-and-hierarchy`
+3. `examples/01-basics/03-cameras`
+4. `examples/01-basics/04-lighting-and-materials`
+5. `examples/01-basics/05-primitive-gallery`
+6. `examples/02-scene/01-backgrounds-and-fog`
+7. `examples/02-effects/01-on-tick-animation`
+8. `examples/03-assets/01-model-loading`
+9. `examples/04-assets/01-material-textures`
+10. `examples/04-layout/01-multiple-renderers`
+11. `examples/05-server-components/01-basic-setup`
 
 See `examples/README.md` for the full walkthrough.
 

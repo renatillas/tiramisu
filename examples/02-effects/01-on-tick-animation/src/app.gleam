@@ -1,4 +1,5 @@
 import gleam/time/duration
+import gleam_community/maths
 import lustre
 import lustre/effect
 import tiramisu
@@ -19,7 +20,7 @@ pub fn main() -> Nil {
 }
 
 type Model {
-  Model(rotation: Float)
+  Model(rotation: Float, bob: Float)
 }
 
 type Msg {
@@ -27,43 +28,41 @@ type Msg {
 }
 
 fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
-  #(Model(rotation: 0.0), effect.none())
+  #(Model(rotation: 0.0, bob: 0.0), effect.none())
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
   case msg {
     Tick(ctx) -> {
       let dt = duration.to_seconds(ctx.delta_time)
-      #(Model(rotation: model.rotation +. dt), effect.none())
+      #(
+        Model(rotation: model.rotation +. dt, bob: model.bob +. dt *. 1.7),
+        effect.none(),
+      )
     }
   }
 }
 
 fn view(model: Model) {
-  tiramisu.renderer(
-    "renderer",
-    [
-      renderer.width(800),
-      renderer.height(500),
-    ],
-    [
-      tiramisu.scene(
-        "scene",
-        [scene.on_tick(Tick), scene.background_color(0x020617)],
-        [
+  tiramisu.renderer("renderer", [renderer.width(800), renderer.height(500)], [
+    tiramisu.scene(
+      "scene",
+      [scene.on_tick(Tick), scene.background_color(0x020617)],
+      [
         tiramisu.camera(
           "camera",
-          [
-            camera.active(True),
-            transform.position(vec3.Vec3(0.0, 1.0, 5.0)),
-          ],
+          [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 5.0))],
           [],
         ),
+        tiramisu.light("ambient", [light.ambient(), light.intensity(0.25)], []),
         tiramisu.light(
-          "light",
+          "accent",
           [
-            transform.position(vec3.Vec3(0.0, 5.0, 0.0)),
-            light.ambient(),
+            light.point(),
+            light.intensity(18.0),
+            light.distance(16.0),
+            light.color(0x38bdf8),
+            transform.position(vec3.Vec3(2.5, 3.5, 2.0)),
           ],
           [],
         ),
@@ -72,12 +71,27 @@ fn view(model: Model) {
           [
             primitive.box(vec3.Vec3(1.8, 1.8, 1.8)),
             material.color(0xe879f9),
+            transform.position(vec3.Vec3(0.0, maths.sin(model.bob) *. 0.45, 0.0)),
             transform.rotation(vec3.Vec3(0.3, model.rotation, 0.1)),
           ],
           [],
         ),
-        ],
-      ),
-    ],
-  )
+        tiramisu.primitive(
+          "ring",
+          [
+            primitive.torus(
+              radius: 2.2,
+              tube: 0.12,
+              radial_segments: 24,
+              tubular_segments: 64,
+            ),
+            material.color(0x38bdf8),
+            material.wireframe(True),
+            transform.rotation(vec3.Vec3(model.rotation *. 0.6, 0.0, 0.0)),
+          ],
+          [],
+        ),
+      ],
+    ),
+  ])
 }

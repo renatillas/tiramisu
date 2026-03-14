@@ -91,6 +91,7 @@ pub fn background_color_space_linear() -> Attribute(msg) {
   attribute.attribute("background-color-space", "linear-srgb")
 }
 
+/// Set the color space used for loaded scene background textures to sRGB.
 pub fn background_color_space_srgb() -> Attribute(msg) {
   attribute.attribute("background-color-space", "srgb")
 }
@@ -121,6 +122,11 @@ pub fn clear_fog() -> Attribute(msg) {
   attribute.attribute("fog", "none")
 }
 
+/// Listen for per-frame tick events emitted by the renderer.
+///
+/// This is the main entry point for animation and simulation work in a scene.
+/// The callback receives a [`Tick`](#Tick) containing the frame delta and
+/// timestamp.
 pub fn on_tick(to_msg: fn(Tick) -> msg) -> Attribute(msg) {
   event.on("tiramisu:tick", {
     use tick_context <- decode.field("detail", tick_decoder())

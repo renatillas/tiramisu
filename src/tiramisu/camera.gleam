@@ -33,18 +33,12 @@ import vec/vec2
 /// The custom element tag used for camera nodes.
 pub const tag = "tiramisu-camera"
 
-/// Supported camera kinds.
-pub type Camera {
-  Perspective
-  Orthographic
+pub fn perspective() -> Attribute(msg) {
+  attribute.attribute("type", "perspective")
 }
 
-/// Choose the camera type.
-pub fn kind(kind: Camera) -> Attribute(msg) {
-  attribute.attribute("type", case kind {
-    Perspective -> "perspective"
-    Orthographic -> "orthographic"
-  })
+pub fn orthographic() -> Attribute(msg) {
+  attribute.attribute("type", "orthographic")
 }
 
 /// Mark a camera as active.
@@ -414,6 +408,10 @@ fn when(value: a, condition: Bool, do callback: fn(a) -> a) -> a {
   }
 }
 
+/// Build the internal extension used to reconcile camera nodes.
+///
+/// Most applications should not call this directly; use
+/// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
   let observed_attributes = [
     "active",

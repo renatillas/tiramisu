@@ -4,7 +4,7 @@ This example demonstrates asset loading with `tiramisu.mesh`.
 
 It demonstrates:
 
-1. Loading a remote GLB model through `attribute.src`.
-2. Listening for `tiramisu:model-loaded`.
-3. Combining loaded meshes with regular lights and primitives.
-4. Setting a renderer background from an equirectangular panorama.
+1. Loading a remote STL mesh through `mesh.src`.
+2. Listening for `mesh.on_model_load`.
+3. Listening for `mesh.on_model_error`.
+4. Combining loaded meshes with lights and regular material attributes.

@@ -67,6 +67,10 @@ fn remove(
   #(runtime, effect.none())
 }
 
+/// Build the internal extension used to reconcile empty group nodes.
+///
+/// Most applications should not call this directly; use
+/// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
   let observed_attributes = ["hidden"]
   extension.node_extension(

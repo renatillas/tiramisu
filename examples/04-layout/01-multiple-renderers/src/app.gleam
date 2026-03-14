@@ -38,18 +38,12 @@ fn scene_card(title: String, background: Int, color: Int, prefix: String) {
     html.h2([attribute.style("text-align", "center")], [html.text(title)]),
     tiramisu.renderer(
       prefix <> "-renderer",
-      [
-        renderer.width(420),
-        renderer.height(320),
-      ],
+      [renderer.width(420), renderer.height(320)],
       [
         tiramisu.scene(prefix <> "-scene", [scene.background_color(background)], [
           tiramisu.camera(
             prefix <> "-camera",
-            [
-              camera.active(True),
-              transform.position(vec3.Vec3(0.0, 1.0, 5.0)),
-            ],
+            [camera.active(True), transform.position(vec3.Vec3(0.0, 1.0, 5.0))],
             [],
           ),
           tiramisu.primitive(

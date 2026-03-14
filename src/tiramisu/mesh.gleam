@@ -122,7 +122,7 @@ fn update(
       {
         Ok(next_context) -> next_context
         Error(Nil) -> {
-          let _ = set_object_attributes(object, attributes)
+          set_object_attributes(object, attributes)
           #(ctx, effect.none())
         }
       }
@@ -142,7 +142,11 @@ fn remove(
   #(runtime, effect.none())
 }
 
-pub type Mode {
+/// Internal async loading mode for mesh assets.
+///
+/// `Register` is used for first-time loads, while `Replace` swaps an already
+/// loaded object after the `src` attribute changes.
+type Mode {
   Register
   Replace
 }
@@ -193,7 +197,7 @@ fn create_stl(
         False -> geometry
       }
       let object = savoiardi.create_mesh(geometry)
-      let _ = set_object_attributes(object, attributes)
+      set_object_attributes(object, attributes)
       promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
   }

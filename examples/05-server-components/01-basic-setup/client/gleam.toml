@@ -6,3 +6,6 @@ target = "javascript"
 gleam_stdlib = ">= 0.64.0 and < 2.0.0"
 lustre = ">= 5.3.5 and < 6.0.0"
 tiramisu = { path = "../../../.." }
+
+[dev-dependencies]
+lustre_dev_tools = ">= 2.3.5 and < 3.0.0"

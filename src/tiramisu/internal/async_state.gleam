@@ -1,6 +1,13 @@
+import gleam/bool
 import gleam/dict
 import gleam/list
 import tiramisu/dev/extension
+
+pub type ResolveDecision {
+  Drop
+  Queue
+  ApplyNow(List(extension.RuntimeAction))
+}
 
 pub type Pending {
   Pending(
@@ -28,14 +35,18 @@ pub fn register(
   owner: extension.RequestOwner,
   key: extension.RequestKey,
 ) -> #(State, Int) {
-  let version = state.next_version + 1
-  let state =
+  let next_version = state.next_version + 1
+  let next_state =
     State(
       ..state,
-      versions: dict.insert(state.versions, registry_key(owner, key), version),
-      next_version: version,
+      versions: dict.insert(
+        state.versions,
+        registry_key(owner, key),
+        next_version,
+      ),
+      next_version: next_version,
     )
-  #(state, version)
+  #(next_state, next_version)
 }
 
 pub fn is_current(
@@ -65,6 +76,46 @@ pub fn enqueue(
 
 pub fn drain_pending(state: State) -> #(State, List(Pending)) {
   #(State(..state, pending: []), list.reverse(state.pending))
+}
+
+pub fn resolve(
+  state: State,
+  owner: extension.RequestOwner,
+  key: extension.RequestKey,
+  version: Int,
+  actions: List(extension.RuntimeAction),
+  reconciling: Bool,
+  runtime_available: Bool,
+  owner_exists: Bool,
+) -> #(State, ResolveDecision) {
+  use <- bool.guard(
+    when: !is_current(state, owner, key, version) || !owner_exists,
+    return: #(state, Drop),
+  )
+  use <- bool.guard(
+    when: reconciling || !runtime_available,
+    return: #(enqueue(state, owner, key, version, actions), Queue),
+  )
+  #(state, ApplyNow(actions))
+}
+
+pub fn drain_ready(
+  state: State,
+  owner_exists: fn(extension.RequestOwner) -> Bool,
+) -> #(State, List(List(extension.RuntimeAction))) {
+  let #(next_state, pending_requests) = drain_pending(state)
+
+  let ready_actions =
+    list.fold(pending_requests, [], fn(acc, pending_request) {
+      let Pending(owner:, key:, version:, actions:) = pending_request
+      case is_current(next_state, owner, key, version) && owner_exists(owner) {
+        True -> [actions, ..acc]
+        False -> acc
+      }
+    })
+    |> list.reverse
+
+  #(next_state, ready_actions)
 }
 
 fn registry_key(

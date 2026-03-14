@@ -1,12 +1,22 @@
-//// Renderer host component for Tiramisu.
+//// Renderer host component and renderer-level attributes.
 ////
-//// A renderer owns the WebGL renderer, canvas, frame loop, and one nested scene.
-//// This mirrors the public API shape:
+//// A renderer is the bridge between Lustre's declarative view tree and the
+//// Three.js runtime managed by Tiramisu. Each renderer owns one canvas, one
+//// render loop, and one nested `tiramisu.scene`.
+////
+//// Most applications use this module indirectly through `tiramisu.renderer`,
+//// while using the attribute helpers here to configure the renderer itself.
 ////
 //// ```gleam
-//// tiramisu.renderer("renderer", [], [
-////   tiramisu.scene("scene", [], [...]),
-//// ])
+//// tiramisu.renderer(
+////   "main-renderer",
+////   [
+////     renderer.width(1280),
+////     renderer.height(720),
+////     renderer.antialias(True),
+////   ],
+////   [tiramisu.scene("scene", [], [])],
+//// )
 //// ```
 
 import gleam/dynamic.{type Dynamic}
@@ -26,15 +36,16 @@ import lustre/element/html
 import savoiardi
 
 import tiramisu/dev/extension
-import tiramisu/internal/async_policy
 import tiramisu/internal/async_state
 import tiramisu/internal/element as dom_element
 import tiramisu/internal/renderer as renderer_runtime
 import tiramisu/internal/scene
 import tiramisu/internal/web_component
 
+/// Set the renderer canvas height in CSS pixels.
 pub const height = attribute.height
 
+/// Set the renderer canvas width in CSS pixels.
 pub const width = attribute.width
 
 type Model {
@@ -321,19 +332,22 @@ fn finalize_runtime(
 ) -> #(Model, effect.Effect(Msg)) {
   case model.in_flight_generation {
     Some(in_flight_generation) if in_flight_generation == generation -> {
-      let #(async_state, pending) = async_state.drain_pending(model.async_state)
+      let #(next_async_state, ready_actions) =
+        async_state.drain_ready(model.async_state, fn(owner) {
+          scene.has_owner(runtime, owner)
+        })
       let #(runtime, pending_effect) =
-        list.fold(pending, #(runtime, effect.none()), fn(acc, pending) {
+        list.fold(ready_actions, #(runtime, effect.none()), fn(acc, actions) {
           let #(runtime, effects) = acc
           let #(next_runtime, next_effect) =
-            apply_pending_async(model, runtime, pending)
+            scene.apply_runtime_actions(runtime, actions)
           #(next_runtime, effect.batch([effects, next_effect]))
         })
       let model =
         Model(
           ..model,
           runtime: Some(runtime),
-          async_state: async_state,
+          async_state: next_async_state,
           in_flight_generation: None,
         )
       let runtime_effect =
@@ -360,77 +374,60 @@ fn apply_async_effect(
   version: Int,
   actions: List(extension.RuntimeAction),
 ) -> #(Model, effect.Effect(Msg)) {
-  let is_current =
-    async_state.is_current(model.async_state, owner, key, version)
-  let owner_exists = case model.runtime {
+  let owner_exists = does_owner_exist(model, owner)
+  let #(next_async_state, decision) =
+    async_state.resolve(
+      model.async_state,
+      owner,
+      key,
+      version,
+      actions,
+      model.in_flight_generation != None,
+      model.runtime != None,
+      owner_exists,
+    )
+
+  case decision {
+    async_state.Drop -> #(
+      Model(..model, async_state: next_async_state),
+      effect.none(),
+    )
+    async_state.Queue -> #(
+      Model(..model, async_state: next_async_state),
+      effect.none(),
+    )
+    async_state.ApplyNow(actions) ->
+      apply_runtime_actions(model, next_async_state, actions)
+  }
+}
+
+fn does_owner_exist(model: Model, owner: extension.RequestOwner) -> Bool {
+  case model.runtime {
     Some(runtime) -> scene.has_owner(runtime, owner)
     None -> True
   }
-
-  case
-    async_policy.request_resolution_outcome(
-      is_current:,
-      in_flight_generation: model.in_flight_generation != None,
-      runtime_available: model.runtime != None,
-      owner_exists:,
-    )
-  {
-    async_policy.DropRequestResolution -> #(model, effect.none())
-
-    async_policy.EnqueueForLater -> #(
-      Model(
-        ..model,
-        async_state: async_state.enqueue(
-          model.async_state,
-          owner,
-          key,
-          version,
-          actions,
-        ),
-      ),
-      effect.none(),
-    )
-
-    async_policy.ApplyNow ->
-      case model.runtime {
-        Some(runtime) -> {
-          let #(runtime, next_effect) = scene.apply_runtime_actions(runtime, actions)
-          #(
-            Model(..model, runtime: Some(runtime)),
-            execute_extension_effects(next_effect),
-          )
-        }
-
-        None -> #(
-          Model(
-            ..model,
-            async_state: async_state.enqueue(
-              model.async_state,
-              owner,
-              key,
-              version,
-              actions,
-            ),
-          ),
-          effect.none(),
-        )
-      }
-  }    
 }
 
-fn apply_pending_async(
+fn apply_runtime_actions(
   model: Model,
-  runtime: scene.Runtime,
-  pending: async_state.Pending,
-) -> #(scene.Runtime, effect.Effect(extension.Msg)) {
-  let async_state.Pending(owner:, key:, version:, actions:) = pending
-  let is_current =
-    async_state.is_current(model.async_state, owner, key, version)
-  let owner_exists = scene.has_owner(runtime, owner)
+  next_async_state: async_state.State,
+  actions: List(extension.RuntimeAction),
+) -> #(Model, effect.Effect(Msg)) {
+  case model.runtime {
+    Some(runtime) -> {
+      let #(next_runtime, next_effect) =
+        scene.apply_runtime_actions(runtime, actions)
+      #(
+        Model(
+          ..model,
+          async_state: next_async_state,
+          runtime: Some(next_runtime),
+        ),
+        execute_extension_effects(next_effect),
+      )
+    }
 
-  case async_policy.should_apply_pending_request(is_current:, owner_exists:) {
-    True -> scene.apply_runtime_actions(runtime, actions)
-    _ -> #(runtime, effect.none())
+    None -> #(Model(..model, async_state: next_async_state), effect.none())
   }
 }
 

@@ -168,6 +168,11 @@ pub fn builtin_extensions() -> List(extension.Extension) {
   ]
 }
 
+/// Inject the browser import map required by Tiramisu's runtime script.
+///
+/// This helper is mainly useful for direct browser usage and examples. If your
+/// app already manages module resolution through a bundler or its own import
+/// map, you likely do not need it.
 pub fn script() {
   html.script(
     [attribute.type_("importmap")],
