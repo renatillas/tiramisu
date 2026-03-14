@@ -55,15 +55,6 @@ pub type Tick {
   )
 }
 
-/// Create a `tiramisu-scene` element.
-pub fn scene(
-  id: String,
-  attributes: List(Attribute(msg)),
-  children: List(Element(msg)),
-) -> Element(msg) {
-  element.element(tag, [attribute.id(id), ..attributes], children)
-}
-
 /// Set the background color for the scene (as hex int).
 pub fn background_color(hex: Int) -> Attribute(msg) {
   attribute.attribute("background", int.to_base16(hex))
