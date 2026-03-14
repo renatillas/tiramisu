@@ -4,7 +4,7 @@ These examples are a guide to the public API.
 The first examples form a learnable path. Later sections are focused capability
 demos and integrations.
 
-Run any example with:
+Run most examples with:
 
 ```sh
 gleam run -m lustre/dev start
@@ -42,7 +42,7 @@ Then open `http://localhost:1234`.
 - `03-assets/01-model-loading`
   Loads an external mesh and handles both success and error events.
 
-- `04-assets/01-material-textures`
+- `03-assets/02-material-textures`
   Demonstrates texture-driven material attributes.
 
 - `04-layout/01-multiple-renderers`

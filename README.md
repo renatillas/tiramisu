@@ -29,12 +29,15 @@ scripts = [
 
 ```gleam
 import lustre
-import lustre/attribute
 import tiramisu
 import tiramisu/camera
+import tiramisu/light
+import tiramisu/material
+import tiramisu/primitive
 import tiramisu/renderer
 import tiramisu/scene
 import tiramisu/transform
+import vec/vec2
 import vec/vec3
 
 pub fn main() -> Nil {
@@ -52,6 +55,15 @@ fn view() {
         tiramisu.camera(
           "camera",
           [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 6.0))],
+          [],
+        ),
+        tiramisu.light("ambient", [light.ambient(), light.intensity(0.6)], []),
+        tiramisu.primitive(
+          "hero",
+          [
+            primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
+            material.color(0x38bdf8),
+          ],
           [],
         ),
       ]),
@@ -73,7 +85,7 @@ Start with:
 6. `examples/02-scene/01-backgrounds-and-fog`
 7. `examples/02-effects/01-on-tick-animation`
 8. `examples/03-assets/01-model-loading`
-9. `examples/04-assets/01-material-textures`
+9. `examples/03-assets/02-material-textures`
 10. `examples/04-layout/01-multiple-renderers`
 11. `examples/05-server-components/01-basic-setup`
 

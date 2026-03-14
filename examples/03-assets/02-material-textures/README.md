@@ -1,4 +1,4 @@
-# 04-assets/01-material-textures
+# 03-assets/02-material-textures
 
 This example shows material attributes that depend on loaded textures.
 
