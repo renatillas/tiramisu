@@ -24,13 +24,13 @@ import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
-
 import lustre/attribute.{type Attribute}
+import lustre/effect
 
 import savoiardi
 import tiramisu/dev/extension
+import tiramisu/dev/runtime
 import tiramisu/internal/element
-import tiramisu/internal/node
 
 // TYPES -----------------------------------------------------------------------
 
@@ -44,7 +44,7 @@ pub type Side {
   Double
 }
 
-/// Use a standard physically based material.
+/// Use a standard physically based material.extension
 pub fn standard() -> Attribute(msg) {
   attribute.attribute("type", "standard")
 }
@@ -89,7 +89,7 @@ pub fn transparent(bool: Bool) -> Attribute(msg) {
 
 /// Set emissive color.
 pub fn emissive(hex: Int) -> Attribute(msg) {
-  attribute.attribute("emissive", "#" <> int.to_base16(hex))
+  attribute.attribute("emissive", int.to_base16(hex))
 }
 
 /// Set emissive intensity.
@@ -108,7 +108,7 @@ pub fn side(s: Side) -> Attribute(msg) {
 
 /// Set the base color.
 pub fn color(hex hex: Int) -> Attribute(msg) {
-  attribute.attribute("color", "#" <> int.to_base16(hex))
+  attribute.attribute("color", int.to_base16(hex))
 }
 
 /// Set the base color texture.
@@ -184,83 +184,93 @@ fn observed_attributes() {
   ]
 }
 
-/// Attribute extension that handles material updates for all tiramisu mesh nodes.
-///
-/// Centralises material parsing and disposal logic that would otherwise be
-/// duplicated across primitive and mesh node handlers.
-pub fn extension() -> extension.Extension {
-  extension.AttributeExtension(extension.Attribute(
-    observed_attributes: observed_attributes(),
-    on_create: fn(context, _tag, id, object, attributes) {
-      case object {
-        // On objects that dont register themselves upon creation, we do nothing (yet)
-        option.None -> promise.resolve(Nil)
-        option.Some(object) ->
-          apply_material(context.spawn, id, object, attributes)
+fn on_resolved(
+  _runtime: runtime.Runtime,
+  _tag: String,
+  id: String,
+  object: savoiardi.Object3D,
+  attributes: Dict(String, String),
+) -> effect.Effect(extension.Msg) {
+  apply_material(id, object, attributes)
+}
+
+fn on_remove(
+  _runtime: runtime.Runtime,
+  _id: String,
+  _parent_id: String,
+  object: savoiardi.Object3D,
+) -> effect.Effect(extension.Msg) {
+  let material = savoiardi.get_object_material(object)
+  savoiardi.dispose_material(material)
+  effect.none()
+}
+
+fn on_update(
+  _runtime: runtime.Runtime,
+  _string: String,
+  id: String,
+  object: option.Option(savoiardi.Object3D),
+  attrs: Dict(String, String),
+  changed_attributes: Dict(String, extension.AttributeChange),
+) -> effect.Effect(extension.Msg) {
+  case object {
+    option.None -> effect.none()
+    option.Some(obj) ->
+      // Only act when at least one material attribute changed.
+      case extension.has_any_change(changed_attributes, observed_attributes()) {
+        True -> replace_material(id, obj, attrs)
+        False -> effect.none()
       }
-    },
-    on_update: fn(context, _tag, id, object, attrs, changed_attributes) {
-      case object {
-        option.None -> promise.resolve(Nil)
-        option.Some(obj) ->
-          // Only act when at least one material attribute changed.
-          case
-            extension.has_any_change(changed_attributes, observed_attributes())
-          {
-            True -> replace_material(context.spawn, id, obj, attrs)
-            False -> promise.resolve(Nil)
-          }
-      }
-    },
-    on_remove: fn(_context, _id, _parent_id, object) {
-      object
-      |> savoiardi.get_object_material
-      |> savoiardi.dispose_material
-      |> promise.resolve
-    },
-    // Once the object has been resolved we can set the material
-    on_object_resolved: fn(_runtime, on_async, _tag, id, object, attributes) {
-      apply_material(on_async, id, object, attributes)
-    },
-  ))
+  }
+}
+
+fn on_create(
+  _runtime: runtime.Runtime,
+  _string: String,
+  id: String,
+  object: option.Option(savoiardi.Object3D),
+  attributes: Dict(String, String),
+) -> effect.Effect(extension.Msg) {
+  case object {
+    // On objects that dont register themselves upon creation, we do nothing (yet)
+    option.None -> effect.none()
+    option.Some(object) -> apply_material(id, object, attributes)
+  }
 }
 
 fn apply_material(
-  on_async,
   id: String,
   object: savoiardi.Object3D,
   attributes: Dict(String, String),
-) -> promise.Promise(Nil) {
+) -> effect.Effect(extension.Msg) {
   let material = parse_material(attributes)
   savoiardi.set_object_material(object, material)
-  load_material_textures(on_async, id, material, attributes)
+  load_material_textures(id, material, attributes)
 }
 
 fn replace_material(
-  on_async,
   id: String,
   object: savoiardi.Object3D,
   attributes: Dict(String, String),
-) -> promise.Promise(Nil) {
+) -> effect.Effect(extension.Msg) {
   object
   |> savoiardi.get_object_material
   |> savoiardi.dispose_material
 
-  apply_material(on_async, id, object, attributes)
+  apply_material(id, object, attributes)
 }
 
 fn load_material_textures(
-  spawn,
   id: String,
   material: savoiardi.Material,
   attributes: Dict(String, String),
-) -> promise.Promise(Nil) {
-  spawn(
-    extension.NodeScope(id),
-    extension.async_key("material:textures"),
+) -> effect.Effect(extension.Msg) {
+  extension.request(
+    extension.NodeOwner(id),
+    extension.request_key("material:textures"),
     promise.map(
       promise.await_list(parse_apply_textures_async(id, material, attributes)),
-      fn(_) { extension.NoOp },
+      list.flatten,
     ),
   )
 }
@@ -273,15 +283,17 @@ fn load_material_textures(
 /// logic when creating their own nodes.
 @internal
 pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
-  let color = node.get(attrs, "color", 0xffffff, node.parse_color)
-  let emissive = node.get(attrs, "emissive", 0x000000, node.parse_color)
-  let opacity = node.get(attrs, "opacity", 1.0, node.parse_number)
-  let transparent = node.get_bool(attrs, "transparent") || opacity <. 1.0
+  let color = extension.get(attrs, "color", 0xffffff, int.base_parse(_, 16))
+  let emissive =
+    extension.get(attrs, "emissive", 0x000000, int.base_parse(_, 16))
+  let opacity = extension.get(attrs, "opacity", 1.0, extension.parse_number)
+  let transparent = extension.get_bool(attrs, "transparent") || opacity <. 1.0
   let material_type = dict.get(attrs, "type") |> result.unwrap("standard")
 
   let mat = case material_type {
     "basic" -> {
-      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
+      let alpha_test =
+        extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
       savoiardi.create_basic_material(
         color:,
         transparent:,
@@ -293,8 +305,10 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "phong" -> {
-      let shininess = node.get(attrs, "shininess", 30.0, node.parse_number)
-      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
+      let shininess =
+        extension.get(attrs, "shininess", 30.0, extension.parse_number)
+      let alpha_test =
+        extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
       savoiardi.create_phong_material(
         color:,
         shininess:,
@@ -307,7 +321,8 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "lambert" -> {
-      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
+      let alpha_test =
+        extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
       savoiardi.create_lambert_material(
         color:,
         color_map: option.None,
@@ -319,7 +334,8 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     "toon" -> {
-      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
+      let alpha_test =
+        extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
       savoiardi.create_toon_material(
         color:,
         color_map: option.None,
@@ -331,15 +347,18 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
     _ -> {
-      let metalness = node.get(attrs, "metalness", 0.5, node.parse_number)
-      let roughness = node.get(attrs, "roughness", 0.5, node.parse_number)
+      let metalness =
+        extension.get(attrs, "metalness", 0.5, extension.parse_number)
+      let roughness =
+        extension.get(attrs, "roughness", 0.5, extension.parse_number)
       let displacement_scale =
-        node.get(attrs, "displacement-scale", 1.0, node.parse_number)
+        extension.get(attrs, "displacement-scale", 1.0, extension.parse_number)
       let displacement_bias =
-        node.get(attrs, "displacement-bias", 0.0, node.parse_number)
+        extension.get(attrs, "displacement-bias", 0.0, extension.parse_number)
       let emissive_intensity =
-        node.get(attrs, "emissive-intensity", 1.0, node.parse_number)
-      let alpha_test = node.get(attrs, "alpha-test", 0.0, node.parse_number)
+        extension.get(attrs, "emissive-intensity", 1.0, extension.parse_number)
+      let alpha_test =
+        extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
 
       savoiardi.create_standard_material(
         color:,
@@ -361,7 +380,10 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       )
     }
   }
-  savoiardi.update_material_wireframe(mat, node.get_bool(attrs, "wireframe"))
+  savoiardi.update_material_wireframe(
+    mat,
+    extension.get_bool(attrs, "wireframe"),
+  )
   savoiardi.update_material_side(
     mat,
     parse_material_side(dict.get(attrs, "side") |> result.unwrap("front")),
@@ -374,9 +396,9 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
 @internal
 pub fn parse_apply_textures_async(
   id: String,
-  mat: savoiardi.Material,
+  _mat: savoiardi.Material,
   attrs: Dict(String, String),
-) -> List(promise.Promise(Result(Nil, Nil))) {
+) -> List(promise.Promise(List(extension.RuntimeAction))) {
   use #(texture_name, texture_src) <- list.map([
     #("map", dict.get(attrs, "color-map")),
     #("normalMap", dict.get(attrs, "normal-map")),
@@ -386,28 +408,46 @@ pub fn parse_apply_textures_async(
     #("displacementMap", dict.get(attrs, "displacement-map")),
   ])
   case texture_src {
-    Error(Nil) -> {
-      promise.resolve(Ok(Nil))
-    }
+    Error(Nil) -> promise.resolve([])
     Ok(url) -> {
       use result <- promise.map(savoiardi.load_texture(url))
       case result {
-        Ok(texture) ->
-          Ok(savoiardi.set_material_texture(mat, texture_name, texture))
-        Error(_) -> {
-          element.dispatch_event(
-            id,
-            "tiramisu:load-texture-error",
-            json.object([
-              #("id", json.string(id)),
-              #("src", json.string(url)),
-            ]),
-          )
-          Error(Nil)
-        }
+        Ok(texture) -> [apply_texture(id, texture_name, texture)]
+        Error(_) -> [emit_texture_error(id, url)]
       }
     }
   }
+}
+
+fn apply_texture(
+  id: String,
+  texture_name: String,
+  texture: savoiardi.Texture,
+) -> extension.RuntimeAction {
+  extension.action(fn(rt) {
+    case runtime.object(rt, id) {
+      Ok(object) -> {
+        let material = savoiardi.get_object_material(object)
+        let _ = savoiardi.set_material_texture(material, texture_name, texture)
+        #(rt, effect.none())
+      }
+      Error(Nil) -> #(rt, effect.none())
+    }
+  })
+}
+
+fn emit_texture_error(id: String, url: String) -> extension.RuntimeAction {
+  extension.action(fn(rt) {
+    element.dispatch_event(
+      id,
+      "tiramisu:load-texture-error",
+      json.object([
+        #("id", json.string(id)),
+        #("src", json.string(url)),
+      ]),
+    )
+    #(rt, effect.none())
+  })
 }
 
 fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
@@ -416,4 +456,14 @@ fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
     "double" -> savoiardi.DoubleSide
     _ -> savoiardi.FrontSide
   }
+}
+
+pub fn ext() -> extension.Extension {
+  extension.attribute_extension(
+    observed_attributes: observed_attributes(),
+    on_create:,
+    on_update:,
+    on_remove:,
+    on_resolved:,
+  )
 }

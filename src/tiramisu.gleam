@@ -158,13 +158,13 @@ pub fn empty(
 /// extension list yourself.
 pub fn builtin_extensions() -> List(extension.Extension) {
   [
-    transform.extension(),
-    mesh.extension(),
-    primitive.extension(),
-    camera.extension(),
-    light.extension(),
-    empty.extension(),
-    material.extension(),
+    transform.ext(),
+    mesh.ext(),
+    primitive.ext(),
+    camera.ext(),
+    light.ext(),
+    empty.ext(),
+    material.ext(),
   ]
 }
 

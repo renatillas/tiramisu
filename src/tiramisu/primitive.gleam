@@ -11,14 +11,14 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 import gleam/string
+import lustre/effect
 import tiramisu/dev/extension
-import tiramisu/internal/node
 
 import lustre/attribute.{type Attribute}
 
 import savoiardi.{type Object3D}
 
-import tiramisu/dev/runtime
+import tiramisu/dev/runtime.{type Runtime}
 
 import vec/vec2
 import vec/vec3
@@ -142,58 +142,54 @@ pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
 @internal
 pub const tag: String = "tiramisu-primitive"
 
-/// Internal node extension for primitive elements.
-pub fn extension() -> extension.Extension {
-  let observed_attributes = ["geometry", "hidden"]
-  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
-  |> extension.NodeExtension
-}
-
 fn create(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   attributes: Dict(String, String),
-) -> extension.Context {
+) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
   case dict.get(attributes, "geometry") |> result.try(parse_geometry) {
     Ok(geometry) -> {
       let object = savoiardi.create_mesh(geometry)
       apply_attributes(object, attributes)
       let next_runtime =
-        runtime.add_object(context.runtime, id, object:, parent_id:, tag:)
-      extension.Context(..context, runtime: next_runtime)
+        runtime.add_object(runtime, id, object:, parent_id:, tag:)
+      #(next_runtime, effect.none())
     }
 
-    Error(Nil) -> context
+    Error(Nil) -> #(runtime, effect.none())
   }
 }
 
 fn update(
-  ctx: extension.Context,
+  ctx: runtime.Runtime,
   _id: String,
   _parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> extension.Context {
+) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
   case object {
     option.Some(object) -> {
       let _ = apply_geometry(object, attributes, changed_attributes)
       let _ = apply_visibility(object, attributes, changed_attributes)
       let _ = apply_shadows(object, attributes, changed_attributes)
-      ctx
+      #(ctx, effect.none())
     }
 
-    option.None -> ctx
+    option.None -> #(ctx, effect.none())
   }
 }
 
 fn apply_attributes(object: Object3D, attributes: Dict(String, String)) -> Nil {
-  savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+  savoiardi.set_object_visible(
+    object,
+    !extension.get_bool(attributes, "hidden"),
+  )
   savoiardi.enable_shadows(
     object,
-    cast_shadow: node.get_bool(attributes, "cast-shadow"),
-    receive_shadow: node.get_bool(attributes, "receive-shadow"),
+    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
+    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
   )
 }
 
@@ -222,7 +218,10 @@ fn apply_visibility(
 ) -> Nil {
   case extension.has_change(changed_attributes, "hidden") {
     True ->
-      savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+      savoiardi.set_object_visible(
+        object,
+        !extension.get_bool(attributes, "hidden"),
+      )
     False -> Nil
   }
 }
@@ -239,8 +238,8 @@ fn apply_shadows(
     True ->
       savoiardi.enable_shadows(
         object,
-        cast_shadow: node.get_bool(attributes, "cast-shadow"),
-        receive_shadow: node.get_bool(attributes, "receive-shadow"),
+        cast_shadow: extension.get_bool(attributes, "cast-shadow"),
+        receive_shadow: extension.get_bool(attributes, "receive-shadow"),
       )
 
     False -> Nil
@@ -313,12 +312,23 @@ fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
 }
 
 fn remove(
-  context: extension.Context,
+  runtime: runtime.Runtime,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> extension.Context {
-  let next_runtime =
-    runtime.remove_object(context.runtime, id, parent_id, object)
-  extension.Context(..context, runtime: next_runtime)
+) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
+  let next_runtime = runtime.remove_object(runtime, id, parent_id, object)
+  #(next_runtime, effect.none())
+}
+
+/// Internal node extension for primitive elements.
+pub fn ext() -> extension.Extension {
+  let observed_attributes = ["geometry", "hidden"]
+  extension.node_extension(
+    tag:,
+    observed_attributes:,
+    create:,
+    update:,
+    remove:,
+  )
 }

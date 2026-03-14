@@ -1,4 +1,4 @@
-//// Light node attributes and runtime integration.
+//// Light extension attributes and runtime integration.
 ////
 //// Lights are regular scene nodes. That means they can be positioned under
 //// groups, animated with transforms, and updated through normal Lustre view
@@ -11,33 +11,16 @@ import gleam/json
 import gleam/option
 import gleam/result
 import gleam_community/maths
+import lustre/effect
 import savoiardi.{type Object3D}
 
 import lustre/attribute.{type Attribute}
 
 import tiramisu/dev/extension
-import tiramisu/dev/runtime
-import tiramisu/internal/node
+import tiramisu/dev/runtime.{type Runtime}
 
 /// The custom element tag used for light nodes.
 pub const tag = "tiramisu-light"
-
-/// Internal node extension for light elements.
-pub fn extension() -> extension.Extension {
-  let observed_attributes = [
-    "type",
-    "color",
-    "intensity",
-    "cast-shadow",
-    "distance",
-    "angle",
-    "penumbra",
-    "sky",
-    "ground",
-  ]
-  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
-  |> extension.NodeExtension
-}
 
 pub fn ambient() -> Attribute(msg) {
   attribute.attribute("type", "ambient")
@@ -66,7 +49,7 @@ pub fn intensity(value: Float) -> Attribute(msg) {
 
 /// Set the light color as a hex integer.
 pub fn color(hex hex: Int) -> Attribute(msg) {
-  attribute.attribute("color", "#" <> int.to_base16(hex))
+  attribute.attribute("color", int.to_base16(hex))
 }
 
 /// Enable or disable shadow casting on the light.
@@ -103,54 +86,72 @@ pub fn ground(color: Int) -> Attribute(msg) {
 }
 
 fn create(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   attributes: dict.Dict(String, String),
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   let light = create_light(attributes)
-  let casts_shadow = node.get_bool(attributes, "cast-shadow")
+  let casts_shadow = extension.get_bool(attributes, "cast-shadow")
   savoiardi.set_light_cast_shadow(light, casts_shadow)
 
   let object = savoiardi.light_to_object3d(light)
-  let next_runtime =
-    runtime.add_object(context.runtime, id, object:, parent_id:, tag:)
-  extension.Context(..context, runtime: next_runtime)
+  let runtime = runtime.add_object(runtime, id, object:, parent_id:, tag:)
+  #(runtime, effect.none())
 }
 
 fn create_directional(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
-  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
+  let color =
+    extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
+  let intensity =
+    extension.get(attributes, "intensity", 1.0, extension.parse_number)
   savoiardi.create_directional_light(color:, intensity:)
 }
 
 fn create_point(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let distance = node.get(attributes, "distance", 0.0, node.parse_number)
-  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
-  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
+  let distance =
+    extension.get(attributes, "distance", 0.0, extension.parse_number)
+  let color =
+    extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
+  let intensity =
+    extension.get(attributes, "intensity", 1.0, extension.parse_number)
   savoiardi.create_point_light(color:, intensity:, distance:)
 }
 
 fn create_hemisphere(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let sky_color = node.get(attributes, "sky", 0x000000, node.parse_color)
-  let ground_color = node.get(attributes, "ground", 0x000000, node.parse_color)
-  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
+  let sky_color =
+    extension.get(attributes, "sky", 0x000000, int.base_parse(_, 16))
+  let ground_color =
+    extension.get(attributes, "ground", 0x000000, int.base_parse(_, 16))
+  let intensity =
+    extension.get(attributes, "intensity", 1.0, extension.parse_number)
   savoiardi.create_hemisphere_light(sky_color:, ground_color:, intensity:)
 }
 
 fn create_spot(attributes: dict.Dict(String, String)) -> savoiardi.Light {
-  let distance = node.get(attributes, "distance", 0.0, node.parse_number)
+  let distance =
+    extension.get(attributes, "distance", 0.0, extension.parse_number)
   let angle =
-    node.get(attributes, "angle", maths.pi() /. 4.0, node.parse_number)
-  let penumbra = node.get(attributes, "penumbra", 0.5, node.parse_number)
-  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
-  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
+    extension.get(
+      attributes,
+      "angle",
+      maths.pi() /. 4.0,
+      extension.parse_number,
+    )
+  let penumbra =
+    extension.get(attributes, "penumbra", 0.5, extension.parse_number)
+  let color =
+    extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
+  let intensity =
+    extension.get(attributes, "intensity", 1.0, extension.parse_number)
   savoiardi.create_spot_light(color:, intensity:, distance:, angle:, penumbra:)
 }
 
 fn create_ambient(attributes: dict.Dict(String, String)) {
-  let color = node.get(attributes, "color", 0xffffff, node.parse_color)
-  let intensity = node.get(attributes, "intensity", 1.0, node.parse_number)
+  let color =
+    extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
+  let intensity =
+    extension.get(attributes, "intensity", 1.0, extension.parse_number)
   savoiardi.create_ambient_light(color:, intensity:)
 }
 
@@ -165,18 +166,18 @@ fn create_light(attributes: dict.Dict(String, String)) -> savoiardi.Light {
 }
 
 fn update(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   _parent_id: String,
   object: option.Option(Object3D),
   attributes: dict.Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   case object {
     option.Some(object) -> {
-      let #(object, next_runtime) =
+      let #(object, runtime) =
         rebuild_light_if_needed(
-          context.runtime,
+          runtime,
           id,
           object,
           attributes,
@@ -184,20 +185,20 @@ fn update(
         )
       let light = savoiardi.object3d_to_light(object)
       let _ = update_light_properties(light, attributes, changed_attributes)
-      extension.Context(..context, runtime: next_runtime)
+      #(runtime, effect.none())
     }
 
-    option.None -> context
+    option.None -> #(runtime, effect.none())
   }
 }
 
 fn rebuild_light_if_needed(
-  scene_runtime: runtime.Runtime,
+  scene_runtime: Runtime,
   id: String,
   object: Object3D,
   attributes: dict.Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> #(Object3D, runtime.Runtime) {
+) -> #(Object3D, Runtime) {
   case extension.has_change(changed_attributes, "type") {
     True -> {
       let object = create_light(attributes) |> savoiardi.light_to_object3d
@@ -213,21 +214,16 @@ fn update_light_properties(
   attributes: dict.Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
-  case extension.has_change(changed_attributes, "cast-shadow") {
-    True ->
-      savoiardi.set_light_cast_shadow(
-        light,
-        node.get_bool(attributes, "cast-shadow"),
-      )
-
-    False -> Nil
+  case extension.bool_change(changed_attributes, "cast-shadow") {
+    Ok(casts_shadow) -> savoiardi.set_light_cast_shadow(light, casts_shadow)
+    Error(Nil) -> Nil
   }
 
   case extension.has_change(changed_attributes, "color") {
     True ->
       savoiardi.update_light_color(
         light,
-        node.get(attributes, "color", 0xffffff, node.parse_color),
+        extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16)),
       )
 
     False -> Nil
@@ -237,7 +233,7 @@ fn update_light_properties(
     True ->
       savoiardi.update_light_intensity(
         light,
-        node.get(attributes, "intensity", 1.0, node.parse_number),
+        extension.get(attributes, "intensity", 1.0, extension.parse_number),
       )
 
     False -> Nil
@@ -245,12 +241,32 @@ fn update_light_properties(
 }
 
 fn remove(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> extension.Context {
-  let next_runtime =
-    runtime.remove_object(context.runtime, id, parent_id, object)
-  extension.Context(..context, runtime: next_runtime)
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let runtime = runtime.remove_object(runtime, id, parent_id, object)
+  #(runtime, effect.none())
+}
+
+pub fn ext() -> extension.Extension {
+  let observed_attributes = [
+    "type",
+    "color",
+    "intensity",
+    "cast-shadow",
+    "distance",
+    "angle",
+    "penumbra",
+    "sky",
+    "ground",
+  ]
+  extension.node_extension(
+    tag:,
+    observed_attributes:,
+    create:,
+    update:,
+    remove:,
+  )
 }

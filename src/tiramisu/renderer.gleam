@@ -9,7 +9,6 @@
 //// ])
 //// ```
 
-import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/float
 import gleam/int
@@ -27,6 +26,8 @@ import lustre/element/html
 import savoiardi
 
 import tiramisu/dev/extension
+import tiramisu/internal/async_policy
+import tiramisu/internal/async_state
 import tiramisu/internal/element as dom_element
 import tiramisu/internal/renderer as renderer_runtime
 import tiramisu/internal/scene
@@ -36,22 +37,10 @@ pub const height = attribute.height
 
 pub const width = attribute.width
 
-/// The model for the renderer component.
-type PendingAsync {
-  PendingAsync(
-    scope: extension.AsyncScope,
-    key: extension.AsyncKey,
-    version: Int,
-    effect: extension.AsyncEffect,
-  )
-}
-
 type Model {
   Model(
     runtime: Option(scene.Runtime),
-    async_versions: dict.Dict(String, Int),
-    next_async_version: Int,
-    pending_async: List(PendingAsync),
+    async_state: async_state.State,
     runtime_generation: Int,
     in_flight_generation: Option(Int),
     reconcile_queued: Bool,
@@ -71,18 +60,22 @@ type Model {
 
 /// Messages for the renderer component.
 type AsyncMsg {
-  InitFinished(Int, scene.Runtime)
-  ReconcileFinished(Int, scene.Runtime)
-  RequestSpawned(
-    extension.AsyncScope,
-    extension.AsyncKey,
-    promise.Promise(extension.AsyncEffect),
+  InitFinished(
+    generation: Int,
+    runtime: scene.Runtime,
+    effects: effect.Effect(extension.Msg),
   )
+  ReconcileFinished(
+    generation: Int,
+    runtime: scene.Runtime,
+    effects: effect.Effect(extension.Msg),
+  )
+  Extension(extension.Msg)
   RequestResolved(
-    extension.AsyncScope,
-    extension.AsyncKey,
+    extension.RequestOwner,
+    extension.RequestKey,
     Int,
-    extension.AsyncEffect,
+    List(extension.RuntimeAction),
   )
 }
 
@@ -164,9 +157,7 @@ fn init(exts: extension.Extensions, _flags: Nil) -> #(Model, effect.Effect(Msg))
   #(
     Model(
       runtime: None,
-      async_versions: dict.new(),
-      next_async_version: 0,
-      pending_async: [],
+      async_state: async_state.new(),
       runtime_generation: 0,
       in_flight_generation: Some(0),
       reconcile_queued: False,
@@ -186,19 +177,15 @@ fn do_init(
 ) -> fn(fn(Msg) -> Nil, Dynamic, dom_element.HtmlElement) -> Nil {
   fn(dispatch, shadow_root, host) {
     let generation = 0
-    promise.map(
+    let #(runtime, effects) =
       scene.initialize(
         shadow_root,
         host,
         extensions,
         fn() { dispatch(ParentDomMutated) },
-        fn(scope, key, async_effect) {
-          on_async(scope, key, async_effect, dispatch)
-        },
         fn(timestamp_ms) { dispatch(Tick(timestamp_ms)) },
-      ),
-      fn(runtime) { dispatch(Async(InitFinished(generation, runtime))) },
-    )
+      )
+    dispatch(Async(InitFinished(generation:, runtime:, effects:)))
     Nil
   }
 }
@@ -235,37 +222,55 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 
 fn update_async(model: Model, msg: AsyncMsg) -> #(Model, effect.Effect(Msg)) {
   case msg {
-    InitFinished(generation, runtime) ->
-      finalize_runtime(model, generation, runtime)
-    ReconcileFinished(generation, runtime) ->
-      finalize_runtime(model, generation, runtime)
-    RequestSpawned(scope, key, task) ->
-      register_async_request(model, scope, key, task)
-    RequestResolved(scope, key, version, async_effect) ->
-      apply_async_effect(model, scope, key, version, async_effect)
+    InitFinished(generation, runtime, extension_effect) ->
+      finalize_runtime(model, generation, runtime, extension_effect)
+    ReconcileFinished(generation, runtime, extension_effect) ->
+      finalize_runtime(model, generation, runtime, extension_effect)
+    Extension(extension.NotifyResolved(tag, id, object)) ->
+      notify_resolved(model, tag, id, object)
+    Extension(extension.Spawn(owner:, key:, task:)) ->
+      register_async_request(model, owner, key, task)
+    RequestResolved(owner, key, version, actions) ->
+      apply_async_effect(model, owner, key, version, actions)
+  }
+}
+
+fn notify_resolved(
+  model: Model,
+  tag: String,
+  id: String,
+  object: savoiardi.Object3D,
+) -> #(Model, effect.Effect(Msg)) {
+  case model.runtime {
+    Some(runtime) -> #(
+      model,
+      execute_extension_effects(scene.notify_resolved_for_runtime(
+        runtime,
+        tag,
+        id,
+        object,
+      )),
+    )
+
+    None -> #(model, effect.none())
   }
 }
 
 fn register_async_request(
   model: Model,
-  scope: extension.AsyncScope,
-  key: extension.AsyncKey,
-  task: promise.Promise(extension.AsyncEffect),
+  owner: extension.RequestOwner,
+  key: extension.RequestKey,
+  task: promise.Promise(List(extension.RuntimeAction)),
 ) -> #(Model, effect.Effect(Msg)) {
-  let version = model.next_async_version + 1
-  let registry_key = async_registry_key(scope, key)
-  let model =
-    Model(
-      ..model,
-      async_versions: dict.insert(model.async_versions, registry_key, version),
-      next_async_version: version,
-    )
+  let #(async_state, version) =
+    async_state.register(model.async_state, owner, key)
+  let model = Model(..model, async_state:)
 
   #(
     model,
     effect.from(fn(dispatch) {
-      promise.map(task, fn(async_effect) {
-        dispatch(Async(RequestResolved(scope, key, version, async_effect)))
+      promise.map(task, fn(actions) {
+        dispatch(Async(RequestResolved(owner, key, version, actions)))
       })
       Nil
     }),
@@ -292,17 +297,12 @@ fn reconcile_runtime(model: Model) -> #(Model, effect.Effect(Msg)) {
           ..model,
           runtime_generation: generation,
           in_flight_generation: Some(generation),
-          pending_async: [],
           reconcile_queued: False,
         ),
         effect.from(fn(dispatch) {
-          promise.map(
-            scene.reconcile(runtime, fn(scope, key, async_effect) {
-              on_async(scope, key, async_effect, dispatch)
-            }),
-            fn(runtime) {
-              dispatch(Async(ReconcileFinished(generation, runtime)))
-            },
+          let #(runtime, extension_effect) = scene.reconcile(runtime)
+          dispatch(
+            Async(ReconcileFinished(generation, runtime, extension_effect)),
           )
           Nil
         }),
@@ -317,23 +317,35 @@ fn finalize_runtime(
   model: Model,
   generation: Int,
   runtime: scene.Runtime,
+  extension_effect: effect.Effect(extension.Msg),
 ) -> #(Model, effect.Effect(Msg)) {
   case model.in_flight_generation {
     Some(in_flight_generation) if in_flight_generation == generation -> {
-      let runtime =
-        list.fold(model.pending_async, runtime, fn(runtime, pending) {
-          apply_pending_async(model, runtime, pending)
+      let #(async_state, pending) = async_state.drain_pending(model.async_state)
+      let #(runtime, pending_effect) =
+        list.fold(pending, #(runtime, effect.none()), fn(acc, pending) {
+          let #(runtime, effects) = acc
+          let #(next_runtime, next_effect) =
+            apply_pending_async(model, runtime, pending)
+          #(next_runtime, effect.batch([effects, next_effect]))
         })
       let model =
         Model(
           ..model,
           runtime: Some(runtime),
-          pending_async: [],
+          async_state: async_state,
           in_flight_generation: None,
         )
+      let runtime_effect =
+        execute_extension_effects(
+          effect.batch([extension_effect, pending_effect]),
+        )
       case model.reconcile_queued {
-        True -> reconcile_runtime(model)
-        False -> #(model, effect.none())
+        True -> {
+          let #(model, reconcile_effect) = reconcile_runtime(model)
+          #(model, effect.batch([runtime_effect, reconcile_effect]))
+        }
+        False -> #(model, runtime_effect)
       }
     }
 
@@ -343,90 +355,82 @@ fn finalize_runtime(
 
 fn apply_async_effect(
   model: Model,
-  scope: extension.AsyncScope,
-  key: extension.AsyncKey,
+  owner: extension.RequestOwner,
+  key: extension.RequestKey,
   version: Int,
-  async_effect: extension.AsyncEffect,
+  actions: List(extension.RuntimeAction),
 ) -> #(Model, effect.Effect(Msg)) {
-  let is_current = case
-    dict.get(model.async_versions, async_registry_key(scope, key))
-  {
-    Ok(current_version) -> current_version == version
-    Error(Nil) -> False
+  let is_current =
+    async_state.is_current(model.async_state, owner, key, version)
+  let owner_exists = case model.runtime {
+    Some(runtime) -> scene.has_owner(runtime, owner)
+    None -> True
   }
-  case is_current {
-    False -> #(model, effect.none())
-    True ->
-      case model.in_flight_generation {
-        Some(_) -> #(
+
+  case
+    async_policy.request_resolution_outcome(
+      is_current:,
+      in_flight_generation: model.in_flight_generation != None,
+      runtime_available: model.runtime != None,
+      owner_exists:,
+    )
+  {
+    async_policy.DropRequestResolution -> #(model, effect.none())
+
+    async_policy.EnqueueForLater -> #(
+      Model(
+        ..model,
+        async_state: async_state.enqueue(
+          model.async_state,
+          owner,
+          key,
+          version,
+          actions,
+        ),
+      ),
+      effect.none(),
+    )
+
+    async_policy.ApplyNow ->
+      case model.runtime {
+        Some(runtime) -> {
+          let #(runtime, next_effect) = scene.apply_runtime_actions(runtime, actions)
+          #(
+            Model(..model, runtime: Some(runtime)),
+            execute_extension_effects(next_effect),
+          )
+        }
+
+        None -> #(
           Model(
             ..model,
-            pending_async: list.append(model.pending_async, [
-              PendingAsync(scope:, key:, version:, effect: async_effect),
-            ]),
+            async_state: async_state.enqueue(
+              model.async_state,
+              owner,
+              key,
+              version,
+              actions,
+            ),
           ),
           effect.none(),
         )
-
-        None ->
-          case model.runtime {
-            Some(runtime) -> {
-              let runtime = case scene.has_scope(runtime, scope) {
-                True -> scene.apply_async_effect(runtime, async_effect)
-                False -> runtime
-              }
-              #(Model(..model, runtime: Some(runtime)), effect.none())
-            }
-
-            None -> #(
-              Model(
-                ..model,
-                pending_async: list.append(model.pending_async, [
-                  PendingAsync(scope:, key:, version:, effect: async_effect),
-                ]),
-              ),
-              effect.none(),
-            )
-          }
       }
-  }
-}
-
-fn async_registry_key(
-  scope: extension.AsyncScope,
-  key: extension.AsyncKey,
-) -> String {
-  scope_to_string(scope) <> "::" <> key_to_string(key)
-}
-
-fn scope_to_string(scope: extension.AsyncScope) -> String {
-  case scope {
-    extension.SceneScope -> "scene"
-    extension.NodeScope(id) -> "node:" <> id
-    extension.CustomScope(value) -> "custom:" <> value
-  }
-}
-
-fn key_to_string(key: extension.AsyncKey) -> String {
-  extension.async_key_to_string(key)
+  }    
 }
 
 fn apply_pending_async(
   model: Model,
   runtime: scene.Runtime,
-  pending: PendingAsync,
-) -> scene.Runtime {
-  let PendingAsync(scope:, key:, version:, effect:) = pending
-  let is_current = case
-    dict.get(model.async_versions, async_registry_key(scope, key))
-  {
-    Ok(current_version) -> current_version == version
-    Error(Nil) -> False
-  }
+  pending: async_state.Pending,
+) -> #(scene.Runtime, effect.Effect(extension.Msg)) {
+  let async_state.Pending(owner:, key:, version:, actions:) = pending
+  let is_current =
+    async_state.is_current(model.async_state, owner, key, version)
+  let owner_exists = scene.has_owner(runtime, owner)
 
-  case is_current, scene.has_scope(runtime, scope) {
-    True, True -> scene.apply_async_effect(runtime, effect)
-    _, _ -> runtime
+  case async_policy.should_apply_pending_request(is_current:, owner_exists:) {
+    True -> scene.apply_runtime_actions(runtime, actions)
+    _ -> #(runtime, effect.none())
   }
 }
 
@@ -490,14 +494,11 @@ fn render_active_camera(runtime: scene.Runtime) -> Nil {
   }
 }
 
-fn on_async(
-  scope: extension.AsyncScope,
-  key: extension.AsyncKey,
-  async_effect: promise.Promise(extension.AsyncEffect),
-  dispatch: fn(Msg) -> Nil,
-) -> promise.Promise(Nil) {
-  dispatch(Async(RequestSpawned(scope, key, async_effect)))
-  promise.resolve(Nil)
+fn execute_extension_effects(
+  extension_effect: effect.Effect(extension.Msg),
+) -> effect.Effect(Msg) {
+  extension_effect
+  |> effect.map(fn(msg) { Async(Extension(msg)) })
 }
 
 // VIEW ------------------------------------------------------------------------

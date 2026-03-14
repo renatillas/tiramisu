@@ -5,18 +5,16 @@
 
 import gleam/dict
 import gleam/float
-import gleam/javascript/promise
 import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
 import lustre/attribute
+import lustre/effect
 import quaternion
 import savoiardi
-import tiramisu/dev/extension.{
-  type AttributeChanges, Attribute, AttributeExtension,
-}
-import tiramisu/internal/node
+import tiramisu/dev/extension.{type AttributeChanges}
+import tiramisu/dev/runtime
 import vec/vec3
 
 /// Set a node position in `x y z` form.
@@ -59,42 +57,12 @@ fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
   <> float.to_string(rotation.w)
 }
 
-/// Internal attribute extension that applies transforms to registered objects.
-pub fn extension() -> extension.Extension {
-  AttributeExtension(Attribute(
-    observed_attributes: ["position", "rotation", "scale"],
-    on_create: fn(_context, _tag, _id, object, attributes) {
-      case object {
-        // On objects that dont register themselves upon creation, we do nothing (yet)
-        option.None -> Nil
-        option.Some(object) -> apply_all(object, attributes)
-      }
-      promise.resolve(Nil)
-    },
-    on_update: fn(_context, _tag, _id, object, attributes, changed_attributes) {
-      case object {
-        option.None -> Nil
-        option.Some(object) -> {
-          apply_changed(object, attributes, changed_attributes)
-        }
-      }
-      promise.resolve(Nil)
-    },
-    on_remove: fn(_context, _id, _parent_id, _object) { promise.resolve(Nil) },
-    // Once the object has been resolved we can set the material
-    on_object_resolved: fn(_runtime, _on_async, _tag, _id, object, attributes) {
-      apply_all(object, attributes)
-      promise.resolve(Nil)
-    },
-  ))
-}
-
 fn apply_all(
   object: savoiardi.Object3D,
   attributes: dict.Dict(String, String),
 ) -> Nil {
-  apply_position(object, attributes)
-  apply_rotation(object, attributes)
+  let _ = apply_position(object, attributes)
+  let _ = apply_rotation(object, attributes)
   apply_scale(object, attributes)
 }
 
@@ -103,12 +71,12 @@ fn apply_changed(
   attributes: dict.Dict(String, String),
   changed_attributes: AttributeChanges,
 ) -> Nil {
-  case extension.has_change(changed_attributes, "position") {
+  let _ = case extension.has_change(changed_attributes, "position") {
     True -> apply_position(object, attributes)
     False -> Nil
   }
 
-  case extension.has_change(changed_attributes, "rotation") {
+  let _ = case extension.has_change(changed_attributes, "rotation") {
     True -> apply_rotation(object, attributes)
     False -> Nil
   }
@@ -179,6 +147,68 @@ fn vector_to_numbers(vector: String) -> Result(List(Float), Nil) {
   vector
   |> string.split(on: " ")
   |> list.map(string.trim)
-  |> list.map(node.parse_number)
+  |> list.map(extension.parse_number)
   |> result.all
+}
+
+fn on_create(
+  _runtime: runtime.Runtime,
+  _tag: String,
+  _id: String,
+  object: option.Option(savoiardi.Object3D),
+  attributes: dict.Dict(String, String),
+) -> effect.Effect(extension.Msg) {
+  let _ = case object {
+    // On objects that dont register themselves upon creation, we do nothing (yet)
+    option.None -> Nil
+    option.Some(object) -> apply_all(object, attributes)
+  }
+  effect.none()
+}
+
+fn on_update(
+  _runtime: runtime.Runtime,
+  _tag: String,
+  _id: String,
+  object: option.Option(savoiardi.Object3D),
+  attributes: dict.Dict(String, String),
+  changed_attributes: dict.Dict(String, extension.AttributeChange),
+) -> effect.Effect(extension.Msg) {
+  let _ = case object {
+    option.None -> Nil
+    option.Some(object) -> {
+      apply_changed(object, attributes, changed_attributes)
+    }
+  }
+  effect.none()
+}
+
+fn on_resolved(
+  _runtime: runtime.Runtime,
+  _tag: String,
+  _id: String,
+  object: savoiardi.Object3D,
+  attributes: dict.Dict(String, String),
+) -> effect.Effect(extension.Msg) {
+  let _ = apply_all(object, attributes)
+  effect.none()
+}
+
+fn on_remove(
+  _runtime: runtime.Runtime,
+  _tag: String,
+  _id: String,
+  _object: savoiardi.Object3D,
+) -> effect.Effect(extension.Msg) {
+  effect.none()
+}
+
+pub fn ext() -> extension.Extension {
+  extension.attribute_extension(
+    observed_attributes: ["position", "rotation", "scale"],
+    on_create:,
+    on_update:,
+    on_remove:,
+    on_resolved:,
+  )
 }

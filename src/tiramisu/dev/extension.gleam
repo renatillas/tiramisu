@@ -10,54 +10,134 @@
 //// want to define custom nodes or cross-cutting attribute behaviour.
 
 import gleam/dict.{type Dict}
+import gleam/float
+import gleam/int
 import gleam/javascript/promise
 import gleam/list
 import gleam/option.{type Option}
+import gleam/result
+import lustre/effect
 import savoiardi.{type CubeTexture, type Object3D, type Texture}
-import tiramisu/dev/runtime.{type Runtime}
+import tiramisu/dev/runtime
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
 
-pub type AsyncEffect {
-  NoOp
-  RegisterObject(id: String, parent_id: String, tag: String, object: Object3D)
-  ReplaceObject(id: String, object: Object3D)
-  SetBackgroundTexture(texture: Texture)
-  SetBackgroundCubeTexture(texture: CubeTexture)
+pub opaque type RuntimeAction {
+  RuntimeAction(fn(runtime.Runtime) -> #(runtime.Runtime, effect.Effect(Msg)))
 }
 
-pub type AsyncScope {
-  SceneScope
-  NodeScope(String)
-  CustomScope(String)
+pub fn action(
+  run: fn(runtime.Runtime) -> #(runtime.Runtime, effect.Effect(Msg)),
+) -> RuntimeAction {
+  RuntimeAction(run)
 }
 
-pub opaque type AsyncKey {
-  AsyncKey(String)
+pub fn register_object(
+  id: String,
+  parent_id: String,
+  tag: String,
+  object: Object3D,
+) -> RuntimeAction {
+  RuntimeAction(fn(rt) {
+    let runtime = runtime.add_object(rt, id, object, parent_id, tag)
+    #(
+      runtime,
+      effect.from(fn(dispatch) { dispatch(NotifyResolved(tag, id, object)) }),
+    )
+  })
 }
 
-pub fn async_key(value: String) -> AsyncKey {
-  AsyncKey(value)
+pub fn replace_object(id: String, object: Object3D) -> RuntimeAction {
+  RuntimeAction(fn(rt) {
+    let runtime = runtime.replace_object(rt, id, object)
+    let tag = case runtime.find_entry(runtime, id) {
+      Ok(runtime.ObjectEntry(tag:, ..)) -> tag
+      Error(Nil) -> ""
+    }
+    #(
+      runtime,
+      effect.from(fn(dispatch) { dispatch(NotifyResolved(tag, id, object)) }),
+    )
+  })
 }
 
-pub fn async_key_to_string(key: AsyncKey) -> String {
-  let AsyncKey(value) = key
+pub fn remove_object(
+  id: String,
+  parent_id: String,
+  object: Object3D,
+) -> RuntimeAction {
+  RuntimeAction(fn(rt) {
+    #(runtime.remove_object(rt, id, parent_id, object), effect.none())
+  })
+}
+
+pub fn set_background_texture(texture: Texture) -> RuntimeAction {
+  RuntimeAction(fn(rt) {
+    let _ = savoiardi.set_scene_background_texture(runtime.scene(rt), texture)
+    #(rt, effect.none())
+  })
+}
+
+pub fn set_background_cube_texture(texture: CubeTexture) -> RuntimeAction {
+  RuntimeAction(fn(rt) {
+    let _ =
+      savoiardi.set_scene_background_cube_texture(runtime.scene(rt), texture)
+    #(rt, effect.none())
+  })
+}
+
+@internal
+pub fn run_action(
+  action: RuntimeAction,
+  runtime: runtime.Runtime,
+) -> #(runtime.Runtime, effect.Effect(Msg)) {
+  let RuntimeAction(run) = action
+  run(runtime)
+}
+
+pub type RequestOwner {
+  SceneOwner
+  NodeOwner(String)
+  CustomOwner(String)
+}
+
+pub opaque type RequestKey {
+  RequestKey(String)
+}
+
+pub fn request_key(value: String) -> RequestKey {
+  RequestKey(value)
+}
+
+pub fn request_key_to_string(key: RequestKey) -> String {
+  let RequestKey(value) = key
   value
 }
 
-/// Context passed to all node extension handlers.
-/// Handlers receive the context, perform their work, and return an updated one.
-pub type Context {
-  Context(
-    runtime: Runtime,
-    /// TODO: DOCS
-    spawn: fn(AsyncScope, AsyncKey, promise.Promise(AsyncEffect)) ->
-      promise.Promise(Nil),
-    /// Called by async model loaders (mesh src=) after the model registers in
-    /// the registry, so attribute extensions can react to the resolved object.
-    /// Arguments: `(tag, id, object)`.
-    on_object_resolved: fn(String, String, Object3D) -> Nil,
+@internal
+pub fn request_owner_to_string(owner: RequestOwner) -> String {
+  case owner {
+    SceneOwner -> "scene"
+    NodeOwner(id) -> "node:" <> id
+    CustomOwner(value) -> "custom:" <> value
+  }
+}
+
+pub type Msg {
+  NotifyResolved(String, String, Object3D)
+  Spawn(
+    owner: RequestOwner,
+    key: RequestKey,
+    task: promise.Promise(List(RuntimeAction)),
   )
+}
+
+pub fn request(
+  owner: RequestOwner,
+  key: RequestKey,
+  task: promise.Promise(List(RuntimeAction)),
+) -> effect.Effect(Msg) {
+  effect.from(fn(dispatch) { dispatch(Spawn(owner:, key:, task:)) })
 }
 
 pub type AttributeChange {
@@ -72,114 +152,124 @@ pub type AttributeChanges =
 
 // NODE EXTENSION --------------------------------------------------------------
 
-/// Extension that handles a custom HTML element tag.
-///
-/// Built-in node types (mesh, camera, light, etc.) are implemented as `Node`
-/// extensions pre-registered at register() time. External packages can define
-/// their own by passing a `NodeExtension` variant to `tiramisu.register`.
+pub fn node_extension(
+  tag tag: String,
+  observed_attributes observed_attributes: List(String),
+  create create: fn(runtime.Runtime, String, String, Dict(String, String)) ->
+    #(runtime.Runtime, effect.Effect(Msg)),
+  update update: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Option(Object3D),
+    Dict(String, String),
+    Dict(String, AttributeChange),
+  ) ->
+    #(runtime.Runtime, effect.Effect(Msg)),
+  remove remove: fn(runtime.Runtime, String, String, Object3D) ->
+    #(runtime.Runtime, effect.Effect(Msg)),
+) -> Extension {
+  NodeExtension(Node(tag:, observed_attributes:, create:, update:, remove:))
+}
+
+pub fn attribute_extension(
+  observed_attributes observed_attributes: List(String),
+  on_create on_create: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Option(Object3D),
+    Dict(String, String),
+  ) ->
+    effect.Effect(Msg),
+  on_update on_update: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Option(Object3D),
+    Dict(String, String),
+    Dict(String, AttributeChange),
+  ) ->
+    effect.Effect(Msg),
+  on_remove on_remove: fn(runtime.Runtime, String, String, Object3D) ->
+    effect.Effect(Msg),
+  on_resolved on_resolved: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Object3D,
+    Dict(String, String),
+  ) ->
+    effect.Effect(Msg),
+) -> Extension {
+  AttributeExtension(Attribute(
+    observed_attributes:,
+    on_create:,
+    on_update:,
+    on_remove:,
+    on_resolved:,
+  ))
+}
+
+@internal
 pub type Node {
   Node(
     tag: String,
-    /// Attribute names this node type observes (added to MutationObserver filter).
     observed_attributes: List(String),
-    /// Called when a new element with this tag appears in the scene.
-    /// The order of arguments is as follows: 
-    /// - `context: Context`
-    /// - `element_id: String`
-    /// - `parent_id: String`
-    /// - `attributes: Dict(String, String)`
-    create: fn(Context, String, String, Dict(String, String)) -> Context,
-    /// Called when an existing element's attrs or transform change.
-    /// The order of arguments is as follows:
-    /// - `context: Context`
-    /// - `element_id: String`
-    /// - `parent_id: String`
-    /// - `object: Option(Object3D)`
-    /// - `attributes: Dict(String, String)`
-    /// - `changed_attributes: AttributeChanges`
+    create: fn(runtime.Runtime, String, String, Dict(String, String)) ->
+      #(runtime.Runtime, effect.Effect(Msg)),
     update: fn(
-      Context,
+      runtime.Runtime,
       String,
       String,
       Option(Object3D),
       Dict(String, String),
       AttributeChanges,
     ) ->
-      Context,
-    /// Called when an element is removed from the scene.
-    /// The handler is responsible for calling `runtime.remove_object`.
-    /// - `context: Context`
-    /// - `id: String`
-    /// - `parent_id: String`
-    /// - `object: Object3D`
-    remove: fn(Context, String, String, Object3D) -> Context,
+      #(runtime.Runtime, effect.Effect(Msg)),
+    remove: fn(runtime.Runtime, String, String, Object3D) ->
+      #(runtime.Runtime, effect.Effect(Msg)),
   )
 }
 
 // ATTRIBUTE EXTENSION ---------------------------------------------------------
 
-/// Extension that hooks into the lifecycle of any tiramisu-managed node.
-///
-/// Use this for side-effects such as physics or positional audio on existing
-/// elements. The hook fires for every node — use `attrs` and the presence of
-/// your custom attribute (e.g. `data-physics-body`) to decide whether to act.
+@internal
 pub type Attribute {
   Attribute(
-    /// Attribute names to observe on tiramisu elements.
-    /// Merged into the MutationObserver filter so DOM changes to these
-    /// attributes trigger a scene re-parse.
     observed_attributes: List(String),
-    /// Fires when any tiramisu node is created.
-    ///
-    /// - `tag`: the element HTML tag (e.g. `"tiramisu-mesh"`)
-    /// - `id`: the element's id attribute
-    /// - `object`: `None` for async `src=` meshes until the model loads
-    /// - `attrs`: all element attributes except id and transform
     on_create: fn(
-      Context,
+      runtime.Runtime,
       String,
       String,
       Option(Object3D),
       Dict(String, String),
     ) ->
-      promise.Promise(Nil),
-    /// Fires when any tiramisu node's attributes or transform change.
-    ///
-    /// - `tag`: the element HTML tag
-    /// - `id`: the element's id attribute
-    /// - `object`: `None` for async `src=` meshes until the model loads
-    /// - `attrs`: all element attributes except id and transform
-    /// - `changed_attributes`: semantic attribute changes for this update
+      effect.Effect(Msg),
     on_update: fn(
-      Context,
+      runtime.Runtime,
       String,
       String,
       Option(Object3D),
       Dict(String, String),
       AttributeChanges,
     ) ->
-      promise.Promise(Nil),
-    on_remove: fn(Context, String, String, Object3D) -> promise.Promise(Nil),
-    on_object_resolved: fn(
-      Runtime,
-      fn(AsyncScope, AsyncKey, promise.Promise(AsyncEffect)) ->
-        promise.Promise(Nil),
+      effect.Effect(Msg),
+    on_remove: fn(runtime.Runtime, String, String, Object3D) ->
+      effect.Effect(Msg),
+    on_resolved: fn(
+      runtime.Runtime,
       String,
       String,
       Object3D,
       Dict(String, String),
     ) ->
-      promise.Promise(Nil),
+      effect.Effect(Msg),
   )
 }
 
-// EXTENSION UNION -------------------------------------------------------------
-
-/// A tiramisu extension registered at startup via `tiramisu.register/1`.
-pub type Extension {
-  /// Handle a custom HTML element tag with full create/update/remove lifecycle.
+pub opaque type Extension {
   NodeExtension(Node)
-  /// Hook into the lifecycle of any tiramisu-managed node for side-effects.
   AttributeExtension(Attribute)
 }
 
@@ -258,4 +348,40 @@ pub fn was_removed(changes: AttributeChanges, key: String) -> Bool {
 /// Check whether any of the given attributes changed.
 pub fn has_any_change(changes: AttributeChanges, keys: List(String)) -> Bool {
   list.any(keys, has_change(changes, _))
+}
+
+pub fn get_bool(attributes: Dict(String, String), key: String) -> Bool {
+  case dict.get(attributes, key) {
+    Ok(_) -> True
+    Error(Nil) -> False
+  }
+}
+
+pub fn bool_change(
+  changes: AttributeChanges,
+  key: String,
+) -> Result(Bool, Nil) {
+  case change(changes, key) {
+    Ok(Removed) -> Ok(False)
+    Ok(Added(_)) | Ok(Updated(_)) -> Ok(True)
+    Error(Nil) -> Error(Nil)
+  }
+}
+
+pub fn get(
+  attributes attributes: Dict(String, String),
+  key key: String,
+  default default: a,
+  parse_fn parse_fn: fn(String) -> Result(a, Nil),
+) -> a {
+  dict.get(attributes, key)
+  |> result.try(parse_fn)
+  |> result.unwrap(default)
+}
+
+pub fn parse_number(number: String) -> Result(Float, Nil) {
+  case float.parse(number) {
+    Ok(float) -> Ok(float)
+    Error(Nil) -> result.map(int.parse(number), int.to_float)
+  }
 }

@@ -8,16 +8,19 @@ import gleam/dict.{type Dict}
 import gleam/dynamic/decode
 import gleam/javascript/promise
 import gleam/json
+import gleam/list
 import gleam/option.{type Option}
+import gleam/result
+import gleam/string
 import lustre/attribute.{type Attribute}
+import lustre/effect
 import lustre/event
 
 import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension
-import tiramisu/dev/runtime
+import tiramisu/dev/runtime.{type Runtime}
 import tiramisu/internal/element
-import tiramisu/internal/node
 
 /// The custom element tag used for asset-backed meshes.
 @internal
@@ -33,13 +36,6 @@ pub const hidden: fn(Bool) -> Attribute(a) = attribute.hidden
 /// Tiramisu resolves supported formats such as GLTF, GLB, OBJ, FBX, and STL
 /// through this attribute.
 pub const src: fn(String) -> Attribute(a) = attribute.src
-
-/// Internal node extension for mesh elements.
-pub fn extension() -> extension.Extension {
-  let observed_attributes = ["src", "hidden"]
-  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
-  |> extension.NodeExtension
-}
 
 /// Listen for successful model loading on this mesh.
 ///
@@ -86,32 +82,32 @@ pub fn receive_shadow(bool: Bool) -> Attribute(msg) {
 }
 
 fn create(
-  context: extension.Context,
+  context: Runtime,
   id: String,
   parent_id: String,
   attributes: Dict(String, String),
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   case dict.get(attributes, "src") {
-    Ok(src) -> {
-      context.spawn(
-        extension.NodeScope(id),
-        extension.async_key("src"),
-        register_model(context, id, parent_id, src, attributes, Register),
-      )
-      context
-    }
-    Error(Nil) -> context
+    Ok(src) -> #(
+      context,
+      extension.request(
+        extension.NodeOwner(id),
+        extension.request_key("src"),
+        register_model(id, parent_id, src, attributes, Register),
+      ),
+    )
+    Error(Nil) -> #(context, effect.none())
   }
 }
 
 fn update(
-  ctx: extension.Context,
+  ctx: Runtime,
   id: String,
   parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   case object {
     option.Some(object) -> {
       case
@@ -126,25 +122,24 @@ fn update(
       {
         Ok(next_context) -> next_context
         Error(Nil) -> {
-          set_object_attributes(object, attributes)
-          ctx
+          let _ = set_object_attributes(object, attributes)
+          #(ctx, effect.none())
         }
       }
     }
 
-    option.None -> ctx
+    option.None -> #(ctx, effect.none())
   }
 }
 
 fn remove(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> extension.Context {
-  let next_runtime =
-    runtime.remove_object(context.runtime, id, parent_id, object)
-  extension.Context(..context, runtime: next_runtime)
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let runtime = runtime.remove_object(runtime, id, parent_id, object)
+  #(runtime, effect.none())
 }
 
 pub type Mode {
@@ -153,48 +148,53 @@ pub type Mode {
 }
 
 fn register_model(
-  context: extension.Context,
   id: String,
   parent_id: String,
   src: String,
   attributes: Dict(String, String),
   mode: Mode,
-) -> promise.Promise(extension.AsyncEffect) {
-  case src {
-    "gltf" | "glb" -> create_gltf(src, id, parent_id, context, attributes, mode)
-    "fbx" -> create_fbx(src, id, parent_id, context, attributes, mode)
-    "obj" -> create_obj(src, id, parent_id, context, attributes, mode)
-    "stl" -> create_stl(src, id, parent_id, context, attributes, mode)
-    _ -> promise.resolve(extension.NoOp)
+) -> promise.Promise(List(extension.RuntimeAction)) {
+  case source_extension(src) {
+    "gltf" | "glb" -> create_gltf(src, id, parent_id, attributes, mode)
+    "fbx" -> create_fbx(src, id, parent_id, attributes, mode)
+    "obj" -> create_obj(src, id, parent_id, attributes, mode)
+    "stl" -> create_stl(src, id, parent_id, attributes, mode)
+    _ -> promise.resolve([])
   }
+}
+
+fn source_extension(src: String) -> String {
+  src
+  |> string.split("#")
+  |> list.first
+  |> result.unwrap(src)
+  |> string.split("?")
+  |> list.first
+  |> result.unwrap(src)
+  |> string.split(".")
+  |> list.last
+  |> result.unwrap("")
+  |> string.lowercase
 }
 
 fn create_stl(
   src: String,
   id: String,
   parent_id: String,
-  _context: extension.Context,
   attributes: Dict(String, String),
   mode: Mode,
-) -> promise.Promise(extension.AsyncEffect) {
+) -> promise.Promise(List(extension.RuntimeAction)) {
   use result <- promise.await(savoiardi.load_stl(src))
   case result {
-    Error(Nil) -> {
-      element.dispatch_event(
-        id,
-        "tiramisu:model-error",
-        json.object([#("id", json.string(id))]),
-      )
-      promise.resolve(extension.NoOp)
-    }
+    Error(Nil) -> promise.resolve([emit_model_error(id)])
     Ok(geometry) -> {
-      let geometry = case node.get_bool(attributes, "center") {
+      let geometry = case extension.get_bool(attributes, "center") {
         True -> savoiardi.center_geometry(geometry)
         False -> geometry
       }
       let object = savoiardi.create_mesh(geometry)
-      set_object_attributes(object, attributes)
-      promise.resolve(build_async_effect(mode, id, parent_id, object))
+      let _ = set_object_attributes(object, attributes)
+      promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
   }
 }
@@ -203,23 +203,15 @@ fn create_obj(
   src: String,
   id: String,
   parent_id: String,
-  _context: extension.Context,
   attributes: Dict(String, String),
   mode: Mode,
-) -> promise.Promise(extension.AsyncEffect) {
+) -> promise.Promise(List(extension.RuntimeAction)) {
   use result <- promise.await(savoiardi.load_obj(src))
   case result {
-    Error(_) -> {
-      element.dispatch_event(
-        id,
-        "tiramisu:model-error",
-        json.object([#("id", json.string(id))]),
-      )
-      promise.resolve(extension.NoOp)
-    }
+    Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(object) -> {
       set_object_attributes(object, attributes)
-      promise.resolve(build_async_effect(mode, id, parent_id, object))
+      promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
   }
 }
@@ -228,24 +220,16 @@ fn create_fbx(
   src: String,
   id: String,
   parent_id: String,
-  _context: extension.Context,
   attributes: Dict(String, String),
   mode: Mode,
-) -> promise.Promise(extension.AsyncEffect) {
+) -> promise.Promise(List(extension.RuntimeAction)) {
   use result <- promise.await(savoiardi.load_fbx(src))
   case result {
-    Error(_) -> {
-      element.dispatch_event(
-        id,
-        "tiramisu:model-error",
-        json.object([#("id", json.string(id))]),
-      )
-      promise.resolve(extension.NoOp)
-    }
+    Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(data) -> {
       let object = savoiardi.get_fbx_scene(data)
       set_object_attributes(object, attributes)
-      promise.resolve(build_async_effect(mode, id, parent_id, object))
+      promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
   }
 }
@@ -254,24 +238,16 @@ fn create_gltf(
   src: String,
   id: String,
   parent_id: String,
-  _context: extension.Context,
   attributes: Dict(String, String),
   mode: Mode,
-) -> promise.Promise(extension.AsyncEffect) {
+) -> promise.Promise(List(extension.RuntimeAction)) {
   use result <- promise.await(savoiardi.load_gltf(src))
   case result {
-    Error(_) -> {
-      element.dispatch_event(
-        id,
-        "tiramisu:model-error",
-        json.object([#("id", json.string(id))]),
-      )
-      promise.resolve(extension.NoOp)
-    }
+    Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(data) -> {
       let object = savoiardi.get_gltf_scene(data)
       set_object_attributes(object, attributes)
-      promise.resolve(build_async_effect(mode, id, parent_id, object))
+      promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
   }
 }
@@ -280,61 +256,90 @@ fn set_object_attributes(
   object: Object3D,
   attributes: Dict(String, String),
 ) -> Nil {
-  savoiardi.set_object_visible(object, !node.get_bool(attributes, "hidden"))
+  savoiardi.set_object_visible(
+    object,
+    !extension.get_bool(attributes, "hidden"),
+  )
   savoiardi.enable_shadows(
     object,
-    cast_shadow: node.get_bool(attributes, "cast-shadow"),
-    receive_shadow: node.get_bool(attributes, "receive-shadow"),
+    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
+    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
   )
 }
 
-fn build_async_effect(
+fn build_runtime_actions(
   mode: Mode,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> extension.AsyncEffect {
-  element.dispatch_event(
-    id,
-    "tiramisu:model-loaded",
-    json.object([#("id", json.string(id))]),
-  )
+) -> List(extension.RuntimeAction) {
   case mode {
-    Register -> extension.RegisterObject(id:, parent_id:, tag:, object:)
-    Replace -> extension.ReplaceObject(id:, object:)
+    Register -> [
+      extension.register_object(id, parent_id, tag, object),
+      emit_model_loaded(id),
+    ]
+    Replace -> [extension.replace_object(id, object), emit_model_loaded(id)]
   }
 }
 
+fn emit_model_loaded(id: String) -> extension.RuntimeAction {
+  extension.action(fn(runtime) {
+    element.dispatch_event(
+      id,
+      "tiramisu:model-loaded",
+      json.object([#("id", json.string(id))]),
+    )
+    #(runtime, effect.none())
+  })
+}
+
+fn emit_model_error(id: String) -> extension.RuntimeAction {
+  extension.action(fn(runtime) {
+    element.dispatch_event(
+      id,
+      "tiramisu:model-error",
+      json.object([#("id", json.string(id))]),
+    )
+    #(runtime, effect.none())
+  })
+}
+
 fn reload_model_if_needed(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   object: Object3D,
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Result(extension.Context, Nil) {
+) -> Result(#(Runtime, effect.Effect(extension.Msg)), Nil) {
   case extension.change(changed_attributes, "src") {
     Ok(extension.Removed) ->
-      extension.Context(
-        ..context,
-        runtime: runtime.remove_object(context.runtime, id, parent_id, object),
+      Ok(#(runtime.remove_object(runtime, id, parent_id, object), effect.none()))
+
+    Ok(extension.Added(_)) | Ok(extension.Updated(_)) -> {
+      use src <- result.map(dict.get(attributes, "src"))
+      #(
+        runtime,
+        extension.request(
+          extension.NodeOwner(id),
+          extension.request_key("src"),
+          register_model(id, parent_id, src, attributes, Replace),
+        ),
       )
-      |> Ok
-
-    Ok(extension.Added(_)) | Ok(extension.Updated(_)) ->
-      case dict.get(attributes, "src") {
-        Ok(src) -> {
-          context.spawn(
-            extension.NodeScope(id),
-            extension.async_key("src"),
-            register_model(context, id, parent_id, src, attributes, Replace),
-          )
-          Error(Nil)
-        }
-
-        Error(Nil) -> Error(Nil)
-      }
+    }
 
     Error(Nil) -> Error(Nil)
   }
+}
+
+/// Internal node extension for mesh elements.
+pub fn ext() -> extension.Extension {
+  let observed_attributes = ["src", "hidden"]
+  extension.node_extension(
+    tag:,
+    observed_attributes:,
+    create:,
+    update:,
+    remove:,
+  )
 }

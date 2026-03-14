@@ -1,4 +1,4 @@
-//// Camera node attributes and runtime integration.
+//// Camera extension attributes and runtime integration.
 ////
 //// Cameras are scene nodes, not renderer configuration. They can live anywhere
 //// in the scene hierarchy and inherit parent transforms like other objects.
@@ -23,32 +23,15 @@ import gleam/json
 import gleam/option.{type Option}
 import gleam/result
 import lustre/attribute.{type Attribute}
+import lustre/effect
 import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension
-import tiramisu/dev/runtime
-import tiramisu/internal/node
+import tiramisu/dev/runtime.{type Runtime}
 import vec/vec2
 
 /// The custom element tag used for camera nodes.
 pub const tag = "tiramisu-camera"
-
-/// Internal node extension for camera elements.
-pub fn extension() -> extension.Extension {
-  let observed_attributes = [
-    "active",
-    "type",
-    "fov",
-    "near",
-    "far",
-    "left",
-    "right",
-    "top",
-    "bottom",
-  ]
-  extension.Node(tag:, observed_attributes:, create:, update:, remove:)
-  |> extension.NodeExtension
-}
 
 /// Supported camera kinds.
 pub type Camera {
@@ -113,32 +96,35 @@ pub fn bottom(value: Float) -> Attribute(msg) {
 }
 
 fn remove(
-  ctx: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   object: Object3D,
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   let next_runtime =
-    ctx.runtime
+    runtime
     |> runtime.remove_object(id, parent_id, object)
     |> runtime.deactivate_camera(id)
-  extension.Context(..ctx, runtime: next_runtime)
+  #(next_runtime, effect.none())
 }
 
 fn create(
-  ctx: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   attributes: Dict(String, String),
-) -> extension.Context {
-  let near = node.get(attributes, "near", 0.1, node.parse_number)
-  let far = node.get(attributes, "far", 1000.0, node.parse_number)
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let near = extension.get(attributes, "near", 0.1, extension.parse_number)
+  let far = extension.get(attributes, "far", 1000.0, extension.parse_number)
   let camera = case dict.get(attributes, "type") {
     Ok("orthographic") -> {
-      let left = node.get(attributes, "left", -10.0, node.parse_number)
-      let right = node.get(attributes, "right", 10.0, node.parse_number)
-      let top = node.get(attributes, "top", 10.0, node.parse_number)
-      let bottom = node.get(attributes, "bottom", -10.0, node.parse_number)
+      let left =
+        extension.get(attributes, "left", -10.0, extension.parse_number)
+      let right =
+        extension.get(attributes, "right", 10.0, extension.parse_number)
+      let top = extension.get(attributes, "top", 10.0, extension.parse_number)
+      let bottom =
+        extension.get(attributes, "bottom", -10.0, extension.parse_number)
       savoiardi.create_orthographic_camera(
         left:,
         right:,
@@ -149,69 +135,78 @@ fn create(
       )
     }
     _ -> {
-      let fov = node.get(attributes, "fov", 75.0, node.parse_number)
-      let aspect = get_canvas_ratio(ctx.runtime)
+      let fov = extension.get(attributes, "fov", 75.0, extension.parse_number)
+      let aspect = get_canvas_ratio(runtime)
       savoiardi.create_perspective_camera(fov:, aspect:, near:, far:)
     }
   }
   let object = savoiardi.camera_to_object3d(camera)
-  let active = node.get_bool(attributes, "active")
-  let next_runtime =
-    ctx.runtime
+  let active = extension.get_bool(attributes, "active")
+  let runtime =
+    runtime
     |> runtime.add_object(id, object:, parent_id:, tag:)
     |> when(active, do: runtime.activate_camera(_, id, camera))
-  extension.Context(..ctx, runtime: next_runtime)
+
+  #(runtime, effect.none())
 }
 
 fn update(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   case
     extension.has_change(changed_attributes, "type"),
     dict.get(attributes, "type") |> result.unwrap("perspective")
   {
     True, "perspective" | True, "orthographic" ->
-      recreate_camera(context, id, parent_id, object, attributes)
+      recreate_camera(runtime, id, parent_id, object, attributes)
 
     False, "perspective" ->
-      update_perspective(context, id, object, attributes, changed_attributes)
-      |> result.unwrap(context)
+      update_perspective(runtime, id, object, attributes, changed_attributes)
+      |> result.unwrap(runtime)
+      |> with_no_effect
 
     False, "orthographic" ->
-      update_orthographic(context, id, object, attributes, changed_attributes)
-      |> result.unwrap(context)
+      update_orthographic(runtime, id, object, attributes, changed_attributes)
+      |> result.unwrap(runtime)
+      |> with_no_effect
 
-    _, _ -> context
+    _, _ -> #(runtime, effect.none())
   }
 }
 
 fn recreate_camera(
-  context: extension.Context,
+  context: Runtime,
   id: String,
   parent_id: String,
   object: Option(Object3D),
   attributes: Dict(String, String),
-) -> extension.Context {
+) -> #(Runtime, effect.Effect(extension.Msg)) {
   case object {
-    option.Some(object) ->
-      remove(context, id, parent_id, object)
-      |> create(id, parent_id, attributes)
-    option.None -> context
+    option.Some(object) -> {
+      let #(context, remove_effect) = remove(context, id, parent_id, object)
+      let #(context, create_effect) = create(context, id, parent_id, attributes)
+      #(context, effect.batch([remove_effect, create_effect]))
+    }
+    option.None -> #(context, effect.none())
   }
 }
 
+fn with_no_effect(context: Runtime) -> #(Runtime, effect.Effect(extension.Msg)) {
+  #(context, effect.none())
+}
+
 fn update_orthographic(
-  context: extension.Context,
+  context: Runtime,
   id: String,
   object: Option(Object3D),
   new_attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Result(extension.Context, Nil) {
+) -> Result(Runtime, Nil) {
   case object {
     option.Some(object) -> {
       let camera = savoiardi.object3d_to_camera(object)
@@ -270,12 +265,12 @@ fn do_update_orthographic(
 }
 
 fn update_perspective(
-  context: extension.Context,
+  context: Runtime,
   id: String,
   object: Option(Object3D),
   new_attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Result(extension.Context, Nil) {
+) -> Result(Runtime, Nil) {
   case object {
     option.Some(object) -> {
       let camera = savoiardi.object3d_to_camera(object)
@@ -295,40 +290,21 @@ fn update_perspective(
 }
 
 fn conditionally_set_active(
-  context: extension.Context,
+  runtime: Runtime,
   id: String,
   camera: savoiardi.Camera,
-  new_attributes: Dict(String, String),
+  _new_attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> extension.Context {
-  case extension.change(changed_attributes, "active") {
-    Ok(extension.Removed) ->
-      extension.Context(
-        ..context,
-        runtime: runtime.deactivate_camera(context.runtime, id),
-      )
-
-    Ok(extension.Added(_)) | Ok(extension.Updated(_)) ->
-      case node.get_bool(new_attributes, "active") {
-        True ->
-          extension.Context(
-            ..context,
-            runtime: runtime.activate_camera(context.runtime, id, camera),
-          )
-
-        False ->
-          extension.Context(
-            ..context,
-            runtime: runtime.deactivate_camera(context.runtime, id),
-          )
-      }
-
-    Error(Nil) -> context
+) -> Runtime {
+  case extension.bool_change(changed_attributes, "active") {
+    Ok(True) -> runtime.activate_camera(runtime, id, camera)
+    Ok(False) -> runtime.deactivate_camera(runtime, id)
+    Error(Nil) -> runtime
   }
 }
 
 fn do_update_perspective(
-  context: extension.Context,
+  runtime: Runtime,
   camera: savoiardi.Camera,
   changed_attributes: extension.AttributeChanges,
   attributes: Dict(String, String),
@@ -345,7 +321,7 @@ fn do_update_perspective(
       let fov = get_fov(attributes)
       let near = get_near(attributes)
       let far = get_far(attributes)
-      let aspect = get_canvas_ratio(context.runtime)
+      let aspect = get_canvas_ratio(runtime)
       savoiardi.set_perspective_camera_params(
         camera,
         fov:,
@@ -360,49 +336,69 @@ fn do_update_perspective(
 }
 
 fn get_fov(attributes: Dict(String, String)) -> Float {
-  node.get(attributes:, key: "fov", default: 75.0, parse_fn: node.parse_number)
+  extension.get(
+    attributes:,
+    key: "fov",
+    default: 75.0,
+    parse_fn: extension.parse_number,
+  )
 }
 
 fn get_near(attributes: Dict(String, String)) -> Float {
-  node.get(attributes:, key: "near", default: 0.1, parse_fn: node.parse_number)
+  extension.get(
+    attributes:,
+    key: "near",
+    default: 0.1,
+    parse_fn: extension.parse_number,
+  )
 }
 
 fn get_far(attributes: Dict(String, String)) -> Float {
-  node.get(
+  extension.get(
     attributes:,
     key: "far",
     default: 1000.0,
-    parse_fn: node.parse_number,
+    parse_fn: extension.parse_number,
   )
 }
 
 fn get_left(attributes: Dict(String, String)) -> Float {
-  node.get(attributes:, key: "left", default: 10.0, parse_fn: node.parse_number)
+  extension.get(
+    attributes:,
+    key: "left",
+    default: 10.0,
+    parse_fn: extension.parse_number,
+  )
 }
 
 fn get_right(attributes: Dict(String, String)) -> Float {
-  node.get(
+  extension.get(
     attributes:,
     key: "right",
     default: 10.0,
-    parse_fn: node.parse_number,
+    parse_fn: extension.parse_number,
   )
 }
 
 fn get_top(attributes: Dict(String, String)) -> Float {
-  node.get(attributes:, key: "top", default: 10.0, parse_fn: node.parse_number)
-}
-
-fn get_bottom(attributes: Dict(String, String)) -> Float {
-  node.get(
+  extension.get(
     attributes:,
-    key: "bottom",
-    default: -10.0,
-    parse_fn: node.parse_number,
+    key: "top",
+    default: 10.0,
+    parse_fn: extension.parse_number,
   )
 }
 
-fn get_canvas_ratio(runtime: runtime.Runtime) -> Float {
+fn get_bottom(attributes: Dict(String, String)) -> Float {
+  extension.get(
+    attributes:,
+    key: "bottom",
+    default: -10.0,
+    parse_fn: extension.parse_number,
+  )
+}
+
+fn get_canvas_ratio(runtime: Runtime) -> Float {
   let vec2.Vec2(x: width, y: height) =
     savoiardi.get_canvas_dimensions(runtime.threejs_renderer(runtime))
   case height {
@@ -416,4 +412,25 @@ fn when(value: a, condition: Bool, do callback: fn(a) -> a) -> a {
     True -> callback(value)
     False -> value
   }
+}
+
+pub fn ext() -> extension.Extension {
+  let observed_attributes = [
+    "active",
+    "type",
+    "fov",
+    "near",
+    "far",
+    "left",
+    "right",
+    "top",
+    "bottom",
+  ]
+  extension.node_extension(
+    tag:,
+    observed_attributes:,
+    create:,
+    update:,
+    remove:,
+  )
 }
