@@ -107,7 +107,7 @@ pub fn add_object(
   let objects =
     dict.insert(runtime.objects, id, ObjectEntry(object:, parent_id:, tag:))
   // Store on DOM element so external integrations (cacao physics) can find it
-  element.store_object(id, object)
+  let _ = element.store_object(id, object)
   Runtime(..runtime, objects:)
 }
 
@@ -126,7 +126,7 @@ pub fn remove_object(
   // Remove from maps
   let objects = dict.delete(runtime.objects, id)
   // Clear DOM reference
-  element.clear_object(id)
+  let _ = element.clear_object(id)
   Runtime(..runtime, objects:)
 }
 
@@ -165,7 +165,7 @@ pub fn replace_object(
       let objects =
         dict.insert(runtime.objects, id, ObjectEntry(..entry, object: replaced))
       // Update DOM reference to point to the new object
-      element.store_object(id, replaced)
+      let _ = element.store_object(id, replaced)
       Runtime(..runtime, objects:)
     }
     _ -> runtime

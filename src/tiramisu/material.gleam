@@ -438,14 +438,15 @@ fn apply_texture(
 
 fn emit_texture_error(id: String, url: String) -> extension.RuntimeAction {
   extension.action(fn(rt) {
-    element.dispatch_event(
-      id,
-      "tiramisu:load-texture-error",
-      json.object([
-        #("id", json.string(id)),
-        #("src", json.string(url)),
-      ]),
-    )
+    let _ =
+      element.dispatch_event(
+        id,
+        "tiramisu:load-texture-error",
+        json.object([
+          #("id", json.string(id)),
+          #("src", json.string(url)),
+        ]),
+      )
     #(rt, effect.none())
   })
 }

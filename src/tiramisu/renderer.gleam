@@ -36,11 +36,11 @@ import lustre/element/html
 import savoiardi
 
 import tiramisu/dev/extension
+import tiramisu/dev/runtime
 import tiramisu/internal/async_state
-import tiramisu/internal/element as dom_element
-import tiramisu/internal/renderer as renderer_runtime
-import tiramisu/internal/scene
+import tiramisu/internal/element as html_element
 import tiramisu/internal/web_component
+import tiramisu/scene
 
 /// Set the renderer canvas height in CSS pixels.
 pub const height = attribute.height
@@ -50,7 +50,7 @@ pub const width = attribute.width
 
 type Model {
   Model(
-    runtime: Option(scene.Runtime),
+    runtime: Option(Runtime),
     async_state: async_state.State,
     runtime_generation: Int,
     in_flight_generation: Option(Int),
@@ -73,12 +73,12 @@ type Model {
 type AsyncMsg {
   InitFinished(
     generation: Int,
-    runtime: scene.Runtime,
+    runtime: Runtime,
     effects: effect.Effect(extension.Msg),
   )
   ReconcileFinished(
     generation: Int,
-    runtime: scene.Runtime,
+    runtime: Runtime,
     effects: effect.Effect(extension.Msg),
   )
   Extension(extension.Msg)
@@ -101,6 +101,17 @@ type Msg {
   AlphaSet(Bool)
   AlphaToggled
   Tick(Float)
+}
+
+type Runtime {
+  Runtime(
+    runtime: runtime.Runtime,
+    scene_id: String,
+    root: html_element.HtmlElement,
+    previous_nodes: List(scene.Node),
+    background_signature: Option(String),
+    extensions: extension.Extensions,
+  )
 }
 
 // COMPONENT -------------------------------------------------------------------
@@ -185,11 +196,11 @@ fn init(exts: extension.Extensions, _flags: Nil) -> #(Model, effect.Effect(Msg))
 
 fn do_init(
   extensions: extension.Extensions,
-) -> fn(fn(Msg) -> Nil, Dynamic, dom_element.HtmlElement) -> Nil {
+) -> fn(fn(Msg) -> Nil, Dynamic, html_element.HtmlElement) -> Nil {
   fn(dispatch, shadow_root, host) {
     let generation = 0
     let #(runtime, effects) =
-      scene.initialize(
+      initialize_scene_runtime(
         shadow_root,
         host,
         extensions,
@@ -199,6 +210,42 @@ fn do_init(
     dispatch(Async(InitFinished(generation:, runtime:, effects:)))
     Nil
   }
+}
+
+fn initialize_scene_runtime(
+  shadow_root: Dynamic,
+  host: html_element.HtmlElement,
+  extensions: extension.Extensions,
+  on_dom_mutated: fn() -> Nil,
+  on_tick: fn(Float) -> Nil,
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let #(scene_id, root) = scene.find_root(host)
+  let renderer_runtime = initialize(shadow_root, host, scene_id, on_tick)
+
+  html_element.observe_mutations(
+    host,
+    list.append(scene.observed_attributes(), extensions.observed_attributes),
+    on_dom_mutated,
+  )
+
+  let #(renderer_runtime, extension_effect) =
+    scene.apply_scene_attributes(renderer_runtime, root, None)
+
+  let initial_nodes = scene.parse(root, extensions)
+  let #(runtime, reconcile_effect) =
+    reconcile_nodes(renderer_runtime, [], initial_nodes, scene_id, extensions)
+
+  #(
+    Runtime(
+      runtime:,
+      scene_id:,
+      root:,
+      previous_nodes: initial_nodes,
+      background_signature: None,
+      extensions:,
+    ),
+    effect.batch([extension_effect, reconcile_effect]),
+  )
 }
 
 // UPDATE ----------------------------------------------------------------------
@@ -253,15 +300,22 @@ fn notify_resolved(
   object: savoiardi.Object3D,
 ) -> #(Model, effect.Effect(Msg)) {
   case model.runtime {
-    Some(runtime) -> #(
-      model,
-      execute_extension_effects(scene.notify_resolved_for_runtime(
-        runtime,
-        tag,
-        id,
-        object,
-      )),
-    )
+    Some(runtime) ->
+      case html_element.find(id) {
+        Ok(node) -> #(
+          model,
+          execute_extension_effects(scene.notify_resolved(
+            runtime.extensions,
+            runtime.runtime,
+            tag,
+            id,
+            object,
+            html_element.attributes(node),
+          )),
+        )
+
+        Error(Nil) -> #(model, effect.none())
+      }
 
     None -> #(model, effect.none())
   }
@@ -311,7 +365,7 @@ fn reconcile_runtime(model: Model) -> #(Model, effect.Effect(Msg)) {
           reconcile_queued: False,
         ),
         effect.from(fn(dispatch) {
-          let #(runtime, extension_effect) = scene.reconcile(runtime)
+          let #(runtime, extension_effect) = reconcile(runtime)
           dispatch(
             Async(ReconcileFinished(generation, runtime, extension_effect)),
           )
@@ -327,20 +381,20 @@ fn reconcile_runtime(model: Model) -> #(Model, effect.Effect(Msg)) {
 fn finalize_runtime(
   model: Model,
   generation: Int,
-  runtime: scene.Runtime,
+  runtime: Runtime,
   extension_effect: effect.Effect(extension.Msg),
 ) -> #(Model, effect.Effect(Msg)) {
   case model.in_flight_generation {
     Some(in_flight_generation) if in_flight_generation == generation -> {
       let #(next_async_state, ready_actions) =
         async_state.drain_ready(model.async_state, fn(owner) {
-          scene.has_owner(runtime, owner)
+          has_owner(runtime, owner)
         })
       let #(runtime, pending_effect) =
         list.fold(ready_actions, #(runtime, effect.none()), fn(acc, actions) {
           let #(runtime, effects) = acc
           let #(next_runtime, next_effect) =
-            scene.apply_runtime_actions(runtime, actions)
+            apply_runtime_actions_to_runtime(runtime, actions)
           #(next_runtime, effect.batch([effects, next_effect]))
         })
       let model =
@@ -403,7 +457,7 @@ fn apply_async_effect(
 
 fn does_owner_exist(model: Model, owner: extension.RequestOwner) -> Bool {
   case model.runtime {
-    Some(runtime) -> scene.has_owner(runtime, owner)
+    Some(runtime) -> has_owner(runtime, owner)
     None -> True
   }
 }
@@ -416,7 +470,7 @@ fn apply_runtime_actions(
   case model.runtime {
     Some(runtime) -> {
       let #(next_runtime, next_effect) =
-        scene.apply_runtime_actions(runtime, actions)
+        apply_runtime_actions_to_runtime(runtime, actions)
       #(
         Model(
           ..model,
@@ -434,7 +488,12 @@ fn apply_runtime_actions(
 fn resize_width(model: Model, width: Int) -> #(Model, effect.Effect(Msg)) {
   let model = Model(..model, width:)
   let effect = case model.runtime {
-    Some(runtime) -> resize_effect(scene.renderer(runtime), width, model.height)
+    Some(runtime) ->
+      resize_effect(
+        runtime.runtime |> runtime.threejs_renderer,
+        width,
+        model.height,
+      )
     None -> effect.none()
   }
   #(model, effect)
@@ -443,7 +502,12 @@ fn resize_width(model: Model, width: Int) -> #(Model, effect.Effect(Msg)) {
 fn resize_height(model: Model, height: Int) -> #(Model, effect.Effect(Msg)) {
   let model = Model(..model, height:)
   let effect = case model.runtime {
-    Some(runtime) -> resize_effect(scene.renderer(runtime), model.width, height)
+    Some(runtime) ->
+      resize_effect(
+        runtime.runtime |> runtime.threejs_renderer,
+        model.width,
+        height,
+      )
     None -> effect.none()
   }
   #(model, effect)
@@ -454,7 +518,7 @@ fn resize_effect(
   width: Int,
   height: Int,
 ) -> effect.Effect(Msg) {
-  effect.from(fn(_) { renderer_runtime.resize(renderer, width, height) })
+  effect.from(fn(_) { resize(renderer, width, height) })
 }
 
 fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
@@ -468,7 +532,13 @@ fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
     Some(runtime) ->
       effect.from(fn(_) {
         let delta_ms = float.round(delta_ms) |> int.to_float
-        scene.dispatch_tick(runtime, delta_ms, timestamp_ms |> float.round)
+        // This could error if the scene is not present
+        let _ =
+          scene.dispatch_tick(
+            runtime.scene_id,
+            delta_ms,
+            timestamp_ms |> float.round,
+          )
         render_active_camera(runtime)
       })
 
@@ -478,16 +548,98 @@ fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
   #(model, effect)
 }
 
-fn render_active_camera(runtime: scene.Runtime) -> Nil {
-  case scene.active_camera(runtime) {
+fn render_active_camera(runtime: Runtime) -> Nil {
+  case runtime.runtime |> runtime.active_camera {
     Ok(camera) ->
       savoiardi.render(
-        scene.renderer(runtime),
-        scene.root_scene(runtime),
+        runtime.runtime |> runtime.threejs_renderer,
+        runtime.runtime |> runtime.scene,
         camera,
       )
 
     Error(Nil) -> Nil
+  }
+}
+
+fn reconcile(rt: Runtime) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let new_nodes = scene.parse(rt.root, rt.extensions)
+  let #(renderer_runtime, scene_effect) =
+    scene.apply_scene_attributes(rt.runtime, rt.root, rt.background_signature)
+  let #(runtime, reconcile_effect) =
+    reconcile_nodes(
+      renderer_runtime,
+      rt.previous_nodes,
+      new_nodes,
+      rt.scene_id,
+      rt.extensions,
+    )
+
+  #(
+    Runtime(
+      ..rt,
+      runtime:,
+      previous_nodes: new_nodes,
+      background_signature: Some(scene.current_background_signature(rt.root)),
+    ),
+    effect.batch([scene_effect, reconcile_effect]),
+  )
+}
+
+fn reconcile_nodes(
+  runtime: runtime.Runtime,
+  previous_nodes: List(scene.Node),
+  next_nodes: List(scene.Node),
+  scene_id: String,
+  extensions: extension.Extensions,
+) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
+  let #(runtime, extension_effect) =
+    scene.apply(
+      scene.diff(previous_nodes, next_nodes, scene_id),
+      runtime,
+      extensions,
+    )
+  #(runtime, extension_effect)
+}
+
+fn apply_runtime_actions_to_runtime(
+  rt: Runtime,
+  actions: List(extension.RuntimeAction),
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  list.fold(actions, #(rt, effect.none()), fn(acc, action) {
+    let #(runtime, effects) = acc
+    let #(next_runtime, next_effect) = apply_runtime_action(runtime, action)
+    #(next_runtime, effect.batch([effects, next_effect]))
+  })
+}
+
+fn apply_runtime_action(
+  rt: Runtime,
+  action: extension.RuntimeAction,
+) -> #(Runtime, effect.Effect(extension.Msg)) {
+  let #(runtime, next_effect) = extension.run_action(action, rt.runtime)
+  #(Runtime(..rt, runtime:), next_effect)
+}
+
+fn has_owner(rt: Runtime, owner: extension.RequestOwner) -> Bool {
+  case owner {
+    extension.SceneOwner -> True
+    extension.NodeOwner(id) ->
+      case runtime.find_entry(rt.runtime, id) {
+        Ok(_) -> True
+        Error(Nil) -> node_belongs_to_scene(rt, id)
+      }
+    extension.CustomOwner(_) -> True
+  }
+}
+
+fn node_belongs_to_scene(rt: Runtime, id: String) -> Bool {
+  case html_element.find(id) {
+    Ok(node) ->
+      case html_element.closest(node, "#" <> rt.scene_id) {
+        Ok(_) -> True
+        Error(Nil) -> False
+      }
+    Error(Nil) -> False
   }
 }
 
@@ -502,4 +654,66 @@ fn execute_extension_effects(
 
 fn view(_model: Model) -> Element(Msg) {
   html.div([], [])
+}
+
+type Config {
+  Config(width: Int, height: Int, antialias: Bool, alpha: Bool)
+}
+
+fn config(
+  host: html_element.HtmlElement,
+  width fallback_width: Int,
+  height fallback_height: Int,
+) -> Config {
+  let width =
+    html_element.attribute(host, "width")
+    |> result.try(int.parse)
+    |> option.from_result()
+    |> option.unwrap(fallback_width)
+  let height =
+    html_element.attribute(host, "height")
+    |> result.try(int.parse)
+    |> option.from_result()
+    |> option.unwrap(fallback_height)
+
+  Config(
+    width:,
+    height:,
+    antialias: case html_element.attribute(host, "antialias") {
+      Ok("") -> True
+      _ -> False
+    },
+    alpha: case html_element.attribute(host, "alpha") {
+      Ok("") -> True
+      _ -> False
+    },
+  )
+}
+
+fn initialize(
+  shadow_root: Dynamic,
+  host: html_element.HtmlElement,
+  scene_id: String,
+  on_tick: fn(Float) -> Nil,
+) -> runtime.Runtime {
+  let config = host |> config(width: 1920, height: 1080)
+  let scene = savoiardi.create_scene()
+  let renderer = create(config)
+  let canvas = savoiardi.get_renderer_dom_element(renderer)
+
+  html_element.append_canvas(shadow_root, canvas)
+  savoiardi.set_animation_loop(renderer, on_tick)
+  runtime.new(scene, scene_id, renderer)
+}
+
+fn resize(renderer: savoiardi.Renderer, width: Int, height: Int) -> Nil {
+  savoiardi.set_renderer_size(renderer, width, height)
+}
+
+fn create(config: Config) -> savoiardi.Renderer {
+  let renderer =
+    savoiardi.create_renderer(antialias: config.antialias, alpha: config.alpha)
+  savoiardi.set_renderer_size(renderer, config.width, config.height)
+  savoiardi.enable_renderer_shadow_map(renderer, True)
+  renderer
 }

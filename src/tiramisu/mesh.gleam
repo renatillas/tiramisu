@@ -288,22 +288,24 @@ fn build_runtime_actions(
 
 fn emit_model_loaded(id: String) -> extension.RuntimeAction {
   extension.action(fn(runtime) {
-    element.dispatch_event(
-      id,
-      "tiramisu:model-loaded",
-      json.object([#("id", json.string(id))]),
-    )
+    let _ =
+      element.dispatch_event(
+        id,
+        "tiramisu:model-loaded",
+        json.object([#("id", json.string(id))]),
+      )
     #(runtime, effect.none())
   })
 }
 
 fn emit_model_error(id: String) -> extension.RuntimeAction {
   extension.action(fn(runtime) {
-    element.dispatch_event(
-      id,
-      "tiramisu:model-error",
-      json.object([#("id", json.string(id))]),
-    )
+    let _ =
+      element.dispatch_event(
+        id,
+        "tiramisu:model-error",
+        json.object([#("id", json.string(id))]),
+      )
     #(runtime, effect.none())
   })
 }

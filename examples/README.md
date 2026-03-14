@@ -45,6 +45,10 @@ Then open `http://localhost:1234`.
 - `03-assets/02-material-textures`
   Demonstrates texture-driven material attributes.
 
+- `03-assets/03-async-capabilities`
+  Stresses async asset and scene loading with rapid owner churn, failures, and
+  background swaps.
+
 - `04-layout/01-multiple-renderers`
   Shows multiple independent renderer instances on the same page.
 
