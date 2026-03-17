@@ -24,7 +24,7 @@ type Model {
 }
 
 type Msg {
-  Tick(scene.Tick)
+  Tick(renderer.Tick)
 }
 
 fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
@@ -44,11 +44,11 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
 }
 
 fn view(model: Model) {
-  tiramisu.renderer("renderer", [renderer.width(800), renderer.height(500)], [
-    tiramisu.scene(
-      "scene",
-      [scene.on_tick(Tick), scene.background_color(0x020617)],
-      [
+  tiramisu.renderer(
+    "renderer",
+    [renderer.on_tick(Tick), renderer.width(800), renderer.height(500)],
+    [
+      tiramisu.scene("scene", [scene.background_color(0x020617)], [
         tiramisu.camera(
           "camera",
           [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 5.0))],
@@ -91,7 +91,7 @@ fn view(model: Model) {
           ],
           [],
         ),
-      ],
-    ),
-  ])
+      ]),
+    ],
+  )
 }

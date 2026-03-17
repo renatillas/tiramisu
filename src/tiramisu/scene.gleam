@@ -8,21 +8,15 @@
 
 import gleam/bool
 import gleam/dict
-import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/javascript/promise
-import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
-import gleam/time/duration
-import gleam/time/timestamp
 import lustre/attribute.{type Attribute}
 import lustre/effect
-import lustre/event
-import lustre/server_component
 import savoiardi.{type Object3D}
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
@@ -38,21 +32,6 @@ pub const tag = "tiramisu-scene"
 @internal
 pub fn observed_attributes() -> List(String) {
   ["background", "background-color-space", "fog"]
-}
-
-/// Context provided on each animation frame tick.
-///
-/// Contains timing and input information useful for smooth animations
-/// and responsive game controls.
-pub type Tick {
-  Tick(
-    /// Time elapsed since the last frame (typically ~16ms at 60fps).
-    /// Use `duration.to_seconds()` to convert to a Float for animation math.
-    delta_time: duration.Duration,
-    /// The timestamp when this frame was rendered.
-    /// Useful for time-based effects or synchronized animations.
-    timestamp: timestamp.Timestamp,
-  )
 }
 
 /// Set the background color for the scene (as hex int).
@@ -124,46 +103,6 @@ pub fn fog_exp2(color color: Int, density density: Float) -> Attribute(msg) {
 /// Clear fog from the scene.
 pub fn clear_fog() -> Attribute(msg) {
   attribute.attribute("fog", "none")
-}
-
-/// Listen for per-frame tick events emitted by the renderer.
-///
-/// This is the main entry point for animation and simulation work in a scene.
-/// The callback receives a [`Tick`](#Tick) containing the frame delta and
-/// timestamp.
-pub fn on_tick(to_msg: fn(Tick) -> msg) -> Attribute(msg) {
-  event.on("tiramisu:tick", {
-    use tick_context <- decode.field("detail", tick_decoder())
-    decode.success(to_msg(tick_context))
-  })
-  |> server_component.include(["detail.delta_ms", "detail.timestamp_ms"])
-}
-
-/// Attach a per-frame tick handler to the current scene element.
-fn tick_decoder() -> decode.Decoder(Tick) {
-  use delta_ms <- decode.field("delta_ms", decode.int)
-  use timestamp_ms <- decode.field("timestamp_ms", decode.int)
-
-  let seconds = timestamp_ms / 1000
-  let milliseconds = timestamp_ms - seconds * 1000
-  let nanoseconds = milliseconds * 1_000_000
-
-  Tick(
-    delta_time: duration.milliseconds(delta_ms),
-    timestamp: timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
-  )
-  |> decode.success
-}
-
-@internal
-pub fn dispatch_tick(delta_ms: Int, timestamp_ms: Int) -> effect.Effect(msg) {
-  event.emit(
-    "tiramisu:tick",
-    json.object([
-      #("delta_ms", json.int(delta_ms)),
-      #("timestamp_ms", json.int(timestamp_ms)),
-    ]),
-  )
 }
 
 @internal

@@ -43,7 +43,7 @@ fn init(_) -> #(Model, effect.Effect(Msg)) {
 }
 
 pub type Msg {
-  Tick(scene.Tick)
+  Tick(renderer.Tick)
   ChoseWarm
   ChoseCool
   MoveLeft
@@ -145,12 +145,12 @@ fn view(model: Model) {
           [
             renderer.width(720),
             renderer.height(420),
+            renderer.on_tick(Tick),
           ],
           [
             tiramisu.scene(
               "server-scene",
               [
-                scene.on_tick(Tick),
                 scene.background_color(preset.background),
               ],
               [

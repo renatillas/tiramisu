@@ -20,6 +20,7 @@
 //// ```
 
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/float
 import gleam/int
 import gleam/javascript/promise
@@ -27,12 +28,16 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/time/duration
+import gleam/time/timestamp
 import lustre
 import lustre/attribute.{type Attribute}
 import lustre/component
 import lustre/effect
 import lustre/element.{type Element}
 import lustre/element/html
+import lustre/event
+import lustre/server_component
 import savoiardi
 
 import tiramisu/dev/extension
@@ -47,6 +52,21 @@ pub const height = attribute.height
 
 /// Set the renderer canvas width in CSS pixels.
 pub const width = attribute.width
+
+/// Context provided on each animation frame tick.
+///
+/// Contains timing and input information useful for smooth animations
+/// and responsive game controls.
+pub type Tick {
+  Tick(
+    /// Time elapsed since the last frame (typically ~16ms at 60fps).
+    /// Use `duration.to_seconds()` to convert to a Float for animation math.
+    delta_time: duration.Duration,
+    /// The timestamp when this frame was rendered.
+    /// Useful for time-based effects or synchronized animations.
+    timestamp: timestamp.Timestamp,
+  )
+}
 
 type Model {
   Model(
@@ -100,7 +120,7 @@ type Msg {
   AntialiasToggled
   AlphaSet(Bool)
   AlphaToggled
-  Tick(Float)
+  RendererTicked(Float)
 }
 
 type Runtime {
@@ -205,7 +225,7 @@ fn do_init(
         host,
         extensions,
         fn() { dispatch(ParentDomMutated) },
-        fn(timestamp_ms) { dispatch(Tick(timestamp_ms)) },
+        fn(timestamp_ms) { dispatch(RendererTicked(timestamp_ms)) },
       )
     dispatch(Async(InitFinished(generation:, runtime:, effects:)))
     Nil
@@ -274,7 +294,7 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       #(Model(..model, alpha: !model.alpha), effect.none())
     }
 
-    Tick(timestamp_ms) -> tick(model, timestamp_ms)
+    RendererTicked(timestamp_ms) -> tick(model, timestamp_ms)
   }
 }
 
@@ -531,10 +551,7 @@ fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
   let effect = case model.runtime {
     Some(runtime) ->
       effect.batch([
-        scene.dispatch_tick(
-          delta_ms |> float.round,
-          timestamp_ms |> float.round,
-        ),
+        dispatch_tick(delta_ms |> float.round, timestamp_ms |> float.round),
         effect.from(fn(_) { render_active_camera(runtime) }),
       ])
 
@@ -712,4 +729,44 @@ fn create(config: Config) -> savoiardi.Renderer {
   savoiardi.set_renderer_size(renderer, config.width, config.height)
   savoiardi.enable_renderer_shadow_map(renderer, True)
   renderer
+}
+
+/// Listen for per-frame tick events emitted by the renderer.
+///
+/// This is the main entry point for animation and simulation work in a scene.
+/// The callback receives a [`Tick`](#Tick) containing the frame delta and
+/// timestamp.
+pub fn on_tick(to_msg: fn(Tick) -> msg) -> Attribute(msg) {
+  event.on("tiramisu:tick", {
+    use tick_context <- decode.field("detail", tick_decoder())
+    decode.success(to_msg(tick_context))
+  })
+  |> server_component.include(["detail.delta_ms", "detail.timestamp_ms"])
+}
+
+/// Attach a per-frame tick handler to the current scene element.
+fn tick_decoder() -> decode.Decoder(Tick) {
+  use delta_ms <- decode.field("delta_ms", decode.int)
+  use timestamp_ms <- decode.field("timestamp_ms", decode.int)
+
+  let seconds = timestamp_ms / 1000
+  let milliseconds = timestamp_ms - seconds * 1000
+  let nanoseconds = milliseconds * 1_000_000
+
+  Tick(
+    delta_time: duration.milliseconds(delta_ms),
+    timestamp: timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
+  )
+  |> decode.success
+}
+
+@internal
+pub fn dispatch_tick(delta_ms: Int, timestamp_ms: Int) -> effect.Effect(msg) {
+  event.emit(
+    "tiramisu:tick",
+    json.object([
+      #("delta_ms", json.int(delta_ms)),
+      #("timestamp_ms", json.int(timestamp_ms)),
+    ]),
+  )
 }

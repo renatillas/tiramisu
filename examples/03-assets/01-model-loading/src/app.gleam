@@ -75,6 +75,7 @@ fn view(model: Model) {
                 [
                   mesh.src(good_model_url),
                   mesh.center(True),
+                  // This doesn't work for now
                   mesh.on_model_load(GoodLoaded),
                   mesh.cast_shadow(True),
                   transform.scale(vec3.splat(0.004)),
@@ -87,6 +88,7 @@ fn view(model: Model) {
                 "broken-texture-mesh",
                 [
                   mesh.src(bad_model_url),
+                  // This doesn't work for now
                   mesh.on_model_error(BadFailed),
                   mesh.hidden(True),
                 ],
