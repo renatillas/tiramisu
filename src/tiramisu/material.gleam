@@ -26,11 +26,11 @@ import gleam/option
 import gleam/result
 import lustre/attribute.{type Attribute}
 import lustre/effect
+import lustre/event
 
 import savoiardi
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
-import tiramisu/internal/element
 
 // TYPES -----------------------------------------------------------------------
 
@@ -438,16 +438,16 @@ fn apply_texture(
 
 fn emit_texture_error(id: String, url: String) -> extension.RuntimeAction {
   extension.action(fn(rt) {
-    let _ =
-      element.dispatch_event(
-        id,
+    #(
+      rt,
+      event.emit(
         "tiramisu:load-texture-error",
         json.object([
           #("id", json.string(id)),
           #("src", json.string(url)),
         ]),
-      )
-    #(rt, effect.none())
+      ),
+    )
   })
 }
 

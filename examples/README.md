@@ -55,5 +55,5 @@ Then open `http://localhost:1234`.
 ## Integrations
 
 - `05-server-components/01-basic-setup`
-  Renders a Tiramisu scene from a Lustre server component. See that example's
-  README for run steps.
+  Renders a Tiramisu scene from a Lustre server component and drives movement
+  with `scene.on_tick`. See that example's README for run steps.

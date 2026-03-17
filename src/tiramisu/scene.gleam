@@ -21,13 +21,13 @@ import gleam/time/duration
 import gleam/time/timestamp
 import lustre/attribute.{type Attribute}
 import lustre/effect
-import lustre/element.{type Element}
 import lustre/event
+import lustre/server_component
 import savoiardi.{type Object3D}
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
 import tiramisu/internal/async_policy
-import tiramisu/internal/element as html_element
+import tiramisu/internal/element
 
 // EVENTS ----------------------------------------------------------------------
 
@@ -136,11 +136,12 @@ pub fn on_tick(to_msg: fn(Tick) -> msg) -> Attribute(msg) {
     use tick_context <- decode.field("detail", tick_decoder())
     decode.success(to_msg(tick_context))
   })
+  |> server_component.include(["detail.delta_ms", "detail.timestamp_ms"])
 }
 
 /// Attach a per-frame tick handler to the current scene element.
 fn tick_decoder() -> decode.Decoder(Tick) {
-  use delta_ms <- decode.field("delta_ms", decode.float)
+  use delta_ms <- decode.field("delta_ms", decode.int)
   use timestamp_ms <- decode.field("timestamp_ms", decode.int)
 
   let seconds = timestamp_ms / 1000
@@ -148,19 +149,18 @@ fn tick_decoder() -> decode.Decoder(Tick) {
   let nanoseconds = milliseconds * 1_000_000
 
   Tick(
-    delta_time: duration.milliseconds(float.round(delta_ms)),
+    delta_time: duration.milliseconds(delta_ms),
     timestamp: timestamp.from_unix_seconds_and_nanoseconds(seconds, nanoseconds),
   )
   |> decode.success
 }
 
 @internal
-pub fn dispatch_tick(scene_id: String, delta_ms: Float, timestamp_ms: Int) {
-  html_element.dispatch_event(
-    scene_id,
+pub fn dispatch_tick(delta_ms: Int, timestamp_ms: Int) -> effect.Effect(msg) {
+  event.emit(
     "tiramisu:tick",
     json.object([
-      #("delta_ms", json.float(delta_ms)),
+      #("delta_ms", json.int(delta_ms)),
       #("timestamp_ms", json.int(timestamp_ms)),
     ]),
   )
@@ -197,7 +197,7 @@ pub type Patch {
 
 @internal
 pub fn parse(
-  root: html_element.HtmlElement,
+  root: element.HtmlElement,
   extensions: extension.Extensions,
 ) -> List(Node) {
   parse_children(root, extensions)
@@ -249,26 +249,26 @@ type Fog {
 @internal
 pub fn apply_scene_attributes(
   runtime: runtime.Runtime,
-  root: html_element.HtmlElement,
+  root: element.HtmlElement,
   previous_background_signature: option.Option(String),
 ) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
   let background_color_space =
     parse_background_color_space(
-      html_element.attribute(root, "background-color-space")
+      element.attribute(root, "background-color-space")
       |> result.unwrap("srgb"),
     )
   let background_signature = current_background_signature(root)
   let #(runtime, background_effect) =
     apply_background(
       runtime,
-      html_element.attribute(root, "background") |> result.unwrap("000000"),
+      element.attribute(root, "background") |> result.unwrap("000000"),
       background_color_space,
       previous_background_signature,
       background_signature,
     )
   #(
     runtime
-      |> apply_fog(html_element.attribute(root, "fog") |> result.unwrap("none")),
+      |> apply_fog(element.attribute(root, "fog") |> result.unwrap("none")),
     background_effect,
   )
 }
@@ -349,11 +349,11 @@ fn apply_background(
 }
 
 @internal
-pub fn current_background_signature(root: html_element.HtmlElement) -> String {
+pub fn current_background_signature(root: element.HtmlElement) -> String {
   let background =
-    html_element.attribute(root, "background") |> result.unwrap("000000")
+    element.attribute(root, "background") |> result.unwrap("000000")
   let color_space =
-    html_element.attribute(root, "background-color-space")
+    element.attribute(root, "background-color-space")
     |> result.unwrap("srgb")
   background <> "::" <> color_space
 }
@@ -505,12 +505,10 @@ fn parse_fog(fog: String) -> Fog {
 }
 
 @internal
-pub fn find_root(
-  host: html_element.HtmlElement,
-) -> #(String, html_element.HtmlElement) {
-  case find_scene_element(html_element.children(host)) {
+pub fn find_root(host: element.HtmlElement) -> #(String, element.HtmlElement) {
+  case find_scene_element(element.children(host)) {
     Ok(root) -> {
-      let scene_id = html_element.attribute(root, "id") |> result.unwrap("")
+      let scene_id = element.attribute(root, "id") |> result.unwrap("")
       #(scene_id, root)
     }
 
@@ -519,14 +517,14 @@ pub fn find_root(
 }
 
 fn find_scene_element(
-  children: List(html_element.HtmlElement),
-) -> Result(html_element.HtmlElement, Nil) {
+  children: List(element.HtmlElement),
+) -> Result(element.HtmlElement, Nil) {
   list.fold(children, Error(Nil), fn(found, child) {
     case found {
       Ok(_) -> found
 
       Error(Nil) ->
-        case string.lowercase(html_element.tag(child)) == tag {
+        case string.lowercase(element.tag(child)) == tag {
           True -> Ok(child)
           False -> Error(Nil)
         }
@@ -535,11 +533,11 @@ fn find_scene_element(
 }
 
 fn parse_element(
-  item: html_element.HtmlElement,
+  item: element.HtmlElement,
   extensions: extension.Extensions,
 ) -> Node {
-  let tag = html_element.tag(item) |> string.lowercase
-  let attributes = html_element.attributes(item)
+  let tag = element.tag(item) |> string.lowercase
+  let attributes = element.attributes(item)
   let key = dict.get(attributes, "id") |> result.unwrap("")
   let node_attributes = dict.delete(attributes, "id")
 
@@ -563,10 +561,10 @@ fn parse_element(
 }
 
 fn parse_children(
-  root: html_element.HtmlElement,
+  root: element.HtmlElement,
   extensions: extension.Extensions,
 ) -> List(Node) {
-  use child <- list.map(html_element.children(root))
+  use child <- list.map(element.children(root))
   parse_element(child, extensions)
 }
 
@@ -683,7 +681,7 @@ fn apply_patch(
         Ok(handler) -> {
           let #(new_runtime, node_effect) =
             handler.create(runtime, id, parent_id, attributes)
-          let object = find_object(new_runtime, id)
+          let object = runtime.object(new_runtime, id) |> option.from_result
           let attribute_effect =
             notify_create(extensions, new_runtime, tag, id, object, attributes)
           #(new_runtime, effect.batch([node_effect, attribute_effect]))
@@ -696,7 +694,7 @@ fn apply_patch(
     UpdateNode(id:, parent_id:, tag:, attributes:, changed_attributes:) -> {
       case extension.get_node(extensions, tag) {
         Ok(handler) -> {
-          let object = find_object(runtime, id)
+          let object = runtime.object(runtime, id) |> option.from_result
           let #(new_runtime, node_effect) =
             handler.update(
               runtime,
@@ -803,9 +801,4 @@ pub fn notify_resolved(
   list.fold(extension.attribute_hooks(extensions), effect.none(), fn(acc, hook) {
     effect.batch([acc, hook.on_resolved(runtime, tag, id, object, attributes)])
   })
-}
-
-fn find_object(runtime: runtime.Runtime, id: String) -> option.Option(Object3D) {
-  runtime.object(runtime, id)
-  |> option.from_result
 }

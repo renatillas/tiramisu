@@ -35,14 +35,6 @@ export function parentElement(element) {
   return Result$Error(undefined);
 }
 
-export function dispatchCustomEvent(element, eventName, detail) {
-  element.dispatchEvent(new CustomEvent(eventName, {
-    bubbles: true,
-    composed: true,
-    detail,
-  }));
-}
-
 export function setProperty(element, name, value) {
   element[name] = value;
 }
@@ -51,8 +43,29 @@ export function deleteProperty(element, name) {
   delete element[name];
 }
 
+function findById(root, id) {
+  if ("getElementById" in root) {
+    const element = root.getElementById(id);
+    if (element) return element;
+  }
+
+  if (!("querySelector" in root)) return null;
+  const directMatch = root.querySelector(`#${CSS.escape(id)}`);
+  if (directMatch) return directMatch;
+
+  if (!("querySelectorAll" in root)) return null;
+  for (const node of root.querySelectorAll("*")) {
+    if (node.shadowRoot) {
+      const shadowMatch = findById(node.shadowRoot, id);
+      if (shadowMatch) return shadowMatch;
+    }
+  }
+
+  return null;
+}
+
 export function getElementById(id) {
-  const element = document.getElementById(id);
+  const element = findById(document, id);
   if (element) return Result$Ok(element);
   return Result$Error(undefined);
 }

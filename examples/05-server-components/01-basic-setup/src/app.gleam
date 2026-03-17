@@ -78,8 +78,9 @@ fn serve_html() -> Response(ResponseData) {
               html.p([], [
                 html.text(
                   "The scene below is rendered by a Lustre server component. "
-                  <> "The browser only hosts the thin Lustre runtime and "
-                  <> "registers Tiramisu's custom elements.",
+                  <> "Its animation loop runs through scene.on_tick on the "
+                  <> "server component, while the browser only hosts the thin "
+                  <> "Lustre runtime and registers Tiramisu's custom elements.",
                 ),
               ]),
               server_component.element([server_component.route("/ws")], []),

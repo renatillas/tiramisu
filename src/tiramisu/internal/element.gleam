@@ -6,13 +6,6 @@ import savoiardi
 
 pub type HtmlElement
 
-@external(javascript, "./element.ffi.mjs", "dispatchCustomEvent")
-fn dispatch_custom_event(
-  element: HtmlElement,
-  event_name: String,
-  detail: a,
-) -> Nil
-
 @external(javascript, "./element.ffi.mjs", "setProperty")
 fn set_property(element: HtmlElement, name: String, value: a) -> Nil
 
@@ -64,15 +57,6 @@ pub fn store_object(id: String, object: savoiardi.Object3D) -> Result(Nil, Nil) 
 pub fn clear_object(id: String) -> Result(Nil, Nil) {
   use element <- result.map(find(id))
   delete_property(element, "_object3d")
-}
-
-pub fn dispatch_event(
-  id: String,
-  event_name: String,
-  detail: _,
-) -> Result(Nil, Nil) {
-  use element <- result.map(find(id))
-  dispatch_custom_event(element, event_name, detail)
 }
 
 @external(javascript, "./element.ffi.mjs", "shadowRootHost")

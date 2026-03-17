@@ -530,17 +530,13 @@ fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
   let model = Model(..model, previous_timestamp_ms: Some(timestamp_ms))
   let effect = case model.runtime {
     Some(runtime) ->
-      effect.from(fn(_) {
-        let delta_ms = float.round(delta_ms) |> int.to_float
-        // This could error if the scene is not present
-        let _ =
-          scene.dispatch_tick(
-            runtime.scene_id,
-            delta_ms,
-            timestamp_ms |> float.round,
-          )
-        render_active_camera(runtime)
-      })
+      effect.batch([
+        scene.dispatch_tick(
+          delta_ms |> float.round,
+          timestamp_ms |> float.round,
+        ),
+        effect.from(fn(_) { render_active_camera(runtime) }),
+      ])
 
     None -> effect.none()
   }

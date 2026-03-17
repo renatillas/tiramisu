@@ -10,7 +10,8 @@ It demonstrates:
 3. Forwarding websocket traffic between Mist and the server component runtime.
 4. Registering Tiramisu in the browser so server-rendered scene tags become live
    custom elements.
-5. Updating a Tiramisu scene from server-side Lustre state.
+5. Driving scene animation with `scene.on_tick` inside server-side Lustre state.
+6. Combining websocket-driven UI controls with continuous movement updates.
 
 Run it with:
 

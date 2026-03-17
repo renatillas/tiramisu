@@ -20,7 +20,6 @@ import savoiardi.{type Object3D}
 
 import tiramisu/dev/extension
 import tiramisu/dev/runtime.{type Runtime}
-import tiramisu/internal/element
 
 /// The custom element tag used for asset-backed meshes.
 @internal
@@ -288,25 +287,25 @@ fn build_runtime_actions(
 
 fn emit_model_loaded(id: String) -> extension.RuntimeAction {
   extension.action(fn(runtime) {
-    let _ =
-      element.dispatch_event(
-        id,
+    #(
+      runtime,
+      event.emit(
         "tiramisu:model-loaded",
         json.object([#("id", json.string(id))]),
-      )
-    #(runtime, effect.none())
+      ),
+    )
   })
 }
 
 fn emit_model_error(id: String) -> extension.RuntimeAction {
   extension.action(fn(runtime) {
-    let _ =
-      element.dispatch_event(
-        id,
+    #(
+      runtime,
+      event.emit(
         "tiramisu:model-error",
         json.object([#("id", json.string(id))]),
-      )
-    #(runtime, effect.none())
+      ),
+    )
   })
 }
 
