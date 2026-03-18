@@ -47,29 +47,43 @@ pub fn main() -> Nil {
 }
 
 fn view() {
-  tiramisu.renderer(
-    "renderer",
-    [renderer.width(800), renderer.height(480)],
-    [
-      tiramisu.scene("scene", [scene.background_color(0x111827)], [
-        tiramisu.camera(
-          "camera",
-          [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 6.0))],
-          [],
-        ),
-        tiramisu.light("ambient", [light.ambient(), light.intensity(0.6)], []),
-        tiramisu.primitive(
-          "hero",
-          [
-            primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
-            material.color(0x38bdf8),
-          ],
-          [],
-        ),
-      ]),
-    ],
-  )
+  tiramisu.renderer("renderer", [renderer.width(800), renderer.height(480)], [
+    tiramisu.scene("scene", [scene.background_color(0x111827)], [
+      tiramisu.camera(
+        "camera",
+        [camera.active(True), transform.position(vec3.Vec3(0.0, 0.0, 6.0))],
+        [],
+      ),
+      tiramisu.light(
+        "ambient",
+        [
+          light.ambient(),
+          light.intensity(0.2),
+        ],
+        [],
+      ),
+      tiramisu.light(
+        "directional",
+        [
+          light.directional(),
+          light.intensity(0.6),
+          transform.position(vec3.Vec3(1.0, 5.0, 1.0)),
+        ],
+        [],
+      ),
+      tiramisu.primitive(
+        "hero",
+        [
+          primitive.sphere(radius: 1.0, segments: vec2.Vec2(32, 16)),
+          material.standard(),
+          material.color(0x38bdf8),
+        ],
+        [],
+      ),
+    ]),
+  ])
 }
+
 ```
 <img width="782" height="456" alt="image" src="https://github.com/user-attachments/assets/14b7fb9b-5e9d-41a9-b8e3-7b0e997e0e56" />
 
