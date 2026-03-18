@@ -6,8 +6,8 @@ Tiramisu is a 3D renderer for Gleam built on top of Lustre web components and Th
 
 - Declarative scene construction with `tiramisu.renderer` and `tiramisu.scene`
 - Scene nodes as web components: camera, primitive, mesh, light, and empty
-- A Lustre-friendly render loop through `tiramisu.on_tick`
-- Asset loading through `tiramisu.mesh` and `attribute.src`
+- A Lustre-friendly render loop through `renderer.on_tick`
+- Asset loading through `tiramisu.mesh` and `mesh.src`
 - Renderer backgrounds with solid colors, textures, panoramas, and cubemaps
 
 ## Install
