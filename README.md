@@ -10,6 +10,8 @@ Tiramisu is a 3D renderer for Gleam built on top of Lustre web components and Th
 - Asset loading through `tiramisu.mesh` and `mesh.src`
 - Renderer backgrounds with solid colors, textures, panoramas, and cubemaps
 
+<img alt="Tiramisu-logo-02" src="https://github.com/user-attachments/assets/f257e8ff-8857-4c68-8146-d6403b93a161" />
+
 ## Install
 
 ```sh
