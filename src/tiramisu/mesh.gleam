@@ -15,8 +15,11 @@ import gleam/string
 import lustre/attribute.{type Attribute}
 import lustre/effect
 import lustre/event
+import savoiardi/geometry
+import savoiardi/loader
+import savoiardi/material
 
-import savoiardi.{type Object3D}
+import savoiardi/object.{type Object3D}
 
 import tiramisu/dev/extension
 import tiramisu/dev/runtime.{type Runtime}
@@ -187,15 +190,16 @@ fn create_stl(
   attributes: Dict(String, String),
   mode: Mode,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_stl(src))
+  use result <- promise.await(geometry.load_stl_async(loader.stl(), src))
   case result {
-    Error(Nil) -> promise.resolve([emit_model_error(id)])
+    Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(geometry) -> {
       let geometry = case extension.get_bool(attributes, "center") {
-        True -> savoiardi.center_geometry(geometry)
+        True -> geometry.center(geometry)
         False -> geometry
       }
-      let object = savoiardi.create_mesh(geometry)
+      let object =
+        object.mesh(geometry, material.standard(material.standard_options()))
       set_object_attributes(object, attributes)
       promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
@@ -209,7 +213,7 @@ fn create_obj(
   attributes: Dict(String, String),
   mode: Mode,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_obj(src))
+  use result <- promise.await(object.load_obj_async(loader.obj(), src))
   case result {
     Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(object) -> {
@@ -226,11 +230,11 @@ fn create_fbx(
   attributes: Dict(String, String),
   mode: Mode,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_fbx(src))
+  use result <- promise.await(object.load_fbx_async(loader.fbx(), src))
   case result {
     Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(data) -> {
-      let object = savoiardi.get_fbx_scene(data)
+      let object = object.get_fbx_scene(data)
       set_object_attributes(object, attributes)
       promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
@@ -244,11 +248,11 @@ fn create_gltf(
   attributes: Dict(String, String),
   mode: Mode,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_gltf(src))
+  use result <- promise.await(object.load_gltf_async(loader.gltf(), src))
   case result {
     Error(_) -> promise.resolve([emit_model_error(id)])
     Ok(data) -> {
-      let object = savoiardi.get_gltf_scene(data)
+      let object = object.get_gltf_scene(data)
       set_object_attributes(object, attributes)
       promise.resolve(build_runtime_actions(mode, id, parent_id, object))
     }
@@ -258,16 +262,11 @@ fn create_gltf(
 fn set_object_attributes(
   object: Object3D,
   attributes: Dict(String, String),
-) -> Nil {
-  savoiardi.set_object_visible(
-    object,
-    !extension.get_bool(attributes, "hidden"),
-  )
-  savoiardi.enable_shadows(
-    object,
-    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
-    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
-  )
+) -> Object3D {
+  object
+  |> object.set_visible(!extension.get_bool(attributes, "hidden"))
+  |> object.set_cast_shadow(extension.get_bool(attributes, "cast-shadow"))
+  |> object.set_receive_shadow(extension.get_bool(attributes, "receive-shadow"))
 }
 
 fn build_runtime_actions(

@@ -28,7 +28,11 @@ import lustre/attribute.{type Attribute}
 import lustre/effect
 import lustre/event
 
-import savoiardi
+import savoiardi/loader
+import savoiardi/material.{type Material}
+import savoiardi/object.{type Object3D}
+import savoiardi/texture.{type Texture}
+
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
 
@@ -188,7 +192,7 @@ fn on_resolved(
   _runtime: runtime.Runtime,
   _tag: String,
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   apply_material(id, object, attributes)
@@ -198,10 +202,11 @@ fn on_remove(
   _runtime: runtime.Runtime,
   _id: String,
   _parent_id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
 ) -> effect.Effect(extension.Msg) {
-  let material = savoiardi.get_object_material(object)
-  savoiardi.dispose_material(material)
+  object
+  |> object.get_material
+  |> material.dispose
   effect.none()
 }
 
@@ -209,7 +214,7 @@ fn on_update(
   _runtime: runtime.Runtime,
   _string: String,
   id: String,
-  object: option.Option(savoiardi.Object3D),
+  object: option.Option(Object3D),
   attrs: Dict(String, String),
   changed_attributes: Dict(String, extension.AttributeChange),
 ) -> effect.Effect(extension.Msg) {
@@ -228,7 +233,7 @@ fn on_create(
   _runtime: runtime.Runtime,
   _string: String,
   id: String,
-  object: option.Option(savoiardi.Object3D),
+  object: option.Option(Object3D),
   attributes: Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   case object {
@@ -240,29 +245,29 @@ fn on_create(
 
 fn apply_material(
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   let material = parse_material(attributes)
-  savoiardi.set_object_material(object, material)
+  object.set_material(object, material)
   load_material_textures(id, material, attributes)
 }
 
 fn replace_material(
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   object
-  |> savoiardi.get_object_material
-  |> savoiardi.dispose_material
+  |> object.get_material
+  |> material.dispose
 
   apply_material(id, object, attributes)
 }
 
 fn load_material_textures(
   id: String,
-  material: savoiardi.Material,
+  material: Material,
   attributes: Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   extension.request(
@@ -282,7 +287,7 @@ fn load_material_textures(
 /// This is public so custom extensions can reuse Tiramisu's material parsing
 /// logic when creating their own nodes.
 @internal
-pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
+pub fn parse_material(attrs: Dict(String, String)) -> Material {
   let color = extension.get(attrs, "color", 0xffffff, int.base_parse(_, 16))
   let emissive =
     extension.get(attrs, "emissive", 0x000000, int.base_parse(_, 16))
@@ -294,22 +299,22 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
     "basic" -> {
       let alpha_test =
         extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
-      savoiardi.create_basic_material(
+      material.basic(material.BasicOptions(
         color:,
         transparent:,
         opacity:,
         color_map: option.None,
-        side: savoiardi.FrontSide,
+        side: material.FrontSide,
         alpha_test:,
         depth_write: True,
-      )
+      ))
     }
     "phong" -> {
       let shininess =
         extension.get(attrs, "shininess", 30.0, extension.parse_number)
       let alpha_test =
         extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
-      savoiardi.create_phong_material(
+      material.phong(material.PhongOptions(
         color:,
         shininess:,
         color_map: option.None,
@@ -318,12 +323,12 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
         transparent:,
         opacity:,
         alpha_test:,
-      )
+      ))
     }
     "lambert" -> {
       let alpha_test =
         extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
-      savoiardi.create_lambert_material(
+      material.lambert(material.LambertOptions(
         color:,
         color_map: option.None,
         normal_map: option.None,
@@ -331,12 +336,12 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
         transparent:,
         opacity:,
         alpha_test:,
-      )
+      ))
     }
     "toon" -> {
       let alpha_test =
         extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
-      savoiardi.create_toon_material(
+      material.toon(material.ToonOptions(
         color:,
         color_map: option.None,
         normal_map: option.None,
@@ -344,7 +349,7 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
         transparent:,
         opacity:,
         alpha_test:,
-      )
+      ))
     }
     _ -> {
       let metalness =
@@ -360,31 +365,25 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
       let alpha_test =
         extension.get(attrs, "alpha-test", 0.0, extension.parse_number)
 
-      savoiardi.create_standard_material(
-        color:,
-        metalness:,
-        roughness:,
-        transparent:,
-        opacity:,
-        color_map: option.None,
-        normal_map: option.None,
-        ambient_occlusion_map: option.None,
-        displacement_map: option.None,
-        displacement_scale:,
-        displacement_bias:,
-        roughness_map: option.None,
-        metalness_map: option.None,
-        emissive:,
-        emissive_intensity:,
-        alpha_test:,
+      material.standard(
+        material.StandardOptions(
+          ..material.standard_options(),
+          color:,
+          metalness:,
+          roughness:,
+          transparent:,
+          opacity:,
+          displacement_scale:,
+          displacement_bias:,
+          emissive:,
+          emissive_intensity:,
+          alpha_test:,
+        ),
       )
     }
   }
-  savoiardi.update_material_wireframe(
-    mat,
-    extension.get_bool(attrs, "wireframe"),
-  )
-  savoiardi.update_material_side(
+  material.set_wireframe(mat, extension.get_bool(attrs, "wireframe"))
+  material.set_side(
     mat,
     parse_material_side(dict.get(attrs, "side") |> result.unwrap("front")),
   )
@@ -396,21 +395,25 @@ pub fn parse_material(attrs: Dict(String, String)) -> savoiardi.Material {
 @internal
 pub fn parse_apply_textures_async(
   id: String,
-  _mat: savoiardi.Material,
+  _mat: Material,
   attrs: Dict(String, String),
 ) -> List(promise.Promise(List(extension.RuntimeAction))) {
   use #(texture_name, texture_src) <- list.map([
-    #("map", dict.get(attrs, "color-map")),
-    #("normalMap", dict.get(attrs, "normal-map")),
-    #("aoMap", dict.get(attrs, "ambient-occlusion-map")),
-    #("roughnessMap", dict.get(attrs, "roughness-map")),
-    #("metalnessMap", dict.get(attrs, "metalness-map")),
-    #("displacementMap", dict.get(attrs, "displacement-map")),
+    #(material.set_env_map, dict.get(attrs, "color-map")),
+    #(material.set_normal_map, dict.get(attrs, "normal-map")),
+    #(
+      material.set_ambient_occlusion_map,
+      dict.get(attrs, "ambient-occlusion-map"),
+    ),
+    #(material.set_roughness_map, dict.get(attrs, "roughness-map")),
+    #(material.set_metalness_map, dict.get(attrs, "metalness-map")),
+    #(material.set_displacement_map, dict.get(attrs, "displacement-map")),
   ])
   case texture_src {
     Error(Nil) -> promise.resolve([])
     Ok(url) -> {
-      use result <- promise.map(savoiardi.load_texture(url))
+      let loader = loader.texture()
+      use result <- promise.map(texture.load_async(loader, url))
       case result {
         Ok(texture) -> [apply_texture(id, texture_name, texture)]
         Error(_) -> [emit_texture_error(id, url)]
@@ -421,14 +424,14 @@ pub fn parse_apply_textures_async(
 
 fn apply_texture(
   id: String,
-  texture_name: String,
-  texture: savoiardi.Texture,
+  apply_function,
+  texture: Texture,
 ) -> extension.RuntimeAction {
   extension.action(fn(rt) {
     case runtime.object(rt, id) {
       Ok(object) -> {
-        let material = savoiardi.get_object_material(object)
-        let _ = savoiardi.set_material_texture(material, texture_name, texture)
+        let material = object.get_material(object)
+        let _ = apply_function(material, texture)
         #(rt, effect.none())
       }
       Error(Nil) -> #(rt, effect.none())
@@ -451,11 +454,11 @@ fn emit_texture_error(id: String, url: String) -> extension.RuntimeAction {
   })
 }
 
-fn parse_material_side(side_str: String) -> savoiardi.MaterialSide {
+fn parse_material_side(side_str: String) -> material.MaterialSide {
   case side_str {
-    "back" -> savoiardi.BackSide
-    "double" -> savoiardi.DoubleSide
-    _ -> savoiardi.FrontSide
+    "back" -> material.BackSide
+    "double" -> material.DoubleSide
+    _ -> material.FrontSide
   }
 }
 

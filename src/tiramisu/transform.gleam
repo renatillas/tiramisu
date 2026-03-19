@@ -12,7 +12,7 @@ import gleam/string
 import lustre/attribute
 import lustre/effect
 import quaternion
-import savoiardi
+import savoiardi/object.{type Object3D}
 import tiramisu/dev/extension.{type AttributeChanges}
 import tiramisu/dev/runtime
 import vec/vec3
@@ -57,17 +57,14 @@ fn quaternion_to_string(rotation: quaternion.Quaternion) -> String {
   <> float.to_string(rotation.w)
 }
 
-fn apply_all(
-  object: savoiardi.Object3D,
-  attributes: dict.Dict(String, String),
-) -> Nil {
+fn apply_all(object: Object3D, attributes: dict.Dict(String, String)) -> Nil {
   apply_position(object, attributes)
   apply_rotation(object, attributes)
   apply_scale(object, attributes)
 }
 
 fn apply_changed(
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: dict.Dict(String, String),
   changed_attributes: AttributeChanges,
 ) -> Nil {
@@ -88,31 +85,28 @@ fn apply_changed(
 }
 
 fn apply_position(
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: dict.Dict(String, String),
 ) -> Nil {
   let _ =
     dict.get(attributes, "position")
     |> result.try(vector_to_numbers)
     |> result.try(parse_vector)
-    |> result.map(savoiardi.set_object_position(object, _))
+    |> result.map(object.set_position(object, _))
   Nil
 }
 
-fn apply_scale(
-  object: savoiardi.Object3D,
-  attributes: dict.Dict(String, String),
-) -> Nil {
+fn apply_scale(object: Object3D, attributes: dict.Dict(String, String)) -> Nil {
   let _ =
     dict.get(attributes, "scale")
     |> result.try(vector_to_numbers)
     |> result.try(parse_vector)
-    |> result.map(savoiardi.set_object_scale(object, _))
+    |> result.map(object.set_scale(object, _))
   Nil
 }
 
 fn apply_rotation(
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: dict.Dict(String, String),
 ) -> Nil {
   let rotation =
@@ -125,7 +119,7 @@ fn apply_rotation(
       result.try(rotation, parse_vector)
       |> result.map(quaternion.from_euler)
     })
-    |> result.map(savoiardi.set_object_quaternion(object, _))
+    |> result.map(object.set_quaternion(object, _))
   Nil
 }
 
@@ -155,7 +149,7 @@ fn on_create(
   _runtime: runtime.Runtime,
   _tag: String,
   _id: String,
-  object: option.Option(savoiardi.Object3D),
+  object: option.Option(Object3D),
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   case object {
@@ -170,7 +164,7 @@ fn on_update(
   _runtime: runtime.Runtime,
   _tag: String,
   _id: String,
-  object: option.Option(savoiardi.Object3D),
+  object: option.Option(Object3D),
   attributes: dict.Dict(String, String),
   changed_attributes: dict.Dict(String, extension.AttributeChange),
 ) -> effect.Effect(extension.Msg) {
@@ -185,7 +179,7 @@ fn on_resolved(
   _runtime: runtime.Runtime,
   _tag: String,
   _id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   apply_all(object, attributes)
@@ -196,7 +190,7 @@ fn on_remove(
   _runtime: runtime.Runtime,
   _tag: String,
   _id: String,
-  _object: savoiardi.Object3D,
+  _object: Object3D,
 ) -> effect.Effect(extension.Msg) {
   effect.none()
 }

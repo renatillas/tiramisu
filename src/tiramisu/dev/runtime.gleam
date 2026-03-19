@@ -11,7 +11,10 @@
 
 import gleam/dict.{type Dict}
 import gleam/option.{type Option, None, Some}
-import savoiardi.{type Camera, type Object3D, type Renderer, type Scene}
+import savoiardi/camera.{type Camera}
+import savoiardi/object.{type Object3D}
+import savoiardi/renderer.{type Renderer}
+import savoiardi/scene.{type Scene}
 import tiramisu/internal/element
 
 /// Metadata about a registered object.
@@ -101,9 +104,9 @@ pub fn add_object(
   parent_id parent_id: String,
   tag tag: String,
 ) -> Runtime {
-  savoiardi.set_object_name(object, id)
+  object.set_name(object, id)
   let parent = resolve_parent(runtime, parent_id)
-  savoiardi.add_child(parent:, child: object)
+  object.add_child(parent:, child: object)
   let objects =
     dict.insert(runtime.objects, id, ObjectEntry(object:, parent_id:, tag:))
   // Store on DOM element so external integrations (cacao physics) can find it
@@ -120,9 +123,9 @@ pub fn remove_object(
 ) -> Runtime {
   // Remove from Three.js scene graph
   let parent = resolve_parent(runtime, parent_id)
-  savoiardi.remove_child(parent, object)
+  object.remove_child(parent, object)
   // Dispose resources
-  savoiardi.dispose_object(object)
+  object.dispose(object)
   // Remove from maps
   let objects = dict.delete(runtime.objects, id)
   // Clear DOM reference
@@ -139,7 +142,7 @@ pub fn reparent_object(
   case dict.get(runtime.objects, id) {
     Ok(ObjectEntry(object: child, ..) as entry) -> {
       let parent = resolve_parent(runtime, parent_id:)
-      savoiardi.add_child(parent:, child:)
+      object.add_child(parent:, child:)
       // Update the entry's parent_id
       let objects =
         dict.insert(runtime.objects, id, ObjectEntry(..entry, parent_id:))
@@ -161,7 +164,7 @@ pub fn replace_object(
 ) -> Runtime {
   case dict.get(runtime.objects, id) {
     Ok(ObjectEntry(object:, ..) as entry) -> {
-      let replaced = savoiardi.replace_object_model(object, new_object, id)
+      let replaced = object.replace_model(object, new_object, id)
       let objects =
         dict.insert(runtime.objects, id, ObjectEntry(..entry, object: replaced))
       // Update DOM reference to point to the new object
@@ -194,12 +197,12 @@ pub fn deactivate_camera(runtime: Runtime, id: String) -> Runtime {
 /// Otherwise looks up the object in the registry, falling back to scene root.
 fn resolve_parent(runtime: Runtime, parent_id parent_id: String) -> Object3D {
   case parent_id == runtime.scene_id {
-    True -> savoiardi.scene_to_object3d(runtime.scene)
+    True -> scene.to_object3d(runtime.scene)
     False ->
       case find_entry(runtime, parent_id) {
         Ok(entry) -> entry.object
         // Fallback to scene root
-        Error(Nil) -> savoiardi.scene_to_object3d(runtime.scene)
+        Error(Nil) -> scene.to_object3d(runtime.scene)
       }
   }
 }

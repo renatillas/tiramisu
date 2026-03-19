@@ -85,7 +85,7 @@ fn view() {
 }
 
 ```
-<img width="782" height="456" alt="image" src="https://github.com/user-attachments/assets/14b7fb9b-5e9d-41a9-b8e3-7b0e997e0e56" />
+<img alt="image" src="https://github.com/user-attachments/assets/14b7fb9b-5e9d-41a9-b8e3-7b0e997e0e56" />
 
 
 ## Guide

@@ -16,15 +16,15 @@ packages = [
   { name = "gleamy_bench", version = "0.6.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleamy_bench", source = "hex", outer_checksum = "DEF68E4B097A56781282F0F9D48371A0ABBCDDCF89CAD05B28C3BEDD6B2E8DF3" },
   { name = "gleeunit", version = "1.9.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "DA9553CE58B67924B3C631F96FE3370C49EB6D6DC6B384EC4862CC4AAA718F3C" },
   { name = "glexer", version = "2.3.1", build_tools = ["gleam"], requirements = ["gleam_stdlib", "splitter"], otp_app = "glexer", source = "hex", outer_checksum = "41D8D2E855AEA87ADC94B7AF26A5FEA3C90268D4CF2CCBBD64FD6863714EE085" },
-  { name = "glinter", version = "2.2.0", build_tools = ["gleam"], requirements = ["argv", "glance", "gleam_json", "gleam_stdlib", "simplifile", "tom"], otp_app = "glinter", source = "hex", outer_checksum = "1F959EB20DCEB09CC674BAB804401B262031B9F112E577E4A5E22CD513A4A388" },
+  { name = "glinter", version = "2.11.1", build_tools = ["gleam"], requirements = ["argv", "glance", "gleam_json", "gleam_stdlib", "simplifile", "tom"], otp_app = "glinter", source = "hex", outer_checksum = "E040E37081DA992277D6A2D7FC0857411488058D9D6D2C60EF9881147161F485" },
   { name = "houdini", version = "1.2.0", build_tools = ["gleam"], requirements = [], otp_app = "houdini", source = "hex", outer_checksum = "5DB1053F1AF828049C2B206D4403C18970ABEF5C18671CA3C2D2ED0DD64F6385" },
   { name = "lustre", version = "5.6.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_json", "gleam_otp", "gleam_stdlib", "houdini"], otp_app = "lustre", source = "hex", outer_checksum = "EE558CD4DB9F09FCC16417ADF0183A3C2DAC3E4B21ED3AC0CAE859792AB810CA" },
   { name = "quaterni", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib", "vec"], otp_app = "quaterni", source = "hex", outer_checksum = "96A9645E9D0704ADC2F782B23A48BDF4ADEF97355768A2A69D534C8C909CFFC3" },
-  { name = "savoiardi", version = "4.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], otp_app = "savoiardi", source = "hex", outer_checksum = "CB3C8972696CDFF1168C007619AC0AC4D548170105EBE9E10B87CE2E26F214AD" },
+  { name = "savoiardi", version = "4.0.0", build_tools = ["gleam"], requirements = ["gleam_javascript", "gleam_stdlib", "gleam_time", "quaterni", "vec"], source = "git", repo = "https://github.com/renatillas/savoiardi", commit = "0293cd9b627cb1580787c3384b911e96619676da" },
   { name = "simplifile", version = "2.4.0", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "7C18AFA4FED0B4CE1FA5B0B4BAC1FA1744427054EA993565F6F3F82E5453170D" },
   { name = "splitter", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "splitter", source = "hex", outer_checksum = "3DFD6B6C49E61EDAF6F7B27A42054A17CFF6CA2135FF553D0CB61C234D281DD0" },
   { name = "tom", version = "2.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib", "gleam_time"], otp_app = "tom", source = "hex", outer_checksum = "90791DA4AACE637E30081FE77049B8DB850FBC8CACC31515376BCC4E59BE1DD2" },
-  { name = "vec", version = "3.2.1", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "05A6617AAB325400B8F513EEAEAF797ED17DC912AE3FB0592703F9108BF0B5C0" },
+  { name = "vec", version = "3.3.0", build_tools = ["gleam"], requirements = ["gleam_community_maths", "gleam_stdlib"], otp_app = "vec", source = "hex", outer_checksum = "15493CD8CDA3D81DEF96074C131460BA5F40EDB577A6ACBA089467D8FDA33ABA" },
 ]
 
 [requirements]
@@ -38,5 +38,5 @@ gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 glinter = { version = ">= 2.2.0 and < 3.0.0" }
 lustre = { version = ">= 5.3.5 and < 6.0.0" }
 quaterni = { version = ">= 1.0.0 and < 2.0.0" }
-savoiardi = { version = ">= 4.0.0 and < 5.0.0" }
+savoiardi = { git = "https://github.com/renatillas/savoiardi", ref = "main" }
 vec = { version = ">= 3.0.1 and < 4.0.0" }

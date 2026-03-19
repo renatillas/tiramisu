@@ -24,7 +24,11 @@ import gleam/option.{type Option}
 import gleam/result
 import lustre/attribute.{type Attribute}
 import lustre/effect
-import savoiardi.{type Object3D}
+import savoiardi/renderer
+import tiramisu/internal/element
+
+import savoiardi/camera
+import savoiardi/object.{type Object3D}
 
 import tiramisu/dev/extension
 import tiramisu/dev/runtime.{type Runtime}
@@ -119,22 +123,17 @@ fn create(
       let top = extension.get(attributes, "top", 10.0, extension.parse_number)
       let bottom =
         extension.get(attributes, "bottom", -10.0, extension.parse_number)
-      savoiardi.create_orthographic_camera(
-        left:,
-        right:,
-        top:,
-        bottom:,
-        near:,
-        far:,
-      )
+      camera.orthographic(left:, right:, top:, bottom:, near:, far:)
+      |> camera.from_orthographic
     }
     _ -> {
       let fov = extension.get(attributes, "fov", 75.0, extension.parse_number)
       let aspect = get_canvas_ratio(runtime)
-      savoiardi.create_perspective_camera(fov:, aspect:, near:, far:)
+      camera.perspective(fov:, aspect:, near:, far:)
+      |> camera.from_perspective
     }
   }
-  let object = savoiardi.camera_to_object3d(camera)
+  let object = camera.to_object3d(camera)
   let active = extension.get_bool(attributes, "active")
   let runtime =
     runtime
@@ -203,9 +202,11 @@ fn update_orthographic(
 ) -> Result(Runtime, Nil) {
   case object {
     option.Some(object) -> {
-      let camera = savoiardi.object3d_to_camera(object)
+      use camera <- result.try(camera.orthographic_from_object3d(object))
 
       let _ = do_update_orthographic(new_attributes, changed_attributes, camera)
+
+      let camera = camera.from_orthographic(camera)
 
       conditionally_set_active(
         context,
@@ -224,7 +225,7 @@ fn update_orthographic(
 fn do_update_orthographic(
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-  camera: savoiardi.Camera,
+  camera: camera.Orthographic,
 ) -> Nil {
   case
     extension.has_any_change(changed_attributes, [
@@ -243,7 +244,7 @@ fn do_update_orthographic(
       let right = get_right(attributes)
       let top = get_top(attributes)
       let bottom = get_bottom(attributes)
-      savoiardi.update_orthograpic(
+      camera.update_orthographic(
         camera,
         left:,
         right:,
@@ -252,7 +253,9 @@ fn do_update_orthographic(
         near:,
         far:,
       )
-      savoiardi.update_camera_projection_matrix(camera)
+      |> camera.from_orthographic
+      |> camera.update_projection_matrix
+      Nil
     }
     False -> Nil
   }
@@ -267,8 +270,9 @@ fn update_perspective(
 ) -> Result(Runtime, Nil) {
   case object {
     option.Some(object) -> {
-      let camera = savoiardi.object3d_to_camera(object)
+      use camera <- result.try(camera.perspective_from_object3d(object))
       do_update_perspective(context, camera, changed_attributes, new_attributes)
+      let camera = camera.from_perspective(camera)
       conditionally_set_active(
         context,
         id,
@@ -286,7 +290,7 @@ fn update_perspective(
 fn conditionally_set_active(
   runtime: Runtime,
   id: String,
-  camera: savoiardi.Camera,
+  camera: camera.Camera,
   _new_attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Runtime {
@@ -299,7 +303,7 @@ fn conditionally_set_active(
 
 fn do_update_perspective(
   runtime: Runtime,
-  camera: savoiardi.Camera,
+  camera: camera.Perspective,
   changed_attributes: extension.AttributeChanges,
   attributes: Dict(String, String),
 ) -> Nil {
@@ -316,14 +320,10 @@ fn do_update_perspective(
       let near = get_near(attributes)
       let far = get_far(attributes)
       let aspect = get_canvas_ratio(runtime)
-      savoiardi.set_perspective_camera_params(
-        camera,
-        fov:,
-        aspect:,
-        near:,
-        far:,
-      )
-      savoiardi.update_camera_projection_matrix(camera)
+      camera.update_perspective(camera, fov:, aspect:, near:, far:)
+      |> camera.from_perspective
+      |> camera.update_projection_matrix
+      Nil
     }
     False -> Nil
   }
@@ -394,11 +394,9 @@ fn get_bottom(attributes: Dict(String, String)) -> Float {
 
 fn get_canvas_ratio(runtime: Runtime) -> Float {
   let vec2.Vec2(x: width, y: height) =
-    savoiardi.get_canvas_dimensions(runtime.threejs_renderer(runtime))
-  case height {
-    0.0 -> 16.0 /. 9.0
-    _ -> width /. height
-  }
+    renderer.canvas(runtime.threejs_renderer(runtime))
+    |> element.canvas_size
+  width /. height
 }
 
 fn when(value: a, condition: Bool, do callback: fn(a) -> a) -> a {

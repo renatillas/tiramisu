@@ -17,7 +17,10 @@ import gleam/result
 import gleam/string
 import lustre/attribute.{type Attribute}
 import lustre/effect
-import savoiardi.{type Object3D}
+import savoiardi/loader
+import savoiardi/object.{type Object3D}
+import savoiardi/scene
+import savoiardi/texture
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
 import tiramisu/internal/async_policy
@@ -221,13 +224,16 @@ fn apply_background(
 ) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
   case parse_background(background) {
     None -> {
-      let _ = savoiardi.clear_scene_background(runtime.scene(runtime))
+      let _ = scene.clear_background(runtime.scene(runtime))
       #(runtime, effect.none())
     }
 
     Color(color) -> {
       let _ =
-        savoiardi.set_scene_background_color(runtime.scene(runtime), color)
+        scene.set_background(
+          runtime.scene(runtime),
+          scene.background_color(color),
+        )
       #(runtime, effect.none())
     }
 
@@ -301,16 +307,16 @@ fn load_background_texture(
   url: String,
   background_color_space: BackgroundColorSpace,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_texture(url))
+  use result <- promise.await(texture.load_async(loader.texture(), url))
   case result {
     Ok(texture) -> {
-      savoiardi.set_texture_color_space(
+      texture.set_color_space(
         texture,
         to_savoiardi_color_space(background_color_space),
       )
       promise.resolve([extension.set_background_texture(texture)])
     }
-    Error(Nil) -> promise.resolve([])
+    Error(_) -> promise.resolve([])
   }
 }
 
@@ -318,27 +324,33 @@ fn load_equirectangular_background(
   url: String,
   background_color_space: BackgroundColorSpace,
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_equirectangular_texture(url))
+  use result <- promise.await(texture.load_equirectangular_async(
+    loader.texture(),
+    url,
+  ))
   case result {
     Ok(texture) -> {
-      savoiardi.set_texture_color_space(
+      texture.set_color_space(
         texture,
         to_savoiardi_color_space(background_color_space),
       )
       promise.resolve([extension.set_background_texture(texture)])
     }
-    Error(Nil) -> promise.resolve([])
+    Error(_) -> promise.resolve([])
   }
 }
 
 fn load_cube_background(
   urls: List(String),
 ) -> promise.Promise(List(extension.RuntimeAction)) {
-  use result <- promise.await(savoiardi.load_cube_texture(urls))
+  use result <- promise.await(texture.load_cube_async(
+    loader.cube_texture(),
+    urls,
+  ))
   case result {
     Ok(texture) ->
       promise.resolve([extension.set_background_cube_texture(texture)])
-    Error(Nil) -> promise.resolve([])
+    Error(_) -> promise.resolve([])
   }
 }
 
@@ -390,28 +402,28 @@ fn parse_background_color_space(encoded: String) -> BackgroundColorSpace {
   }
 }
 
-fn to_savoiardi_color_space(space: BackgroundColorSpace) -> savoiardi.ColorSpace {
+fn to_savoiardi_color_space(space: BackgroundColorSpace) -> texture.ColorSpace {
   case space {
-    SRGB -> savoiardi.SRGBColorSpace
-    LinearSRGB -> savoiardi.LinearSRGBColorSpace
+    SRGB -> texture.SRGB
+    LinearSRGB -> texture.LinearSRGB
   }
 }
 
 fn apply_fog(runtime: runtime.Runtime, fog: String) -> runtime.Runtime {
   case parse_fog(fog) {
     NoFog -> {
-      let _ = savoiardi.clear_scene_fog(runtime.scene(runtime))
+      let _ = scene.clear_fog(runtime.scene(runtime))
       runtime
     }
 
     LinearFog(color, near, far) -> {
-      let _ = savoiardi.set_scene_fog(runtime.scene(runtime), color, near, far)
+      let _ = scene.set_fog(runtime.scene(runtime), scene.fog(color, near, far))
       runtime
     }
 
     Exp2Fog(color, density) -> {
       let _ =
-        savoiardi.set_scene_fog_exp2(runtime.scene(runtime), color, density)
+        scene.set_fog(runtime.scene(runtime), scene.fog_exp2(color, density))
       runtime
     }
   }

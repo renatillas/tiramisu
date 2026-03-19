@@ -4,7 +4,7 @@ import gleam/dict.{type Dict}
 import gleam/option
 import lustre/attribute
 import lustre/effect
-import savoiardi.{type Object3D}
+import savoiardi/object.{type Object3D}
 
 import tiramisu/dev/extension
 import tiramisu/dev/runtime.{type Runtime}
@@ -25,15 +25,15 @@ fn create(
   parent_id: String,
   attributes: Dict(String, String),
 ) -> #(Runtime, effect.Effect(extension.Msg)) {
-  let object = savoiardi.create_group()
-  set_hidden(object, attributes)
+  let object = object.group()
+  let object = set_hidden(object, attributes)
   let next_runtime = runtime.add_object(runtime, id, object:, parent_id:, tag:)
   #(next_runtime, effect.none())
 }
 
-fn set_hidden(group: Object3D, attributes: Dict(String, String)) -> Nil {
+fn set_hidden(group: Object3D, attributes: Dict(String, String)) -> Object3D {
   let hide = extension.get_bool(attributes, "hidden")
-  savoiardi.set_object_visible(group, !hide)
+  object.set_visible(group, !hide)
 }
 
 fn update(
@@ -44,10 +44,13 @@ fn update(
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> #(Runtime, effect.Effect(extension.Msg)) {
-  let _ = case object {
+  case object {
     option.Some(group) -> {
       case extension.has_change(changed_attributes, "hidden") {
-        True -> set_hidden(group, attributes)
+        True -> {
+          set_hidden(group, attributes)
+          Nil
+        }
         False -> Nil
       }
     }

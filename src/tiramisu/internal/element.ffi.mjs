@@ -1,5 +1,6 @@
 import { Result$Ok, Result$Error } from "../../../prelude.mjs";
 import { toList } from "../../../prelude.mjs";
+import { Vec2$Vec2 } from "../../../vec/vec/vec2.mjs";
 
 export function shadowRootHost(shadowRoot) {
   return shadowRoot.host;
@@ -99,4 +100,8 @@ export function getAllAttributesList(element) {
 
 export function appendCanvasToContainer(container, canvas) {
   container.appendChild(canvas);
+}
+
+export function canvasSize(canvas) {
+  return Vec2$Vec2(canvas.clientWidth, canvas.clientHeight)
 }

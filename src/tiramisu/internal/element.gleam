@@ -2,7 +2,9 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/javascript/array
 import gleam/result
-import savoiardi
+import savoiardi/object.{type Object3D}
+import savoiardi/renderer.{type Canvas}
+import vec/vec2
 
 pub type HtmlElement
 
@@ -18,7 +20,10 @@ fn get_all_attributes_list(
 ) -> array.Array(#(String, String))
 
 @external(javascript, "./element.ffi.mjs", "appendCanvasToContainer")
-pub fn append_canvas(shadow_root: Dynamic, canvas: savoiardi.Canvas) -> Nil
+pub fn append_canvas(shadow_root: Dynamic, canvas: Canvas) -> Nil
+
+@external(javascript, "./element.ffi.mjs", "canvasSize")
+pub fn canvas_size(canvas: Canvas) -> vec2.Vec2(Float)
 
 @external(javascript, "./element.ffi.mjs", "getAttribute")
 pub fn attribute(element: HtmlElement, name: String) -> Result(String, Nil)
@@ -49,7 +54,7 @@ pub fn attributes(element: HtmlElement) -> Dict(String, String) {
   dict.insert(acc, pair.0, pair.1)
 }
 
-pub fn store_object(id: String, object: savoiardi.Object3D) -> Result(Nil, Nil) {
+pub fn store_object(id: String, object: Object3D) -> Result(Nil, Nil) {
   use element <- result.map(find(id))
   set_property(element, "_object3d", object)
 }

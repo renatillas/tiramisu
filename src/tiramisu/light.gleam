@@ -12,7 +12,8 @@ import gleam/option
 import gleam/result
 import gleam_community/maths
 import lustre/effect
-import savoiardi.{type Object3D}
+import savoiardi/light
+import savoiardi/object.{type Object3D}
 
 import lustre/attribute.{type Attribute}
 
@@ -110,42 +111,42 @@ fn create(
 ) -> #(Runtime, effect.Effect(extension.Msg)) {
   let light = create_light(attributes)
   let casts_shadow = extension.get_bool(attributes, "cast-shadow")
-  savoiardi.set_light_cast_shadow(light, casts_shadow)
+  light.set_cast_shadow(light, casts_shadow)
 
-  let object = savoiardi.light_to_object3d(light)
+  let object = light.to_object3d(light)
   let runtime = runtime.add_object(runtime, id, object:, parent_id:, tag:)
   #(runtime, effect.none())
 }
 
-fn create_directional(attributes: dict.Dict(String, String)) -> savoiardi.Light {
+fn create_directional(attributes: dict.Dict(String, String)) -> light.Light {
   let color =
     extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
   let intensity =
     extension.get(attributes, "intensity", 1.0, extension.parse_number)
-  savoiardi.create_directional_light(color:, intensity:)
+  light.directional(color:, intensity:)
 }
 
-fn create_point(attributes: dict.Dict(String, String)) -> savoiardi.Light {
+fn create_point(attributes: dict.Dict(String, String)) -> light.Light {
   let distance =
     extension.get(attributes, "distance", 0.0, extension.parse_number)
   let color =
     extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
   let intensity =
     extension.get(attributes, "intensity", 1.0, extension.parse_number)
-  savoiardi.create_point_light(color:, intensity:, distance:)
+  light.point(color:, intensity:, distance:)
 }
 
-fn create_hemisphere(attributes: dict.Dict(String, String)) -> savoiardi.Light {
+fn create_hemisphere(attributes: dict.Dict(String, String)) -> light.Light {
   let sky_color =
     extension.get(attributes, "sky", 0x000000, int.base_parse(_, 16))
   let ground_color =
     extension.get(attributes, "ground", 0x000000, int.base_parse(_, 16))
   let intensity =
     extension.get(attributes, "intensity", 1.0, extension.parse_number)
-  savoiardi.create_hemisphere_light(sky_color:, ground_color:, intensity:)
+  light.hemisphere(sky_color:, ground_color:, intensity:)
 }
 
-fn create_spot(attributes: dict.Dict(String, String)) -> savoiardi.Light {
+fn create_spot(attributes: dict.Dict(String, String)) -> light.Light {
   let distance =
     extension.get(attributes, "distance", 0.0, extension.parse_number)
   let angle =
@@ -161,7 +162,7 @@ fn create_spot(attributes: dict.Dict(String, String)) -> savoiardi.Light {
     extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
   let intensity =
     extension.get(attributes, "intensity", 1.0, extension.parse_number)
-  savoiardi.create_spot_light(color:, intensity:, distance:, angle:, penumbra:)
+  light.spot(color:, intensity:, distance:, angle:, penumbra:)
 }
 
 fn create_ambient(attributes: dict.Dict(String, String)) {
@@ -169,10 +170,10 @@ fn create_ambient(attributes: dict.Dict(String, String)) {
     extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16))
   let intensity =
     extension.get(attributes, "intensity", 1.0, extension.parse_number)
-  savoiardi.create_ambient_light(color:, intensity:)
+  light.ambient(color:, intensity:)
 }
 
-fn create_light(attributes: dict.Dict(String, String)) -> savoiardi.Light {
+fn create_light(attributes: dict.Dict(String, String)) -> light.Light {
   case dict.get(attributes, "type") |> result.unwrap("point") {
     "directional" -> create_directional(attributes)
     "point" -> create_point(attributes)
@@ -200,8 +201,9 @@ fn update(
           attributes,
           changed_attributes,
         )
-      let light = savoiardi.object3d_to_light(object)
-      let _ = update_light_properties(light, attributes, changed_attributes)
+      let _ =
+        light.from_object3d(object)
+        |> result.map(update_light_properties(_, attributes, changed_attributes))
       #(runtime, effect.none())
     }
 
@@ -218,7 +220,7 @@ fn rebuild_light_if_needed(
 ) -> #(Object3D, Runtime) {
   case extension.has_change(changed_attributes, "type") {
     True -> {
-      let object = create_light(attributes) |> savoiardi.light_to_object3d
+      let object = create_light(attributes) |> light.to_object3d
       #(object, runtime.replace_object(scene_runtime, id, object))
     }
 
@@ -227,31 +229,38 @@ fn rebuild_light_if_needed(
 }
 
 fn update_light_properties(
-  light: savoiardi.Light,
+  light: light.Light,
   attributes: dict.Dict(String, String),
   changed_attributes: extension.AttributeChanges,
 ) -> Nil {
   case extension.bool_change(changed_attributes, "cast-shadow") {
-    Ok(casts_shadow) -> savoiardi.set_light_cast_shadow(light, casts_shadow)
+    Ok(casts_shadow) -> {
+      light.set_cast_shadow(light, casts_shadow)
+      Nil
+    }
     Error(Nil) -> Nil
   }
 
   case extension.has_change(changed_attributes, "color") {
-    True ->
-      savoiardi.update_light_color(
+    True -> {
+      light.set_color(
         light,
         extension.get(attributes, "color", 0xffffff, int.base_parse(_, 16)),
       )
+      Nil
+    }
 
     False -> Nil
   }
 
   case extension.has_change(changed_attributes, "intensity") {
-    True ->
-      savoiardi.update_light_intensity(
+    True -> {
+      light.set_intensity(
         light,
         extension.get(attributes, "intensity", 1.0, extension.parse_number),
       )
+      Nil
+    }
 
     False -> Nil
   }

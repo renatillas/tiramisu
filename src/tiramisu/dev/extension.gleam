@@ -17,7 +17,9 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 import lustre/effect
-import savoiardi.{type CubeTexture, type Object3D, type Texture}
+import savoiardi/object.{type Object3D}
+import savoiardi/scene
+import savoiardi/texture.{type CubeTexture, type Texture}
 import tiramisu/dev/runtime
 
 // NODE APPLY CONTEXT ----------------------------------------------------------
@@ -86,7 +88,8 @@ pub fn remove_object(
 /// Set the scene background to a 2D texture.
 pub fn set_background_texture(texture: Texture) -> RuntimeAction {
   RuntimeAction(fn(rt) {
-    let _ = savoiardi.set_scene_background_texture(runtime.scene(rt), texture)
+    let _ =
+      scene.set_background(runtime.scene(rt), scene.background_texture(texture))
     #(rt, effect.none())
   })
 }
@@ -95,7 +98,10 @@ pub fn set_background_texture(texture: Texture) -> RuntimeAction {
 pub fn set_background_cube_texture(texture: CubeTexture) -> RuntimeAction {
   RuntimeAction(fn(rt) {
     let _ =
-      savoiardi.set_scene_background_cube_texture(runtime.scene(rt), texture)
+      scene.set_background(
+        runtime.scene(rt),
+        scene.background_cube_texture(texture),
+      )
     #(rt, effect.none())
   })
 }

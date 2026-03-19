@@ -3,8 +3,8 @@
 //// Primitive nodes are the fastest way to put visible geometry in a scene
 //// without relying on external assets.
 
-import gleam/dict.{type Dict}
 import gleam/bool
+import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
 import gleam/json
@@ -13,11 +13,13 @@ import gleam/option.{type Option}
 import gleam/result
 import gleam/string
 import lustre/effect
+import savoiardi/geometry.{type Geometry}
+import savoiardi/material
 import tiramisu/dev/extension
 
 import lustre/attribute.{type Attribute}
 
-import savoiardi.{type Object3D}
+import savoiardi/object.{type Object3D}
 
 import tiramisu/dev/runtime.{type Runtime}
 
@@ -151,7 +153,8 @@ fn create(
 ) -> #(runtime.Runtime, effect.Effect(extension.Msg)) {
   case dict.get(attributes, "geometry") |> result.try(parse_geometry) {
     Ok(geometry) -> {
-      let object = savoiardi.create_mesh(geometry)
+      let object =
+        object.mesh(geometry, material.basic(material.basic_options()))
       apply_attributes(object, attributes)
       let next_runtime =
         runtime.add_object(runtime, id, object:, parent_id:, tag:)
@@ -182,16 +185,14 @@ fn update(
   }
 }
 
-fn apply_attributes(object: Object3D, attributes: Dict(String, String)) -> Nil {
-  savoiardi.set_object_visible(
-    object,
-    !extension.get_bool(attributes, "hidden"),
-  )
-  savoiardi.enable_shadows(
-    object,
-    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
-    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
-  )
+fn apply_attributes(
+  object: Object3D,
+  attributes: Dict(String, String),
+) -> Object3D {
+  object
+  |> object.set_visible(!extension.get_bool(attributes, "hidden"))
+  |> object.set_cast_shadow(extension.get_bool(attributes, "cast-shadow"))
+  |> object.set_receive_shadow(extension.get_bool(attributes, "receive-shadow"))
 }
 
 fn apply_geometry(
@@ -206,7 +207,7 @@ fn apply_geometry(
   let _ =
     dict.get(attributes, "geometry")
     |> result.try(parse_geometry)
-    |> result.map(savoiardi.set_object_geometry(object, _))
+    |> result.map(object.set_geometry(object, _))
   Nil
 }
 
@@ -214,36 +215,30 @@ fn apply_visibility(
   object: Object3D,
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Nil {
+) -> Object3D {
   use <- bool.guard(
     when: !extension.has_change(changed_attributes, "hidden"),
-    return: Nil,
+    return: object,
   )
-  savoiardi.set_object_visible(
-    object,
-    !extension.get_bool(attributes, "hidden"),
-  )
+  object.set_visible(object, !extension.get_bool(attributes, "hidden"))
 }
 
 fn apply_shadows(
   object: Object3D,
   attributes: Dict(String, String),
   changed_attributes: extension.AttributeChanges,
-) -> Nil {
+) -> Object3D {
   use <- bool.guard(
-    when:
-      !extension.has_change(changed_attributes, "cast-shadow")
+    when: !extension.has_change(changed_attributes, "cast-shadow")
       && !extension.has_change(changed_attributes, "receive-shadow"),
-    return: Nil,
+    return: object,
   )
-  savoiardi.enable_shadows(
-    object,
-    cast_shadow: extension.get_bool(attributes, "cast-shadow"),
-    receive_shadow: extension.get_bool(attributes, "receive-shadow"),
-  )
+  object
+  |> object.set_cast_shadow(extension.get_bool(attributes, "cast-shadow"))
+  |> object.set_receive_shadow(extension.get_bool(attributes, "receive-shadow"))
 }
 
-fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
+fn parse_geometry(geometry: String) -> Result(Geometry, Nil) {
   case string.split(geometry, ":") {
     [type_str, params_str] -> {
       let params =
@@ -252,55 +247,43 @@ fn parse_geometry(geometry: String) -> Result(savoiardi.Geometry, Nil) {
         |> list.filter_map(float.parse)
 
       case type_str, params {
-        "box", [w, h, d] -> Ok(savoiardi.create_box_geometry(w, h, d))
-        "box", [s] -> Ok(savoiardi.create_box_geometry(s, s, s))
-        "box", _ -> Ok(savoiardi.create_box_geometry(1.0, 1.0, 1.0))
+        "box", [w, h, d] -> Ok(geometry.box(w, h, d))
+        "box", [s] -> Ok(geometry.box(s, s, s))
+        "box", _ -> Ok(geometry.box(1.0, 1.0, 1.0))
 
         "sphere", [r, ws, hs] ->
-          Ok(savoiardi.create_sphere_geometry(
-            r,
-            float.round(ws),
-            float.round(hs),
-          ))
-        "sphere", [r] -> Ok(savoiardi.create_sphere_geometry(r, 32, 16))
-        "sphere", _ -> Ok(savoiardi.create_sphere_geometry(1.0, 32, 16))
+          Ok(geometry.sphere(r, float.round(ws), float.round(hs)))
+        "sphere", [r] -> Ok(geometry.sphere(r, 32, 16))
+        "sphere", _ -> Ok(geometry.sphere(1.0, 32, 16))
 
-        "plane", [w, h] -> Ok(savoiardi.create_plane_geometry(w, h, 1, 1))
-        "plane", _ -> Ok(savoiardi.create_plane_geometry(1.0, 1.0, 1, 1))
+        "plane", [w, h] -> Ok(geometry.plane(w, h, 1, 1))
+        "plane", _ -> Ok(geometry.plane(1.0, 1.0, 1, 1))
 
         "cylinder", [rt, rb, h, s] ->
-          Ok(savoiardi.create_cylinder_geometry(rt, rb, h, float.round(s)))
-        "cylinder", [r, h] ->
-          Ok(savoiardi.create_cylinder_geometry(r, r, h, 32))
-        "cylinder", _ ->
-          Ok(savoiardi.create_cylinder_geometry(1.0, 1.0, 1.0, 32))
+          Ok(geometry.cylinder(rt, rb, h, float.round(s)))
+        "cylinder", [r, h] -> Ok(geometry.cylinder(r, r, h, 32))
+        "cylinder", _ -> Ok(geometry.cylinder(1.0, 1.0, 1.0, 32))
 
-        "cone", [r, h, s] ->
-          Ok(savoiardi.create_cone_geometry(r, h, float.round(s)))
-        "cone", [r, h] -> Ok(savoiardi.create_cone_geometry(r, h, 32))
-        "cone", _ -> Ok(savoiardi.create_cone_geometry(1.0, 1.0, 32))
+        "cone", [r, h, s] -> Ok(geometry.cone(r, h, float.round(s)))
+        "cone", [r, h] -> Ok(geometry.cone(r, h, 32))
+        "cone", _ -> Ok(geometry.cone(1.0, 1.0, 32))
 
         "torus", [r, t, rs, ts] ->
-          Ok(savoiardi.create_torus_geometry(
-            r,
-            t,
-            float.round(rs),
-            float.round(ts),
-          ))
-        "torus", [r, t] -> Ok(savoiardi.create_torus_geometry(r, t, 16, 48))
-        "torus", _ -> Ok(savoiardi.create_torus_geometry(1.0, 0.4, 16, 48))
+          Ok(geometry.torus(r, t, float.round(rs), float.round(ts)))
+        "torus", [r, t] -> Ok(geometry.torus(r, t, 16, 48))
+        "torus", _ -> Ok(geometry.torus(1.0, 0.4, 16, 48))
 
         _, _ -> Error(Nil)
       }
     }
     [type_str] -> {
       case type_str {
-        "box" -> Ok(savoiardi.create_box_geometry(1.0, 1.0, 1.0))
-        "sphere" -> Ok(savoiardi.create_sphere_geometry(1.0, 32, 16))
-        "plane" -> Ok(savoiardi.create_plane_geometry(1.0, 1.0, 1, 1))
-        "cylinder" -> Ok(savoiardi.create_cylinder_geometry(1.0, 1.0, 1.0, 32))
-        "cone" -> Ok(savoiardi.create_cone_geometry(1.0, 1.0, 32))
-        "torus" -> Ok(savoiardi.create_torus_geometry(1.0, 0.4, 16, 48))
+        "box" -> Ok(geometry.box(1.0, 1.0, 1.0))
+        "sphere" -> Ok(geometry.sphere(1.0, 32, 16))
+        "plane" -> Ok(geometry.plane(1.0, 1.0, 1, 1))
+        "cylinder" -> Ok(geometry.cylinder(1.0, 1.0, 1.0, 32))
+        "cone" -> Ok(geometry.cone(1.0, 1.0, 32))
+        "torus" -> Ok(geometry.torus(1.0, 0.4, 16, 48))
         _ -> Error(Nil)
       }
     }

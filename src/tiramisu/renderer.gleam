@@ -38,7 +38,9 @@ import lustre/element.{type Element}
 import lustre/element/html
 import lustre/event
 import lustre/server_component
-import savoiardi
+import savoiardi/object.{type Object3D}
+import savoiardi/renderer.{type Renderer}
+import savoiardi/scene as savoiardi_scene
 
 import tiramisu/dev/extension
 import tiramisu/dev/runtime
@@ -317,7 +319,7 @@ fn notify_resolved(
   model: Model,
   tag: String,
   id: String,
-  object: savoiardi.Object3D,
+  object: Object3D,
 ) -> #(Model, effect.Effect(Msg)) {
   case model.runtime {
     Some(runtime) ->
@@ -534,11 +536,14 @@ fn resize_height(model: Model, height: Int) -> #(Model, effect.Effect(Msg)) {
 }
 
 fn resize_effect(
-  renderer: savoiardi.Renderer,
+  renderer: Renderer,
   width: Int,
   height: Int,
 ) -> effect.Effect(Msg) {
-  effect.from(fn(_) { resize(renderer, width, height) })
+  effect.from(fn(_) {
+    resize(renderer, width, height)
+    Nil
+  })
 }
 
 fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
@@ -564,7 +569,7 @@ fn tick(model: Model, timestamp_ms: Float) -> #(Model, effect.Effect(Msg)) {
 fn render_active_camera(runtime: Runtime) -> Nil {
   case runtime.runtime |> runtime.active_camera {
     Ok(camera) ->
-      savoiardi.render(
+      renderer.render(
         runtime.runtime |> runtime.threejs_renderer,
         runtime.runtime |> runtime.scene,
         camera,
@@ -710,25 +715,29 @@ fn initialize(
   on_tick: fn(Float) -> Nil,
 ) -> runtime.Runtime {
   let config = host |> config(width: 1920, height: 1080)
-  let scene = savoiardi.create_scene()
+  let scene = savoiardi_scene.new()
   let renderer = create(config)
-  let canvas = savoiardi.get_renderer_dom_element(renderer)
+  let canvas = renderer.canvas(renderer)
 
   html_element.append_canvas(shadow_root, canvas)
-  savoiardi.set_animation_loop(renderer, on_tick)
+  renderer.set_animation_loop(renderer, on_tick)
   runtime.new(scene, scene_id, renderer)
 }
 
-fn resize(renderer: savoiardi.Renderer, width: Int, height: Int) -> Nil {
-  savoiardi.set_renderer_size(renderer, width, height)
+fn resize(renderer: Renderer, width: Int, height: Int) -> Renderer {
+  renderer.set_size(renderer, width, height)
 }
 
-fn create(config: Config) -> savoiardi.Renderer {
-  let renderer =
-    savoiardi.create_renderer(antialias: config.antialias, alpha: config.alpha)
-  savoiardi.set_renderer_size(renderer, config.width, config.height)
-  savoiardi.enable_renderer_shadow_map(renderer, True)
-  renderer
+fn create(config: Config) -> Renderer {
+  renderer.new(
+    renderer.RendererOptions(
+      ..renderer.options(),
+      antialias: config.antialias,
+      alpha: config.alpha,
+    ),
+  )
+  |> renderer.set_size(config.width, config.height)
+  |> renderer.set_shadow_map(True)
 }
 
 /// Listen for per-frame tick events emitted by the renderer.
