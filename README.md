@@ -109,6 +109,9 @@ Start with:
 
 See `examples/README.md` for the full walkthrough.
 
+If you are building custom scene nodes or cross-cutting behaviors, see
+`docs/extensions.md`.
+
 
 ## Development
 
