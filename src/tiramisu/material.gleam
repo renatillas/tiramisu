@@ -467,7 +467,8 @@ fn parse_material_side(side_str: String) -> material.MaterialSide {
 /// Most applications should not call this directly; use
 /// `tiramisu.builtin_extensions()` instead.
 pub fn ext() -> extension.Extension {
-  extension.attribute_extension(
+  extension.scoped_attribute_extension(
+    applies_to: extension.OnlyTags(["tiramisu-primitive", "tiramisu-mesh"]),
     observed_attributes: observed_attributes(),
     on_create:,
     on_update:,

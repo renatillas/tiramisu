@@ -248,7 +248,50 @@ pub fn attribute_extension(
   ) ->
     effect.Effect(Msg),
 ) -> Extension {
+  scoped_attribute_extension(
+    applies_to: AllTags,
+    observed_attributes: observed_attributes,
+    on_create: on_create,
+    on_update: on_update,
+    on_remove: on_remove,
+    on_resolved: on_resolved,
+  )
+}
+
+/// Construct an attribute extension scoped to specific node tags.
+pub fn scoped_attribute_extension(
+  applies_to applies_to: TagScope,
+  observed_attributes observed_attributes: List(String),
+  on_create on_create: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Option(Object3D),
+    Dict(String, String),
+  ) ->
+    effect.Effect(Msg),
+  on_update on_update: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Option(Object3D),
+    Dict(String, String),
+    Dict(String, AttributeChange),
+  ) ->
+    effect.Effect(Msg),
+  on_remove on_remove: fn(runtime.Runtime, String, String, Object3D) ->
+    effect.Effect(Msg),
+  on_resolved on_resolved: fn(
+    runtime.Runtime,
+    String,
+    String,
+    Object3D,
+    Dict(String, String),
+  ) ->
+    effect.Effect(Msg),
+) -> Extension {
   AttributeExtension(Attribute(
+    applies_to:,
     observed_attributes:,
     on_create:,
     on_update:,
@@ -280,9 +323,16 @@ pub type Node {
 
 // ATTRIBUTE EXTENSION ---------------------------------------------------------
 
+/// Select which node tags a cross-cutting attribute extension applies to.
+pub type TagScope {
+  AllTags
+  OnlyTags(List(String))
+}
+
 @internal
 pub type Attribute {
   Attribute(
+    applies_to: TagScope,
     observed_attributes: List(String),
     on_create: fn(
       runtime.Runtime,
@@ -368,6 +418,14 @@ pub fn get_node(exts: Extensions, tag: String) -> Result(Node, Nil) {
 @internal
 pub fn attribute_hooks(exts: Extensions) -> List(Attribute) {
   exts.attributes
+}
+
+@internal
+pub fn attribute_hook_applies_to_tag(hook: Attribute, tag: String) -> Bool {
+  case hook.applies_to {
+    AllTags -> True
+    OnlyTags(tags) -> list.contains(tags, tag)
+  }
 }
 
 /// Check whether a given attribute changed in any way.

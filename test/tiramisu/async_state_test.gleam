@@ -11,42 +11,15 @@ pub fn resolve_decision_test() {
   let #(state, version) = async_state.new() |> async_state.register(owner, key)
 
   let #(state, decision) =
-    async_state.resolve(
-      state,
-      owner,
-      key,
-      version,
-      [],
-      False,
-      True,
-      True,
-    )
+    async_state.resolve(state, owner, key, version, [], False, True, True)
   let assert async_state.ApplyNow([]) = decision
 
   let #(_, stale_decision) =
-    async_state.resolve(
-      state,
-      owner,
-      key,
-      version - 1,
-      [],
-      False,
-      True,
-      True,
-    )
+    async_state.resolve(state, owner, key, version - 1, [], False, True, True)
   let assert async_state.Drop = stale_decision
 
   let #(_, missing_owner_decision) =
-    async_state.resolve(
-      state,
-      owner,
-      key,
-      version,
-      [],
-      False,
-      True,
-      False,
-    )
+    async_state.resolve(state, owner, key, version, [], False, True, False)
   let assert async_state.Drop = missing_owner_decision
 }
 
@@ -57,16 +30,7 @@ pub fn resolve_queueing_test() {
   let #(state, version) = async_state.new() |> async_state.register(owner, key)
 
   let #(state, decision) =
-    async_state.resolve(
-      state,
-      owner,
-      key,
-      version,
-      actions,
-      True,
-      True,
-      True,
-    )
+    async_state.resolve(state, owner, key, version, actions, True, True, True)
   let assert async_state.Queue = decision
 
   let #(state, queued) =
@@ -75,16 +39,7 @@ pub fn resolve_queueing_test() {
   assert list.length(resolved_actions) == 1
 
   let #(_, queued_without_runtime_decision) =
-    async_state.resolve(
-      state,
-      owner,
-      key,
-      version,
-      actions,
-      False,
-      False,
-      True,
-    )
+    async_state.resolve(state, owner, key, version, actions, False, False, True)
   let assert async_state.Queue = queued_without_runtime_decision
 }
 
@@ -93,14 +48,19 @@ pub fn drain_ready_drops_stale_and_missing_owners_test() {
   let other = extension.NodeOwner("other")
   let key = extension.request_key("src")
 
-  let #(state, stale_version) = async_state.new() |> async_state.register(owner, key)
+  let #(state, stale_version) =
+    async_state.new() |> async_state.register(owner, key)
   let #(state, _) = async_state.register(state, owner, key)
   let #(state, other_version) = async_state.register(state, other, key)
 
   let state =
     state
-    |> async_state.enqueue(owner, key, stale_version, [extension.action(fn(runtime) { #(runtime, effect.none()) })])
-    |> async_state.enqueue(other, key, other_version, [extension.action(fn(runtime) { #(runtime, effect.none()) })])
+    |> async_state.enqueue(owner, key, stale_version, [
+      extension.action(fn(runtime) { #(runtime, effect.none()) }),
+    ])
+    |> async_state.enqueue(other, key, other_version, [
+      extension.action(fn(runtime) { #(runtime, effect.none()) }),
+    ])
 
   let #(state, ready) =
     async_state.drain_ready(state, fn(request_owner) { request_owner == owner })

@@ -92,10 +92,10 @@ pub fn resolve(
     when: !is_current(state, owner, key, version) || !owner_exists,
     return: #(state, Drop),
   )
-  use <- bool.guard(
-    when: reconciling || !runtime_available,
-    return: #(enqueue(state, owner, key, version, actions), Queue),
-  )
+  use <- bool.guard(when: reconciling || !runtime_available, return: #(
+    enqueue(state, owner, key, version, actions),
+    Queue,
+  ))
   #(state, ApplyNow(actions))
 }
 

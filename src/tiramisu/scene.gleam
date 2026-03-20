@@ -676,7 +676,7 @@ fn apply_patch(
       case dict.get(runtime.entries(runtime), id) {
         Ok(runtime.ObjectEntry(parent_id:, tag:, object:)) -> {
           let attribute_effect =
-            notify_remove(extensions, runtime, id, parent_id, object)
+            notify_remove(extensions, runtime, tag, id, parent_id, object)
           case extension.get_node(extensions, tag) {
             Ok(handler) -> {
               let #(runtime, node_effect) =
@@ -707,7 +707,11 @@ fn notify_create(
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   list.fold(extension.attribute_hooks(extensions), effect.none(), fn(acc, hook) {
-    effect.batch([acc, hook.on_create(runtime, tag, id, object, attributes)])
+    case extension.attribute_hook_applies_to_tag(hook, tag) {
+      True ->
+        effect.batch([acc, hook.on_create(runtime, tag, id, object, attributes)])
+      False -> acc
+    }
   })
 }
 
@@ -721,22 +725,38 @@ fn notify_update(
   changed_attributes: extension.AttributeChanges,
 ) -> effect.Effect(extension.Msg) {
   list.fold(extension.attribute_hooks(extensions), effect.none(), fn(acc, hook) {
-    effect.batch([
-      acc,
-      hook.on_update(runtime, tag, id, object, attributes, changed_attributes),
-    ])
+    case extension.attribute_hook_applies_to_tag(hook, tag) {
+      True ->
+        effect.batch([
+          acc,
+          hook.on_update(
+            runtime,
+            tag,
+            id,
+            object,
+            attributes,
+            changed_attributes,
+          ),
+        ])
+      False -> acc
+    }
   })
 }
 
 fn notify_remove(
   extensions: extension.Extensions,
   runtime: runtime.Runtime,
+  tag: String,
   id: String,
   parent_id: String,
   object: Object3D,
 ) -> effect.Effect(extension.Msg) {
   list.fold(extension.attribute_hooks(extensions), effect.none(), fn(acc, hook) {
-    effect.batch([acc, hook.on_remove(runtime, id, parent_id, object)])
+    case extension.attribute_hook_applies_to_tag(hook, tag) {
+      True ->
+        effect.batch([acc, hook.on_remove(runtime, id, parent_id, object)])
+      False -> acc
+    }
   })
 }
 
@@ -750,6 +770,13 @@ pub fn notify_resolved(
   attributes: dict.Dict(String, String),
 ) -> effect.Effect(extension.Msg) {
   list.fold(extension.attribute_hooks(extensions), effect.none(), fn(acc, hook) {
-    effect.batch([acc, hook.on_resolved(runtime, tag, id, object, attributes)])
+    case extension.attribute_hook_applies_to_tag(hook, tag) {
+      True ->
+        effect.batch([
+          acc,
+          hook.on_resolved(runtime, tag, id, object, attributes),
+        ])
+      False -> acc
+    }
   })
 }
