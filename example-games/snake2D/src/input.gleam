@@ -1,7 +1,10 @@
 import gleam/dynamic/decode
 import gleam/set.{type Set}
+import lustre
 import lustre/attribute.{type Attribute}
 import lustre/event
+import plinth/browser/document
+import plinth/browser/event as pevent
 
 pub type Key {
   A
@@ -467,4 +470,33 @@ fn code_to_key(code: String) -> Key {
     // Fallback
     other -> Other(other)
   }
+}
+
+/// Add a document level 'keydown' handler. It will send your message type to your lustre runtime
+///
+pub fn add_key_down(
+  runtime: lustre.Runtime(msg),
+  handler: fn(Key) -> msg,
+) -> Nil {
+  document.add_event_listener("keydown", fn(pevent) {
+    pevent
+    |> pevent.key
+    |> code_to_key
+    |> handler
+    |> lustre.dispatch
+    |> lustre.send(runtime, _)
+  })
+}
+
+/// Add a document level 'keyup' handler. It will send your message type to your lustre runtime
+///
+pub fn add_key_up(runtime: lustre.Runtime(msg), handler: fn(Key) -> msg) -> Nil {
+  document.add_event_listener("keyup", fn(pevent) {
+    pevent
+    |> pevent.key
+    |> code_to_key
+    |> handler
+    |> lustre.dispatch
+    |> lustre.send(runtime, _)
+  })
 }
