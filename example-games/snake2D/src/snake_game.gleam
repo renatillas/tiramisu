@@ -15,7 +15,7 @@ import tiramisu/light
 import tiramisu/material
 import tiramisu/primitive
 import tiramisu/renderer
-import tiramisu/tick
+import tiramisu/scene
 import tiramisu/transform
 import vec/vec3
 
@@ -65,7 +65,7 @@ pub type Direction {
 }
 
 pub type Msg {
-  Tick(tick.TickContext)
+  Tick(renderer.Tick)
   KeyDown(input.Key)
   KeyUp(input.Key)
   MouseDown(input.MouseButton)
@@ -87,8 +87,12 @@ type Color {
 
 pub fn main() -> Nil {
   let assert Ok(_) = tiramisu.register(tiramisu.builtin_extensions())
-  let assert Ok(_) =
+  let assert Ok(runtime) =
     lustre.application(init:, update:, view:) |> lustre.start("#app", Nil)
+
+  input.add_key_down(runtime, KeyDown)
+  input.add_key_up(runtime, KeyUp)
+
   Nil
 }
 
@@ -154,7 +158,7 @@ pub fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   }
 }
 
-fn update_running_model(model: Model, ctx: tick.TickContext) -> Model {
+fn update_running_model(model: Model, ctx: renderer.Tick) -> Model {
   case check_game_over(model) {
     True -> {
       Model(..model, game_state: GameOver, score_info: 0)
@@ -205,7 +209,7 @@ fn spawn_too_close(snake_element: BoxData, cand: #(Float, Float)) -> Bool {
   dist_x <. 2.0 *. box_width && dist_y <. 2.0 *. box_width
 }
 
-fn update_snake_beute(model: Model, ctx: tick.TickContext) -> Model {
+fn update_snake_beute(model: Model, ctx: renderer.Tick) -> Model {
   let delta_seconds = duration.to_seconds(ctx.delta_time)
   let new_time = model.time +. delta_seconds /. 10.0
   let new_direction = parse_direction_from_key(model)
@@ -383,60 +387,51 @@ pub fn view(model: Model) -> Element(Msg) {
       // 1 world unit == 1 pixel in the orthographic camera below.
       attribute.attribute("width", "1920"),
       attribute.attribute("height", "1080"),
-      renderer.background_color(0x000000),
+      scene.background_color(0x000000),
+      renderer.on_tick(Tick),
+      input.on_mousedown(MouseDown),
+      input.on_mouseup(MouseUp),
     ],
     [
-      tiramisu.scene(
-        "snake",
-        [
-          tiramisu.on_tick(Tick),
-          // tabindex="0" allows the element to receive keyboard focus on click.
-          attribute.attribute("tabindex", "0"),
-          input.on_keydown(KeyDown),
-          input.on_keyup(KeyUp),
-          input.on_mousedown(MouseDown),
-          input.on_mouseup(MouseUp),
-        ],
-        [
-          tiramisu.camera(
-            "camera",
-            [
-              camera.kind(camera.Orthographic),
-              // Map world units 1:1 to pixels — left/right span the full canvas width,
-              // top/bottom span the full canvas height.
-              camera.left(-960.0),
-              camera.right(960.0),
-              camera.top(540.0),
-              camera.bottom(-540.0),
-              camera.near(0.1),
-              camera.far(100.0),
-              camera.active(True),
-              transform.position(vec3.Vec3(0.0, 0.0, 20.0)),
-            ],
-            [],
-          ),
-          tiramisu.light(
-            "ambient",
-            [
-              light.kind(light.Ambient),
-              light.color(0xffffff),
-              light.intensity(1.0),
-            ],
-            [],
-          ),
-          tiramisu.empty("root-node", [], {
-            list.flatten([
-              create_static_view(),
-              case model.game_state {
-                Running -> create_running_game_view(model)
-                // GameOver and NotStarted: only the static borders remain visible.
-                // The player can restart by pressing Enter or clicking.
-                GameOver | NotStarted -> []
-              },
-            ])
-          }),
-        ],
-      ),
+      tiramisu.scene("snake", [], [
+        tiramisu.camera(
+          "camera",
+          [
+            camera.orthographic(),
+            // Map world units 1:1 to pixels — left/right span the full canvas width,
+            // top/bottom span the full canvas height.
+            camera.left(-960.0),
+            camera.right(960.0),
+            camera.top(540.0),
+            camera.bottom(-540.0),
+            camera.near(0.1),
+            camera.far(100.0),
+            camera.active(True),
+            transform.position(vec3.Vec3(0.0, 0.0, 20.0)),
+          ],
+          [],
+        ),
+        tiramisu.light(
+          "ambient",
+          [
+            light.ambient(),
+            light.color(0xffffff),
+            light.intensity(1.0),
+          ],
+          [],
+        ),
+        tiramisu.empty("root-node", [], {
+          list.flatten([
+            create_static_view(),
+            case model.game_state {
+              Running -> create_running_game_view(model)
+              // GameOver and NotStarted: only the static borders remain visible.
+              // The player can restart by pressing Enter or clicking.
+              GameOver | NotStarted -> []
+            },
+          ])
+        }),
+      ]),
     ],
   )
 }
