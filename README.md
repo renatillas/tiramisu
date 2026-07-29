@@ -1,3 +1,6 @@
+> [!WARNING]
+> This repo has been migrated to tangled here: https://tangled.org/renatillas.dev/tiramisu
+
 # Tiramisu
 
 Tiramisu is a 3D renderer for Gleam built on top of Lustre web components and Three.js.
